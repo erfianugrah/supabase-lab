@@ -1,0 +1,28 @@
+# tofu state - never commit
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.tfstate.lock.info
+
+# var files: only templates and non-secret experiment config are committed
+*.tfvars
+!secrets.example.tfvars
+!secrets.enc.tfvars
+!experiment.tfvars
+
+# plans
+tfplan
+*.tfplan
+
+# test evidence (may contain connection details)
+evidence/
+
+# lambda build artifacts
+lambda/dist/
+lambda/node_modules/
+
+# sops plaintext
+secrets.tfvars
+
+# tofu plan files (zip archives; embed tfstate incl. variable values)
+tfplan-*
