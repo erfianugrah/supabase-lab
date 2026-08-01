@@ -39,7 +39,7 @@ resource "supabase_settings" "lab" {
 # Destroy semantics verified from Studio source: DELETE .../aws-account/{aws_account_id},
 # which matches restapi_object's default destroy of DELETE {path}/{id} exactly.
 resource "restapi_object" "privatelink_aws_account" {
-  count = var.send_association ? 1 : 0
+  count        = var.send_association ? 1 : 0
   path         = "/platform/projects/${supabase_project.lab.id}/privatelink/associations/aws-account"
   id_attribute = "aws_account_id"
 
