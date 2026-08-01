@@ -21,6 +21,13 @@ make secrets-decrypt         # writes secrets.tfvars from secrets.enc.tfvars
 `secrets.tfvars` holds: Supabase PAT, org id, AWS account id, DB password,
 break-glass CIDR. Edit + `make secrets-encrypt` to update the committed copy.
 
+`make suite` passes the DB password and PAT to the runner inside the SSM
+`send-command` payload - nothing secret is baked into the instance, but SSM
+keeps command parameters in history for ~30 days. That is an accepted
+tradeoff for a throwaway project destroyed the same day; use Parameter Store
+SecureString or Secrets Manager with an instance-role read if you lift this
+pattern into an environment that outlives the test.
+
 ## Running an experiment (privatelink-aws)
 
 ```sh
