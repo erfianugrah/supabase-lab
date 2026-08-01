@@ -27,6 +27,22 @@ platform behaviour or writing it into docs
   Evidence gets generalised: no org names, no account IDs, no project
   refs, no internal ticket IDs, no named individuals.
 - AWS creds are a local prereq; never commit them.
+- Secrets reach the runner only at invocation time, inside the SSM
+  `send-command` payload (`suite.sh` reads them from `secrets.tfvars`).
+  Nothing secret is baked into user_data or the AMI, and the runner holds
+  no AWS credentials (gocurl in via presigned GET, artifacts out via
+  presigned PUT). Caveat this lab accepts and a customer environment must
+  not: SSM retains command parameters in history (~30 days, readable via
+  `aws ssm list-commands` and CloudTrail), so the DB password and PAT are
+  recoverable by anyone with SSM read on the account. Fine for a
+  same-day-destroyed throwaway project; for real environments put the
+  secret in Parameter Store SecureString / Secrets Manager and read it
+  with the instance role so it never transits the payload.
+- `evidence/` is gitignored - reports carry hostnames, ENI IPs, and
+  project refs.
+- Unencrypted `*tfvars*` are blocked by a SOPS pre-commit hook;
+  `.allow-unencrypted-paths` allowlists the two that are legitimately
+  plaintext (`secrets.example.tfvars`, `experiments/*/experiment.tfvars`).
 - Never commit tofu plan files (`tfplan*`): they are zip archives that
   embed tfstate including all variable values (i.e. every secret).
   `.gitignore` covers them; verify with `git status` before committing.
