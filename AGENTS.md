@@ -26,6 +26,13 @@ platform behaviour or writing it into docs
 - Nothing account- or engagement-specific in this repo; it is built to be public.
   Evidence gets generalised: no org names, no account IDs, no project
   refs, no internal ticket IDs, no named individuals.
+- Committed ciphertext is permanent: this repo is public, so anything in
+  `secrets.enc.tfvars` stays downloadable at that commit forever. If a
+  secret is exposed, **revoke the secret** - rotating the age key does not
+  help, because the old key still decrypts the old commits. Keep live
+  credentials out of the committed file when the run is over; the checked-in
+  copy should decrypt to placeholders, not to a token someone has to
+  discover is dead.
 - AWS creds: either in `secrets.tfvars` (`aws_access_key_id` /
   `aws_secret_access_key`, encrypted at rest with everything else) or left
   empty to use the ambient chain (profile / SSO / env). Provider-block
