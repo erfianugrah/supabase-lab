@@ -26,7 +26,16 @@ only the public recipient. To give someone else access, add their age public key
 as a second recipient in `.sops.yaml` and re-run `make secrets-encrypt`.
 
 `secrets.tfvars` holds: Supabase PAT, org id, AWS account id, DB password,
-break-glass CIDR. Edit + `make secrets-encrypt` to update the committed copy.
+break-glass CIDR, and optionally the AWS access key pair. Edit +
+`make secrets-encrypt` to update the committed copy.
+
+AWS auth works two ways. Fill `aws_access_key_id` / `aws_secret_access_key`
+in `secrets.tfvars` and the provider uses them directly - highest precedence
+in the AWS chain, so a stale key pair exported in your shell cannot break the
+run. Leave them empty and everything falls back to the ambient chain
+(`aws configure sso`, a named profile, or env vars). Either way the Makefile
+exports the same values for the `aws` CLI calls, so tofu and the CLI never
+disagree.
 
 `make suite` passes the DB password and PAT to the runner inside the SSM
 `send-command` payload - nothing secret is baked into the instance, but SSM

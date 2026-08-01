@@ -20,6 +20,20 @@ variable "aws_account_id" {
   type        = string
 }
 
+variable "aws_access_key_id" {
+  description = "AWS access key id. Empty = use the ambient chain (profile/SSO/env)."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "aws_secret_access_key" {
+  description = "AWS secret access key. Empty = use the ambient chain (profile/SSO/env)."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
 variable "db_password" {
   description = "Postgres password for the lab project (secrets.tfvars)"
   type        = string

@@ -26,8 +26,15 @@ terraform {
   }
 }
 
+# Credentials come from secrets.tfvars, same as the Supabase PAT - one
+# encrypted source of truth. Provider-block creds are the highest-precedence
+# entry in the AWS chain (verified: bogus keys here beat valid env vars), so
+# a stale AWS_ACCESS_KEY_ID in the shell cannot break a run. Leave the vars
+# empty to fall back to the ambient chain (profile / SSO / env) instead.
 provider "aws" {
-  region = var.aws_region
+  region     = var.aws_region
+  access_key = var.aws_access_key_id != "" ? var.aws_access_key_id : null
+  secret_key = var.aws_secret_access_key != "" ? var.aws_secret_access_key : null
 }
 
 provider "supabase" {
