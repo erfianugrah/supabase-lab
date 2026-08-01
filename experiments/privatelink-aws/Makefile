@@ -3,6 +3,14 @@ VARS := -var-file=$(ROOT)/secrets.tfvars -var-file=experiment.tfvars
 ARNVARS := $(if $(wildcard arns.tfvars),-var-file=arns.tfvars,)
 REF := $(shell tofu output -raw project_ref 2>/dev/null)
 
+# tofu reads AWS creds from secrets.tfvars via the provider block, but the aws
+# CLI calls below cannot read tfvars - export the same values so both agree on
+# one source of truth. Empty (keys absent from secrets.tfvars, or file not yet
+# decrypted) exports empty, which the CLI ignores and falls back to the profile
+# chain - and which also neutralises a stale key pair inherited from the shell.
+export AWS_ACCESS_KEY_ID := $(shell grep -E '^aws_access_key_id' $(ROOT)/secrets.tfvars 2>/dev/null | cut -d'"' -f2)
+export AWS_SECRET_ACCESS_KEY := $(shell grep -E '^aws_secret_access_key' $(ROOT)/secrets.tfvars 2>/dev/null | cut -d'"' -f2)
+
 .PHONY: init fmt validate phase1 wait-ready arns phase2 plan apply destroy suite suite-clean ssm restrict unrestrict lambda-zip lambda-secret
 
 init:
@@ -83,6 +91,9 @@ apply:
 destroy:
 	tofu plan $(VARS) $(ARNVARS) -destroy -out=destroy.tfplan
 	tofu apply destroy.tfplan
+	@rm -f arns.tfvars destroy.tfplan tfplan tfplan-*
+	@echo "arns.tfvars removed - it gates phase 2, and a stale copy against empty"
+	@echo "state makes the next plan fail on the ENI for_each (unknown keys)."
 
 # Full automated suite: deploy scripts + gocurl to the runner, run TLS /
 # latency / ceiling / restart phases, pull artifacts, render evidence/<ts>/REPORT.md

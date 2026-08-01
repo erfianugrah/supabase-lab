@@ -26,7 +26,16 @@ platform behaviour or writing it into docs
 - Nothing account- or engagement-specific in this repo; it is built to be public.
   Evidence gets generalised: no org names, no account IDs, no project
   refs, no internal ticket IDs, no named individuals.
-- AWS creds are a local prereq; never commit them.
+- AWS creds: either in `secrets.tfvars` (`aws_access_key_id` /
+  `aws_secret_access_key`, encrypted at rest with everything else) or left
+  empty to use the ambient chain (profile / SSO / env). Provider-block
+  credentials are the highest-precedence entry in the AWS chain - verified:
+  bogus keys in the provider block beat valid env vars - so filling them in
+  makes a run immune to a stale `AWS_ACCESS_KEY_ID` in the shell, which
+  otherwise fails every call with `InvalidClientTokenId`. The experiment
+  Makefile exports the same two values for the `aws` CLI calls it shells out
+  to, so tofu and the CLI share one source of truth; empty exports are
+  ignored by the CLI and neutralise an inherited stale pair.
 - Secrets reach the runner only at invocation time, inside the SSM
   `send-command` payload (`suite.sh` reads them from `secrets.tfvars`).
   Nothing secret is baked into user_data or the AMI, and the runner holds
