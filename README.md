@@ -18,6 +18,13 @@ aws configure sso            # or export AWS creds - none configured on a fresh 
 make secrets-decrypt         # writes secrets.tfvars from secrets.enc.tfvars
 ```
 
+On a fresh machine, restore the age private key to `~/.config/sops/age/keys.txt`
+(mode 600) before the decrypt - that default path is the only thing sops looks at
+here, so no shell wrapper or `SOPS_AGE_*` export is needed and `make` works
+non-interactively. Without the key the decrypt just fails; `.sops.yaml` carries
+only the public recipient. To give someone else access, add their age public key
+as a second recipient in `.sops.yaml` and re-run `make secrets-encrypt`.
+
 `secrets.tfvars` holds: Supabase PAT, org id, AWS account id, DB password,
 break-glass CIDR. Edit + `make secrets-encrypt` to update the committed copy.
 
