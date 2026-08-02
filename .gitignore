@@ -27,3 +27,6 @@ secrets.tfvars
 
 # tofu plan files (zip archives; embed tfstate incl. variable values)
 tfplan-*
+
+# bun workspace
+node_modules/

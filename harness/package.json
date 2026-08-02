@@ -1,0 +1,10 @@
+{
+  "name": "pvlab-harness",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "bun test",
+    "gen": "bun scripts/gen-registry.ts",
+    "build": "bun scripts/gen-registry.ts ../experiments/privatelink-aws/tests && bun build --compile --target=bun-linux-x64 src/run.ts --outfile dist/pvlab"
+  }
+}
