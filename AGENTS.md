@@ -124,8 +124,13 @@ Measured (micro, ap-southeast-1; evidence/20260731-175026/REPORT.md):
 - PostgREST root `/rest/v1/` requires service_role on the current
   platform; anon probes need a real table (SQL-created tables get anon
   SELECT via default privileges, no RLS).
-- Pooler client ceiling on Micro: first refusal at exactly 200.
-- Restart down window over the endpoint: 49/72/131s (3 samples).
+- Pooler client ceiling on Micro: NOT a reproducible number. PgBouncer
+  queues before it refuses; isolated quiet-system probes gave first
+  refusal at client 213 (run 6) and 287 (run 7), against a published 200.
+  Quote the shape and the mechanism (`max_client_conn`), not an integer.
+- Restart down window over the endpoint: 49/72/131s by psql probe,
+  59/93s through a Lambda on 6543 (failure mode: `timeout expired`, not
+  a refusal).
 - Direct endpoint is IPv6-only; from an IPv4-only VPC there is no
   public-direct path (IPv4 add-on exists but is moot under PrivateLink).
 
