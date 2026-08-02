@@ -33,6 +33,16 @@ resource "aws_iam_role_policy_attachment" "lambda_vpc" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
 }
 
+# Lambda auto-creates this log group on first invoke and tofu would never own
+# it, so `make destroy` left it behind (run 6). Declaring it keeps teardown
+# complete and bounds retention on a disposable lab.
+resource "aws_cloudwatch_log_group" "lambda" {
+  count = var.enable_lambda ? 1 : 0
+
+  name              = "/aws/lambda/supabase-lab-probe"
+  retention_in_days = 1
+}
+
 resource "aws_lambda_function" "probe" {
   count = var.enable_lambda ? 1 : 0
 
@@ -41,6 +51,7 @@ resource "aws_lambda_function" "probe" {
   runtime          = "nodejs20.x"
   handler          = "index.handler"
   filename         = data.archive_file.lambda[0].output_path
+  depends_on       = [aws_cloudwatch_log_group.lambda]
   source_code_hash = data.archive_file.lambda[0].output_base64sha256
   timeout          = 30
 
