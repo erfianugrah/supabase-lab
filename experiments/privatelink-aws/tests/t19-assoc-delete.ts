@@ -12,8 +12,8 @@
  * DESTRUCTIVE: the operator removes the association during the run.
  */
 import { $ } from "bun";
-import { Client } from "pg";
 import type { Ctx, TestModule } from "../../../harness/src/types";
+import { invokeProbe } from "./t15-lambda";
 
 const MAX_WAIT_MS = 360_000;
 
@@ -26,32 +26,20 @@ async function shareStatus(ctx: Ctx): Promise<string> {
   return p.trim() || "unknown";
 }
 
+/**
+ * Probe from INSIDE the VPC. The first version connected from the
+ * orchestrator, which cannot reach a private endpoint at all: db_ok was false
+ * from the first tick and the test still concluded "clients broke".
+ */
 async function dbOk(ctx: Ctx): Promise<boolean> {
-  const c = new Client({
-    host: ctx.phzHost,
-    port: 5432,
-    user: "postgres",
-    database: "postgres",
-    password: ctx.dbPassword,
-    ssl: { rejectUnauthorized: false },
-    connectionTimeoutMillis: 6000,
-  });
-  try {
-    await c.connect();
-    await c.query("select 1");
-    return true;
-  } catch {
-    return false;
-  } finally {
-    await c.end().catch(() => {});
-  }
+  return (await invokeProbe(ctx.region, { port: 5432 })).all_ok === true;
 }
 
 const mod: TestModule = {
   id: "T19",
   title: "Association DELETE - client impact and ordering",
   where: "local",
-  requires: ["db", "endpoint"],
+  requires: ["db", "endpoint", "lambda"],
   destructive: true,
   async run(ctx) {
     if (process.env.PVLAB_EXPECT_MANUAL_DELETE !== "1") {
@@ -64,6 +52,15 @@ const mod: TestModule = {
       };
     }
 
+    // BASELINE GATE - without a working control there is nothing to measure.
+    if (!(await dbOk(ctx))) {
+      return {
+        id: "T19",
+        title: mod.title,
+        status: "skip",
+        detail: "baseline in-VPC probe failed before any removal - no control, no conclusion",
+      };
+    }
     ctx.log(">>> Remove the AWS account in Settings > Integrations > AWS PrivateLink now <<<");
     const t0 = Date.now();
     let shareGoneAt: number | null = null;

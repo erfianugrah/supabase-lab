@@ -154,10 +154,29 @@ const mod: TestModule = {
     });
 
     if (create.ok) {
-      await aws([
-        "ec2", "delete-vpc-endpoints", "--region", ctx.region,
-        "--vpc-endpoint-ids", create.out.trim(),
-      ]);
+      // Verify the cleanup: run 8's delete call reported nothing and left the
+      // scratch endpoint Available, which is a leak the lab pays for.
+      const id = create.out.trim();
+      await aws(["ec2", "delete-vpc-endpoints", "--region", ctx.region, "--vpc-endpoint-ids", id]);
+      let gone = false;
+      for (let i = 0; i < 10; i++) {
+        await Bun.sleep(6000);
+        const chk = await aws([
+          "ec2", "describe-vpc-endpoints", "--region", ctx.region,
+          "--vpc-endpoint-ids", id, "--query", "VpcEndpoints[0].State", "--output", "text",
+        ]);
+        const st = chk.out.trim();
+        if (!chk.ok || st === "" || st === "None" || /delet/i.test(st)) {
+          gone = true;
+          break;
+        }
+      }
+      results.push({
+        id: "T18d",
+        title: "scratch dualstack endpoint cleaned up",
+        status: gone ? "pass" : "fail",
+        detail: gone ? `${id} deleted` : `${id} STILL PRESENT - delete it by hand`,
+      });
     }
 
     return results;
