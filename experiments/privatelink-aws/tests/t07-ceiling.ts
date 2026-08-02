@@ -25,16 +25,54 @@ const mod: TestModule = {
   requires: ["db", "pgbench"],
   async run(ctx) {
     const conn = `host=${ctx.phzHost} port=6543 user=postgres dbname=postgres sslmode=require`;
-    await Bun.write("/tmp/pvlab-instant.sql", "select 1;\n");
+    // Each client must HOLD its connection, otherwise clients recycle faster
+    // than they accumulate and the ceiling is never reached - the port's first
+    // version used an instant query and "found" no ceiling at 250.
+    const HOLD_S = Number(process.env.PVLAB_HOLD_S ?? 20);
+    await Bun.write("/tmp/pvlab-hold.sql", `select pg_sleep(${HOLD_S});\n`);
     const results: TestResult[] = [];
+    // ORDER IS LOAD-BEARING: this runs FIRST, on a quiet system. Run 7 had it
+    // after the ramp and reported "refusal at client 24" - the previous step's
+    // held connections were still occupying the budget. The ramp below then
+    // establishes the SHAPE (queue before refuse); only this probe produces a
+    // number worth quoting.
+    await Bun.write("/tmp/pvlab-instant.sql", "select 1;\n");
+    const isolated = await $`pgbench ${conn} -f /tmp/pvlab-instant.sql -c 300 -j 8 -n -t 1`
+      .env({ ...process.env, PGPASSWORD: ctx.dbPassword, PGCONNECT_TIMEOUT: "10" })
+      .quiet()
+      .nothrow();
+    const isoOut = isolated.stdout.toString() + isolated.stderr.toString();
+    const isoAt = isoOut.match(/could not create connection for client (\d+)/)?.[1];
+    results.push({
+      id: "T07-ceiling",
+      title: "isolated ceiling probe (quiet system, instant query, 300 requested)",
+      status: isoAt ? "info" : "info",
+      detail: isoAt
+        ? `first refusal at client ${isoAt} - the number to size concurrency against`
+        : "no refusal at 300 concurrent; ceiling is above the probe",
+      measurements: {
+        requested: 300,
+        first_refusal_at_client: isoAt ?? "none",
+        server_refusal: SERVER_REFUSAL.test(isoOut) ? "yes" : "no",
+      },
+      evidence: isoOut.split("\n").find((l) => SERVER_REFUSAL.test(l)) ?? "",
+    });
 
+
+    // Connections from the previous step keep the budget occupied while they
+    // drain, which drags the apparent boundary down (run 6 saw refusal at
+    // client 124 of 200 for exactly this reason). Wait out the hold first.
+    let first = true;
     for (const clients of [150, 200, 250]) {
-      const out = await $`pgbench ${conn} -f /tmp/pvlab-instant.sql -c ${clients} -j 8 -n -t 1`
+      if (!first) await Bun.sleep((HOLD_S + 5) * 1000);
+      first = false;
+      // pgbench writes NOTICEs and connection errors to stderr; capturing only
+      // stdout made the classifier see nothing and report "no queueing" (run 7).
+      const proc = await $`pgbench ${conn} -f /tmp/pvlab-hold.sql -c ${clients} -j 8 -n -t 1`
         .env({ ...process.env, PGPASSWORD: ctx.dbPassword, PGCONNECT_TIMEOUT: "10" })
         .quiet()
-        .nothrow()
-        .text()
-        .catch((e) => String(e));
+        .nothrow();
+      const out = proc.stdout.toString() + proc.stderr.toString();
 
       const refused = SERVER_REFUSAL.test(out);
       const clientBound = CLIENT_LIMIT.test(out);
@@ -62,6 +100,7 @@ const mod: TestModule = {
         evidence: out.split("\n").filter((l) => SERVER_REFUSAL.test(l) || QUEUED.test(l))[0] ?? "",
       });
     }
+
     return results;
   },
 };
