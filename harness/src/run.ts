@@ -96,6 +96,18 @@ const main = async () => {
 
   const ctx = await buildCtx({ where });
   const modules = await loadTests(testsDir);
+
+  if (flag("list")) {
+    console.log(`registered tests (${modules.length}):`);
+    for (const m of modules.sort((a, b) => a.id.localeCompare(b.id, "en"))) {
+      console.log(
+        `  ${m.id.padEnd(6)} ${m.where.padEnd(6)} ` +
+          `${m.destructive ? "destructive " : "            "}` +
+          `${(m.requires ?? []).join(",") || "-"}  ${m.title}`,
+      );
+    }
+    return;
+  }
   const { run, skipped } = planRun(modules, {
     where,
     capabilities: ctx.capabilities,

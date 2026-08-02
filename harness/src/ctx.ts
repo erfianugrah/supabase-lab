@@ -50,6 +50,34 @@ async function runnerEnv(): Promise<Record<string, string>> {
   return out;
 }
 
+/**
+ * Pure capability derivation, split out so the gating rules are testable
+ * without touching a network or a filesystem. Run 7 shipped a bug here -
+ * endpoint IPs were read from an env file that is empty because the runner is
+ * replaced during phase 2 - and no test could have caught it.
+ */
+export function deriveCapabilities(f: {
+  dbPassword?: string;
+  phzHost?: string;
+  endpointIps?: string[];
+  anonKey?: string;
+  pat?: string;
+  hasPgbench?: boolean;
+  hasOpenssl?: boolean;
+  lambdaEnabled?: boolean;
+  where?: Where;
+}): Set<Capability> {
+  const caps = new Set<Capability>();
+  if (f.dbPassword && f.phzHost) caps.add("db");
+  if (f.endpointIps?.length) caps.add("endpoint");
+  if (f.anonKey) caps.add("anon-key");
+  if (f.pat) caps.add("pat");
+  if (f.hasPgbench) caps.add("pgbench");
+  if (f.hasOpenssl) caps.add("openssl");
+  if (f.where === "local" && f.lambdaEnabled) caps.add("lambda");
+  return caps;
+}
+
 export async function buildCtx(input: CtxInput): Promise<Ctx> {
   const env = input.where === "runner" ? await runnerEnv() : {};
   const ref = input.ref ?? env.REF ?? process.env.PVLAB_REF ?? "";
@@ -70,14 +98,17 @@ export async function buildCtx(input: CtxInput): Promise<Ctx> {
       .filter((l) => /^\d+\.\d+\.\d+\.\d+$/.test(l));
   }
 
-  const capabilities = new Set<Capability>();
-  if (dbPassword && phzHost) capabilities.add("db");
-  if (endpointIps.length) capabilities.add("endpoint");
-  if (anonKey) capabilities.add("anon-key");
-  if (pat) capabilities.add("pat");
-  if (await has("pgbench")) capabilities.add("pgbench");
-  if (await has("openssl")) capabilities.add("openssl");
-  if (input.where === "local" && process.env.PVLAB_LAMBDA === "1") capabilities.add("lambda");
+  const capabilities = deriveCapabilities({
+    dbPassword,
+    phzHost,
+    endpointIps,
+    anonKey,
+    pat,
+    hasPgbench: await has("pgbench"),
+    hasOpenssl: await has("openssl"),
+    lambdaEnabled: process.env.PVLAB_LAMBDA === "1",
+    where: input.where,
+  });
 
   return {
     ref,

@@ -7,6 +7,12 @@ resource "aws_vpc" "lab" {
   enable_dns_hostnames = true
   enable_dns_support   = true
 
+  # Opt-in only. The default lab shape stays IPv4 so every other measurement
+  # is taken against the same network; set enable_ipv6 to answer the
+  # "IPv6-first VPC" question, which needs dualstack subnets to even attempt
+  # a dualstack endpoint.
+  assign_generated_ipv6_cidr_block = var.enable_ipv6
+
   tags = { Name = "supabase-lab" }
 }
 
@@ -25,6 +31,10 @@ resource "aws_subnet" "private" {
   vpc_id            = aws_vpc.lab.id
   cidr_block        = "10.42.${count.index + 1}.0/24"
   availability_zone = data.aws_availability_zones.available.names[count.index]
+
+  ipv6_cidr_block = var.enable_ipv6 ? cidrsubnet(aws_vpc.lab.ipv6_cidr_block, 8, count.index + 1) : null
+  # Required before an endpoint in this subnet can take a dualstack address.
+  assign_ipv6_address_on_creation = var.enable_ipv6
 
   tags = { Name = "supabase-lab-private-${count.index + 1}" }
 }

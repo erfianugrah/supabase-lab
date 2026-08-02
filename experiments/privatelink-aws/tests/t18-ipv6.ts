@@ -101,15 +101,64 @@ const mod: TestModule = {
       ]);
     }
 
+    if (!hasV6) {
+      results.push({
+        id: "T18c",
+        title: "create-time dualstack in an IPv6-enabled VPC",
+        status: "skip",
+        detail:
+          "lab VPC is IPv4-only - apply with enable_ipv6=true to answer the IPv6-first-VPC question",
+        measurements: { vpc_has_ipv6: "no" },
+      });
+      return results;
+    }
+
+    // The case that actually matters: can a Resource endpoint be CREATED
+    // dualstack in a VPC that has IPv6? Built directly (not via tofu) as a
+    // scratch endpoint so the lab's own endpoint is untouched, then removed.
+    const subnets = await aws([
+      "ec2", "describe-subnets", "--region", ctx.region,
+      "--filters", `Name=vpc-id,Values=${info.vpc}`, "Name=tag:Name,Values=supabase-lab-private-*",
+      "--query", "Subnets[0].SubnetId", "--output", "text",
+    ]);
+    const sg = await aws([
+      "ec2", "describe-security-groups", "--region", ctx.region,
+      "--filters", `Name=vpc-id,Values=${info.vpc}`, "Name=group-name,Values=supabase-lab-endpoint",
+      "--query", "SecurityGroups[0].GroupId", "--output", "text",
+    ]);
+    const rcfg = await aws([
+      "ec2", "describe-vpc-endpoints", "--region", ctx.region,
+      "--vpc-endpoint-ids", info.id,
+      "--query", "VpcEndpoints[0].ResourceConfigurationArn", "--output", "text",
+    ]);
+
+    const create = await aws([
+      "ec2", "create-vpc-endpoint", "--region", ctx.region,
+      "--vpc-id", info.vpc, "--vpc-endpoint-type", "Resource",
+      "--resource-configuration-arn", rcfg.out.trim(),
+      "--subnet-ids", subnets.out.trim(),
+      "--security-group-ids", sg.out.trim(),
+      "--ip-address-type", "dualstack",
+      "--query", "VpcEndpoint.VpcEndpointId", "--output", "text",
+    ]);
+
     results.push({
       id: "T18c",
       title: "create-time dualstack in an IPv6-enabled VPC",
-      status: "skip",
-      detail: hasV6
-        ? "VPC has IPv6 but the create-time test needs a scratch endpoint; not attempted"
-        : "lab VPC is IPv4-only - set enable_ipv6 and re-run to answer the IPv6-first-VPC question",
-      measurements: { vpc_has_ipv6: hasV6 ? "yes" : "no" },
+      status: "info",
+      detail: create.ok
+        ? "ACCEPTED - a Resource endpoint can be created dualstack in an IPv6-enabled VPC"
+        : `rejected: ${create.out.split("\n").pop()?.slice(0, 180)}`,
+      measurements: { vpc_has_ipv6: "yes", created: create.ok ? "yes" : "no" },
+      evidence: create.out.slice(0, 400),
     });
+
+    if (create.ok) {
+      await aws([
+        "ec2", "delete-vpc-endpoints", "--region", ctx.region,
+        "--vpc-endpoint-ids", create.out.trim(),
+      ]);
+    }
 
     return results;
   },
