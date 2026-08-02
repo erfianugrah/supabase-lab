@@ -53,18 +53,23 @@ make phase1          # project + PrivateLink association
 make wait-ready      # polls association status (needs a dashboard session JWT - PATs get 401; or just watch the dashboard)
 make arns            # RAM share + resource config ARNs -> arns.tfvars
 make phase2          # VPC, endpoint, PHZ, runner
-make suite           # automated: TLS matrix, latency bench (psql/pgbench/gocurl),
-                     # pooler-ceiling probe, restart-downtime measurement;
-                     # pulls artifacts, renders evidence/<ts>/REPORT.md
+make suite           # typed harness, both vantages: connectivity, TLS modes,
+                     # latency/pgbench, Data API, CLI migration paths, ceiling,
+                     # Lambda; merges into evidence/<ts>/REPORT.md
 make destroy         # when done - NAT + endpoint are the hourly costs
 make suite-clean     # remove the suite artifact bucket (not tofu-tracked)
 ```
 
+`./suite.sh --destructive` adds the tests that mutate or interrupt the
+environment (project restart, endpoint replacement). They are deferred to the
+end so the read-only battery always produces results first.
+
 Suite evidence lands locally in `experiments/privatelink-aws/evidence/<ts>/`
-(gitignored): REPORT.md plus the raw suite-out artifacts. For interactive
-work, `make ssm` gives a shell on the runner (the `pvlab` binary is the manual
-test matrix); its logs land in `/home/ssm-user/evidence-<ts>.log` on the
-runner - copy them out via the SSM session before destroying.
+(gitignored): `REPORT.md` plus the raw JSON artifacts from both vantages. The
+harness compiles to a single binary that is staged to the runner over an S3
+presigned URL, so nothing test-related is baked into the AMI. For interactive
+work, `make ssm` gives a shell on the runner where `pvlab --where runner` can
+be re-run by hand.
 
 See `experiments/privatelink-aws/RUNLOG.md` for what each run established
 and the measured numbers.
