@@ -8,8 +8,8 @@ set -euxo pipefail
 # No `curl` in the list: AL2023 ships curl-minimal, which conflicts (run 4b).
 # curl-minimal provides /usr/bin/curl with HTTP(S), enough for the CLI fetch.
 dnf makecache --refresh
-dnf install -y postgresql16 bind-utils jq tar gzip || \
-  dnf install -y postgresql15 bind-utils jq tar gzip
+dnf install -y postgresql16 postgresql16-contrib bind-utils jq tar gzip || \
+  dnf install -y postgresql15 postgresql15-contrib bind-utils jq tar gzip
 
 # supabase CLI, latest release (linux amd64 tarball)
 ASSET=$(curl -s https://api.github.com/repos/supabase/cli/releases/latest \

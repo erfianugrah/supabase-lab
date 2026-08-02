@@ -26,6 +26,7 @@ validate:
 # exist until the association reaches READY, so phase 2 resources are gated
 # on arns.tfvars.
 phase1:
+	@grep -q 'enable_lambda *= *true' experiment.tfvars && $(MAKE) --no-print-directory lambda-zip || true
 	tofu plan $(VARS) -out=tfplan
 	tofu apply tfplan
 
@@ -64,9 +65,16 @@ arns:
 	fi; \
 	share=$$(aws ram get-resource-share-invitations --region $$region --no-paginate \
 		--query "resourceShareInvitations[?resourceShareName && contains(resourceShareName, '$(REF)')].resourceShareArn | [0]" --output text); \
-	rc=$$(aws ram list-resources --resource-owner OTHER-ACCOUNTS --resource-share-arn "$$share" \
-		--region $$region --no-paginate \
-		--query 'resources[0].arn' --output text | head -1); \
+	rc="None"; \
+	for i in 1 2 3 4 5 6 7 8 9 10; do \
+		rc=$$(aws ram list-resources --resource-owner OTHER-ACCOUNTS --resource-share-arn "$$share" \
+			--region $$region --no-paginate \
+			--query 'resources[0].arn' --output text | head -1); \
+		[ "$$rc" != "None" ] && [ -n "$$rc" ] && break; \
+		echo "resource configuration not visible yet (acceptance is async) - retry $$i/10"; \
+		sleep 10; \
+	done; \
+	test "$$rc" != "None" || (echo "resource configuration never appeared - check the share in the RAM console"; exit 1); \
 	printf 'resource_share_arn = "%s"\nresource_configuration_arn = "%s"\n' "$$share" "$$rc" > arns.tfvars; \
 	cat arns.tfvars
 

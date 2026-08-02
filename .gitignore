@@ -17,9 +17,10 @@ tfplan
 # test evidence (may contain connection details)
 evidence/
 
-# lambda build artifacts
-lambda/dist/
-lambda/node_modules/
+# lambda build artifacts (anchored anywhere - these live under experiments/*/)
+**/lambda/dist/
+**/lambda/node_modules/
+**/lambda/function.zip
 
 # sops plaintext
 secrets.tfvars
