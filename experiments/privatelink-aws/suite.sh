@@ -35,7 +35,7 @@ echo "== 2/5 stage it to the runner =="
 aws s3 mb "s3://$BUCKET" --region "$REGION" 2>/dev/null || true
 aws s3 cp "$ROOT/harness/dist/pvlab" "s3://$BUCKET/bin/pvlab" --quiet
 GET_URL=$(aws s3 presign "s3://$BUCKET/bin/pvlab" --expires-in 3600 --region "$REGION")
-PUT_URL=$(aws s3 presign "s3://$BUCKET/artifacts/runner-$TS.json" --expires-in 3600 --region "$REGION")
+PUT_URL="s3://$BUCKET/artifacts/runner-$TS.json"   # runner writes with its instance role
 
 ANON=$(curl -s -H "Authorization: Bearer $TOK" \
 	"https://api.supabase.com/v1/projects/$REF/api-keys" | jq -r '.[] | select(.name=="anon") | .api_key' | head -1)
@@ -58,11 +58,24 @@ ssm() { # <commands-json-file> <label>
 }
 
 echo "== 3/5 run the runner-side battery =="
-jq -n --arg get "$GET_URL" --arg put "$PUT_URL" --arg dbpw "$DBPW" --arg anon "$ANON" --arg d "$DESTRUCTIVE" '{
+# Phase 2 replaces the runner (the endpoint flips a user_data template var),
+# so the instance may still be registering when we get here. Wait for SSM,
+# then let cloud-init finish before the tests look for psql/pgbench.
+for i in $(seq 1 40); do
+	ping=$(aws ssm describe-instance-information --region "$REGION" \
+		--filters Key=InstanceIds,Values="$RUNNER" \
+		--query 'InstanceInformationList[0].PingStatus' --output text 2>/dev/null || echo none)
+	[ "$ping" = "Online" ] && break
+	echo "  waiting for SSM on $RUNNER ($ping)"
+	sleep 15
+done
+
+jq -n --arg get "$GET_URL" --arg put "$PUT_URL" --arg dbpw "$DBPW" --arg anon "$ANON" --arg tok "$TOK" --arg d "$DESTRUCTIVE" '{
   commands: [
+    "cloud-init status --wait >/dev/null 2>&1 || true",
     "curl -sL \"" + $get + "\" -o /usr/local/bin/pvlab && chmod 755 /usr/local/bin/pvlab",
-    "export DB_PASSWORD=\"" + $dbpw + "\" SUPABASE_ANON_KEY=\"" + $anon + "\"; pvlab --where runner --out /tmp/pvlab " + $d,
-    "curl -s -T \"$(ls -t /tmp/pvlab/run-*.json | head -1)\" \"" + $put + "\" && echo artifact-uploaded"
+    "export DB_PASSWORD=\"" + $dbpw + "\" SUPABASE_ANON_KEY=\"" + $anon + "\" SUPABASE_ACCESS_TOKEN=\"" + $tok + "\"; pvlab --where runner --out /tmp/pvlab " + $d,
+    "aws s3 cp \"$(ls -t /tmp/pvlab/run-*.json | head -1)\" \"" + $put + "\" && echo artifact-uploaded"
   ]
 }' > "/tmp/pvlab-run-$TS.json"
 ssm "/tmp/pvlab-run-$TS.json" runner | tail -25
