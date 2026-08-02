@@ -1,21 +1,27 @@
 /**
  * T21 - what happens to clients when one AZ's endpoint ENI is unreachable.
  *
- * The endpoint places one ENI per private subnet and the PHZ A record carries
- * both addresses, so the question is whether a client actually fails over or
- * just fails. libpq tries the addresses a hostname resolves to in order, so
- * the answer depends on connect timeouts, not on anything Supabase controls -
- * which is exactly why it is worth measuring rather than assuming.
+ * The endpoint puts one ENI per private subnet and the PHZ A record carries
+ * both, so the question is whether a client actually fails over. That is a
+ * CLIENT-STACK property, not a platform one: libpq tries every address a
+ * hostname resolves to, while Node's default resolution hands the driver a
+ * single address. Both are measured here, because the customer's runtime is
+ * node-postgres in Lambda but their tooling is psql.
  *
- * Method: a NACL rule on the runner's subnet blackholes ONE ENI address
- * (security groups cannot express deny). Then connect via the PHZ name
- * repeatedly and count successes. Reverted at the end.
+ * Method: blackhole ONE ENI address with a NACL rule (security groups cannot
+ * express deny), then probe from INSIDE the VPC - via the Lambda for node-pg
+ * and via SSM psql for libpq. Reverted afterwards.
+ *
+ * The first version of this test ran the probes from the orchestrator, which
+ * cannot reach a private endpoint at all: its baseline failed and it still
+ * reported "clients do not fail over". A test whose control is broken must
+ * report nothing, so the baseline gate below is load-bearing.
  *
  * DESTRUCTIVE: mutates a network ACL for the duration.
  */
 import { $ } from "bun";
-import { Client } from "pg";
-import type { Ctx, TestModule, TestResult } from "../../../harness/src/types";
+import type { Ctx, TestModule } from "../../../harness/src/types";
+import { invokeProbe } from "./t15-lambda";
 
 const RULE = 99;
 
@@ -27,33 +33,36 @@ async function aws(args: string[]): Promise<{ ok: boolean; out: string }> {
   return { ok: p.exitCode === 0, out: (p.stdout.toString() + p.stderr.toString()).trim() };
 }
 
-async function connectVia(ctx: Ctx, timeoutMs: number): Promise<number | null> {
-  const c = new Client({
-    host: ctx.phzHost,
-    port: 5432,
-    user: "postgres",
-    database: "postgres",
-    password: ctx.dbPassword,
-    ssl: { rejectUnauthorized: false },
-    connectionTimeoutMillis: timeoutMs,
-  });
-  const t0 = performance.now();
-  try {
-    await c.connect();
-    await c.query("select 1");
-    return Math.round(performance.now() - t0);
-  } catch {
-    return null;
-  } finally {
-    await c.end().catch(() => {});
+/** psql from the runner: libpq, which tries every resolved address. */
+async function psqlViaRunner(ctx: Ctx, runnerId: string): Promise<boolean | null> {
+  const cmd = `PGPASSWORD='${ctx.dbPassword}' PGCONNECT_TIMEOUT=20 psql "host=${ctx.phzHost} port=5432 user=postgres dbname=postgres sslmode=require" -tAc 'select 1'`;
+  const send = await aws([
+    "ssm", "send-command", "--region", ctx.region, "--instance-ids", runnerId,
+    "--document-name", "AWS-RunShellScript", "--timeout-seconds", "120",
+    "--parameters", JSON.stringify({ commands: [cmd] }),
+    "--query", "Command.CommandId", "--output", "text",
+  ]);
+  if (!send.ok) return null;
+  const cid = send.out.trim();
+  for (let i = 0; i < 12; i++) {
+    await Bun.sleep(5000);
+    const inv = await aws([
+      "ssm", "get-command-invocation", "--region", ctx.region,
+      "--command-id", cid, "--instance-id", runnerId,
+      "--query", "{s:Status,o:StandardOutputContent}", "--output", "json",
+    ]);
+    if (!inv.ok) continue;
+    const { s, o } = JSON.parse(inv.out) as { s: string; o: string };
+    if (["Success", "Failed", "TimedOut", "Cancelled"].includes(s)) return o.trim() === "1";
   }
+  return null;
 }
 
 const mod: TestModule = {
   id: "T21",
-  title: "Client behaviour when one endpoint ENI is unreachable",
+  title: "Client failover when one endpoint ENI is unreachable",
   where: "local",
-  requires: ["db", "endpoint"],
+  requires: ["db", "endpoint", "lambda"],
   destructive: true,
   async run(ctx) {
     const target = ctx.endpointIps[0];
@@ -66,18 +75,36 @@ const mod: TestModule = {
       };
     }
 
-    // The runner's subnets share a NACL; find it via the endpoint's VPC.
+    const runner = await aws([
+      "ec2", "describe-instances", "--region", ctx.region,
+      "--filters", "Name=tag:Name,Values=supabase-lab-runner", "Name=instance-state-name,Values=running",
+      "--query", "Reservations[0].Instances[0].InstanceId", "--output", "text",
+    ]);
+    const runnerId = runner.ok ? runner.out.trim() : "";
+
+    // BASELINE GATE: if the in-VPC probes do not work before the blackhole,
+    // anything measured after it is meaningless.
+    const baseLambda = (await invokeProbe(ctx.region, { port: 5432 })).all_ok === true;
+    const basePsql = runnerId ? await psqlViaRunner(ctx, runnerId) : null;
+    if (!baseLambda) {
+      return {
+        id: "T21",
+        title: mod.title,
+        status: "skip",
+        detail: "baseline Lambda probe failed - no working control, so no conclusion is possible",
+      };
+    }
+
     const nacl = await aws([
       "ec2", "describe-network-acls", "--region", ctx.region,
-      "--filters", "Name=default,Values=true",
+      "--filters", "Name=default,Values=true", `Name=vpc-id,Values=${await labVpc(ctx)}`,
       "--query", "NetworkAcls[0].NetworkAclId", "--output", "text",
     ]);
-    if (!nacl.ok) {
-      return { id: "T21", title: mod.title, status: "skip", detail: "could not find the VPC NACL" };
+    if (!nacl.ok || !nacl.out.trim() || nacl.out.includes("None")) {
+      return { id: "T21", title: mod.title, status: "skip", detail: "could not find the lab VPC NACL" };
     }
     const naclId = nacl.out.trim();
 
-    const before = await connectVia(ctx, 8000);
     const add = await aws([
       "ec2", "create-network-acl-entry", "--region", ctx.region,
       "--network-acl-id", naclId, "--rule-number", String(RULE),
@@ -89,32 +116,34 @@ const mod: TestModule = {
         id: "T21",
         title: mod.title,
         status: "skip",
-        detail: `could not install the blackhole rule: ${add.out.slice(0, 140)}`,
+        detail: `could not install the blackhole: ${add.out.slice(0, 140)}`,
       };
     }
 
     try {
-      await Bun.sleep(5000); // let the NACL change take effect
-      const samples: Array<number | null> = [];
-      for (let i = 0; i < 5; i++) samples.push(await connectVia(ctx, 15000));
-      const ok = samples.filter((s) => s !== null) as number[];
-      const worst = ok.length ? Math.max(...ok) : 0;
+      await Bun.sleep(8000);
+      let lambdaOk = 0;
+      for (let i = 0; i < 3; i++) {
+        if ((await invokeProbe(ctx.region, { port: 5432 })).all_ok === true) lambdaOk++;
+      }
+      const psqlOk = runnerId ? await psqlViaRunner(ctx, runnerId) : null;
 
       return {
         id: "T21",
         title: mod.title,
-        status: ok.length === samples.length ? "pass" : ok.length ? "info" : "fail",
+        status: "info",
         detail:
-          ok.length === samples.length
-            ? `client failed over to the surviving ENI on every attempt (worst connect ${worst}ms vs ${before}ms baseline)`
-            : ok.length
-              ? `partial: ${ok.length}/${samples.length} connects succeeded - failover is not reliable within the timeout`
-              : "no connection succeeded with one ENI blackholed - clients do NOT fail over",
+          `one ENI (${target}) blackholed: node-postgres ${lambdaOk}/3 succeeded, ` +
+          `psql/libpq ${psqlOk === null ? "not measured" : psqlOk ? "succeeded" : "failed"}` +
+          (lambdaOk < 3 && psqlOk
+            ? " - libpq fails over across the PHZ's two A records, the Node driver does not"
+            : ""),
         measurements: {
           blackholed_ip: target,
-          baseline_ms: before ?? "failed",
-          successes: `${ok.length}/${samples.length}`,
-          worst_connect_ms: worst,
+          baseline_lambda: baseLambda ? "ok" : "failed",
+          baseline_psql: basePsql === null ? "not measured" : basePsql ? "ok" : "failed",
+          node_pg_successes: `${lambdaOk}/3`,
+          libpq_success: psqlOk === null ? "not measured" : psqlOk ? "yes" : "no",
         },
       };
     } finally {
@@ -125,4 +154,14 @@ const mod: TestModule = {
     }
   },
 };
+
+async function labVpc(ctx: Ctx): Promise<string> {
+  const r = await aws([
+    "ec2", "describe-vpcs", "--region", ctx.region,
+    "--filters", "Name=tag:Name,Values=supabase-lab",
+    "--query", "Vpcs[0].VpcId", "--output", "text",
+  ]);
+  return r.ok ? r.out.trim() : "";
+}
+
 export default mod;

@@ -84,6 +84,49 @@ Scaffolding bugs found and fixed this run:
   pre-first-session (tolerated), run-matrix.sh $${...} expanded to PID
   (templatefile does not recurse into inserted payloads).
 
+## 2026-08-02 - run 8 (IPv6 VPC; closes the create-time and AZ questions)
+
+First run with `enable_ipv6 = true`, so the VPC and private subnets carry
+IPv6 and a dualstack endpoint can actually be attempted.
+
+ANSWERED:
+
+- IPv6-first VPC: a Resource endpoint CAN BE CREATED dualstack in an
+  IPv6-enabled VPC (accepted by the API). What is rejected is CONVERTING an
+  existing IPv4 endpoint - `ModifyVpcEndpoint` returns `InvalidParameter:
+  Modifying IpAddressType to DUALSTACK is not supported`. So the constraint
+  is create-time-only: build it dualstack from the start. This supersedes
+  run 6's narrow "dualstack rejected" note.
+- Single-ENI failure: blackholing ONE endpoint ENI address with a NACL deny
+  did NOT break clients. node-postgres 3/3 and psql/libpq both still
+  connected via the PHZ name. (Caveat: this is one address blackholed, not a
+  true AZ outage, and 3/3 does not prove deterministic failover ordering.)
+- Restart window: 89s (sixth sample; running set 49/72/131/93/59/89).
+
+STILL NOT EXERCISED:
+
+- Association DELETE (T19). The test now works - valid in-VPC baseline, and
+  it correctly reported "no removal observed, association left in place"
+  rather than inventing a result - but the dashboard removal never happened
+  during the window.
+
+CEILING - further evidence it is not a constant: refusals at client 174 and
+213 this run, against 213 (run 6) and 287 (run 7). Four measurements, four
+different numbers. The published 200 remains the planning figure.
+
+TEST BUGS FOUND - both concluded from a broken control:
+
+1. T21 v1 ran its probes from the ORCHESTRATOR, which cannot reach a private
+   endpoint. Its baseline failed and it still reported "clients do NOT fail
+   over" - the opposite of the truth. T19 v1 had the identical flaw and
+   reported "clients broke".
+2. Both now have a BASELINE GATE: if the control does not work before the
+   fault is injected, the test returns skip and asserts nothing. Adopt this
+   for every future fault-injection test.
+3. T18's create-time probe LEAKED its scratch dualstack endpoint - the
+   delete call reported nothing and the endpoint stayed Available. Cleanup
+   is now verified in a loop rather than assumed.
+
 ## 2026-08-02 - run 7 (harness parity run; TS suite replaces the bash suite)
 
 Purpose: validate the ported typed harness against run 5/6 numbers before

@@ -86,11 +86,16 @@ export async function buildCtx(input: CtxInput): Promise<Ctx> {
   const anonKey = input.anonKey ?? process.env.SUPABASE_ANON_KEY ?? undefined;
   const pat = input.pat ?? process.env.SUPABASE_ACCESS_TOKEN ?? undefined;
   let endpointIps =
-    input.endpointIps ?? (env.ENDPOINT_IPS ? env.ENDPOINT_IPS.trim().split(/\s+/) : []);
+    input.endpointIps ??
+    (process.env.PVLAB_ENDPOINT_IPS
+      ? process.env.PVLAB_ENDPOINT_IPS.trim().split(/[\s,]+/).filter(Boolean)
+      : env.ENDPOINT_IPS
+        ? env.ENDPOINT_IPS.trim().split(/\s+/)
+        : []);
   // The runner is replaced during phase 2, before the ENI addresses exist, so
   // its baked-in env can be empty. Resolve the PHZ name instead of silently
   // skipping every endpoint-dependent test.
-  if (!endpointIps.length && phzHost) {
+  if (!endpointIps.length && phzHost && input.where === "runner") {
     const dug = await $`dig +short ${phzHost} A`.quiet().nothrow().text().catch(() => "");
     endpointIps = dug
       .split("\n")
