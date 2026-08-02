@@ -15,8 +15,19 @@ platform behaviour or writing it into docs
   Makefiles wire it in with `-var-file`.
 - Per-experiment non-secret config: `experiment.tfvars` (committed).
 - No provisioning scripts: everything is OpenTofu resources. The only shell
-  payloads are (a) Makefile orchestration (phase gating, ARN lookups,
-  status polling) and (b) the on-runner test matrix - the thing under test.
+  payload is Makefile/suite orchestration (phase gating, ARN lookups, SSM,
+  S3 staging); the tests themselves are the typed harness, not shell.
+- Tests live in `harness/` (shared contract + runner + report renderer) and
+  `experiments/<name>/tests/*.ts` (the test modules). Adding a test is ONE
+  file exporting a `TestModule`: `where` picks the vantage (runner vs local
+  orchestrator), `requires` gates on capabilities so it self-skips with a
+  reason, `destructive` defers it behind `--destructive`, and anything in
+  `measurements` becomes a report column with no renderer change.
+- A measured `fail` is data, not an error to retry away. The suite records
+  outcomes; it never drives the external system to green.
+- `bun build --compile` bundles only statically-reachable code, so the test
+  registry is GENERATED at build time (`harness/scripts/gen-registry.ts`).
+  Never hand-edit `src/tests.generated.ts`; `bun run build` rewrites it.
 
 ## Conventions
 
