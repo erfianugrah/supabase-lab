@@ -106,7 +106,7 @@ destroy:
 # Full automated suite: deploy scripts + gocurl to the runner, run TLS /
 # latency / ceiling / restart phases, pull artifacts, render evidence/<ts>/REPORT.md
 suite:
-	@chmod +x suite.sh render-report.sh
+	@chmod +x suite.sh
 	./suite.sh
 
 # The suite artifact bucket is created by suite.sh (orchestration), not by

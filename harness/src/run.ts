@@ -54,7 +54,41 @@ async function labCommit(): Promise<string | undefined> {
   }
 }
 
+/** Merge artifacts from both vantages into one report. */
+async function mergeMode(files: string[], outDir: string): Promise<void> {
+  const parts: RunArtifact[] = [];
+  for (const f of files) parts.push(JSON.parse(await Bun.file(f).text()) as RunArtifact);
+  if (!parts.length) throw new Error("no artifacts to merge");
+  const first = parts[0]!;
+  const merged: RunArtifact = {
+    startedAt: parts.map((p) => p.startedAt).sort()[0]!,
+    finishedAt: parts.map((p) => p.finishedAt).sort().at(-1)!,
+    where: first.where,
+    region: first.region,
+    ref: parts.find((p) => p.ref)?.ref ?? "",
+    labCommit: first.labCommit,
+    toolVersions: Object.assign({}, ...parts.map((p) => p.toolVersions)),
+    // Skips from one vantage are noise when the other vantage ran the test.
+    results: parts
+      .flatMap((p) => p.results)
+      .filter(
+        (r, _i, all) =>
+          !(r.status === "skip" && /runs on "/.test(r.detail ?? "") &&
+            all.some((o) => o.id === r.id && o.status !== "skip")),
+      ),
+  };
+  await $`mkdir -p ${outDir}`.quiet();
+  await Bun.write(`${outDir}/merged.json`, JSON.stringify(merged, null, 2));
+  await Bun.write(`${outDir}/REPORT.md`, renderMarkdown(merged));
+  console.log(`merged ${parts.length} artifacts -> ${outDir}/REPORT.md`);
+}
+
 const main = async () => {
+  const mergeArg = arg("merge");
+  if (mergeArg) {
+    await mergeMode(mergeArg.split(",").map((s) => s.trim()).filter(Boolean), arg("out", "./out")!);
+    return;
+  }
   const where = (arg("where", "runner") as Where) ?? "runner";
   const testsDir = arg("tests", "./tests")!;
   const outDir = arg("out", "./out")!;
