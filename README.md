@@ -62,7 +62,7 @@ make suite-clean     # remove the suite artifact bucket (not tofu-tracked)
 
 Suite evidence lands locally in `experiments/privatelink-aws/evidence/<ts>/`
 (gitignored): REPORT.md plus the raw suite-out artifacts. For interactive
-work, `make ssm` gives a shell on the runner (`run-matrix.sh` is the manual
+work, `make ssm` gives a shell on the runner (the `pvlab` binary is the manual
 test matrix); its logs land in `/home/ssm-user/evidence-<ts>.log` on the
 runner - copy them out via the SSM session before destroying.
 

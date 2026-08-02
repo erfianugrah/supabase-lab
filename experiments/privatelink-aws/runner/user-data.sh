@@ -30,9 +30,6 @@ ENV
 chmod 644 /etc/pvlab/env
 
 # Test payload - the thing under test, not provisioning glue.
-install -m 755 /dev/stdin /usr/local/bin/run-matrix.sh <<'PAYLOAD'
-${run_matrix}
-PAYLOAD
 
 # ssm-user does not exist until the first SSM session - do not fail the boot.
 chown -R ssm-user:ssm-user /home/ssm-user 2>/dev/null || true
