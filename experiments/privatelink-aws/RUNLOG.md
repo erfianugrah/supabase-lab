@@ -84,6 +84,70 @@ Scaffolding bugs found and fixed this run:
   pre-first-session (tolerated), run-matrix.sh $${...} expanded to PID
   (templatefile does not recurse into inserted payloads).
 
+## 2026-08-02 - run 7 (harness parity run; TS suite replaces the bash suite)
+
+Purpose: validate the ported typed harness against run 5/6 numbers before
+trusting it. It reproduced the qualitative findings and caught four of its
+own port bugs - which is exactly what the parity baseline was for.
+
+Reproduced (harness vs baseline):
+
+- verify-full via PHZ, verify-ca: pass / pass (same)
+- cert chain: 3 certs, CN=db.<ref>.supabase.co (same)
+- prepared statements on 6543: ok (same)
+- pgbench 6543: 3445 tps vs 3350 baseline; 5432: 4317 vs 3810 (same order,
+  different project instance)
+- connect p50: 28ms (5432) / 20ms (6543) vs 37 / 31 baseline - the harness
+  measures in-process libpq connects, the bash version spawned a psql
+  process per sample, so the harness numbers exclude process startup
+- DNS split, PostgREST service_role behaviour, no public A record: same
+- CLI: default link -> public pooler; --skip-pooler and --db-url both push
+  over the endpoint (same)
+- Restart via Lambda: 59s, failure mode `timeout expired` (93s in run 6;
+  inside the known 49-131s spread, same failure mode)
+- Realtime: now PASSES with a real ws client (72ms handshake). The bash
+  probe's uninterpretable 500 was a bad curl handshake, not a platform
+  behaviour.
+
+Port bugs the parity run caught (all fixed):
+
+1. Ceiling test dropped the connection HOLD, so clients recycled instead of
+   accumulating - it reported "no queueing at 250" and would have
+   "disproved" the ceiling entirely.
+2. Bun's `$.text()` returns stdout only; pgbench writes NOTICEs and
+   connection errors to stderr, so the classifier saw nothing.
+3. Endpoint IPs were read from user_data env, which is empty because the
+   runner is REPLACED during phase 2 before the ENIs exist - every
+   endpoint-IP-dependent subtest silently vanished. The harness now
+   resolves the PHZ name itself.
+4. suite.sh never passed the PAT to the runner, so the CLI tests skipped.
+
+CEILING - CORRECTION #2 (this supersedes run 6's "213"):
+
+An isolated probe on a quiet system gave first refusal at client 287 here,
+against 213 in run 6 - same tier, different project. The boundary is NOT
+reproducible; the published 200 stays the number to size against. What
+reproduces is the shape (queue, then refuse) and the mechanism (server-side
+`max_client_conn`). Also learned: probe ORDER matters - a ceiling probe run
+after a load ramp reports garbage (it read 24 and 90 while previous holds
+were still draining), so the isolated probe now runs first.
+
+Infrastructure notes:
+
+- `aws s3 presign` signs for GET; reusing that URL for PUT fails with
+  SignatureDoesNotMatch. The runner now writes artifacts with its instance
+  role via a scoped s3:PutObject policy (tofu-managed).
+- suite.sh waits for SSM registration: phase 2 replaces the runner, so the
+  suite used to race the new instance's bootstrap.
+- Teardown of a Lambda-enabled run is SLOW: Lambda's VPC ENIs sit in
+  `available` for tens of minutes after the function is gone, and tofu just
+  retries the subnet delete meanwhile (21m and still blocked here).
+  Deleting the detached ENIs directly unblocks it immediately - worth doing
+  rather than waiting.
+- The docs' evidence table had drifted from its own prose (table still said
+  "refusal at 200" while the prose said 213) because an atomic multi-edit
+  failed and only part of the correction was re-applied. Fixed.
+
 ## 2026-08-02 - run 6 (org B, Team plan; Lambda path + corrections)
 
 Enablement was unchanged from run 5 (org flag + entitlement persist), share

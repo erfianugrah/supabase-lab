@@ -40,6 +40,23 @@ resource "aws_iam_role_policy_attachment" "runner_ssm" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 
+# The runner uploads its own result artifact. A presigned URL cannot do this:
+# `aws s3 presign` signs for GET, so reusing it for PUT fails with
+# SignatureDoesNotMatch (run 7). Scoped to the suite bucket only.
+resource "aws_iam_role_policy" "runner_artifacts" {
+  role = aws_iam_role.runner.name
+  name = "suite-artifacts"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["s3:PutObject", "s3:GetObject"]
+      Resource = "arn:aws:s3:::supabase-lab-suite-${var.aws_account_id}/*"
+    }]
+  })
+}
+
 resource "aws_iam_instance_profile" "runner" {
   name = "supabase-lab-runner"
   role = aws_iam_role.runner.name

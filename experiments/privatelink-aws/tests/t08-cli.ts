@@ -44,7 +44,7 @@ const mod: TestModule = {
     );
 
     // T08: default link - expected to resolve to the public shared pooler.
-    const link = await sh(`supabase link --project-ref ${ctx.ref}`, ctx);
+    const link = await sh(`supabase link --project-ref ${ctx.ref} -p "$SUPABASE_DB_PASSWORD"`, ctx);
     const linkedHost =
       (await $`bash -lc "grep -ho 'pooler[^ \"]*' ${DIR}/supabase/.temp/* 2>/dev/null | head -1"`
         .quiet()
@@ -61,27 +61,27 @@ const mod: TestModule = {
     });
 
     // T09: the documented fix - link direct, then push over the endpoint.
-    const skipPooler = await sh(`supabase link --project-ref ${ctx.ref} --skip-pooler`, ctx);
-    const push = skipPooler.ok ? await sh("supabase db push --include-all -y", ctx) : null;
+    const skipPooler = await sh(`supabase link --project-ref ${ctx.ref} --skip-pooler -p "$SUPABASE_DB_PASSWORD"`, ctx);
+    const push = skipPooler.ok ? await sh("printf 'y\\n' | supabase db push --include-all", ctx) : null;
     results.push({
       id: "T09",
       title: "`link --skip-pooler` + `db push` over the endpoint",
       status: push?.ok ? "pass" : "fail",
       detail: push?.ok
         ? "migration applied over the private path"
-        : (push?.out ?? skipPooler.out).split("\n").slice(-2).join(" ").slice(0, 200),
+        : (push?.out ?? skipPooler.out).split("\n").filter(Boolean).slice(-4).join(" | ").slice(0, 300),
     });
 
     // T10: no link at all - explicit db-url through the PHZ.
     const url = `postgresql://postgres:${encodeURIComponent(ctx.dbPassword)}@${ctx.phzHost}:5432/postgres?sslmode=require`;
-    const dbUrl = await sh(`supabase db push --db-url '${url}' --include-all -y`, ctx);
+    const dbUrl = await sh(`printf 'y\\n' | supabase db push --db-url '${url}' --include-all`, ctx);
     results.push({
       id: "T10",
       title: "`db push --db-url` with no link",
       status: dbUrl.ok ? "pass" : "fail",
       detail: dbUrl.ok
         ? "migration applied via an explicit endpoint URL"
-        : dbUrl.out.split("\n").slice(-2).join(" ").slice(0, 200),
+        : dbUrl.out.split("\n").filter(Boolean).slice(-4).join(" | ").slice(0, 300),
     });
 
     return results;
