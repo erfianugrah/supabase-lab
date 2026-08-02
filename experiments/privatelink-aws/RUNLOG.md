@@ -84,6 +84,57 @@ Scaffolding bugs found and fixed this run:
   pre-first-session (tolerated), run-matrix.sh $${...} expanded to PID
   (templatefile does not recurse into inserted payloads).
 
+## 2026-08-02 - run 6 (org B, Team plan; Lambda path + corrections)
+
+Enablement was unchanged from run 5 (org flag + entitlement persist), share
+landed 32s after the dashboard click.
+
+New evidence:
+
+- Lambda in private subnets -> endpoint: BOTH ports work. Cold connect
+  698ms (5432) / 218ms (6543), query 20ms / 3ms, named prepared
+  statements OK on both. This was the last `design-only` row.
+- Restart through the Lambda client on 6543: 93s outage (5s probe
+  granularity). Failure mode is `timeout expired`, NOT refusal - a 30s
+  Lambda timeout is spent entirely on one attempt.
+- Endpoint replacement: ENI IPs DO churn (10.42.1.93/10.42.2.139 ->
+  10.42.1.203/10.42.2.170); clients recover once the same apply refreshes
+  the PHZ. Replacement needs the same two-pass treatment as phase 2.
+- `ModifyVpcEndpoint --ip-address-type dualstack` -> `InvalidParameter:
+  Modifying IpAddressType to DUALSTACK is not supported`. NARROW: this
+  tests modify, not create-in-an-IPv6-VPC. The IPv6-first-VPC question
+  remains open.
+- Realtime: DNS split confirmed (API host -> public 104.18.38.10, DB host
+  -> 10.42.2.139 ENI). The WebSocket upgrade probe returned 500 and is
+  INCONCLUSIVE - a curl-shaped handshake, not a real ws client.
+- Association DELETE: NOT exercised (probe ran its window, no removal
+  performed).
+
+Corrections to previously published claims:
+
+- "First refusal at exactly 200 concurrent (micro)" was WRONG - and wrong
+  in the worst way, by agreeing with the published figure. The ramp used
+  `pgbench -c N -j N` (one thread per client) on a 2-vCPU runner, so a
+  failure at high N could not be attributed to the server. Re-run with
+  `-j 8`, a quiet system, instant queries, and the server's error text
+  captured: below the limit PgBouncer QUEUES (`No server connection
+  available in postgres backend, client being queued`); refusal
+  (`FATAL: no more connections allowed (max_client_conn)`) first appeared
+  at the 213th concurrent client.
+- `pgbench` is in `postgresql16-contrib`, which user_data never installed.
+  Run-5's throughput numbers came from a hand-installed pgbench on a live
+  runner - real output, unreproducible setup. Fixed in user-data.sh.
+
+Lab bugs found and fixed:
+
+- `make arns` raced the RAM acceptance: the resource configuration is not
+  visible to list-resources for a few seconds after ACCEPTED. Now polls.
+- A full apply reverted the Lambda env block and silently wiped the
+  out-of-band PGPASSWORD (`make lambda-secret`), leaving the probe
+  authenticating with nothing. Password is now in-config - db_password is
+  already in state via supabase_project, so this exposes nothing new.
+- `make phase1` now builds the Lambda zip when enable_lambda=true.
+
 ## 2026-07-31 - run 5 (automated suite; full evidence report)
 
 `make suite` built and run green end-to-end: 4 on-runner phases deployed

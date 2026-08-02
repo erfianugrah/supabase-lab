@@ -55,7 +55,11 @@ resource "aws_lambda_function" "probe" {
       PGUSER     = "postgres"
       PGDATABASE = "postgres"
       PGSSLMODE  = "require"
-      # PGPASSWORD set out-of-band: make lambda-secret
+      # In-config on purpose: db_password is already in state via
+      # supabase_project, so out-of-band `make lambda-secret` bought no
+      # secrecy - and any later apply silently reverted the env to this
+      # block, leaving the probe authenticating with no password (run 6).
+      PGPASSWORD = var.db_password
     }
   }
 
