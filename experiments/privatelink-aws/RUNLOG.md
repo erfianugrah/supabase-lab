@@ -302,8 +302,45 @@ Destroy: verified clean same day (state 0; suite S3 bucket
 supabase-lab-suite-* removed separately - it is created by suite.sh,
 not tofu, so `make destroy` does not cover it; `make suite-clean` does).
 
+## 2026-08-02 - T22/T23 written, NOT YET RUN
+
+The "how private can the whole product get" question decomposes into three
+surfaces: the database socket (settled - PrivateLink + restrictions), the
+Supabase HTTP tier (not privatable, only removable), and the control plane
+(always public, proven harmless). Only the middle one has open questions,
+and until these run the answer is doc-cited, not measured - the same gap
+that made the prepared-statement claim wrong for a year.
+
+Two destructive runner tests added, both restoring their baseline in a
+finally block:
+
+- T22 `tests/t22-dataapi-disable.ts` - hypothesis: an EMPTY `db_schema` on
+  `PATCH /v1/projects/{ref}/postgrest` is the API-side equivalent of the
+  Dashboard's "Enable Data API" toggle. The published /v1 spec has no
+  `enabled` field, so a rejection is itself the finding (posture is
+  Dashboard-only, not expressible in IaC). Then measures: time for REST to
+  stop answering, both private ports still serving, and `db push --db-url`
+  still applying migrations with the HTTP tier off.
+- T23 `tests/t23-realtime-private.ts` - `private_only` IS a documented PAT
+  lever (`PATCH /v1/projects/{ref}/config/realtime`). The unmeasured part is
+  where enforcement lands: WebSocket upgrade or channel join. If the anon
+  socket still opens, Realtime stays an internet-reachable surface and
+  "disable Realtime" overstates what the toggle buys.
+
+Still unverified, no test written:
+
+- Whether Supabase-hosted compute (Edge Functions, cron, webhooks) can reach
+  the database over PrivateLink at all, or is forced onto the public pooler.
+  If it is the latter, posture A has a hole wherever that logic lives.
+- Whether a Cloudflare Workers VPC Service accepts a hostname rather than
+  `--ipv4 <DATABASE_IP>`. Against this endpoint an IP target is doubly bad:
+  ENI addresses churn on replacement (measured, run 6) and connecting by IP
+  breaks `verify-full`, since the cert carries only `db.<ref>.supabase.co`.
+
 ## Open follow-ups
 
+- [ ] Run the suite with `--destructive` to close T22/T23; both are
+      config-flip tests, so a Micro project and one lab spin covers them.
 - [x] Generalise evidence into a public guide - done:
       lexicanum `reference/supabase-aws-privatelink`.
 - [ ] Feed results back to the private findings notes (claims move from
