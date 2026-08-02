@@ -1,0 +1,19 @@
+{
+  "name": "supabase-lab",
+  "private": true,
+  "type": "module",
+  "workspaces": ["harness"],
+  "scripts": {
+    "test": "bun test harness",
+    "typecheck": "bunx tsc --noEmit -p harness/tsconfig.json"
+  },
+  "dependencies": {
+    "pg": "^8.13.1",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/pg": "^8.11.10",
+    "@types/ws": "^8.5.13"
+  }
+}
