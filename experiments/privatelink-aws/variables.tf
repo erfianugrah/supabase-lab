@@ -20,6 +20,12 @@ variable "aws_account_id" {
   type        = string
 }
 
+variable "enable_ipv6" {
+  description = "Give the VPC and private subnets IPv6, so a dualstack endpoint can be attempted (the IPv6-first-VPC question). Off by default - it changes the network every other test measures."
+  type        = bool
+  default     = false
+}
+
 variable "aws_access_key_id" {
   description = "AWS access key id. Empty = use the ambient chain (profile/SSO/env)."
   type        = string
