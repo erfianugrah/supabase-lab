@@ -83,6 +83,7 @@ aws s3 cp "s3://$BUCKET/artifacts/runner-$TS.json" "$EVID/runner.json" --quiet
 
 echo "== 4/5 run the local-side battery =="
 PVLAB_REF="$REF" PVLAB_LAMBDA="$(tofu output -raw lambda_invoke 2>/dev/null | grep -q 'disabled' && echo 0 || echo 1)" \
+	PVLAB_ENDPOINT_IPS="$(tofu output -json endpoint_ips 2>/dev/null | jq -r 'join(",")')" \
 	DB_PASSWORD="$DBPW" SUPABASE_ACCESS_TOKEN="$TOK" AWS_REGION="$REGION" \
 	"$ROOT/harness/dist/pvlab" --where local --out "$EVID" $DESTRUCTIVE | tail -20
 

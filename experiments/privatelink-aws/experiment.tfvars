@@ -7,3 +7,4 @@ instance_size        = "micro"
 runner_instance_type = "t3.micro"
 enable_lambda        = true
 public_access_cidrs  = ["0.0.0.0/0", "::/0"]
+enable_ipv6          = false

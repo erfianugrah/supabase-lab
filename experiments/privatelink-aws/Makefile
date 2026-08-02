@@ -96,12 +96,44 @@ apply:
 	tofu plan $(VARS) $(ARNVARS) -out=tfplan
 	tofu apply tfplan
 
+# A VPC-attached Lambda gets AWS-managed (Hyperplane) ENIs that AWS only
+# releases some minutes AFTER the last function using them is deleted. A
+# single `tofu destroy` therefore sits for 10-25 minutes retrying subnet and
+# security-group deletion (measured: 21m in run 7, still blocked at 13m in
+# run 8). Deleting the Lambda first, then reaping the ENIs the moment they go
+# `available`, turns that into ~2 minutes.
 destroy:
+	@if grep -q 'enable_lambda *= *true' experiment.tfvars && tofu state list 2>/dev/null | grep -q aws_lambda_function; then \
+		echo "==> deleting the Lambda first so AWS starts releasing its ENIs"; \
+		tofu destroy $(VARS) $(ARNVARS) -target='aws_lambda_function.probe[0]' -auto-approve; \
+		$(MAKE) --no-print-directory reap-enis; \
+	fi
 	tofu plan $(VARS) $(ARNVARS) -destroy -out=destroy.tfplan
 	tofu apply destroy.tfplan
 	@rm -f arns.tfvars destroy.tfplan tfplan tfplan-*
 	@echo "arns.tfvars removed - it gates phase 2, and a stale copy against empty"
 	@echo "state makes the next plan fail on the ENI for_each (unknown keys)."
+
+# Delete lab ENIs as soon as AWS detaches them. Bounded so it cannot hang a
+# teardown; the subsequent destroy still works if this gives up.
+reap-enis:
+	@region=$$(grep aws_region experiment.tfvars | cut -d'"' -f2); \
+	vpc=$$(aws ec2 describe-vpcs --region $$region --filters Name=tag:Name,Values=supabase-lab --query 'Vpcs[0].VpcId' --output text 2>/dev/null); \
+	[ "$$vpc" = "None" ] && exit 0; \
+	for i in $$(seq 1 40); do \
+		avail=$$(aws ec2 describe-network-interfaces --region $$region \
+			--filters Name=vpc-id,Values=$$vpc Name=status,Values=available \
+			--query 'NetworkInterfaces[].NetworkInterfaceId' --output text); \
+		if [ -n "$$avail" ]; then \
+			for eni in $$avail; do aws ec2 delete-network-interface --region $$region --network-interface-id $$eni && echo "  reaped $$eni"; done; \
+		fi; \
+		stuck=$$(aws ec2 describe-network-interfaces --region $$region \
+			--filters Name=vpc-id,Values=$$vpc Name=description,Values='AWS Lambda VPC*' \
+			--query 'NetworkInterfaces[].NetworkInterfaceId' --output text); \
+		[ -z "$$stuck" ] && { echo "  all Lambda ENIs released"; exit 0; }; \
+		echo "  waiting for AWS to detach Lambda ENIs ($$i/40)"; sleep 15; \
+	done; \
+	echo "  giving up on ENI reaping - destroy will retry on its own"
 
 # Full automated suite: deploy scripts + gocurl to the runner, run TLS /
 # latency / ceiling / restart phases, pull artifacts, render evidence/<ts>/REPORT.md
