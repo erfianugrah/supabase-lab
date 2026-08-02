@@ -134,6 +134,28 @@ Measured (micro, ap-southeast-1; evidence/20260731-175026/REPORT.md):
 - Direct endpoint is IPv6-only; from an IPv4-only VPC there is no
   public-direct path (IPv4 add-on exists but is moot under PrivateLink).
 
+## experiments/http-tier-lockdown - key facts (validated 2026-08-02)
+
+One project, no AWS. PrivateLink settles the DB socket; this settles what
+can be done about the managed HTTP tier on `<ref>.supabase.co`.
+
+- Data API "disable" has NO published /v1 lever. `PATCH
+  /v1/projects/{ref}/postgrest` accepts `db_schema: ""` (200), but the
+  result is a WEDGED PostgREST, not a disabled one: anon reads return
+  `503 PGRST002 "Could not query the database for the schema cache.
+  Retrying."` within 6-8s, steady for at least 120s, `/graphql/v1` 503 with
+  it, and `/rest/v1/` root keeps answering 401 (gateway unaffected).
+  Restore takes 1-2s. Do NOT sell this as the Dashboard toggle's
+  equivalent - the toggle stays Dashboard-only, like the PrivateLink
+  association.
+- Realtime `private_only` IS a documented lever (`PATCH
+  /v1/projects/{ref}/config/realtime`, 204) and takes effect in ~9s, but it
+  is an AUTHORIZATION control, not a network one: the anon WebSocket
+  handshake still succeeds, and the refusal arrives in the join reply
+  (`"PrivateOnly: This project only allows private channels"`). It narrows
+  what a connected client may do; it does not remove the endpoint.
+- Auth and Storage have no equivalent toggle.
+
 ## Commands
 
 Root: `make secrets-decrypt`, `make secrets-encrypt`, `make experiments`.

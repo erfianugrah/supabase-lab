@@ -302,6 +302,20 @@ Destroy: verified clean same day (state 0; suite S3 bucket
 supabase-lab-suite-* removed separately - it is created by suite.sh,
 not tofu, so `make destroy` does not cover it; `make suite-clean` does).
 
+## 2026-08-02 - T22/T23 written; HTTP-tier half RUN (elsewhere)
+
+The HTTP-tier questions do not need a VPC, so they were answered on a bare
+project in `experiments/http-tier-lockdown` rather than waiting for a spin
+here. Headline: an empty `db_schema` does NOT emulate the Dashboard's
+"Enable Data API" toggle - it wedges PostgREST into a `503 PGRST002`
+schema-cache retry loop (steady for 120s), takes `/graphql/v1` with it, and
+leaves the gateway answering 401 on the root throughout. Realtime
+`private_only` is enforced at channel JOIN, not at the WebSocket upgrade.
+Full numbers and verbatim payloads: `experiments/http-tier-lockdown/RUNLOG.md`.
+
+Still owed by THIS experiment: T22d/e/f, the private-path-survives-lockdown
+rows, which need the `db` capability from inside the VPC.
+
 ## 2026-08-02 - T22/T23 written, NOT YET RUN
 
 The "how private can the whole product get" question decomposes into three
@@ -339,8 +353,10 @@ Still unverified, no test written:
 
 ## Open follow-ups
 
-- [ ] Run the suite with `--destructive` to close T22/T23; both are
-      config-flip tests, so a Micro project and one lab spin covers them.
+- [x] T22a/b/c/g/h + all of T23 - closed on a bare project, see
+      `experiments/http-tier-lockdown/RUNLOG.md`.
+- [ ] T22d/e/f on the next `--destructive` spin here: private path on 5432
+      and 6543, plus `db push --db-url`, while the Data API is wedged.
 - [x] Generalise evidence into a public guide - done:
       lexicanum `reference/supabase-aws-privatelink`.
 - [ ] Feed results back to the private findings notes (claims move from
