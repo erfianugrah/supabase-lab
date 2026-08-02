@@ -2,7 +2,7 @@
 #
 # /etc/pvlab.env is written by user_data with everything known at apply time.
 # It deliberately does NOT contain the DB password or the Supabase PAT:
-# export SUPABASE_ACCESS_TOKEN and let run-matrix.sh prompt for the password
+# export SUPABASE_ACCESS_TOKEN; the pvlab harness binary is shipped by suite.sh
 # inside the SSM session.
 
 data "aws_ami" "al2023" {
@@ -68,13 +68,12 @@ resource "aws_instance" "runner" {
   iam_instance_profile   = aws_iam_instance_profile.runner.name
 
   user_data = templatefile("${path.module}/runner/user-data.sh", {
-    ref        = local.ref
-    phz        = local.phz
-    region     = var.aws_region
-    phase2     = local.phase2
-    ep_dns     = local.phase2 ? try(aws_vpc_endpoint.supabase[0].dns_entry[0].dns_name, "") : ""
-    ep_ips     = local.phase2 ? join(" ", [for eni in data.aws_network_interface.endpoint : eni.private_ip]) : ""
-    run_matrix = file("${path.module}/runner/run-matrix.sh")
+    ref    = local.ref
+    phz    = local.phz
+    region = var.aws_region
+    phase2 = local.phase2
+    ep_dns = local.phase2 ? try(aws_vpc_endpoint.supabase[0].dns_entry[0].dns_name, "") : ""
+    ep_ips = local.phase2 ? join(" ", [for eni in data.aws_network_interface.endpoint : eni.private_ip]) : ""
   })
 
   tags = { Name = "supabase-lab-runner" }
