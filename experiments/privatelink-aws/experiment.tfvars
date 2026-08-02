@@ -5,5 +5,5 @@ aws_region           = "ap-southeast-1"
 project_name         = "lab-privatelink"
 instance_size        = "micro"
 runner_instance_type = "t3.micro"
-enable_lambda        = false
+enable_lambda        = true
 public_access_cidrs  = ["0.0.0.0/0", "::/0"]
