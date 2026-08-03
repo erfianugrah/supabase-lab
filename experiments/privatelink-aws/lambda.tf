@@ -48,7 +48,7 @@ resource "aws_lambda_function" "probe" {
 
   function_name    = "supabase-lab-probe"
   role             = aws_iam_role.lambda[0].arn
-  runtime          = "nodejs20.x"
+  runtime          = "nodejs24.x"
   handler          = "index.handler"
   filename         = data.archive_file.lambda[0].output_path
   depends_on       = [aws_cloudwatch_log_group.lambda]
