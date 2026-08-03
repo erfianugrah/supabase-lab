@@ -17,6 +17,15 @@ platform behaviour or writing it into docs
 - No provisioning scripts: everything is OpenTofu resources. The only shell
   payload is Makefile/suite orchestration (phase gating, ARN lookups, SSM,
   S3 staging); the tests themselves are the typed harness, not shell.
+- ONE registry covers every experiment: `harness/scripts/gen-registry.ts` scans
+  `experiments/*/tests` with no argument, and selection happens at run time
+  (`--only`, `--where`, capability gating). Do not go back to passing one
+  experiment's dir at build time: the generated registry (gitignored) is what
+  the compiled binary can reach, so a per-experiment build made `dist/pvlab`
+  carry whichever experiment was built last and silently could not run the
+  others. Registering all of them costs nothing - a test whose project ref is
+  absent self-skips with a reason. Pass `--experiment <name>` so the report
+  titles itself correctly.
 - Tests live in `harness/` (shared contract + runner + report renderer) and
   `experiments/<name>/tests/*.ts` (the test modules). Adding a test is ONE
   file exporting a `TestModule`: `where` picks the vantage (runner vs local
@@ -155,6 +164,32 @@ can be done about the managed HTTP tier on `<ref>.supabase.co`.
   (`"PrivateOnly: This project only allows private channels"`). It narrows
   what a connected client may do; it does not remove the endpoint.
 - Auth and Storage have no equivalent toggle.
+
+## experiments/cross-project-auth - key facts (validated 2026-08-03)
+
+Two projects, no AWS. Can one project's identity be trusted by another, so a
+tenant keeps its token across a move? See RUNLOG.md.
+
+- Third-party-auth config shapes: `oidc_issuer_url` and `jwks_url` BOTH
+  resolve, on the create response (tens to low hundreds of ms), to identical
+  key material. `custom_jwks` is accepted with 201 and never resolves
+  (`resolved_at` null past 92s) - reproduced on a fresh project pair, so the
+  earlier hand-rolled-SFP finding was not environmental. Pick either working
+  shape on grounds of which URL you prefer to hard-code, not capability.
+- The response `type` is `custom` for all three shapes: it does not tell you
+  which shape created an integration. Read the three fields.
+- Cross-project portability holds, and is attributable: the SAME token is
+  refused with `401 PGRST301` before trust exists, accepted about a second
+  after the integration is created, reads a copied slice with no re-login, and
+  is refused again under a second after the integration is deleted. Hold the
+  token constant and vary the target's config - that beats a foreign-key
+  negative control, and an anon-bearer control proves nothing (anon is signed
+  by a key the target trusts and is stopped by RLS, not by signature checks).
+- Trust revocation is prompt in the same way trust creation is. Neither is
+  synchronous with the API call; both land well inside two seconds.
+- Untested and load-bearing for any "the tenant is now independent" claim:
+  refresh still goes to the ISSUING project's `/token` endpoint. The spoke can
+  verify, not mint.
 
 ## Commands
 

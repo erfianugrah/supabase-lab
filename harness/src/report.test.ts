@@ -13,6 +13,18 @@ const artifact = (results: RunArtifact["results"]): RunArtifact => ({
 });
 
 describe("renderMarkdown", () => {
+  test("the title names the experiment, and does not claim PrivateLink when unlabelled", () => {
+    const labelled = renderMarkdown({
+      ...artifact([{ id: "X01", title: "shapes", status: "pass" }]),
+      experiment: "cross-project-auth",
+    });
+    expect(labelled.split("\n")[0]).toBe("# cross-project-auth run - 2026-08-02T00:00:00Z");
+
+    const unlabelled = renderMarkdown(artifact([{ id: "X01", title: "shapes", status: "pass" }]));
+    expect(unlabelled.split("\n")[0]).toBe("# supabase-lab run - 2026-08-02T00:00:00Z");
+    expect(unlabelled).not.toContain("PrivateLink");
+  });
+
   test("a new test's measurements become columns with no renderer change", () => {
     const md = renderMarkdown(
       artifact([
