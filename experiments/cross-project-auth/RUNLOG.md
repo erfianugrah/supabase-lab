@@ -16,10 +16,14 @@ Two things were being asserted rather than measured before this run:
    `custom_jwks` is accepted and never works, and that `jwks_url` works. It
    never tested `oidc_issuer_url`, which was nonetheless written up as
    "likely the better choice" - a recommendation with no evidence under it.
-2. Portability was measured with a weak control: "the anon key gets nothing".
-   An anon bearer is signed by a key the target DOES trust and is refused by
-   RLS, so it says nothing about signature validation. Acceptance was
-   therefore not attributable to the trust configuration.
+2. Portability had a control - a token signed with a key the target does not
+   trust was refused - but not the strongest available one. That control varies
+   the TOKEN, so it leaves open whether the accepted token was accepted for the
+   reason claimed. Varying the target's CONFIGURATION instead, with the token
+   held byte-identical, closes that. (The guide's other control, "an anon key
+   gets nothing", proves less than it looks: an anon bearer is signed by a key
+   the target DOES trust and is stopped by grants and RLS, so it says nothing
+   about signature validation at all.)
 
 ## 2026-08-03 - run 1 (Micro x2, ap-southeast-1)
 
@@ -89,11 +93,12 @@ control, not an eventually-consistent hope.
 ## Why the negative control matters here
 
 "The token worked on both projects" and "the API is not checking signatures"
-produce identical observations. The pre-trust state distinguishes them, and it
-is a stronger control than signing a token with a foreign key, because it
-holds the token constant and varies only the target's configuration. It also
-falsifies the lazier reading of the earlier lab's result, in which the
-`jwks_url` integration might have been incidental.
+produce identical observations. A foreign-key token distinguishes them, and the
+earlier lab ran that one. The pre-trust state is the stronger version of the
+same control: it holds the token constant and varies only the target's
+configuration, so it also rules out the possibility that the accepted token
+differed from the refused one in some way nobody was tracking. Two controls
+that fail in the same direction for different reasons is the point.
 
 ## What this does NOT answer
 
