@@ -26,7 +26,7 @@ export function renderMarkdown(a: RunArtifact): string {
     (s) => [s, a.results.filter((r) => r.status === s).length] as const,
   ).filter(([, n]) => n > 0);
 
-  out.push(`# PrivateLink lab run - ${a.startedAt}`);
+  out.push(`# ${a.experiment ? `${a.experiment} run` : "supabase-lab run"} - ${a.startedAt}`);
   out.push("");
   out.push(
     `Project \`${a.ref}\` | region ${a.region} | vantage ${a.where}` +

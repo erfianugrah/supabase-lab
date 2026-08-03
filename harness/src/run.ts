@@ -66,6 +66,7 @@ async function mergeMode(files: string[], outDir: string): Promise<void> {
     where: first.where,
     region: first.region,
     ref: parts.find((p) => p.ref)?.ref ?? "",
+    experiment: first.experiment,
     labCommit: first.labCommit,
     toolVersions: Object.assign({}, ...parts.map((p) => p.toolVersions)),
     // Skips from one vantage are noise when the other vantage ran the test.
@@ -92,6 +93,10 @@ const main = async () => {
   const where = (arg("where", "runner") as Where) ?? "runner";
   const testsDir = arg("tests", "./tests")!;
   const outDir = arg("out", "./out")!;
+  // Which experiment this run belongs to. The registry is shared, so the label
+  // has to come from the invocation - the report title is otherwise a lie the
+  // moment a second experiment uses the same binary.
+  const experiment = arg("experiment") ?? process.env.PVLAB_EXPERIMENT;
   const only = arg("only")?.split(",").map((s) => s.trim()).filter(Boolean);
 
   const ctx = await buildCtx({ where });
@@ -153,6 +158,7 @@ const main = async () => {
     where,
     region: ctx.region,
     ref: ctx.ref,
+    experiment,
     labCommit: await labCommit(),
     toolVersions: await toolVersions(),
     results,

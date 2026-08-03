@@ -80,6 +80,11 @@ export interface RunArtifact {
   where: Where;
   region: string;
   ref: string;
+  /**
+   * Which experiment produced this. One registry now carries every
+   * experiment's tests, so the report cannot assume it is the PrivateLink one.
+   */
+  experiment?: string;
   labCommit?: string;
   toolVersions: Record<string, string>;
   results: TestResult[];
