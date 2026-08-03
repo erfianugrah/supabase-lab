@@ -165,6 +165,24 @@ can be done about the managed HTTP tier on `<ref>.supabase.co`.
   what a connected client may do; it does not remove the endpoint.
 - Auth and Storage have no equivalent toggle.
 
+## Provisioning: ACTIVE_HEALTHY is not readiness (validated 2026-08-03)
+
+Affects every experiment here, since they all create projects.
+
+- The project's aggregate `status` flipping to `ACTIVE_HEALTHY` does not mean the
+  services are usable. Poll `GET /v1/projects/{ref}/health?services=auth&services=rest&services=db`
+  per service instead, as the Supabase-for-Platforms guide says.
+- That is still not sufficient. On 2 of 2 fresh projects, all three services
+  returned `ACTIVE_HEALTHY` on the FIRST health poll and the first
+  `POST /auth/v1/admin/users` call nonetheless failed with
+  `500 "Database error checking email"`, succeeding about ten seconds later.
+  Retry the first write with backoff; do not treat its failure as a finding.
+- New projects carry BOTH key pairs: legacy `anon` / `service_role` JWTs and the
+  newer `sb_publishable_` / `sb_secret_` keys. Select by `name` OR `type` when
+  reading `/api-keys?reveal=true`, or a script that assumes one shape sends a
+  non-JWT as a bearer and gets `PGRST301 "Expected 3 parts in JWT; got 1"`, which
+  reads like an auth finding and is not.
+
 ## experiments/cross-project-auth - key facts (validated 2026-08-03)
 
 Two projects, no AWS. Can one project's identity be trusted by another, so a
@@ -181,10 +199,11 @@ tenant keeps its token across a move? See RUNLOG.md.
 - Cross-project portability holds, and is attributable: the SAME token is
   refused with `401 PGRST301` before trust exists, accepted about a second
   after the integration is created, reads a copied slice with no re-login, and
-  is refused again under a second after the integration is deleted. Hold the
-  token constant and vary the target's config - that beats a foreign-key
-  negative control, and an anon-bearer control proves nothing (anon is signed
-  by a key the target trusts and is stopped by RLS, not by signature checks).
+  is refused again under a second after the integration is deleted. Holding the
+  token constant and varying the target's config is the stronger form of the
+  foreign-key control the earlier lab ran - it also rules out the two tokens
+  differing in some untracked way. An anon-bearer control, by contrast, proves
+  nothing: anon is signed by a key the target trusts and is stopped by RLS.
 - Trust revocation is prompt in the same way trust creation is. Neither is
   synchronous with the API call; both land well inside two seconds.
 - Untested and load-bearing for any "the tenant is now independent" claim:
