@@ -257,6 +257,14 @@ export interface CopyOutcome {
   /** Columns actually copied (source-target intersection, non-generated). */
   cols: number;
   result: SqlResult;
+  /**
+   * The SELECT that read the source. Kept because an insert of zero rows
+   * succeeds: without this, a dump that ERRORED is indistinguishable from a
+   * source that legitimately had nothing to copy, and the test reports a pass
+   * having moved nothing. That is exactly how a broken predicate survived the
+   * first live run of this experiment.
+   */
+  dump: SqlResult;
 }
 
 /**
@@ -292,6 +300,11 @@ export async function copyTable(
     `select coalesce(json_agg(t), '[]'::json)::text as payload
        from (select ${list} from ${schema}.${table} where ${where}) t`,
   );
+  if (dump.error) {
+    // Nothing was read, so nothing can be inserted. Report the read failure
+    // rather than an empty-but-successful insert.
+    return { read: 0, cols: cols.length, result: dump, dump };
+  }
   const payload = String(dump.rows?.[0]?.payload ?? "[]");
   const rows = JSON.parse(payload) as unknown[];
   const t = tag();
@@ -301,7 +314,7 @@ export async function copyTable(
     `insert into ${schema}.${table} (${list})
        select ${selectList} from json_populate_recordset(null::${schema}.${table}, ${t}${payload}${t}::json)`,
   );
-  return { read: rows.length, cols: cols.length, result };
+  return { read: rows.length, cols: cols.length, result, dump };
 }
 
 /**

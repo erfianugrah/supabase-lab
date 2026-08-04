@@ -22,7 +22,8 @@ import {
   waitReady,
 } from "../lib/promote";
 
-const EMAIL = "p02-mfa@lab.invalid";
+const RUN = Math.random().toString(36).slice(2, 8);
+const EMAIL = `p02-mfa-${RUN}@lab.invalid`;
 
 // ---- base32 decode (RFC 4648, padded) ----
 const B32 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
@@ -266,6 +267,13 @@ const mod: TestModule = {
       "auth",
       "refresh_tokens",
       `user_id = '${uid}'`,
+      // Do NOT carry the source's surrogate id. auth.refresh_tokens.id is a
+      // bigserial, and a target that has seen ANY prior auth activity already
+      // occupies the low ids - the insert then dies on refresh_tokens_pkey.
+      // The token string is what the client presents; the id is the target's
+      // to assign. (Copying ids instead is legal, but then the sequence resync
+      // below is mandatory rather than belt-and-braces.)
+      { id: "nextval('auth.refresh_tokens_id_seq')" },
     );
 
     // Sequence resync: without it the tenant's NEXT refresh collides on an

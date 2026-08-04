@@ -26,7 +26,8 @@ no endpoint; the PAT and two project refs are the whole input. All
 
 The positive case. Tenant A reads its rows on the shared project; its auth
 rows are copied to the dedicated project in FK order (users -> identities
--> sessions -> refresh_tokens) and `auth.refresh_tokens_id_seq` is resynced;
+-> sessions -> refresh_tokens, with the target assigning its own
+`refresh_tokens.id`) and `auth.refresh_tokens_id_seq` is resynced;
 the refresh token the client ALREADY HELD
 mints a session at the dedicated project with no password grant; it reads
 its row there.
@@ -67,6 +68,30 @@ Probes the Management API's vanity-subdomain endpoints
 recorded result with its status code, never a thrown error. The predecessor
 bash script read check-availability's 201 as a refusal and skipped
 activate, which is why this test exists.
+
+## What the first live run changed
+
+The port went green on the offline gates and then failed twice against real
+projects, which is the argument for running it.
+
+1. `auth.refresh_tokens.user_id` is `character varying`, not `uuid`. The copy
+   predicate compared it against a subquery returning `uuid`, so the dump
+   errored - and because an INSERT of zero rows succeeds, the copy reported a
+   pass having moved nothing. `copyTable` now returns the dump result and a
+   failed read can no longer read as an empty-but-successful copy.
+2. Do not carry the source's surrogate id for `auth.refresh_tokens`. It is a
+   bigserial, and a target that has seen any prior auth activity already
+   occupies the low ids, so the insert dies on `refresh_tokens_pkey`. The
+   token string is what the client presents; the id belongs to the target.
+   The predecessor bash never hit this because it created a fresh project per
+   run and destroyed it afterwards - the collision only appears when the same
+   pair is probed twice, which this repo does by design.
+3. The vanity endpoint wants a bare subdomain LABEL. A dotted hostname is
+   rejected 400 before availability is evaluated.
+
+Emails are randomised per run for the same reason: `adminCreate` 422s on a
+duplicate address, so constant addresses make a module pass exactly once
+against a given pair of projects.
 
 ## Provisioning
 
