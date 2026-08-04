@@ -286,6 +286,35 @@ per-customer projects merged INTO one shared multi-tenant project. See RUNLOG.md
 - The management query endpoint connects as `postgres`, so it sees every row
   while a tenant sees none. Verifying data landed says nothing about isolation.
 
+## experiments/key-rotation - key facts (ported 2026-08-04, findings from 2026-08-03/04)
+
+Hub and spoke: the hub's GoTrue is the spoke's third-party auth issuer, and the
+hub rotates its signing key. Ported from bash that produced the findings below;
+the port has NOT been run live yet, so treat it as a mechanism awaiting its first
+run rather than a source of measurements.
+
+- The window belongs to the CONSUMER's cache, not the issuer's publication. The
+  hub published the new kid in its own JWKS in about 7 minutes; the spoke's
+  cached kid set held exactly one entry across 282 probes and 37 minutes and
+  never re-resolved. Re-creating the integration does not help - it re-caches
+  the same stale set.
+- A token signed by the old key keeps working through `previously_used` AND
+  through `revoked` - still 200 sixteen minutes after revocation, with the key's
+  status re-read immediately before each probe.
+- Standby-key creation is rate limited on a fresh project: `Please wait until
+  <ISO8601>`, measured at 144 s, 127 s and 131 s. Wait the deadline out; do not
+  retry past it.
+- Every probe records four fields - PostgREST error code, the spoke's cached kid
+  set, the hub's published JWKS, and the token key's status at that moment. A
+  sensor fails if any goes missing, because capturing only HTTP status is what
+  left the original anomaly (G34) unexplained. Do not let `pgrst_code` fall back
+  to the HTTP status; that conflation is the thing the four fields prevent.
+- R03 mints its token while the key is still active, THEN rotates and revokes.
+  An earlier draft re-promoted the key it was about to revoke, which adds two
+  rotations the measured protocol never had - and they perturb the consumer
+  cache under test, so a non-reproduction would have been the harness's fault.
+- Windows and intervals are configurable. The live ones are 20 and 15 minutes.
+
 ## experiments/tenant-promotion - key facts (validated 2026-08-04)
 
 Two projects, no AWS. The direction consolidation runs backwards: one tenant

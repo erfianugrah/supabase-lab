@@ -12,6 +12,9 @@ facts):
 - `tenant-promotion` - the same road backwards: one tenant moved OUT of a shared
   project into its own, whether a client follows without re-authenticating, and
   what it takes to retire the identity left behind.
+- `key-rotation` - what happens to a trusting project when the issuer rotates
+  its signing key. Ported mechanism; the findings it reproduces are already
+  measured, the port itself has not been run live.
 - `http-tier-lockdown` - restricting the HTTP tier.
 - `privatelink-aws` - PrivateLink (VPC Lattice) to a Supabase project in
   ap-southeast-1 (demo region; region is one var - `aws_region` in
