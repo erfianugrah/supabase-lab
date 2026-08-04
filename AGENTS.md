@@ -325,6 +325,37 @@ Ported from throwaway bash that produced the same findings; see RUNLOG.md.
 - Emails are randomised per run: `adminCreate` 422s on a duplicate address, so a
   module with a constant address passes exactly once against a given pair.
 
+## experiments/platform-downtime - key facts (validated 2026-08-04)
+
+- What a platform OPERATION costs a client, per connection path. All windows
+  below sampled at 500 ms, all n=1, one Micro project in ap-southeast-1.
+- **Restart: the paths do not move together.** REST and Realtime served
+  CONTINUOUSLY through a full restart - zero failed samples. Auth was down 75 s
+  (`HTTP 521`), Storage 78 s (`HTTP 500`), the pooler 158 s. An app whose read
+  path is PostgREST may not notice a restart; one signing users in during the
+  same window fails for over a minute. This refines T14, which measured one path
+  at 5 s resolution and reported a single number.
+- The pooler is down roughly TWICE as long as the HTTP tier, and its error
+  (`Failed to connect to database: {:error, :timeout}`) says Supavisor is alive
+  and waiting on Postgres behind it, not that the pooler died.
+- **A network restriction does not touch the HTTP tier.** Locking the database
+  to a CIDR that excludes you leaves REST, Auth, Storage and Realtime serving -
+  they reach Postgres from inside. It DOES reach the pooler: Supavisor enforces
+  the allow-list against the client address, so 6543 is covered, not only direct
+  5432. It bites ~1 s after the API returns 201 and the refusal names the
+  rejected address.
+- A destructive module that restores state must restore INSIDE the sampled
+  operation. The first D02 restored in a `finally`, so recovery happened after
+  sampling stopped and every run reported "never recovered" - it could prove a
+  restriction bites and measure nothing else.
+- Report time-to-bite separately from outage duration. They are different facts,
+  and the first survives a run that ends before recovery.
+- **Bun does not implement ws's `unexpected-response` event.** A 4xx upgrade
+  arrives as `error: failed: Expected 101 status code` with no status, so a
+  WebSocket probe cannot tell "answered 401" from "dead" under this runtime
+  (verified against a live project: curl gets 401, ws gets the string). Do not
+  add that handler back expecting it to fire.
+
 ## experiments/platform-facts - key facts
 
 - Not a behaviour test: a dated snapshot of the platform constants that docs
