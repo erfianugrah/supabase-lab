@@ -20,7 +20,9 @@ export type Capability =
   | "peer" // a second project ref is available (multi-project experiments)
   | "org" // at least one organization slug supplied
   | "pgbench" // pgbench on PATH (postgresql*-contrib)
-  | "openssl";
+  | "openssl"
+  | "pooler" // pooler host supplied via PVLAB_ENDPOINT_POOLER
+  | "direct-db"; // direct 5432 reachable from this vantage (IPv6 - runner only)
 
 export type Status = "pass" | "fail" | "skip" | "info";
 
@@ -65,6 +67,15 @@ export interface Ctx {
   peers: Record<string, string>;
   /** Organization slugs under test, from `PVLAB_ORG_SLUGS` (comma-separated). */
   orgSlugs: string[];
+  /**
+   * Probe targets for this run, by role - `pooler`, `custom_domain`, `replica`.
+   * Populated from `PVLAB_ENDPOINT_<NAME>`, lowercased. Same reasoning as
+   * `peers`: a test that reads process.env directly puts the run's shape
+   * outside the context object whose job is to describe it. An env var set to
+   * empty counts as absent, because a Makefile interpolating a missing tofu
+   * output exports exactly that.
+   */
+  endpoints: Record<string, string>;
   capabilities: Set<Capability>;
   /** Where this process is running, so `where`-filtering works. */
   where: Where;

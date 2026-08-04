@@ -34,6 +34,7 @@ export interface CtxInput {
   endpointIps?: string[];
   peers?: Record<string, string>;
   orgSlugs?: string[];
+  endpoints?: Record<string, string>;
   quiet?: boolean;
 }
 
@@ -49,6 +50,21 @@ export function readPeers(env: Record<string, string | undefined>): Record<strin
     if (m?.[1] && v) peers[m[1].toLowerCase()] = v;
   }
   return peers;
+}
+
+/**
+ * `PVLAB_ENDPOINT_POOLER=host` -> `{ pooler: "host" }`. Roles are
+ * experiment-defined, exactly as with peers. `PVLAB_ENDPOINT_IPS` is excluded:
+ * it predates this and is parsed on its own in buildCtx.
+ */
+export function readEndpoints(env: Record<string, string | undefined>): Record<string, string> {
+  const endpoints: Record<string, string> = {};
+  for (const [k, v] of Object.entries(env)) {
+    if (k === "PVLAB_ENDPOINT_IPS") continue;
+    const m = k.match(/^PVLAB_ENDPOINT_([A-Z0-9_]+)$/);
+    if (m?.[1] && v) endpoints[m[1].toLowerCase()] = v;
+  }
+  return endpoints;
 }
 
 /**
@@ -80,6 +96,7 @@ export function deriveCapabilities(f: {
   pat?: string;
   peers?: Record<string, string>;
   orgSlugs?: string[];
+  endpoints?: Record<string, string>;
   hasPgbench?: boolean;
   hasOpenssl?: boolean;
   lambdaEnabled?: boolean;
@@ -92,6 +109,7 @@ export function deriveCapabilities(f: {
   if (f.pat) caps.add("pat");
   if (f.peers && Object.keys(f.peers).length) caps.add("peer");
   if (f.orgSlugs?.length) caps.add("org");
+  if (f.endpoints?.pooler) caps.add("pooler");
   if (f.hasPgbench) caps.add("pgbench");
   if (f.hasOpenssl) caps.add("openssl");
   if (f.where === "local" && f.lambdaEnabled) caps.add("lambda");
@@ -128,6 +146,8 @@ export async function buildCtx(input: CtxInput): Promise<Ctx> {
     input.orgSlugs ??
     (process.env.PVLAB_ORG_SLUGS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
 
+  const endpoints = input.endpoints ?? readEndpoints(process.env);
+
   const capabilities = deriveCapabilities({
     dbPassword,
     phzHost,
@@ -136,6 +156,7 @@ export async function buildCtx(input: CtxInput): Promise<Ctx> {
     pat,
     peers,
     orgSlugs,
+    endpoints,
     hasPgbench: await has("pgbench"),
     hasOpenssl: await has("openssl"),
     lambdaEnabled: process.env.PVLAB_LAMBDA === "1",
@@ -153,6 +174,7 @@ export async function buildCtx(input: CtxInput): Promise<Ctx> {
     endpointIps,
     peers,
     orgSlugs,
+    endpoints,
     capabilities,
     where: input.where,
     log: (m) => {
