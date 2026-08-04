@@ -1707,7 +1707,28 @@ point of `reachable()`.
 
 The riskiest line in the module is `$`${bin} ${args}`` - Bun interpolates the array as
 separate arguments, and a mistake there produces one giant argv entry that `sbperf` rejects
-with a usage dump. Verify it against a stub before trusting it against a real run:
+with a usage dump.
+
+**Do NOT try to reach the stub through the module.** `reachable()` preflights every target
+with a real connection before shelling out, so with no database up, all three targets skip
+and `sbperf` is never invoked - measured 2026-08-04, the stub below stayed untouched. That
+preflight is correct and worth keeping; it means this step has to exercise the interpolation
+in ISOLATION. Verified that way instead, with a password containing a space and a slash and
+a username containing a dot:
+
+```
+ARGC=20
+ARGV[1]=bench
+ARGV[2]=--db-url
+ARGV[3]=postgres://postgres.abcdefghijklmnopqrst:p%40ss%20w%2Ford@127.0.0.1:6543/postgres
+```
+
+Twenty separate entries, and the URL arrives as ONE argument with the credentials
+percent-encoded, which is what sbperf's `new URL()` split requires. The stub's JSON then
+parses through `parseBenchJson` to a tps figure, so the whole spawn-to-summary path is
+covered without a database.
+
+The stub, for reference:
 
 ```bash
 mkdir -p /tmp/stubbin && cat > /tmp/stubbin/sbperf <<'EOF'
