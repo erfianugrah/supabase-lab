@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { deriveCapabilities, readPeers } from "./ctx";
+import { deriveCapabilities, readEndpoints, readPeers } from "./ctx";
 
 describe("deriveCapabilities", () => {
   test("db needs BOTH a password and a host", () => {
@@ -61,4 +61,32 @@ describe("readPeers", () => {
     // then fails on a blank ref instead of skipping with a reason.
     expect(readPeers({ PVLAB_PEER_TARGET: "" })).toEqual({});
   });
+});
+
+describe("readEndpoints", () => {
+  test("PVLAB_ENDPOINT_POOLER=host -> { pooler: host }, lowercased", () => {
+    expect(
+      readEndpoints({
+        PVLAB_ENDPOINT_POOLER: "pooler.example.test",
+        PVLAB_ENDPOINT_CUSTOM_DOMAIN: "db.example.test",
+        UNRELATED: "x",
+      }),
+    ).toEqual({ pooler: "pooler.example.test", custom_domain: "db.example.test" });
+  });
+
+  test("an empty value counts as absent", () => {
+    // A Makefile interpolating a missing tofu output exports exactly this.
+    expect(readEndpoints({ PVLAB_ENDPOINT_POOLER: "" })).toEqual({});
+  });
+
+  test("PVLAB_ENDPOINT_IPS is NOT an endpoint", () => {
+    // It predates this and is parsed separately in buildCtx; a greedy prefix
+    // match would swallow it into endpoints.ips.
+    expect(readEndpoints({ PVLAB_ENDPOINT_IPS: "10.0.0.1 10.0.0.2" })).toEqual({});
+  });
+});
+
+test("pooler capability comes from a supplied endpoint", () => {
+  expect(deriveCapabilities({ endpoints: {} }).has("pooler")).toBe(false);
+  expect(deriveCapabilities({ endpoints: { pooler: "h" } }).has("pooler")).toBe(true);
 });

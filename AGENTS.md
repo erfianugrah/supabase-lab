@@ -42,6 +42,27 @@ platform behaviour or writing it into docs
   so a missing ref is a skip with a reason rather than a probe against an
   empty string. An env var set to empty counts as absent - a Makefile
   interpolating a missing tofu output exports exactly that.
+- Probe targets live in `ctx.endpoints`, keyed by an experiment-defined role and
+  populated from `PVLAB_ENDPOINT_<ROLE>` - same reasoning as `peers`/`orgSlugs`,
+  and the third time that lesson came up, so it is general rather than three
+  named fields. `PVLAB_ENDPOINT_POOLER` also gates the `pooler` capability.
+  `PVLAB_ENDPOINT_IPS` is deliberately excluded (it predates this and is parsed
+  on its own).
+- `harness/src/sampler.ts` samples several connection paths independently while
+  an operation runs, and returns one scalar window per path. It exists because
+  measuring a platform operation means separating "what operation" from "what
+  paths" from "how we time it" - t14-restart.ts interleaves all three, which is
+  why it measures one path at 5s resolution. Recovery requires `settleMs` of
+  SUSTAINED success: a pooler queues before it refuses, so one lucky sample
+  mid-outage is not recovery. A run where nothing fails deliberately burns the
+  full `maxWaitMs` - a null result has to be earned by waiting, not assumed.
+- `pvlab --diff prev.json,cur.json` compares two run artifacts at the
+  (test id, measurement key) level and writes `diff.md`. Offline by
+  construction - dispatched before `buildCtx`, so it needs no PAT and touches no
+  network. Do NOT diff the rendered reports instead: they carry timestamps, a
+  lab commit and per-test durations, so every re-run diffs dirty and the one
+  entitlement that moved is buried. Only `measurements` is compared; TestResult's
+  own fields are run metadata.
 - One Management API client for everyone: `harness/src/mgmt.ts`. It does not
   use `res.json()`, because api.supabase.com answers aggressive polling with a
   Cloudflare HTML interstitial rather than a JSON 429; `classifyBody` reports
