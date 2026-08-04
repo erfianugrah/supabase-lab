@@ -30,3 +30,7 @@ tfplan-*
 
 # bun workspace
 node_modules/
+
+# Loop harness manifests: local tooling, and they carry absolute paths from
+# whichever machine wrote them.
+.pi/
