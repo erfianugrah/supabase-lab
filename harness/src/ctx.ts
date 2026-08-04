@@ -32,7 +32,23 @@ export interface CtxInput {
   pat?: string;
   region?: string;
   endpointIps?: string[];
+  peers?: Record<string, string>;
+  orgSlugs?: string[];
   quiet?: boolean;
+}
+
+/**
+ * `PVLAB_PEER_SPOKE=abc` -> `{ spoke: "abc" }`. Roles are experiment-defined;
+ * the harness only carries them, so adding a three-project experiment needs
+ * no change here.
+ */
+export function readPeers(env: Record<string, string | undefined>): Record<string, string> {
+  const peers: Record<string, string> = {};
+  for (const [k, v] of Object.entries(env)) {
+    const m = k.match(/^PVLAB_PEER_([A-Z0-9_]+)$/);
+    if (m?.[1] && v) peers[m[1].toLowerCase()] = v;
+  }
+  return peers;
 }
 
 /**
@@ -62,6 +78,8 @@ export function deriveCapabilities(f: {
   endpointIps?: string[];
   anonKey?: string;
   pat?: string;
+  peers?: Record<string, string>;
+  orgSlugs?: string[];
   hasPgbench?: boolean;
   hasOpenssl?: boolean;
   lambdaEnabled?: boolean;
@@ -72,6 +90,8 @@ export function deriveCapabilities(f: {
   if (f.endpointIps?.length) caps.add("endpoint");
   if (f.anonKey) caps.add("anon-key");
   if (f.pat) caps.add("pat");
+  if (f.peers && Object.keys(f.peers).length) caps.add("peer");
+  if (f.orgSlugs?.length) caps.add("org");
   if (f.hasPgbench) caps.add("pgbench");
   if (f.hasOpenssl) caps.add("openssl");
   if (f.where === "local" && f.lambdaEnabled) caps.add("lambda");
@@ -103,12 +123,19 @@ export async function buildCtx(input: CtxInput): Promise<Ctx> {
       .filter((l) => /^\d+\.\d+\.\d+\.\d+$/.test(l));
   }
 
+  const peers = input.peers ?? readPeers(process.env);
+  const orgSlugs =
+    input.orgSlugs ??
+    (process.env.PVLAB_ORG_SLUGS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+
   const capabilities = deriveCapabilities({
     dbPassword,
     phzHost,
     endpointIps,
     anonKey,
     pat,
+    peers,
+    orgSlugs,
     hasPgbench: await has("pgbench"),
     hasOpenssl: await has("openssl"),
     lambdaEnabled: process.env.PVLAB_LAMBDA === "1",
@@ -124,6 +151,8 @@ export async function buildCtx(input: CtxInput): Promise<Ctx> {
     pat,
     region: input.region ?? env.REGION ?? process.env.AWS_REGION ?? "ap-southeast-1",
     endpointIps,
+    peers,
+    orgSlugs,
     capabilities,
     where: input.where,
     log: (m) => {

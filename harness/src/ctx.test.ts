@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { deriveCapabilities } from "./ctx";
+import { deriveCapabilities, readPeers } from "./ctx";
 
 describe("deriveCapabilities", () => {
   test("db needs BOTH a password and a host", () => {
@@ -26,7 +26,39 @@ describe("deriveCapabilities", () => {
     expect(caps.has("openssl")).toBe(false);
   });
 
+  test("peer needs at least one entry, not just the key existing", () => {
+    expect(deriveCapabilities({ peers: {} }).has("peer")).toBe(false);
+    expect(deriveCapabilities({ peers: { target: "abc" } }).has("peer")).toBe(true);
+  });
+
+  test("org comes from supplied slugs", () => {
+    expect(deriveCapabilities({ orgSlugs: [] }).has("org")).toBe(false);
+    expect(deriveCapabilities({ orgSlugs: ["acme"] }).has("org")).toBe(true);
+  });
+
   test("empty input yields no capabilities", () => {
     expect(deriveCapabilities({}).size).toBe(0);
+  });
+});
+
+describe("readPeers", () => {
+  test("lowercases the role and ignores unrelated env", () => {
+    expect(readPeers({ PVLAB_PEER_TARGET: "abc", PATH: "/usr/bin", PVLAB_REF: "zzz" })).toEqual({
+      target: "abc",
+    });
+  });
+
+  test("carries several roles, so a three-project experiment needs no harness change", () => {
+    expect(readPeers({ PVLAB_PEER_SHARED: "a", PVLAB_PEER_DEDICATED: "b" })).toEqual({
+      shared: "a",
+      dedicated: "b",
+    });
+  });
+
+  test("an empty value is absent, not an empty-string peer", () => {
+    // A Makefile that interpolates a missing tofu output exports the name with
+    // an empty value; treating that as present is how a test gets planned and
+    // then fails on a blank ref instead of skipping with a reason.
+    expect(readPeers({ PVLAB_PEER_TARGET: "" })).toEqual({});
   });
 });

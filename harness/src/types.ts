@@ -17,6 +17,8 @@ export type Capability =
   | "lambda" // probe Lambda deployed (enable_lambda = true)
   | "anon-key" // project anon key available
   | "pat" // Supabase management PAT available
+  | "peer" // a second project ref is available (multi-project experiments)
+  | "org" // at least one organization slug supplied
   | "pgbench" // pgbench on PATH (postgresql*-contrib)
   | "openssl";
 
@@ -53,6 +55,16 @@ export interface Ctx {
   pat?: string;
   region: string;
   endpointIps: string[];
+  /**
+   * Other project refs this experiment spans, by role - `spoke`, `target`,
+   * `hub`. Multi-project experiments outnumber single-project ones now, and
+   * reading `process.env.X_SOMETHING_REF` inside a test put the run's shape
+   * outside the context object that is supposed to describe it. Populated
+   * from `PVLAB_PEER_<ROLE>`, lowercased.
+   */
+  peers: Record<string, string>;
+  /** Organization slugs under test, from `PVLAB_ORG_SLUGS` (comma-separated). */
+  orgSlugs: string[];
   capabilities: Set<Capability>;
   /** Where this process is running, so `where`-filtering works. */
   where: Where;
