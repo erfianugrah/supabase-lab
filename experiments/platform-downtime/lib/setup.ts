@@ -66,6 +66,25 @@ export async function buildProbes(ctx: Ctx): Promise<{ probes: Probe[]; note: st
 }
 
 /**
+ * Compute size is an ADDON mutation, not a resize endpoint:
+ * `PATCH /v1/projects/{ref}/billing/addons` with `{addon_variant, addon_type}`.
+ * Verb, path and body read off the published OpenAPI document on 2026-08-04.
+ * Variants run `ci_micro` through `ci_48xlarge`; that enum is the API SURFACE,
+ * which is not the same as what a given project is entitled to buy - the GET
+ * sibling returns the latter, and it is what F02 reads for the catalogue.
+ */
+export async function setComputeSize(ctx: Ctx, variant: string): Promise<void> {
+  const r = await mgmt(ctx, "PATCH", `/projects/${ctx.ref}/billing/addons`, {
+    addon_variant: variant,
+    addon_type: "compute_instance",
+  });
+  if (r.status === undefined || r.status >= 300) {
+    throw new Error(`resize to ${variant} failed: HTTP ${r.status} ${(r.text ?? "").slice(0, 200)}`);
+  }
+  ctx.log(`compute -> ${variant}: HTTP ${r.status}`);
+}
+
+/**
  * One column per path, plus the resolution the numbers were taken at.
  *
  * `first_fail_s` is separate from `window_s` on purpose: for an operation that
