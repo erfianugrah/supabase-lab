@@ -5,12 +5,14 @@
  *
  *   pvlab --tests ./tests --where runner --out ./out
  *   pvlab --tests ./tests --where local --only T20 --destructive
+ *   pvlab --diff evidence/a/run-1.json,evidence/b/run-2.json --out evidence/diff
  */
 import { $ } from "bun";
 import { readdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import { buildCtx, toolVersions } from "./ctx";
 import { planRun } from "./plan";
+import { diffArtifacts, renderDiffMarkdown } from "./diff";
 import { renderMarkdown } from "./report";
 import type { RunArtifact, TestModule, TestResult, Where } from "./types";
 
@@ -84,10 +86,31 @@ async function mergeMode(files: string[], outDir: string): Promise<void> {
   console.log(`merged ${parts.length} artifacts -> ${outDir}/REPORT.md`);
 }
 
+/**
+ * `--diff prev.json,cur.json` - compare two artifacts and write the result.
+ * Placed beside mergeMode and dispatched before buildCtx for the same reason:
+ * this is an offline operation on files and must not need a credential.
+ */
+async function diffMode(files: string[], outDir: string): Promise<void> {
+  if (files.length !== 2) throw new Error("--diff needs exactly two artifact paths, oldest first");
+  const [prevPath, curPath] = files as [string, string];
+  const prev = JSON.parse(await Bun.file(prevPath).text()) as RunArtifact;
+  const cur = JSON.parse(await Bun.file(curPath).text()) as RunArtifact;
+  const md = renderDiffMarkdown(diffArtifacts(prev, cur));
+  await $`mkdir -p ${outDir}`.quiet();
+  await Bun.write(`${outDir}/diff.md`, md);
+  console.log(md);
+}
+
 const main = async () => {
   const mergeArg = arg("merge");
   if (mergeArg) {
     await mergeMode(mergeArg.split(",").map((s) => s.trim()).filter(Boolean), arg("out", "./out")!);
+    return;
+  }
+  const diffArg = arg("diff");
+  if (diffArg) {
+    await diffMode(diffArg.split(",").map((t) => t.trim()).filter(Boolean), arg("out", "./out")!);
     return;
   }
   const where = (arg("where", "runner") as Where) ?? "runner";
