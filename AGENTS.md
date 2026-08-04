@@ -32,8 +32,27 @@ platform behaviour or writing it into docs
   orchestrator), `requires` gates on capabilities so it self-skips with a
   reason, `destructive` defers it behind `--destructive`, and anything in
   `measurements` becomes a report column with no renderer change.
+- Multi-project experiments carry their other refs in `ctx.peers`, keyed by an
+  experiment-defined role, populated from `PVLAB_PEER_<ROLE>`. Reading
+  `process.env.SOME_OTHER_REF` inside a test works and was how the first
+  two-project experiment did it, but it puts the run's shape outside the
+  context object whose whole job is to describe it, and the second and third
+  experiments would each have invented their own variable name. Same for
+  `ctx.orgSlugs` (`PVLAB_ORG_SLUGS`). Both gate capabilities (`peer`, `org`),
+  so a missing ref is a skip with a reason rather than a probe against an
+  empty string. An env var set to empty counts as absent - a Makefile
+  interpolating a missing tofu output exports exactly that.
+- One Management API client for everyone: `harness/src/mgmt.ts`. It does not
+  use `res.json()`, because api.supabase.com answers aggressive polling with a
+  Cloudflare HTML interstitial rather than a JSON 429; `classifyBody` reports
+  that as `throttled` so a retryable condition stops being recorded as a test
+  bug. Three experiments had their own copy of this before it moved here.
 - A measured `fail` is data, not an error to retry away. The suite records
   outcomes; it never drives the external system to green.
+- Test ids sort within the destructive tier, so id order IS execution order.
+  Where a negative control must precede the thing it makes interpretable
+  (vault-root-key V02 before V03), that ordering lives in the ids, not in the
+  Makefile - do not reorder them for tidiness.
 - `bun build --compile` bundles only statically-reachable code, so the test
   registry is GENERATED at build time (`harness/scripts/gen-registry.ts`).
   Never hand-edit `src/tests.generated.ts`; `bun run build` rewrites it.
@@ -206,9 +225,82 @@ tenant keeps its token across a move? See RUNLOG.md.
   nothing: anon is signed by a key the target trusts and is stopped by RLS.
 - Trust revocation is prompt in the same way trust creation is. Neither is
   synchronous with the API call; both land well inside two seconds.
-- Untested and load-bearing for any "the tenant is now independent" claim:
-  refresh still goes to the ISSUING project's `/token` endpoint. The spoke can
-  verify, not mint.
+- Load-bearing for any "the tenant is now independent" claim: refresh still
+  goes to the ISSUING project's `/token` endpoint. The spoke can verify, not
+  mint. Measured outside this repo since - a refresh presented to the trusting
+  project answers `400 refresh_token_not_found` - but there is still no test
+  module for it here, so treat it as reported, not reproducible. Worth a X0n.
+
+## experiments/tenant-consolidation - key facts (validated 2026-08-04)
+
+Three projects, no AWS. The direction the corpus does not cover: many
+per-customer projects merged INTO one shared multi-tenant project. See RUNLOG.md.
+
+- Merging is not promotion run backwards. Splitting a project cannot produce a
+  collision; merging two independently provisioned ones produces one for every
+  namespace they both allocated from - addresses, surrogate keys, sequences.
+- The auth-schema copy works many-to-one (34 non-generated columns), preserves
+  the uuid AND the password, and needs no `auth.identities` rows - but it is
+  not necessary. `POST /auth/v1/admin/users` accepts `password_hash` (the `$2a$`
+  string straight from the source), honours a supplied `id`, and sets
+  `app_metadata` at creation. The documented surface does the whole job.
+- `users_email_partial_key` is `UNIQUE (email) WHERE (is_sso_user = false)` - a
+  btree over the RAW column. The admin endpoint normalises case and refuses a
+  variant with 422 `email_exists`; a SQL copy does not, so it lands two rows for
+  one human. Which of the two a login then reaches is NOT stable: over five
+  attempts per casing, both accounts were reachable from both input strings and
+  the mapping changed mid-sequence. That is a cross-tenant exposure, not a
+  cosmetic duplicate.
+- One duplicate costs the whole customer: a single INSERT is atomic, so the
+  second source contributed 0 of its 2 users.
+- `primary key (tenant_id, id)` merges both sources with ids intact. The first
+  write AFTER the merge still collides - the merged table's sequence starts at
+  1 - and that surfaces on the first real write, not during the migration.
+- Two RLS results worth carrying into any review: a FOR ALL policy with only
+  `using` DOES govern writes (Postgres reuses the expression as the check, so
+  the usual "omit with check and writes are open" is wrong for that shape), and
+  PostgREST's default `return=representation` reports a permitted write as
+  403 42501 because RETURNING is filtered by the SELECT policy. Test writes
+  with `return=minimal` and count rows server-side, or the hole reads as closed.
+- The management query endpoint connects as `postgres`, so it sees every row
+  while a tenant sees none. Verifying data landed says nothing about isolation.
+
+## experiments/platform-facts - key facts
+
+- Not a behaviour test: a dated snapshot of the platform constants that docs
+  quote as bare numbers (compute prices, connection counts, plan entitlements,
+  key shapes, default Postgres major). Built to be re-run and DIFFED.
+- Most results are `info` on purpose. There is no correct value for a price,
+  so asserting one manufactures a failure every time the platform legitimately
+  changes. Only the three shape claims assert.
+- F03's live-token control is not optional. 404 on every scope candidate also
+  describes a dead token or an outage; without the control returning 200 in the
+  same run, the negative result is a `skip`, not a `pass`.
+- Org slugs are a precondition (`make probe ORGS=a,b`), not a resource: the
+  provider has no organization resource and plan changes are a billing action.
+
+## experiments/vault-root-key - key facts
+
+- Test ORDER is load-bearing and comes from the planner, not the Makefile:
+  ids sort within the destructive tier, so V02 ("cannot decrypt without the
+  key") always precedes V03 ("apply the key"). Reverse them and there is no way
+  to tell "the key mattered" from "the ciphertext was portable all along".
+- V03 probes several verb/path shapes rather than calling one. The doc it
+  serves says "apply that value to the target project's pgsodium config" with
+  no endpoint and no method, so the open question is whether ANY surface
+  exists - and one guessed 404 would answer it confidently and wrongly.
+- V03 checks EFFECT, not status code. A 2xx that changes nothing is a real
+  failure mode here; `custom_jwks` in cross-project-auth returns 201, echoes
+  the material back, and never resolves.
+- The root key value never enters a measurement, a detail string, or evidence.
+  Only length, character class, and a hash. `evidence/` is gitignored, but a
+  live encryption root key does not belong in a file one `git add -f` from a
+  public repo.
+- V04 needs the source project GONE, so it is a separate pass
+  (`make probe-deleted-source`). Deletion goes through `tofu -target`, not a
+  DELETE call, so state stays truthful; the dead ref is captured BEFORE the
+  destroy and passed as `PVLAB_DEAD_REF`, because afterwards the tofu output is
+  empty and probing an empty ref returns a meaningless 404.
 
 ## Commands
 
