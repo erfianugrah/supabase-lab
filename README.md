@@ -2,8 +2,17 @@
 
 OpenTofu reference environments for Supabase platform features, validated end-to-end on disposable infrastructure. Each experiment is one OpenTofu state under `experiments/<name>/` - build, run the test suite, `make destroy` the same day. Where platform behaviour diverges from the docs (undocumented endpoints, auth-model gaps, multi-pass applies), the code comments and `RUNLOG.md` capture what was actually measured.
 
-Current experiments:
+Current experiments (the committed ones; see `AGENTS.md` for per-experiment key
+facts):
 
+- `cross-project-auth` - can one project's identity be trusted by another, so a
+  tenant's token survives being moved between projects.
+- `tenant-consolidation` - many per-customer projects merged INTO one shared
+  multi-tenant project, and the collisions that produces.
+- `tenant-promotion` - the same road backwards: one tenant moved OUT of a shared
+  project into its own, whether a client follows without re-authenticating, and
+  what it takes to retire the identity left behind.
+- `http-tier-lockdown` - restricting the HTTP tier.
 - `privatelink-aws` - PrivateLink (VPC Lattice) to a Supabase project in
   ap-southeast-1 (demo region; region is one var - `aws_region` in
   experiment.tfvars - and both sides take it, since PrivateLink is

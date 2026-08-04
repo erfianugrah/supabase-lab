@@ -265,6 +265,45 @@ per-customer projects merged INTO one shared multi-tenant project. See RUNLOG.md
 - The management query endpoint connects as `postgres`, so it sees every row
   while a tenant sees none. Verifying data landed says nothing about isolation.
 
+## experiments/tenant-promotion - key facts (validated 2026-08-04)
+
+Two projects, no AWS. The direction consolidation runs backwards: one tenant
+moved OUT of a shared project into its own, and whether a client follows it.
+Ported from throwaway bash that produced the same findings; see RUNLOG.md.
+
+- A client that reads its placement from a registry at runtime follows the move
+  with ZERO password logins - the refresh token it already held mints a session
+  at the destination once the auth rows are there, and the `sub` matches on both
+  sides. The two controls are what make that mean anything: the other tenant is
+  unaffected, and the source still serves afterwards. Promotion is a copy, not a
+  cutover, so both projects answer for the tenant until the source identity is
+  retired.
+- Retiring it is one `DELETE /auth/v1/admin/users/{id}`, and it closes BOTH
+  issuing paths at the source (password grant `invalid_credentials`, the old
+  refresh token `refresh_token_not_found`) while the destination carries on. The
+  tenant's ROWS stay behind. Identity retires, data does not.
+- MFA survives the copy. A TOTP factor enrolled and verified at the source
+  arrives `status: verified`, and the SAME secret produces a code that verifies
+  at the destination for an `aal2` session. Without this the zero-re-login
+  result would silently exclude every MFA-enrolled account.
+- `auth.refresh_tokens.user_id` is `character varying` while `auth.users.id` is
+  `uuid`, so a subquery predicate errors instead of matching. Combined with the
+  fact that inserting zero rows SUCCEEDS, that presented as a copy reporting a
+  pass having moved nothing - `copyTable` now returns the dump result so a
+  failed read cannot look like an empty source.
+- Do not carry the source's `auth.refresh_tokens.id`. It is a bigserial, and a
+  destination with any prior auth activity already holds the low ids, so the
+  insert dies on `refresh_tokens_pkey`. Let the destination assign it; the token
+  string is what the client presents. If you DO carry ids, the sequence resync
+  is mandatory rather than belt-and-braces, and the collision it prevents
+  surfaces on the tenant's NEXT refresh, not during the promotion.
+- Ref-hiding does not need a proxy in the data path. The vanity-subdomain
+  endpoints activate a tenant-facing hostname that contains no project ref
+  (`check-availability` answers 201, not 200, and wants a bare LABEL - a dotted
+  hostname is rejected before availability is evaluated).
+- Emails are randomised per run: `adminCreate` 422s on a duplicate address, so a
+  module with a constant address passes exactly once against a given pair.
+
 ## experiments/platform-facts - key facts
 
 - Not a behaviour test: a dated snapshot of the platform constants that docs
