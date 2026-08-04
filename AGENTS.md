@@ -329,12 +329,31 @@ Ported from throwaway bash that produced the same findings; see RUNLOG.md.
 
 - What a platform OPERATION costs a client, per connection path. All windows
   below sampled at 500 ms, all n=1, one Micro project in ap-southeast-1.
-- **Restart: the paths do not move together.** REST and Realtime served
-  CONTINUOUSLY through a full restart - zero failed samples. Auth was down 75 s
-  (`HTTP 521`), Storage 78 s (`HTTP 500`), the pooler 158 s. An app whose read
-  path is PostgREST may not notice a restart; one signing users in during the
-  same window fails for over a minute. This refines T14, which measured one path
-  at 5 s resolution and reported a single number.
+- **REST and Realtime never failed under ANY of the four operations** measured
+  (restart, restriction flip, resize up, resize down) - zero failed samples at
+  500 ms. One operation could be luck; four is a pattern.
+- **The paths do not move together.** On restart: Auth 75 s (`HTTP 521`),
+  Storage 78 s (`HTTP 500`), pooler 158 s, REST and Realtime untouched. An app
+  whose read path is PostgREST may not notice a restart; one signing users in
+  during the same window fails for over a minute. This refines T14, which
+  measured one path at 5 s resolution and reported a single number.
+- **A resize costs about twice a restart** - Auth 131 s resizing up against
+  75 s restarting, pooler 207 s against 158 s. Budget a maintenance window off
+  the restart number and you will under-budget.
+- Resize asymmetry is half real: on the HTTP tier growing costs about a third
+  more than shrinking (Auth 131 s up, 99 s down); on the pooler the two are
+  within 5 % (207 s / 196 s).
+- Compute size is an ADDON mutation, `PATCH /v1/projects/{ref}/billing/addons`
+  with `{addon_variant, addon_type: "compute_instance"}` - there is no resize
+  endpoint. Variants `ci_micro`..`ci_48xlarge`; that enum is the API surface,
+  not the entitlement. Returning to micro REMOVES the addon (the GET then
+  reports null), because micro is the absence of one.
+- **The pooler reports a DIFFERENT error for each operation**, so the mode says
+  which operation is underway: restart `{:error, :timeout}`, restriction
+  `EADDRNOTALLOWED ... allow_list`, resize up `{:error, :econnrefused}`, resize
+  down `terminating connection due to administrator command`. Only the last is
+  a Postgres message - Supavisor is alive through all four, and what varies is
+  how the backend is unavailable.
 - The pooler is down roughly TWICE as long as the HTTP tier, and its error
   (`Failed to connect to database: {:error, :timeout}`) says Supavisor is alive
   and waiting on Postgres behind it, not that the pooler died.

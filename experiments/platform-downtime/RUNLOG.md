@@ -68,6 +68,67 @@ module holds the restriction for a fixed 60 s dwell before restoring, so the
 facts here are the 1 s to bite and the ~2 s to recover; the middle is a
 parameter this test chose.
 
+### D03 / D04 - compute resize, up then down
+
+`PATCH /v1/projects/{ref}/billing/addons` with
+`{addon_variant: "ci_small"|"ci_micro", addon_type: "compute_instance"}`. There
+is no resize endpoint; compute size is an addon mutation. Worth stating because
+a previous investigation on a related question concluded a size could not be
+changed programmatically after searching only for resize-shaped and
+branch-shaped paths. Returning to micro REMOVES the addon rather than setting
+one - micro is the absence of a compute addon, and the GET afterwards reports
+`null`.
+
+| path | D03 up, bit after / outage | D04 down, bit after / outage |
+| --- | --- | --- |
+| rest | - / **never failed** | - / **never failed** |
+| realtime | - / **never failed** | - / **never failed** |
+| auth | 2 s / 131 s | 2 s / 99 s |
+| storage | 2 s / 127 s | 2 s / 100 s |
+| pooler | 3 s / 207 s | 3 s / 196 s |
+
+**The asymmetry hypothesis is half right.** On the HTTP tier, growing costs
+about a third more than shrinking (131 s against 99 s for Auth). On the pooler
+the two are within 5 % of each other (207 s against 196 s), so whatever
+dominates the pooler's window is something neither direction escapes.
+
+**A resize is not a restart with extra steps - it is roughly twice one.** Auth
+75 s on restart against 131 s resizing up; the pooler 158 s against 207 s.
+Anyone planning a maintenance window off the restart number will under-budget.
+
+## The full matrix
+
+Four operations, five paths, 500 ms resolution, n=1 each.
+
+| operation | rest | realtime | auth | storage | pooler |
+| --- | --- | --- | --- | --- | --- |
+| restart | - | - | 75 s | 78 s | 158 s |
+| restriction flip | - | - | - | - | bites in 1 s |
+| resize up | - | - | 131 s | 127 s | 207 s |
+| resize down | - | - | 99 s | 100 s | 196 s |
+
+**REST and Realtime never failed under any of the four.** One operation could
+be luck; four is a pattern worth relying on, at this resolution and from this
+vantage.
+
+**The pooler reports a different error for every operation**, which makes the
+mode diagnostic of what is happening rather than merely that something is:
+
+| operation | pooler mode |
+| --- | --- |
+| restart | `Failed to connect to database: {:error, :timeout}` |
+| restriction flip | `(EADDRNOTALLOWED) address not in tenant allow_list` |
+| resize up | `Failed to connect to database: {:error, :econnrefused}` |
+| resize down | `terminating connection due to administrator command` |
+
+Only the last is a Postgres message; the rest are Supavisor's. So the pooler is
+alive throughout all four, and what changes is how the backend is unavailable -
+unreachable, refused, deliberately shut down, or the client not permitted.
+
+Auth and Storage keep their own modes across every operation: `HTTP 521` and
+`HTTP 500` respectively. A client retrying on any 5xx treats them alike; one
+matching a specific status does not.
+
 ## Defects found by running it
 
 **The first D02 restored in a `finally`, after sampling had stopped.** Recovery
@@ -94,9 +155,10 @@ limitation written next to the probe.
 
 ## Cost / teardown
 
-One Micro project for about twenty minutes; `make destroy`. Both operations are
-self-restoring, so nothing needs cleaning up beyond the project itself.
+Two Micro projects, roughly twenty minutes each, both destroyed. D03/D04 ran on
+the second one and put the compute size back themselves, so the only cleanup is
+the project. Restrictions were confirmed restored to `0.0.0.0/0` before the
+first teardown rather than assumed.
 
-Not run here, and each needs its own justification: resize up/down (billable,
-and the compute change persists between the two), major upgrade, PITR restore,
-and read-replica add/remove.
+Not run here, and each needs its own justification: major upgrade, PITR
+restore, and read-replica add/remove.
