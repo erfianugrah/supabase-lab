@@ -329,7 +329,24 @@ Ported from throwaway bash that produced the same findings; see RUNLOG.md.
 
 - Not a behaviour test: a dated snapshot of the platform constants that docs
   quote as bare numbers (compute prices, connection counts, plan entitlements,
-  key shapes, default Postgres major). Built to be re-run and DIFFED.
+  key shapes, default Postgres major). Built to be re-run and DIFFED - and
+  since `pvlab --diff` exists, diffing it is one command rather than an eyeball.
+- There is NO region-catalogue endpoint (F04): `/regions`, `/platform/regions`
+  and `/projects/regions` all 404 while `/projects` and `/organizations` answer
+  200 in the same run. `region` is accepted at project creation and nothing
+  lets a caller enumerate what may legally be passed, so per-customer placement
+  can place but cannot discover, and an upstream region change is invisible
+  until a create fails.
+- Organization membership is READ-ONLY on the stable API (F05). Enumerated from
+  the published OpenAPI document rather than probed: across 169 operations there
+  is exactly one membership operation, `GET /v1/organizations/{slug}/members`,
+  and the only two org-scoped writes are org creation and project-claim. The
+  `jit/invite` endpoints that a keyword search turns up are DATABASE access, a
+  different subsystem - do not read them as membership provisioning.
+- F05 reads the whole spec on purpose. A previous investigation concluded an API
+  "cannot do X" after probing only paths containing X's noun and was wrong,
+  because the lever sat on a differently-named path. A negative is only worth
+  stating across the complete operation set.
 - Most results are `info` on purpose. There is no correct value for a price,
   so asserting one manufactures a failure every time the platform legitimately
   changes. Only the three shape claims assert.
