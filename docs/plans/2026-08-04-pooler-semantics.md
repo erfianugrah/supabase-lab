@@ -2034,6 +2034,29 @@ are ordered and the earlier ones would otherwise mask the one under test.
 
 ### Task 8: apply, discover the connection surface, run
 
+**Parked 2026-08-04 with tasks 1-5 built and committed.** Settle these three
+unknowns with read-only calls BEFORE provisioning - each one can invalidate a row
+this task pays for, and all three are answerable from an existing project or the
+published schema.
+
+1. **Does a Micro project offer `ipv4_default` in `available_addons`?** The variant
+   is in the create/patch enum, but the enum is the API surface and entitlement is
+   a separate question. The direct-5432 control row depends on it: this vantage is
+   IPv4-only, confirmed - no global address, no egress - so without the addon the
+   control is unreachable and every pooled row loses its reference.
+2. **Is dedicated-pooler SESSION mode simply port 5432 on the host the API returns
+   for transaction mode?** `GET /v1/projects/{ref}/config/database/pooler` returned
+   `pool_mode: transaction`, port 6543, and said nothing about a session endpoint.
+   S01b assumes the same host on 5432. If that is wrong the row is measuring the
+   wrong thing rather than skipping.
+3. **Are the dedicated and public shared poolers distinct hosts on one project?**
+   S01c and S01d are separate rows on the assumption they differ. If they resolve
+   to the same host the two rows are one measurement reported twice.
+
+Also re-prove the `--only` guard for the S ids specifically. It was proven for
+`D01,D02` under `pat,anon-key,db,org`; this experiment additionally supplies
+`pgbench`, so the admitted set is different and the earlier proof does not carry.
+
 **Files:** none - this task spends money and records answers.
 
 - [ ] **Step 1: Apply**
