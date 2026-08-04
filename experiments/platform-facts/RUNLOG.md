@@ -103,6 +103,51 @@ member filter so the two org writes match flips the detail to "the read-only
 finding has changed", and raising the control threshold above the real
 operation count produces the intended `fail` rather than a quiet pass.
 
+### 2026-08-04 - F06, the upgrade window, and why it was not measured
+
+The intent was to add the upgrade to the downtime matrix. In-place major
+upgrades are widely described as costing HOURS, and that is unquantified in
+exactly the way the restart number was before it was measured. The instrument
+already existed - the sampler, the five probes and the verdict logic are all
+committed - so it should have been one more module with a different operation
+closure.
+
+**It cannot be done on a throwaway project.** A freshly created project comes up
+already at the latest app version: `eligible: false`, current == latest,
+`target_upgrade_versions: []`, `duration_estimate_hours: 0`. There is nothing to
+upgrade to.
+
+**And the conditions cannot be arranged.** `postgres_engine` and
+`release_channel` on `POST /v1/projects` are BOTH deprecated and typed `null` in
+the published schema, so a created project takes the current default and there
+is no way to ask for an older one. Measuring a real client-visible upgrade
+window therefore requires a project that has aged past the current version -
+which means being willing to upgrade something real. That is the structural
+reason this number stays folklore, and it is worth stating plainly rather than
+leaving the gap looking like laziness.
+
+**What IS readable, for free: the platform's own estimate.** The eligibility
+payload carries `duration_estimate_hours`. Across the aged projects on this
+account, three were eligible for `17.6.1.141 -> 17.6.1.155` and each reported
+`duration_estimate_hours: 1`, with one target and zero validation errors. So the
+platform itself budgets an hour for a PATCH-level app upgrade on small projects.
+
+Two caveats on that number, and they matter:
+
+- It is a published ESTIMATE, not a measured outage. platform-downtime showed
+  those are different things - an operation's duration and its client-visible
+  window differ per connection path, sometimes by 2x, and REST stayed up through
+  every operation measured there.
+- All three eligible projects returned exactly `1`, which reads like a coarse
+  or rounded figure rather than a per-project computation.
+
+One project returned `eligible: null` with no version fields at all - a state
+where eligibility is not computable. Not investigated; noted so the next reader
+does not treat the field as always-boolean.
+
+`POST /v1/projects/{ref}/upgrade` exists and F06 deliberately never calls it.
+The only projects on which it would do anything are real ones.
+
 **Diff mode, first real exercise.** Two F04 runs 11 seconds apart, then
 `make diff` with `SUPABASE_ACCESS_TOKEN` explicitly unset: `no change across 12
 measurements`. Diffing the two rendered reports instead gives 8 lines, all of
