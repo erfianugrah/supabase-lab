@@ -77,9 +77,18 @@ probe records the server's wording verbatim rather than a boolean.
 - `sbperf bench` spawns pgbench with `{ ...process.env, PGPASSWORD }`, so `PGSSLMODE` set
   by the caller reaches pgbench. It parses `--db-url` with `new URL()`, so the username and
   password must be percent-encoded.
-- **`pgbench` is NOT installed on the machine this plan was written on.** S02 therefore
-  self-skips there with `missing capability: pgbench`, measured. Install the PostgreSQL
-  client tools before Task 9.
+- `pgbench` was absent when this plan was written and S02 correctly self-skipped with
+  `missing capability: pgbench`. **Installed 2026-08-04: pgbench 18.4**, from Arch's
+  `postgresql` package (`postgresql-libs`, which ships psql, does NOT carry it). The
+  harness derives the capability from `which pgbench`, so S02 needs no change to light up.
+- **The direct 5432 control needs IPv6 and this vantage has none** - no global address, no
+  egress, confirmed. DECISION: buy the `ipv4_default` addon on the throwaway project for
+  the duration of the run, using the same `PATCH /v1/projects/{ref}/billing/addons` lever
+  D03/D04 exercised (`addon_type: "ipv4"`). Check the project's own `available_addons`
+  before relying on it. The alternatives were rejected: the AWS runner rig is the whole
+  VPC/SSM/endpoint stack for one experiment, and running without the control leaves
+  "cursors do not work on 6543" indistinguishable from "the cursor probe is broken", which
+  is the one thing summariseRow exists to prevent.
 - Test ids sort within the destructive tier, so id order IS execution order. S01
   (non-destructive) runs before S02 (destructive), which is the order the findings need:
   the feature matrix explains the throughput numbers.
@@ -580,22 +589,28 @@ sbperf bench --db-url "postgres://u:p@127.0.0.1:6543/postgres" --ref abcdefghijk
   --builtin select-only --clients 8 --time 60 --runs 3 --warmup 10 \
   --protocol extended --name smoke --store /tmp/sbperf-flagcheck.db --json
 ```
-Expected, measured on 2026-08-04:
+Expected, re-measured on 2026-08-04 WITH pgbench installed:
 ```
-error: pgbench not found. Install PostgreSQL client tools, or set SBPERF_PGBENCH=/path/to/pgbench
+> pgbench 18.4 -> 127.0.0.1:6543/postgres (as u)
+> 8 clients / 8 threads, 3 x 60s + 10s warmup, protocol extended
+error: warmup failed (exit 1): pgbench: error: connection to server at "127.0.0.1", port 6543 failed: Connection refused
 ```
-That error is the PASS condition for this step: reaching `findPgbench()` means every flag
-above parsed and the target resolved. If instead you get an unknown-flag usage dump, the
-installed `sbperf` is older than this plan - reconcile against its `--help` before
-continuing. `--store` points at a throwaway file so the flag check does not write into
-`~/.sbperf/history.db`.
+That is the PASS condition: every flag parsed, pgbench was found, the target resolved, and
+it died only because nothing is listening on that port. Before pgbench was installed the
+pass condition was the earlier `error: pgbench not found` - also fine, and also proof the
+flags parsed, since both errors come after argument handling. If instead you get an
+unknown-flag usage dump, the installed `sbperf` is older than this plan - reconcile against
+its `--help` before continuing. `--store` points at a throwaway file so the flag check does
+not write into the real history store.
 
-Then install the client tools, because Task 9 needs them:
+Note what that output also confirms: sbperf prints PROSE, not JSON, when it fails. That is
+exactly the path `parseBenchJson` is built to surface rather than swallow as a
+SyntaxError.
+
+Client tools are now present:
 ```bash
-which pgbench || echo "ABSENT - install postgresql-client / postgresql*-contrib"
+which pgbench   # /usr/sbin/pgbench, pgbench 18.4
 ```
-On the machine this plan was written on, pgbench was ABSENT. Without it, S02 self-skips
-with `missing capability: pgbench` and Group 2 produces nothing.
 
 - [ ] **Step 2: Write the failing tests**
 
