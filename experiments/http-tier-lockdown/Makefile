@@ -38,7 +38,7 @@ probe:
 	PVLAB_REF="$(REF)" SUPABASE_ACCESS_TOKEN="$(TOK)" SUPABASE_ANON_KEY="$$anon" \
 		$(ROOT)/harness/dist/pvlab --where runner --destructive --only T22,T23 \
 		--out evidence/$(TS)
-	@echo "== evidence/$(TS)/REPORT.md =="
+	@echo "== evidence/$(TS)/run-<stamp>.md =="
 
 destroy:
 	tofu plan -destroy $(VARS) -out=tfplan-destroy
