@@ -16,10 +16,6 @@ import type { Ctx, TestModule, TestResult } from "../../../harness/src/types";
 
 const API = "https://api.supabase.com/v1";
 
-function peerRef(): string | undefined {
-  return process.env.XPROJ_SPOKE_REF || undefined;
-}
-
 async function mgmt(ctx: Ctx, method: string, path: string, body?: unknown) {
   const res = await fetch(`${API}${path}`, {
     method,
@@ -72,16 +68,16 @@ const mod: TestModule = {
   id: "X01",
   title: "Third-party auth: which config shapes resolve",
   where: "local",
-  requires: ["pat"],
+  requires: ["pat", "peer"],
   destructive: true, // writes and deletes auth config on the spoke
   async run(ctx) {
-    const spoke = peerRef();
+    const spoke = ctx.peers.spoke;
     if (!spoke) {
       return {
         id: "X01",
         title: this.title,
         status: "skip",
-        detail: "XPROJ_SPOKE_REF not set - this experiment needs both projects",
+        detail: "PVLAB_PEER_SPOKE not set - this experiment needs both projects",
       };
     }
     const results: TestResult[] = [];
