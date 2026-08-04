@@ -393,6 +393,20 @@ Ported from throwaway bash that produced the same findings; see RUNLOG.md.
   and the only two org-scoped writes are org creation and project-claim. The
   `jit/invite` endpoints that a keyword search turns up are DATABASE access, a
   different subsystem - do not read them as membership provisioning.
+- **The upgrade window is not measurable on a throwaway project** (F06). A newly
+  created project comes up already at the latest app version - `eligible: false`,
+  current == latest, no targets - and `postgres_engine` / `release_channel` on
+  `POST /v1/projects` are both DEPRECATED and typed null, so an older one cannot
+  be requested. Measuring a real client-visible upgrade window means upgrading
+  something real. That is the structural reason the "upgrades take hours" claim
+  stays unquantified.
+- What IS free: `duration_estimate_hours` in the eligibility payload. Observed
+  `1` for a patch-level app upgrade (17.6.1.141 -> 17.6.1.155) on three aged
+  projects, each with one target and zero validation errors. It is a PUBLISHED
+  ESTIMATE, not a measured outage - platform-downtime showed operation duration
+  and client-visible window differ per path, sometimes 2x - and all three
+  returning exactly 1 reads as a coarse figure. `eligible` can also come back
+  `null` with no version fields; do not treat it as always-boolean.
 - F05 reads the whole spec on purpose. A previous investigation concluded an API
   "cannot do X" after probing only paths containing X's noun and was wrong,
   because the lever sat on a differently-named path. A negative is only worth
