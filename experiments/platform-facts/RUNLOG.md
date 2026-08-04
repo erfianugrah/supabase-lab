@@ -67,6 +67,42 @@ fails.
 **F04b - 2 distinct regions across 4 projects** on this account (aggregate only;
 refs deliberately not recorded).
 
+### 2026-08-04 - F05, also no project
+
+**F05a - organization membership is read-only on the stable API.** Enumerated
+rather than probed: the published OpenAPI document lists 169 operations, of
+which exactly ONE touches membership (`GET /v1/organizations/{slug}/members`).
+The only two org-scoped writes are `POST /v1/organizations` and the
+project-claim callback. No create, no update, no delete, no invitation
+endpoint, no roles endpoint.
+
+The method matters more than the number. Probing four plausible paths and
+finding 404s would have been the same mistake a previous investigation made on
+a different question - it concluded an API could not do something after
+searching only the paths named after the thing, and the lever turned out to
+live on a differently-named path. So F05 reads the whole document. The absence
+is stated across all 169 operations or not at all. The parse count doubles as
+the control: a document that half-arrived would make the absence an artifact.
+
+**The near-miss worth recording.** A keyword search for "invite" DOES return
+endpoints - `POST /v1/projects/{ref}/database/jit/invite` and friends. They
+grant temporary DATABASE access, not organization seats. Anyone grepping the
+spec for membership provisioning will find them, and reading them as
+membership would produce a confidently wrong claim.
+
+This agrees with the conclusion a sibling gateway project reached from the
+inside, by watching its own proxy refuse those writes. Two routes, same answer;
+the enumeration is the stronger of the two because it does not depend on that
+proxy's routing table being complete.
+
+**F05b - the documented read answers** (200, against a 200 control), so the
+absence above is of writes specifically, not of the whole surface.
+
+Both branches were exercised before the negative was trusted: widening the
+member filter so the two org writes match flips the detail to "the read-only
+finding has changed", and raising the control threshold above the real
+operation count produces the intended `fail` rather than a quiet pass.
+
 **Diff mode, first real exercise.** Two F04 runs 11 seconds apart, then
 `make diff` with `SUPABASE_ACCESS_TOKEN` explicitly unset: `no change across 12
 measurements`. Diffing the two rendered reports instead gives 8 lines, all of
