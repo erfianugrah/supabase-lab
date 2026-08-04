@@ -28,8 +28,11 @@ import {
   waitReady,
 } from "../lib/promote";
 
-const EMAIL_A = "p01-tenant-a@lab.invalid";
-const EMAIL_B = "p01-tenant-b@lab.invalid";
+// Unique per run: adminCreate 422s on a duplicate address, so constant
+// emails make the module pass exactly once against a given project pair.
+const RUN = Math.random().toString(36).slice(2, 8);
+const EMAIL_A = `p01-tenant-a-${RUN}@lab.invalid`;
+const EMAIL_B = `p01-tenant-b-${RUN}@lab.invalid`;
 const TENANT_A = "tenant-a";
 const TENANT_B = "tenant-b";
 
@@ -188,7 +191,7 @@ const mod: TestModule = {
     results.push({
       id: "P01d",
       title: "auth.identities rows copied",
-      status: identCopy.result.status < 300 ? "pass" : "fail",
+      status: identCopy.result.status < 300 && identCopy.read > 0 ? "pass" : "fail",
       detail: `${identCopy.read} row(s) over ${identCopy.cols} columns`,
       measurements: { read: identCopy.read, sqlstate: sqlstate(identCopy.result) },
       evidence: identCopy.result.error?.slice(0, 200),
@@ -205,7 +208,7 @@ const mod: TestModule = {
     results.push({
       id: "P01e",
       title: "auth.sessions rows copied",
-      status: sessionCopy.result.status < 300 ? "pass" : "fail",
+      status: sessionCopy.result.status < 300 && sessionCopy.read > 0 ? "pass" : "fail",
       detail: `${sessionCopy.read} row(s) over ${sessionCopy.cols} columns`,
       measurements: { read: sessionCopy.read, sqlstate: sqlstate(sessionCopy.result) },
       evidence: sessionCopy.result.error?.slice(0, 200),
@@ -217,12 +220,21 @@ const mod: TestModule = {
       dedicated,
       "auth",
       "refresh_tokens",
-      `user_id in (select id from auth.users where email = '${EMAIL_A}')`,
+      `user_id::text in (select id::text from auth.users where email = '${EMAIL_A}')`,
+      // Do NOT carry the source's surrogate id. auth.refresh_tokens.id is a
+      // bigserial, and a target that has seen ANY prior auth activity already
+      // occupies the low ids - the insert then dies on refresh_tokens_pkey.
+      // The token string is what the client presents; the id is the target's
+      // to assign. (Copying ids instead is legal, but then the sequence resync
+      // below is mandatory rather than belt-and-braces.)
+      { id: "nextval('auth.refresh_tokens_id_seq')" },
     );
     results.push({
       id: "P01f",
       title: "auth.refresh_tokens rows copied",
-      status: rtCopy.result.status < 300 ? "pass" : "fail",
+      // read > 0 matters: inserting an empty set succeeds, so status alone
+      // reports a pass for a copy that moved nothing.
+      status: rtCopy.result.status < 300 && rtCopy.read > 0 ? "pass" : "fail",
       detail: `${rtCopy.read} row(s) over ${rtCopy.cols} columns`,
       measurements: { read: rtCopy.read, sqlstate: sqlstate(rtCopy.result) },
       evidence: rtCopy.result.error?.slice(0, 200),

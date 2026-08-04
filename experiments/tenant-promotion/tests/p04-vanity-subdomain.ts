@@ -33,7 +33,10 @@ const mod: TestModule = {
     }
     const results: TestResult[] = [];
 
-    const domain = "promo-lab.example.com";
+    // A bare label, not a hostname: the endpoint owns the .supabase.co
+    // suffix, and a dotted value is rejected with 400 before availability
+    // is ever evaluated. Randomised because the namespace is global.
+    const domain = `lab-promo-${Math.random().toString(36).slice(2, 8)}`;
 
     // ---- check-availability ----
     const check = await mgmt(
