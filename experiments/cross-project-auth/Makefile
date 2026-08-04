@@ -34,7 +34,7 @@ probe:
 	@test -n "$(TOK)" || (echo "no PAT in $(ROOT)/secrets.tfvars - run 'make secrets-decrypt' at the root"; exit 1)
 	@cd $(ROOT)/harness && bun run build >/dev/null
 	@mkdir -p evidence/$(TS)
-	@PVLAB_REF="$(HUB)" XPROJ_SPOKE_REF="$(SPOKE)" SUPABASE_ACCESS_TOKEN="$(TOK)" \
+	@PVLAB_REF="$(HUB)" PVLAB_PEER_SPOKE="$(SPOKE)" SUPABASE_ACCESS_TOKEN="$(TOK)" \
 		$(ROOT)/harness/dist/pvlab --where local --destructive --only X01,X02 --experiment cross-project-auth \
 		--out evidence/$(TS)
 	@echo "== evidence/$(TS)/REPORT.md =="
