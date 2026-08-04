@@ -140,16 +140,16 @@ const mod: TestModule = {
   id: "X02",
   title: "Cross-project token portability under three trust states",
   where: "local",
-  requires: ["pat"],
+  requires: ["pat", "peer"],
   destructive: true, // creates schema, users and auth config on both projects
   async run(ctx) {
-    const spoke = process.env.XPROJ_SPOKE_REF;
+    const spoke = ctx.peers.spoke;
     if (!spoke) {
       return {
         id: "X02",
         title: this.title,
         status: "skip",
-        detail: "XPROJ_SPOKE_REF not set - this experiment needs both projects",
+        detail: "PVLAB_PEER_SPOKE not set - this experiment needs both projects",
       };
     }
     const results: TestResult[] = [];
@@ -175,6 +175,13 @@ const mod: TestModule = {
         { id: "X02z", title: "key fetch", status: "fail", detail: "could not read project API keys" },
       ];
     }
+    // Bound to plain consts because the guard above narrows the PROPERTIES,
+    // and TypeScript discards property narrowing inside a closure - the
+    // object could in principle be mutated before the closure runs. Two of
+    // the reads below happen inside `until(() => ...)` retry callbacks.
+    const hubAnon: string = hubKeys.anon;
+    const hubService: string = hubKeys.service;
+    const spokeAnon: string = spokeKeys.anon;
 
     // Two tenants, tenant_id in app_metadata because that object is
     // admin-only; a client-writable claim would let a tenant widen its scope.
@@ -182,8 +189,8 @@ const mod: TestModule = {
       fetch(`https://${hub}.supabase.co/auth/v1/admin/users`, {
         method: "POST",
         headers: {
-          apikey: hubKeys.service!,
-          Authorization: `Bearer ${hubKeys.service}`,
+          apikey: hubService,
+          Authorization: `Bearer ${hubService}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
@@ -200,7 +207,7 @@ const mod: TestModule = {
     const login = async (tenant: string) => {
       const r = await fetch(`https://${hub}.supabase.co/auth/v1/token?grant_type=password`, {
         method: "POST",
-        headers: { apikey: hubKeys.anon!, "Content-Type": "application/json" },
+        headers: { apikey: hubAnon, "Content-Type": "application/json" },
         body: JSON.stringify({ email: `${tenant}@lab.invalid`, password: "LabPassword123!" }),
         signal: AbortSignal.timeout(20000),
       });
@@ -216,7 +223,7 @@ const mod: TestModule = {
       ];
     }
 
-    const onHubA = await restRead(`${hub}.supabase.co`, hubKeys.anon, tokA);
+    const onHubA = await restRead(`${hub}.supabase.co`, hubAnon, tokA);
     results.push({
       id: "X02a",
       title: "Tenant A reads its own rows on the issuing project",
@@ -225,7 +232,7 @@ const mod: TestModule = {
       measurements: { rows: onHubA.rows?.length ?? 0, status: onHubA.status },
     });
 
-    const onHubB = await restRead(`${hub}.supabase.co`, hubKeys.anon, tokB);
+    const onHubB = await restRead(`${hub}.supabase.co`, hubAnon, tokB);
     results.push({
       id: "X02b",
       title: "Tenant B cannot see tenant A's rows (RLS)",
@@ -235,7 +242,7 @@ const mod: TestModule = {
     });
 
     // ---- State 1: the negative control. Same token, no trust configured.
-    const preTrust = await restRead(`${spoke}.supabase.co`, spokeKeys.anon, tokA);
+    const preTrust = await restRead(`${spoke}.supabase.co`, spokeAnon, tokA);
     results.push({
       id: "X02c",
       title: "Control: before trust is configured, the other project refuses the token",
@@ -267,7 +274,7 @@ const mod: TestModule = {
     });
 
     const accepted = await until(
-      () => restRead(`${spoke}.supabase.co`, spokeKeys.anon, tokA),
+      () => restRead(`${spoke}.supabase.co`, spokeAnon, tokA),
       (r) => r.rows !== undefined,
       90000,
     );
@@ -293,7 +300,7 @@ const mod: TestModule = {
       spoke,
       `insert into public.items(tenant_id,body) values ('tenant-a','a1'),('tenant-a','a2');`,
     );
-    const afterCopy = await restRead(`${spoke}.supabase.co`, spokeKeys.anon, tokA);
+    const afterCopy = await restRead(`${spoke}.supabase.co`, spokeAnon, tokA);
     results.push({
       id: "X02f",
       title: "After copying the slice, the same token reads it - no re-login",
@@ -310,7 +317,7 @@ const mod: TestModule = {
       await clearTpa(ctx, spoke);
     }
     const revoked = await until(
-      () => restRead(`${spoke}.supabase.co`, spokeKeys.anon, tokA),
+      () => restRead(`${spoke}.supabase.co`, spokeAnon, tokA),
       refused,
       120000,
     );
