@@ -1,5 +1,32 @@
 # RUNLOG - key-rotation
 
+> **PARKED: this has never been run against real projects.** It is a port of
+> bash that produced the findings below on 2026-08-03 and 2026-08-04, and it
+> passes an offline gate - it compiles, registers, validates, and skips cleanly
+> without credentials. None of that proves it reproduces anything.
+>
+> Until someone runs it, a failure here means nothing: you cannot tell a changed
+> platform from a broken harness. Treat the modules as unproven and the findings
+> as belonging to the bash they replaced.
+>
+> **First live run, when you pick this up:**
+>
+> 1. `make secrets-decrypt` at the repo root, with a valid PAT in it.
+> 2. `make apply` here - two projects, hub and spoke.
+> 3. `make probe`, and budget about an hour. R02's window is 20 minutes and
+>    R03's is 15; shortening them for the FIRST run defeats the purpose, because
+>    what happens across those windows is the entire question.
+> 4. Compare against the key-facts section for this experiment in the root
+>    `AGENTS.md`. Exact numbers are not the test - the standby cooldown already
+>    varied 127-144 s over three runs - the SHAPE is: the consumer never
+>    re-resolves, and the old key keeps working through revoked.
+> 5. `make destroy`, then replace this banner with what the run found.
+>
+> If the shape does NOT hold, that is interesting rather than a bug to paper
+> over: check the harness first, then consider that the platform may have
+> changed - which is the reason this port exists at all.
+
+
 Two Supabase projects, no AWS. Answers a question about platform
 eventual-consistency: when a hub project's GoTrue is registered as a spoke
 project's third-party auth issuer and the hub rotates its signing key, does
