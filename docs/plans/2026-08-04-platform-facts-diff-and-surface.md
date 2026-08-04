@@ -660,13 +660,30 @@ boundary, not a measurement.
 | --- | --- | --- |
 | A Personal Access Token reaches every organization and project the account can reach | F03, which carries a positive control in the same run | Say that the control is what makes the 404s mean anything |
 | Organization roles are a fixed small set; there is no custom role builder | `org-topology` | State the number only if F01's entitlements output confirms it on the day of writing |
-| Some provisioning and membership actions are not reachable from the stable API | F05 (Task 4 above), plus the sibling gateway project's independent `member-plan` result | CONDITIONAL: if F05 has not run, cite the sibling project alone and say so |
+| Organization membership is READ-ONLY on the stable API - one operation across 169 | F05, RAN 2026-08-04, with `/projects` and `/organizations` as a same-run positive control | FIRM. Corroborated from the opposite direction by the sibling gateway project's `member-plan`. Two independent routes to the same answer is worth stating; it is the strongest control-plane row here |
+| The `jit/invite` endpoints are DATABASE access, not membership | F05 | Include it - a keyword search for "invite" finds them, and reading them as membership provisioning produces a confidently wrong claim |
+| There is no region-catalogue endpoint; the creatable set is documentation-only | F04, RAN 2026-08-04, same control idiom | FIRM. This is what qualifies any "programmatic per-customer region placement" claim: you can place, you cannot discover |
+| A project cannot be created at an older version, so an upgrade cannot be staged | F06, RAN 2026-08-04 | FIRM. The version selectors on project creation are deprecated and typed null |
 | The mitigation is a scoped gateway in front of the coarse credential, not a finer credential | the sibling gateway project | Be explicit that this governs only traffic routed through it |
 
 ### The synthesis section
 
 Close the doc by mapping each common enterprise ask to its plane and to today's answer on
 that plane. No roadmap opinions - those date the doc, and the boundary does not.
+
+### Status on park, 2026-08-04
+
+Four of the control-plane rows above are now measured rather than conditional -
+F04, F05 and F06 all ran, and F05's row was written before it had. The data-plane
+side is unchanged.
+
+**One conditional row remains, and it is the only thing blocking the doc:** the
+claim that refresh goes to the issuing project - that a trusting project verifies
+but does not mint. It sits in `cross-project-auth`'s RUNLOG as reported and not
+reproduced. Closing it is one test module (X03) against two peer projects, and it
+is load-bearing for every "the tenant stays independent" statement the doc would
+make. Write X03 before the doc, or publish that row as reported-not-reproduced
+and say which.
 
 ### Pin what must not regress
 
