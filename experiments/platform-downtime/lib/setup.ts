@@ -88,9 +88,16 @@ export async function setComputeSize(ctx: Ctx, variant: string): Promise<void> {
  * One column per path, plus the resolution the numbers were taken at.
  *
  * `first_fail_s` is separate from `window_s` on purpose: for an operation that
- * takes effect asynchronously, how long the platform took to BITE after the API
- * returned 2xx is a different fact from how long the outage then lasted, and
- * only the first is available when a run ends before recovery.
+ * takes effect asynchronously, how long the platform took to BITE is a different
+ * fact from how long the outage then lasted, and only the first is available
+ * when a run ends before recovery.
+ *
+ * BITE is measured from when SAMPLING STARTED, not from when the operation's own
+ * API call returned. `sampleDuring` sets t0 before the probe loops begin and then
+ * awaits operation(), so the request's own latency sits inside the window. This
+ * comment used to claim "after the API returned 2xx"; RUNLOG repeated it and a
+ * published doc inherited it. Capture the response timestamp and subtract if the
+ * response-relative figure is ever what you want.
  */
 export function flatten(windows: PathWindow[]): Record<string, number | string> {
   const m: Record<string, number | string> = { probe_interval_ms: INTERVAL_MS };
