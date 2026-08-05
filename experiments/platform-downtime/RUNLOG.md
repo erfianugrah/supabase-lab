@@ -60,7 +60,8 @@ restriction and not only direct `5432`. The refusal names the rejected address,
 so the failure is self-diagnosing - unlike a restart, where the pooler reports a
 timeout and tells you nothing about why.
 
-It bites **1 s** after the API returns 201.
+It bites **1 s** after sampling starts (not after the API returns 201 - t0 is
+set before the probe loops, so the apply call's own latency is inside that 1 s).
 
 **Caveat on the outage duration: it is an artifact, not a measurement.** The
 module holds the restriction for a fixed 60 s dwell before restoring, so the
