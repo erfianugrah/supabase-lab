@@ -158,6 +158,20 @@ const mod: TestModule = {
       evidence: open.detail,
     });
 
+    // BASELINE GATE: T23c's whole claim is "the flip caused this refusal". If
+    // a public join did not even succeed BEFORE the flip, a refusal after it
+    // proves nothing - the channel could already have been unreachable for an
+    // unrelated reason.
+    if (open.joinStatus !== "ok") {
+      results.push({
+        id: "T23",
+        title: mod.title,
+        status: "skip",
+        detail: `baseline public-channel join did not succeed (join status "${open.joinStatus}") - no control, no conclusion about what private_only does`,
+      });
+      return results;
+    }
+
     const flip = await mgmt(ctx, "PATCH", `/v1/projects/${ctx.ref}/config/realtime`, {
       private_only: true,
     });

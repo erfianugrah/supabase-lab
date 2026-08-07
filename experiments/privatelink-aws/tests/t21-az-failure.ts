@@ -21,7 +21,7 @@
  */
 import { $ } from "bun";
 import type { Ctx, TestModule } from "../../../harness/src/types";
-import { invokeProbe } from "./t15-lambda";
+import { invokeProbe } from "../lib/lambda-probe";
 
 const RULE = 99;
 
