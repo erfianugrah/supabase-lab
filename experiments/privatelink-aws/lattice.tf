@@ -115,7 +115,12 @@ resource "aws_vpclattice_service_network_vpc_association" "lab" {
 resource "aws_vpclattice_service_network_resource_association" "supabase" {
   count = var.enable_service_network && local.phase2 ? 1 : 0
 
-  resource_configuration_identifier = var.resource_configuration_arn
+  # The bare id, NOT the ARN. The provider accepts an ARN here and then returns
+  # the bare id from the API, so an ARN in config never converges: every apply
+  # errors "Provider produced inconsistent result after apply" AND leaves a new
+  # association behind, which bills per resource-hour. Measured 2026-08-07 on
+  # hashicorp/aws 6.57.1 - two applies, two orphaned snra-* associations.
+  resource_configuration_identifier = element(split("/", var.resource_configuration_arn), 1)
   service_network_identifier        = aws_vpclattice_service_network.supabase[0].id
 
   tags = { Name = "supabase-lab" }
