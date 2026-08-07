@@ -43,8 +43,16 @@ resource "aws_route_table_association" "second_private" {
 }
 
 # Same account, same region - auto_accept works with no manual step.
+#
+# Mutually exclusive with the transit gateway in tgw.tf (T27, enable_transit_gateway):
+# gated additionally on `!var.enable_transit_gateway` so turning the transit
+# gateway on TEARS THIS DOWN rather than adding a second transport alongside
+# it. Without that, a client in the second VPC could reach the endpoint over
+# either path and T27 would have no way to attribute a reachable result to
+# the transit gateway specifically - see tgw.tf's header comment and
+# tests/t27-transit-gateway.ts's independent transport check.
 resource "aws_vpc_peering_connection" "second" {
-  count = var.enable_second_vpc ? 1 : 0
+  count = var.enable_second_vpc && !var.enable_transit_gateway ? 1 : 0
 
   vpc_id      = aws_vpc.lab.id
   peer_vpc_id = aws_vpc.second[0].id
@@ -54,7 +62,7 @@ resource "aws_vpc_peering_connection" "second" {
 }
 
 resource "aws_route" "lab_to_second" {
-  count = var.enable_second_vpc ? 1 : 0
+  count = var.enable_second_vpc && !var.enable_transit_gateway ? 1 : 0
 
   route_table_id            = aws_route_table.private.id
   destination_cidr_block    = aws_vpc.second[0].cidr_block
@@ -62,7 +70,7 @@ resource "aws_route" "lab_to_second" {
 }
 
 resource "aws_route" "second_to_lab" {
-  count = var.enable_second_vpc ? 1 : 0
+  count = var.enable_second_vpc && !var.enable_transit_gateway ? 1 : 0
 
   route_table_id            = aws_route_table.second_private[0].id
   destination_cidr_block    = aws_vpc.lab.cidr_block

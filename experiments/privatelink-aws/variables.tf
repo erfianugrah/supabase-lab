@@ -91,6 +91,24 @@ variable "enable_service_network" {
   default     = false
 }
 
+variable "enable_transit_gateway" {
+  description = "T27: route the second VPC to the lab VPC over a transit gateway (tgw.tf) instead of the peering connection T24 built. Mutually exclusive with that peering connection by construction - vpc2.tf tears peering down when this is on - so a client in the second VPC can only reach the endpoint one way at a time and T27 can attribute a reachable result to the transport actually under test. Off by default - a second, billed network surface; opt in alongside enable_second_vpc for a live spin that will run T27."
+  type        = bool
+  default     = false
+}
+
+variable "enable_read_replica" {
+  description = "T28: create a read replica via the Management API (read-replicas/setup) and probe whether it appears as a second Lattice resource, gets its own hostname, and is reachable through the existing endpoint - removing it again in the test's own finally block. Also gates a second consumer Resource endpoint (replica.tf) for the replica's own resource configuration, once that ARN is known post-creation. Off by default - a replica bills for as long as it exists; opt in only for a live spin that will run T28 (with --destructive) to completion."
+  type        = bool
+  default     = false
+}
+
+variable "enable_soak" {
+  description = "T29: an EventBridge schedule invoking the probe Lambda every few minutes, appending one JSON record per invocation to the suite bucket under soak/ (soak.tf) - a longer PgBouncer client-ceiling read than a single test run can take. Off by default - it accrues Lambda invocations and small S3 PUT costs for as long as it runs; opt in for a live spin, then read the accumulated records with T29."
+  type        = bool
+  default     = false
+}
+
 variable "public_access_cidrs" {
   description = "DB network restrictions allowlist. Default open; `make restrict IP=x.x.x.x` closes it to break-glass only for test T12."
   type        = list(string)
@@ -105,6 +123,15 @@ variable "resource_share_arn" {
 }
 
 variable "resource_configuration_arn" {
+  type    = string
+  default = ""
+}
+
+# T28 phase 2: the read replica's own Lattice resource configuration ARN,
+# once it exists and its RAM share has been accepted - same shape as
+# resource_configuration_arn above, just for the replica instead of the
+# primary. Empty by default - see aws_vpc_endpoint.read_replica in replica.tf.
+variable "replica_resource_configuration_arn" {
   type    = string
   default = ""
 }

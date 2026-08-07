@@ -71,6 +71,10 @@ resource "aws_lambda_function" "probe" {
       # secrecy - and any later apply silently reverted the env to this
       # block, leaving the probe authenticating with no password (run 6).
       PGPASSWORD = var.db_password
+      # T29 - empty unless enable_soak is on. Set, index.mjs additionally
+      # writes a soak record to this bucket on every {"mode":"soak"} invoke
+      # (soak.tf's schedule); empty, it probes exactly as it always has.
+      SOAK_BUCKET = var.enable_soak ? "supabase-lab-suite-${var.aws_account_id}" : ""
     }
   }
 
