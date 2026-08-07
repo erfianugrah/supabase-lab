@@ -62,9 +62,8 @@ gate:
 # produces. STRIPE_SECRET_KEY is read from the environment, never from
 # secrets.tfvars - see variables.tf for why.
 seed:
-	@test -n "$$STRIPE_SECRET_KEY" || (echo "export STRIPE_SECRET_KEY=sk_test_... for the dedicated test account"; exit 1)
-	@echo "not implemented yet - see RUNLOG.md 'Fixture matrix'"
-	@exit 1
+	@test -n "$$STRIPE_SECRET_KEY" || (echo "export STRIPE_SECRET_KEY=sk_test_... (a WRITE key) for the dedicated test account"; exit 1)
+	@cd $(ROOT) && bun run experiments/stripe-sync-schema/seed/seed.ts $(SEED_ARGS)
 
 probe:
 	@test -n "$(REF)" || (echo "no project_ref output - run 'make apply' first"; exit 1)
