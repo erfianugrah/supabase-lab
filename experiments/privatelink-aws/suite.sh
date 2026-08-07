@@ -70,11 +70,13 @@ for i in $(seq 1 40); do
 	sleep 15
 done
 
-jq -n --arg get "$GET_URL" --arg put "$PUT_URL" --arg dbpw "$DBPW" --arg anon "$ANON" --arg tok "$TOK" --arg d "$DESTRUCTIVE" '{
+SVCNET_DNS=$(tofu output -raw service_network_dns 2>/dev/null || true)
+
+jq -n --arg get "$GET_URL" --arg put "$PUT_URL" --arg dbpw "$DBPW" --arg anon "$ANON" --arg tok "$TOK" --arg d "$DESTRUCTIVE" --arg svcnet "$SVCNET_DNS" '{
   commands: [
     "cloud-init status --wait >/dev/null 2>&1 || true",
     "curl -sL \"" + $get + "\" -o /usr/local/bin/pvlab && chmod 755 /usr/local/bin/pvlab",
-    "export DB_PASSWORD=\"" + $dbpw + "\" SUPABASE_ANON_KEY=\"" + $anon + "\" SUPABASE_ACCESS_TOKEN=\"" + $tok + "\"; pvlab --where runner --out /tmp/pvlab " + $d,
+    "export DB_PASSWORD=\"" + $dbpw + "\" SUPABASE_ANON_KEY=\"" + $anon + "\" SUPABASE_ACCESS_TOKEN=\"" + $tok + "\" PVLAB_ENDPOINT_SERVICE_NETWORK_DNS=\"" + $svcnet + "\"; pvlab --where runner --out /tmp/pvlab " + $d,
     "aws s3 cp \"$(ls -t /tmp/pvlab/run-*.json | head -1)\" \"" + $put + "\" && echo artifact-uploaded"
   ]
 }' > "/tmp/pvlab-run-$TS.json"
@@ -84,6 +86,7 @@ aws s3 cp "s3://$BUCKET/artifacts/runner-$TS.json" "$EVID/runner.json" --quiet
 echo "== 4/5 run the local-side battery =="
 PVLAB_REF="$REF" PVLAB_LAMBDA="$(tofu output -raw lambda_invoke 2>/dev/null | grep -q 'disabled' && echo 0 || echo 1)" \
 	PVLAB_ENDPOINT_IPS="$(tofu output -json endpoint_ips 2>/dev/null | jq -r 'join(",")')" \
+	PVLAB_ENDPOINT_SECOND_VPC_LAMBDA="$(tofu output -raw second_vpc_lambda_name 2>/dev/null || true)" \
 	DB_PASSWORD="$DBPW" SUPABASE_ACCESS_TOKEN="$TOK" AWS_REGION="$REGION" \
 	"$ROOT/harness/dist/pvlab" --where local --out "$EVID" $DESTRUCTIVE | tail -20
 

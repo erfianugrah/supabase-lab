@@ -110,6 +110,14 @@ export function deriveCapabilities(f: {
   if (f.peers && Object.keys(f.peers).length) caps.add("peer");
   if (f.orgSlugs?.length) caps.add("org");
   if (f.endpoints?.pooler) caps.add("pooler");
+  // Both are experiment-specific probe targets read the same way as pooler -
+  // present only once the matching tofu toggle was applied AND the invoking
+  // shell exported it, so a missing endpoint is a skip, not a probe against
+  // an empty string. Vantage-restricted the same way "lambda" is: the second
+  // VPC's Lambda is invoked from the orchestrator, the service network's DNS
+  // name only resolves from inside the lab VPC (the runner).
+  if (f.where === "local" && f.endpoints?.second_vpc_lambda) caps.add("second-vpc");
+  if (f.where === "runner" && f.endpoints?.service_network_dns) caps.add("service-network");
   if (f.hasPgbench) caps.add("pgbench");
   if (f.hasOpenssl) caps.add("openssl");
   if (f.where === "local" && f.lambdaEnabled) caps.add("lambda");

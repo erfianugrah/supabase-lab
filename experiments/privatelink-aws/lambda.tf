@@ -76,3 +76,44 @@ resource "aws_lambda_function" "probe" {
 
   tags = { Name = "supabase-lab" }
 }
+
+# T24's probe Lambda, same code (same zip artifact) as the primary one above,
+# placed inside the SECOND VPC instead of the lab VPC. No NAT in that VPC and
+# none needed - this only opens an outbound TCP connection over the peering
+# link, never to the public internet.
+resource "aws_cloudwatch_log_group" "lambda_second_vpc" {
+  count = var.enable_second_vpc && var.enable_lambda ? 1 : 0
+
+  name              = "/aws/lambda/supabase-lab-probe-second-vpc"
+  retention_in_days = 1
+}
+
+resource "aws_lambda_function" "probe_second_vpc" {
+  count = var.enable_second_vpc && var.enable_lambda ? 1 : 0
+
+  function_name    = "supabase-lab-probe-second-vpc"
+  role             = aws_iam_role.lambda[0].arn
+  runtime          = "nodejs24.x"
+  handler          = "index.handler"
+  filename         = data.archive_file.lambda[0].output_path
+  depends_on       = [aws_cloudwatch_log_group.lambda_second_vpc]
+  source_code_hash = data.archive_file.lambda[0].output_base64sha256
+  timeout          = 30
+
+  vpc_config {
+    subnet_ids         = [aws_subnet.second_private[0].id]
+    security_group_ids = [aws_security_group.second[0].id]
+  }
+
+  environment {
+    variables = {
+      PGHOST     = local.phz
+      PGUSER     = "postgres"
+      PGDATABASE = "postgres"
+      PGSSLMODE  = "require"
+      PGPASSWORD = var.db_password
+    }
+  }
+
+  tags = { Name = "supabase-lab-second-vpc" }
+}
