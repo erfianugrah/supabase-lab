@@ -431,6 +431,48 @@ AWS sweep shows 0 vpcs / lambdas / endpoints / nat / eips / instances / lattice
 networks / private zones / iam roles / active RAM shares. The S3 suite bucket
 is gone despite `suite-clean` reporting a spurious remove_bucket failure.
 
+## 2026-08-07 - T27/T28/T29 written, NOT YET RUN
+
+The association is the only step that cannot be automated - the `/platform`
+routes reject PATs, so it is one dashboard click. Everything downstream is
+Management API or AWS, so the remaining measurements were pre-built
+credential-free rather than waiting for a spin: all three ride on that one
+click once it happens. No AWS or Supabase calls were made while writing
+these; every number below is a description of what the test WILL measure,
+not a result.
+
+- T27 `tests/t27-transit-gateway.ts` (`enable_transit_gateway`, tgw.tf) -
+  reuses T24's second VPC and probe Lambda, but routes it to the endpoint
+  over a transit gateway instead of the peering connection. The two
+  transports are made mutually exclusive in tofu (peering is additionally
+  gated on `!var.enable_transit_gateway`, so enabling the gateway tears
+  peering down), and the test independently confirms which transport is
+  actually up against AWS before trusting a reachable result - both up, or
+  neither up, is a skip, not a guess.
+- T28 `tests/t28-read-replica.ts` (`enable_read_replica`, replica.tf) -
+  creates a read replica via `read-replicas/setup`, checks whether a second
+  AWS RAM resource appears, looks for a hostname-shaped field in the
+  response, and probes whether the existing endpoint reaches it. Removal is
+  unconditional (try/finally) and verified against the RAM resource count
+  rather than trusted from the remove call's status.
+- T29 `tests/t29-soak-read.ts` (`enable_soak`, soak.tf) - infrastructure
+  only, not a test run: an EventBridge Scheduler schedule invokes the
+  existing probe Lambda every 5 minutes, which appends a JSON record to the
+  suite bucket under `soak/` (reusing the bucket suite.sh already creates,
+  rather than a second one). T29 itself reads those records and reports
+  duration, success-rate drift, latency drift, and specifically whether
+  `max_client_conn` refusals appear as the run ages. The long-idle probe
+  path (a connection held open across ticks, not reconnected each time) is
+  implemented opportunistically in the same Lambda via a module-scope client
+  that survives only if AWS happens to reuse the execution environment - not
+  guaranteed, and reported as such rather than pretended to be a controlled
+  long-idle test.
+
+All three toggles default false and are not switched on in
+`experiment.tfvars`. With no credentials, all three self-skip with a reason
+(missing capability), which was the gate this work was validated against
+instead of a live spin.
+
 ## Open follow-ups
 
 - [x] T22a/b/c/g/h + all of T23 - closed on a bare project, see
@@ -456,3 +498,7 @@ is gone despite `suite-clean` reporting a spurious remove_bucket failure.
       Declined on run 9. T20c confirms it is the only blocker: "no public A
       record for the database host - without the IPv4 add-on there is no
       public-direct path to measure".
+- [ ] Run T27/T28/T29 on the next spin: `enable_second_vpc=true
+      enable_transit_gateway=true enable_read_replica=true enable_soak=true`,
+      apply, let the soak accumulate for a while, then `--destructive`
+      (T28 needs it; T27/T29 do not).
