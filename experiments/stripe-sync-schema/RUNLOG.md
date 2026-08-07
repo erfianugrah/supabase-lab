@@ -3,12 +3,13 @@
 Does the Stripe Sync Engine integration's projected Postgres schema stay in
 agreement with the Stripe API version its data actually arrives at?
 
-Short answer from the accidental observation that prompted this: no, and
-nothing tells you.
+Short answer: no. A controlled version toggle proves it for one field; how
+many other fields are affected is still open, and nothing surfaces any of it.
 
 ## Status
 
-Scaffolded, not yet run against its own project. `make seed` is a stub - the
+Scaffolded, not yet run against its own project. The mechanism is settled (see
+"The FDW is the control"); the SCOPE is not. `make seed` is a stub - the
 fixture matrix below is the next piece of work. Everything in **Prior
 observation** was measured on a pre-existing project and is what motivates the
 experiment; it is not a result of this experiment and is not sufficient on its
@@ -75,6 +76,51 @@ conflates three different things:
 
 Only (1) is a finding. Separating them is the entire reason this experiment
 exists.
+
+## The FDW is the control, and it changes the diagnosis
+
+Measured 2026-08-07. The Stripe FDW (`wrappers` 0.6.2, `stripe_wrapper`) was
+stood up on the SAME project, pointed at the SAME Stripe account, on the same
+day. The prediction was that it would show the same drift, on the theory that
+any schema pinned over a moving API rots the same way.
+
+It does not. The FDW returns the renewal date on all 13 active subscriptions
+while the Sync Engine's typed column is NULL on all 13, for the same
+subscription ids.
+
+One server option accounts for the entire difference:
+
+| `api_version` on the FDW server | typed column | sub-level in payload | item-level in payload |
+|---|---|---|---|
+| `2025-03-31.basil` | 0 / 13 | 0 | 13 |
+| unset (the FDW's own default) | 13 / 13 | 13 | - |
+
+That is a one-variable controlled experiment, and it moves the finding off
+inference entirely. Nothing about sampling, fixtures or object states is load
+bearing for THIS claim: flip the version, the column empties; flip it back, the
+column fills.
+
+So the corrected diagnosis is narrower and more useful than "pinned schemas go
+stale":
+
+- The FDW pins **both** sides. It ships a schema and requests a matching API
+  version, so its columns and its payloads agree by construction. It would
+  break in exactly the same way if you pinned it forward past a relocation -
+  the table above is that break, deliberately induced.
+- The Sync Engine pins the **schema only**. The projection is frozen at a 2020
+  spec while the managed webhook records `api_version = null` and therefore
+  follows the account default, which moves on Stripe's schedule rather than
+  yours.
+
+The failure is not staleness. It is two version knobs that are supposed to move
+together and are not connected to each other. That also names the fix, which
+the earlier framing did not: pin the webhook's `api_version` to whatever spec
+the projection was generated from, or advance the projection, but do not let
+them float independently.
+
+This does NOT retire the fixture matrix below. The version toggle proves the
+mechanism for one field; it says nothing about how many other columns are
+affected, which is still a counting problem and still needs controlled data.
 
 ## What this experiment adds
 
