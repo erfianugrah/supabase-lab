@@ -134,10 +134,14 @@ instrument: a column that changes bucket between runs is drift by
 construction, with no inference about sampling required. Everything short of
 that is a photograph of one side of a transition.
 
-## Fixture matrix (what `make seed` must create)
+## Fixture matrix (`make seed`)
 
-Not yet implemented. Each row exists to make some column non-null that the
-naive case leaves empty.
+Implemented in `seed/seed.ts`. Each row exists to make some column non-null
+that the naive case leaves empty. Idempotent - everything is tagged
+`metadata[pvlab]=stripe-sync-schema` and a second run is a no-op unless
+`--force`. It refuses a non-`sk_test_` key, and refuses an account containing
+subscriptions it did not create, because pointing a seeder at the wrong
+account has already happened once here by hand.
 
 | Fixture | Why |
 |---|---|
@@ -152,6 +156,19 @@ naive case leaves empty.
 | charge: refunded, disputed | `refunds`, `dispute`, `failure_balance_transaction` |
 | payment_method: several types | the dozen per-type columns |
 | customer: with tax IDs and multiple sources | tests the expandable-field hypothesis directly |
+
+Seeded today: active, trialing, multi-item, discounted, canceled,
+cancel_at_period_end, a customer with an EU VAT id, and a refunded charge.
+
+Three rows are NOT seeded, and they are the ones most likely to populate
+columns E02 currently calls dead, so a clean run does not mean the matrix is
+finished:
+
+| Missing | Why, and how to get it |
+|---|---|
+| past_due / dunning | needs a payment to fail and the retry schedule to advance, which is wall-clock bound. Drive it with a test clock (`POST /v1/test_helpers/test_clocks`) rather than waiting. |
+| disputes | card `4000000000000259` opens one asynchronously; the webhook lands minutes later, so it cannot be awaited inline in the seeder. |
+| subscription_schedules | straightforward to add, just not needed for the first count. |
 
 The expandable-field row matters most for honesty: if `customers.tax_ids`
 stays empty even when tax IDs exist, it is an expansion artifact and belongs
@@ -188,8 +205,8 @@ instructions instead.
 ```sh
 make apply                       # provision the project
 make gate                        # prints the Dashboard step, then passes once installed
-export STRIPE_SECRET_KEY=sk_test_...
-make seed                        # NOT IMPLEMENTED YET
+export STRIPE_SECRET_KEY=sk_test_...   # WRITE key, dedicated account
+make seed                        # idempotent; SEED_ARGS=--force for a 2nd generation
 make probe                       # E01 E02 E03 -> evidence/<ts>/
 # change the account's default API version in the Stripe Dashboard
 make probe
