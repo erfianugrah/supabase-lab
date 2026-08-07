@@ -90,3 +90,21 @@ test("pooler capability comes from a supplied endpoint", () => {
   expect(deriveCapabilities({ endpoints: {} }).has("pooler")).toBe(false);
   expect(deriveCapabilities({ endpoints: { pooler: "h" } }).has("pooler")).toBe(true);
 });
+
+test("second-vpc is a local-vantage capability only, like lambda", () => {
+  expect(
+    deriveCapabilities({ endpoints: { second_vpc_lambda: "fn" }, where: "runner" }).has("second-vpc"),
+  ).toBe(false);
+  expect(
+    deriveCapabilities({ endpoints: { second_vpc_lambda: "fn" }, where: "local" }).has("second-vpc"),
+  ).toBe(true);
+});
+
+test("service-network is a runner-vantage capability only - the DNS name only resolves in-VPC", () => {
+  expect(
+    deriveCapabilities({ endpoints: { service_network_dns: "h" }, where: "local" }).has("service-network"),
+  ).toBe(false);
+  expect(
+    deriveCapabilities({ endpoints: { service_network_dns: "h" }, where: "runner" }).has("service-network"),
+  ).toBe(true);
+});

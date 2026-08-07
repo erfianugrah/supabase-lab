@@ -79,6 +79,18 @@ variable "enable_lambda" {
   default     = false
 }
 
+variable "enable_second_vpc" {
+  description = "T24: build a second VPC, peer it to the lab VPC, and associate the PHZ with it, to test whether a Resource endpoint is reachable across peering. Off by default - it is a second network surface with its own blast radius; opt in per live spin."
+  type        = bool
+  default     = false
+}
+
+variable "enable_service_network" {
+  description = "T25: build a VPC Lattice service network, associate it with the lab VPC, and associate the project's resource configuration with it - the alternative consumption path to the direct Resource endpoint. Off by default - it bills a second per-resource-hour rate on top of the endpoint; opt in per live spin."
+  type        = bool
+  default     = false
+}
+
 variable "public_access_cidrs" {
   description = "DB network restrictions allowlist. Default open; `make restrict IP=x.x.x.x` closes it to break-glass only for test T12."
   type        = list(string)

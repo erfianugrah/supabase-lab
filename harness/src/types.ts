@@ -22,6 +22,8 @@ export type Capability =
   | "pgbench" // pgbench on PATH (postgresql*-contrib)
   | "openssl"
   | "pooler" // pooler host supplied via PVLAB_ENDPOINT_POOLER
+  | "second-vpc" // probe Lambda in a second, peered VPC (PVLAB_ENDPOINT_SECOND_VPC_LAMBDA) - local vantage only
+  | "service-network" // VPC Lattice service-network DNS name resolvable (PVLAB_ENDPOINT_SERVICE_NETWORK_DNS) - runner vantage only
   | "direct-db"; // direct 5432 reachable from this vantage (IPv6 - runner only)
 
 export type Status = "pass" | "fail" | "skip" | "info";

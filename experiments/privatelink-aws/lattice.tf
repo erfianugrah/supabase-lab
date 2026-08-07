@@ -82,3 +82,41 @@ resource "aws_route53_record" "db" {
   ttl     = 60
   records = [for eni in data.aws_network_interface.endpoint : eni.private_ip]
 }
+
+# T25 - the VPC Lattice SERVICE NETWORK consumption path, as an alternative
+# to the direct Resource endpoint above. AWS's pricing page quotes a roughly
+# 5x per-resource-hour delta for this path over the endpoint-hours already
+# running in this lab - cited from pricing documentation, never built. Off
+# by default (enable_service_network): it bills that second rate on top of
+# the endpoint for as long as it exists.
+resource "aws_vpclattice_service_network" "supabase" {
+  count = var.enable_service_network ? 1 : 0
+
+  name = "supabase-lab-network"
+
+  tags = { Name = "supabase-lab" }
+}
+
+# The lab VPC, so the SAME runner that already answers T02 can answer T25
+# too - the question is which consumption path works, not which VPC.
+resource "aws_vpclattice_service_network_vpc_association" "lab" {
+  count = var.enable_service_network ? 1 : 0
+
+  vpc_identifier             = aws_vpc.lab.id
+  service_network_identifier = aws_vpclattice_service_network.supabase[0].id
+  security_group_ids         = [aws_security_group.endpoint.id]
+
+  tags = { Name = "supabase-lab" }
+}
+
+# Needs phase 2 for the resource configuration ARN to exist - the same gate
+# the direct endpoint above uses. Its dns_entry is a computed attribute; T25
+# reads the domain name from it rather than guessing a naming scheme.
+resource "aws_vpclattice_service_network_resource_association" "supabase" {
+  count = var.enable_service_network && local.phase2 ? 1 : 0
+
+  resource_configuration_identifier = var.resource_configuration_arn
+  service_network_identifier        = aws_vpclattice_service_network.supabase[0].id
+
+  tags = { Name = "supabase-lab" }
+}

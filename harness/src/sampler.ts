@@ -4,8 +4,9 @@
  * Runs an operation while sampling several connection paths independently, and
  * reports one window per path. Separating "what operation" from "what paths"
  * from "how we time it" is what lets one module per platform operation stay a
- * few dozen lines - see t14-restart.ts for the interleaved version this
- * generalises.
+ * few dozen lines - see privatelink-aws/tests/t26-restart-paths.ts for a
+ * module built on this. It replaced an earlier hand-rolled, interleaved,
+ * first-success loop (t14-restart.ts, since deleted) that this generalises.
  *
  * Everything returned is scalar: `measurements` in the report contract is
  * Record<string, number | string>, so a series has nowhere to go.

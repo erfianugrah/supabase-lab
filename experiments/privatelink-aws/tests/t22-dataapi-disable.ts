@@ -221,6 +221,23 @@ const mod: TestModule = {
     ctx.log(`baseline db_schema = "${baseline.db_schema}"`);
 
     const live = await snapshot(ctx);
+
+    // BASELINE GATE: the private-path claim below ("DB still works with the
+    // Data API off") is meaningless if the DB path was already broken before
+    // touching anything - the run would report a pre-existing failure as
+    // though this test's own mutation had caused it.
+    if (hasDb) {
+      const baselineDb = await dbStillWorks(ctx, 5432);
+      if (!baselineDb.ok) {
+        return {
+          id: "T22",
+          title: mod.title,
+          status: "skip",
+          detail: `baseline private-path probe on 5432 failed before any change (${baselineDb.error}) - no control, no conclusion`,
+        };
+      }
+    }
+
     results.push({
       id: "T22a",
       title: "Data API baseline (anon table read + PostgREST root)",

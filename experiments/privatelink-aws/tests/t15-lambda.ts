@@ -2,36 +2,8 @@
  * T15 - the customer-shaped client: Lambda in private subnets reaching the
  * endpoint on both ports. Invoked from the orchestrator, not the runner.
  */
-import { $ } from "bun";
 import type { TestModule, TestResult } from "../../../harness/src/types";
-
-interface ProbeResult {
-  port: number;
-  ok: boolean;
-  connect_ms?: number;
-  query_ms?: number;
-  prepared?: string;
-  error?: string;
-}
-
-export async function invokeProbe(
-  region: string,
-  payload: Record<string, unknown> = {},
-): Promise<{ all_ok?: boolean; results?: ProbeResult[]; raw: string }> {
-  const out = "/tmp/pvlab-lambda-out.json";
-  await $`aws lambda invoke --region ${region} --function-name supabase-lab-probe --cli-binary-format raw-in-base64-out --payload ${JSON.stringify(payload)} ${out}`
-    .env({ ...process.env, AWS_ACCESS_KEY_ID: "", AWS_SECRET_ACCESS_KEY: "" })
-    .quiet()
-    .nothrow();
-  const raw = await Bun.file(out)
-    .text()
-    .catch(() => "");
-  try {
-    return { ...JSON.parse(raw), raw };
-  } catch {
-    return { raw };
-  }
-}
+import { invokeProbe } from "../lib/lambda-probe";
 
 const mod: TestModule = {
   id: "T15",
