@@ -351,17 +351,108 @@ Still unverified, no test written:
   ENI addresses churn on replacement (measured, run 6) and connecting by IP
   breaks `verify-full`, since the cert carries only `db.<ref>.supabase.co`.
 
+## 2026-08-07 - run 9 (org B, Team plan; Tier-B gaps closed, T14 replaced)
+
+Built before the spin, credential-free: T24 (second peered VPC), T25 (Lattice
+service network), T26 (restart per private path, replacing T14), both tofu
+toggles defaulting false. T14 had no baseline gate - it POSTed the restart and
+started probing, so a path already broken going in would have had its
+pre-existing downtime published as restart downtime. Run 8's own conclusion
+("adopt this for every future fault-injection test") had never been applied to
+it. T22 and T23 turned out to be missing the gate too.
+
+Results:
+
+- **T22d/e/f - CLOSED.** With the Data API wedged via `PATCH .../postgrest`
+  (db_schema=""), the private path keeps working: query over the PHZ host on
+  5432 and on 6543 both succeeded, and `db push --db-url` still applied
+  migrations. The ops path survives the lockdown. T22h re-confirms the state
+  is *wedged* (PGRST002 schema-cache retry loop), not disabled.
+- **T25 - CLOSED, and it works.** Connected on both 5432 and 6543 through
+  `snra-<id>.rcfg-<id>.<x>.vpc-lattice-rsc.ap-southeast-1.on.aws`. The
+  service-network consumption path is real, not just priced.
+- **T24 - the doc's claim is WRONG.** A Lambda in a second, peered VPC reached
+  the endpoint on both ports (5432 connect 792ms cold, 6543 218ms, prepared
+  statements ok). Peering ALONE is indeed not enough, but peering + a
+  Route53 PHZ zone association + an SG rule for the peer CIDR is - and that
+  serves the second VPC from the EXISTING endpoint. So "multi-VPC means an
+  endpoint each, or a Lattice service-network association" is false: neither a
+  second endpoint nor the 5x Lattice path is required for a peered VPC.
+  The test's own detail string overstates this as "contradicting the per-VPC
+  claim" - reword before it reaches the docs.
+- **T26 - the private paths do NOT move together.** One restart, 500ms
+  sampling, sustained recovery: direct-5432 down 45s ("the database system is
+  starting up"), pooler-6543 down 60s ("timeout expired"). Different windows
+  AND different failure modes on the same restart. T14's single-path 49-131s
+  spread was conflating them. Note `timeout expired` still appears here, so
+  the serverless failure-mode finding survives the vantage change from Lambda
+  to runner-direct.
+- **T19 - answered, but not the question it asked.** Removing the AWS account
+  is REFUSED while any consumer attachment references the resource
+  configuration: "Cannot remove last AWS PrivateLink Association: There are
+  still Endpoint Associations attached to the Resource Configuration". Both
+  the VPC endpoint and the Lattice resource association count. After
+  destroying both, the removal succeeded and the RAM share disappeared
+  immediately. So the abrupt-cut scenario T19 was built to measure is
+  UNREACHABLE - the control plane enforces detach-before-remove. Every prior
+  run missed this because deleting the project bypasses the guard. T19 should
+  be rewritten as an ordering-constraint test: attempt with an attachment
+  present, expect refusal; detach; expect success.
+
+New gotchas:
+
+- **`aws_vpclattice_service_network_resource_association` never converges when
+  given an ARN.** The provider accepts `resource_configuration_identifier` as
+  an ARN and returns the bare id, so every apply fails with "Provider produced
+  inconsistent result after apply" AND replaces the association - which bills
+  per resource-hour. hashicorp/aws 6.57.1. Fixed by passing
+  `element(split("/", var.resource_configuration_arn), 1)`.
+- **`make wait-ready` is dead.** It polls
+  `/platform/projects/{ref}/privatelink/associations`, which rejects PATs
+  (401 "JWT could not be decoded", re-verified this run). Use the RAM
+  invitation as the readiness signal instead; `make arns` already does.
+- **`reap-enis` only covers the VPC tagged `supabase-lab`**, so it does not
+  reap the second VPC's Lambda ENI and that VPC's destroy stalls. The second
+  ENI took ~8 min to release on its own.
+- **Destroying the endpoint out of band poisons the next plan.** `arns.tfvars`
+  still on disk keeps `local.phase2` true while
+  `aws_vpc_endpoint.supabase[0].network_interface_ids` is unknown, so
+  `data.aws_network_interface.endpoint`'s for_each errors. `make destroy` only
+  removes arns.tfvars after a SUCCESS, so a failed run leaves the poison in
+  place. Remove it by hand and re-destroy.
+
+Also re-confirmed on this run: no `dns_entry` on a Resource endpoint (provider
+6.57.1); `ModifyVpcEndpoint` rejects IPV4 -> DUALSTACK; the DNS split (database
+resolves to 10.42.x in-VPC while the API resolves publicly); T21 survives one
+blackholed ENI.
+
+Teardown: clean. 39 resources destroyed, 0 in state, project deleted, and an
+AWS sweep shows 0 vpcs / lambdas / endpoints / nat / eips / instances / lattice
+networks / private zones / iam roles / active RAM shares. The S3 suite bucket
+is gone despite `suite-clean` reporting a spurious remove_bucket failure.
+
 ## Open follow-ups
 
 - [x] T22a/b/c/g/h + all of T23 - closed on a bare project, see
       `experiments/http-tier-lockdown/RUNLOG.md`.
-- [ ] T22d/e/f on the next `--destructive` spin here: private path on 5432
-      and 6543, plus `db push --db-url`, while the Data API is wedged.
+- [x] T22d/e/f - closed on run 9: private 5432 and 6543 both keep working and
+      `db push --db-url` still applies migrations while the Data API is wedged.
 - [x] Generalise evidence into a public guide - done:
       lexicanum `reference/supabase-aws-privatelink`.
 - [ ] Feed results back to the private findings notes (claims move from
       Inferred to Tested, linking the published guide).
-- [ ] Optional: enable_lambda=true run for the Lambda-native tests.
+- [x] enable_lambda=true run for the Lambda-native tests - done runs 6-9.
+- [ ] Rewrite T19 as an ordering-constraint test (refusal while attached ->
+      success after detach). Its current premise, watching live clients break
+      on removal, is unreachable: the platform enforces detach-before-remove.
+- [ ] Fix `make wait-ready` (polls a PAT-rejecting /platform route) and widen
+      `reap-enis` to every `supabase-lab*` VPC, not just `supabase-lab`.
+- [ ] Reword T24's detail string - "contradicting the doc's per-VPC claim"
+      overstates it. Peering alone is genuinely insufficient; peering + PHZ
+      association + SG rule is what carries the endpoint.
 - [ ] Optional: IPv4 add-on probe (T15) - enable via Management API,
       watch public-direct-5432 go from SKIP to green, disable.
       ~$0.0055/hr while on; argued moot for PrivateLink designs.
+      Declined on run 9. T20c confirms it is the only blocker: "no public A
+      record for the database host - without the IPv4 add-on there is no
+      public-direct path to measure".
