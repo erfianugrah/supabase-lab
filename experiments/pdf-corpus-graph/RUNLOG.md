@@ -383,12 +383,38 @@ speed. The catalogue was the only possible source of that answer.
 
 ---
 
+## Cold rebuild - one command, measured
+
+`make up` goes from nothing to a working pggraph.erfi.dev: `tofu apply`,
+`wait-ready`, then `scripts/seed.sh` (extensions, corpus schema, seed restore,
+citation extraction, API, security, PostgREST exposure, generated `.env`, build,
+wrangler deploy).
+
+**Measured end to end at 446s** against a project that was destroyed and then
+recreated, which also closes the two previously-unmeasured cold-rebuild steps:
+`tofu apply` provisioning was 4s and the seed restore was 1s. The dominant step
+is citation extraction (338s), then Cloudflare deploy propagation and the
+PostgREST schema-cache reload.
+
+The rebuild caught four drift bugs that only existed because the system was
+assembled interactively and never rebuilt from files: `seed.sh` did not fail
+fast (`set -u` only, so a broken phase logged and the next ran on missing
+output); the `pg_trgm` relocation raced its own creation; no `demo/db/*.sql`
+pinned a `search_path`, which a fresh database over the pooler needs; and
+`04-api.sql` still granted on the dropped `v_documents` view. The definer
+markers and the tiered search ranking now live in `04-api.sql` rather than in an
+interactive psql session, which is why a rebuild no longer silently reverts
+exact-match ranking to 1.0.
+
+What `make up` does NOT reproduce: the Cloudflare custom-domain route for
+pggraph.erfi.dev. That lives in Cloudflare's state, not the demo's, so destroying
+the Supabase project alone is safe - a rebuild just repoints the data. Tearing
+down the Worker or its route would need a separate step.
+
+---
+
 ## Open gaps
 
 - **Maximum disk size for a single project.** G06 found throughput fields only.
 - **Recall for the vector indexes.** Synthetic vectors cannot support it; needs a
   real embedding model over the real corpus.
-- **Cold-rebuild time end to end.** Component timings are measured (fetching 40 MB
-  takes about a minute, `pdftotext` about eleven seconds, the demo citation
-  extraction about six minutes, the frontend about three seconds), but `tofu apply`
-  provisioning and the text upload over the pooler are not.
