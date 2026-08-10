@@ -1,0 +1,167 @@
+@import "tailwindcss";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
+@import "@fontsource/ibm-plex-mono/600.css";
+@import "@fontsource/ibm-plex-mono/700.css";
+
+/* ---------------------------------------------------------------
+   McMaster-Carr appliance-manual tokens, carried over verbatim from
+   the bonkled palette so the two surfaces read as one system.
+   Cream paper + black ink in light; warm dark paper + warm off-white
+   ink in dark. Never pure black/white - the warmth is the brand.
+   No rounded corners, no shadows, no gradients. Hairlines only.
+--------------------------------------------------------------- */
+@theme {
+  --color-bg-cream: #faf7ee;
+  --color-bg-cream-strong: #efe9d8;
+  --color-ink: #1a1a1a;
+  --color-ink-muted: #5a5a5a;
+  --color-accent-red: #c8102e;
+  --color-hairline: #dcd6c8;
+  --color-hairline-strong: #b8b0a0;
+
+  /* Entity-kind identity. Reused from the tile palette rather than
+     invented, so a kind badge sits in the same colour world as the
+     rest of the system. */
+  --color-kind-control: #4a6f3c;
+  --color-kind-usc: #b59a52;
+  --color-kind-cfr: #8c8378;
+  --color-kind-publaw: #c8102e;
+
+  --font-mono: "IBM Plex Mono", "JetBrains Mono", "Menlo", "Consolas", monospace;
+
+  --radius-*: initial;
+}
+
+@layer base {
+  :root[data-theme="dark"] {
+    --color-bg-cream: #14110d;
+    --color-bg-cream-strong: #1f1b14;
+    --color-ink: #e8e0ce;
+    --color-ink-muted: #8c8474;
+    --color-accent-red: #ff5460;
+    --color-hairline: #3a342a;
+    --color-hairline-strong: #5a5446;
+    --color-kind-control: #6fab58;
+    --color-kind-usc: #d9b96a;
+    --color-kind-cfr: #605a50;
+    --color-kind-publaw: #ff5460;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --color-bg-cream: #14110d;
+      --color-bg-cream-strong: #1f1b14;
+      --color-ink: #e8e0ce;
+      --color-ink-muted: #8c8474;
+      --color-accent-red: #ff5460;
+      --color-hairline: #3a342a;
+      --color-hairline-strong: #5a5446;
+      --color-kind-control: #6fab58;
+      --color-kind-usc: #d9b96a;
+      --color-kind-cfr: #605a50;
+      --color-kind-publaw: #ff5460;
+    }
+  }
+
+  html,
+  body {
+    background: var(--color-bg-cream);
+    color: var(--color-ink);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 1.5;
+    font-variant-ligatures: none;
+  }
+  *,
+  *::before,
+  *::after {
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+  a {
+    color: var(--color-ink);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  hr {
+    border: 0;
+    border-top: 1px solid var(--color-hairline);
+  }
+
+  /* Dense data tables are the primary surface here, so the defaults live in
+     base rather than being re-applied per component. */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-variant-numeric: tabular-nums;
+  }
+  th {
+    text-align: left;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-size: 11px;
+    color: var(--color-ink-muted);
+    border-bottom: 1px solid var(--color-hairline-strong);
+    padding: 3px 8px;
+    white-space: nowrap;
+  }
+  td {
+    border-bottom: 1px solid var(--color-hairline);
+    padding: 3px 8px;
+    vertical-align: top;
+  }
+  tbody tr:hover {
+    background: var(--color-bg-cream-strong);
+  }
+
+  input,
+  select,
+  button {
+    font-family: inherit;
+    font-size: inherit;
+    background: var(--color-bg-cream);
+    color: var(--color-ink);
+    border: 1px solid var(--color-hairline-strong);
+    padding: 3px 6px;
+  }
+  button {
+    cursor: pointer;
+    background: var(--color-bg-cream-strong);
+  }
+  button:disabled {
+    color: var(--color-ink-muted);
+    cursor: default;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      transition-duration: 0.001ms !important;
+    }
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-ink) !important;
+    outline-offset: 1px;
+  }
+}
+
+/* Numeric columns right-align so magnitudes line up on the decimal. */
+.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

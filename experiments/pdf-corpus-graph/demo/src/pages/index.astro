@@ -1,0 +1,54 @@
+---
+import Explorer from "../components/Explorer";
+import "../styles/global.css";
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Corpus graph - document citation index</title>
+    <meta
+      name="description"
+      content="Public-document corpus turned into a queryable citation graph in Postgres. Entities, edges, traversal, shortest path, and byte-exact provenance."
+    />
+  </head>
+  <body class="mx-auto max-w-[1600px] p-3">
+    <header class="mb-3 border-b-2 border-[var(--color-ink)] pb-2">
+      <div class="flex items-baseline justify-between gap-4">
+        <h1 class="text-[15px] font-bold uppercase tracking-[0.08em]">
+          Corpus graph &mdash; document citation index
+        </h1>
+        <span class="text-[11px] text-[var(--color-ink-muted)]">
+          POSTGRES 17.6 &middot; PGROUTING 3.4.1 &middot; POSTGREST
+        </span>
+      </div>
+      <p class="mt-1 max-w-[110ch] text-[12px] text-[var(--color-ink-muted)]">
+        Seven public-domain US federal documents, extracted to text and indexed
+        as a citation graph. Entities are NIST control ids, statutes, regulations
+        and Public Law numbers; edges are co-citation within a 400-character
+        window. Traversal is a recursive CTE; shortest path and components are
+        pgrouting over the same ordinary edge table. No graph database.
+      </p>
+    </header>
+
+    <!--
+      client:load, not client:visible. The explorer IS the page - deferring
+      hydration until scroll would leave an empty shell above the fold.
+    -->
+    <Explorer client:load />
+
+    <footer
+      class="mt-4 border-t border-[var(--color-hairline-strong)] pt-2 text-[11px] text-[var(--color-ink-muted)]"
+    >
+      <p>
+        Extraction is deterministic: these documents carry their cross-references
+        as explicit, grammatically fixed citations, so every entity and edge is
+        verifiable against the source text with no model in the loop. That is a
+        property of this corpus, not a general claim - open-domain entity
+        extraction needs an LLM pass and a human review step.
+      </p>
+    </footer>
+  </body>
+</html>

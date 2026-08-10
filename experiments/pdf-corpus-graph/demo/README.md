@@ -1,0 +1,131 @@
+# corpus-graph-demo
+
+A document corpus turned into a queryable citation graph in Postgres. Seven
+public-domain US federal documents (legislation, regulation, budget, standards,
+a tax form), extracted to text and indexed as entities, edges and byte-exact
+provenance. Traversal is a recursive CTE; shortest path and connected components
+are pgrouting over the same ordinary edge table.
+
+No graph database. No bespoke API server. No LLM in the extraction path.
+
+## What it demonstrates
+
+| Question | Answered by |
+|---|---|
+| Who is connected to whom, and how closely? | `neighbourhood()` - recursive CTE, depth-capped |
+| What is the strongest link between two things? | `shortest_path()` - `pgr_dijkstra`, cost = 1/co-citation weight |
+| Does the corpus cluster? | `components()` - `pgr_connectedComponents` |
+| Why does this node exist? | `provenance()` - document + exact character offset + source snippet |
+| Find a thing despite a typo | `search_entities()` - tiered exact / punctuation-insensitive / prefix / trigram |
+
+## Numbers from the loaded corpus
+
+1,521 entities (328 NIST control ids, 798 statutes, 359 Public Law numbers,
+36 CFR references), 10,016 mentions, 14,233 edges, over 7 documents.
+
+The extracted-text-to-source-PDF ratio spans **0.048** (a positioned tax form,
+which yields almost no running text) to **1.0885** (dense regulation, where the
+extracted text is larger than its own PDF because PDF already compresses its
+content streams). Source size does not predict database size, and the aggregate
+ratio of 0.7633 hides that 22x spread.
+
+## Architecture
+
+```
+public PDF -> extracted text (corpus.documents)
+           -> citation extraction, set-based SQL      (demo.extract_document_fast)
+           -> entities + mentions with exact offsets  (demo.entities, demo.mentions)
+           -> co-citation edges within 400 chars      (demo.build_edges)
+           -> 7 read-only Postgres functions
+           -> PostgREST over HTTPS
+           -> Astro static + one React island
+```
+
+The API is the database. Each endpoint is a Postgres function that PostgREST
+exposes; there is no API tier to deploy or scale separately.
+
+## Why extraction is deterministic here
+
+The general case for document-to-graph is LLM triple extraction, and every
+serious pipeline in the field works that way. This corpus is the special case
+where that is unnecessary: US federal legal and regulatory documents carry
+cross-references as explicit, grammatically fixed citations (`AC-1`,
+`5 U.S.C. 552`, `17 CFR 240`, `Public Law 118-15`). Those are regex-exact, so
+every entity and every edge is verifiable against the source bytes with no
+hallucination and no review step.
+
+That is a property of this corpus, not a general claim. Open-domain entity
+extraction needs a model pass, entity resolution by embedding similarity, and a
+human review stage.
+
+The edge definition is also deliberately weak and stated as such: co-occurrence
+within a character window is not a typed relationship. An LLM pipeline would
+produce `{subject, predicate, object}`. This demo shows the graph *layer* on real
+data, and proximity is enough to produce a real topology to traverse.
+
+## Security model
+
+The anon key is public by design. That role can execute exactly seven read-only
+functions and can select from **no table at all** - raw table access returns
+`42501`. The functions are `SECURITY DEFINER` with a pinned `search_path`
+specifically so anon never needs rights on the underlying document text; granting
+`select` on `corpus.documents` would otherwise expose the full extracted text of
+every document through PostgREST's auto-generated table endpoint.
+
+## Running it
+
+```bash
+cp .env.example .env      # fill in PUBLIC_SUPABASE_URL + PUBLIC_SUPABASE_ANON_KEY
+bun install
+bun run dev               # localhost:4321
+bun run check             # astro check + tsc
+bun run build
+```
+
+Database setup, in order, against a project that already has the corpus loaded:
+
+```bash
+psql "$PGURL" -f db/01-schema.sql
+psql "$PGURL" -f db/02-extract.sql            # patterns + normalization + edges
+psql "$PGURL" -f db/03-extract-setbased.sql   # the fast extractor
+psql "$PGURL" -f db/04-api.sql                # the 7 endpoints + grants
+```
+
+`demo` must be added to the project's exposed PostgREST schemas, or every call
+returns `PGRST106 Invalid schema: demo`:
+
+```
+PATCH /v1/projects/{ref}/postgrest
+{"db_schema": "public, graphql_public, demo"}
+```
+
+## Gotchas worth keeping
+
+These each cost a debugging round and are recorded in comments at the site of the
+fix:
+
+- **Postgres word boundary is `\y`, not `\b`.** `\b` is read as backspace and
+  matches nothing, silently. `\y[A-Z]{2}-[0-9]{1,2}\y` finds 5,913 control
+  references where the `\b` spelling of the same pattern found 0 - and 0 looked
+  like a fact about the document.
+- **`row_number() over ()` beside a set-returning function in the SELECT list
+  assigns 1 to every row.** Window functions run before SRF expansion. Use
+  `WITH ORDINALITY` in `FROM`.
+- **`regexp_instr` rejects the `g` flag**; the occurrence argument does that job.
+  Walking the occurrence index with a fixed start is quadratic - advance the
+  start offset instead.
+- **`DISTINCT` on a projected row is not `DISTINCT ON` the unique key.** Several
+  surface forms deliberately share one normalized key, so a plain `DISTINCT`
+  makes one `INSERT` propose two rows for one key: "ON CONFLICT DO UPDATE command
+  cannot affect row a second time". This is entity resolution arriving as a
+  constraint violation.
+- **PostgREST exposes only `public` and `graphql_public` by default.** A custom
+  schema needs both the project config change and a per-request
+  `Content-Profile` header.
+
+## Theme
+
+McMaster-Carr appliance manual, carried over from the bonkled palette: IBM Plex
+Mono, cream paper and black ink (warm dark paper and warm off-white ink in dark
+mode), hairline borders, no rounded corners, no shadows, no gradients. Tables
+over cards, numbers over adjectives, and diagnostic voice for failure states.
