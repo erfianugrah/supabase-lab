@@ -1,5 +1,14 @@
 # pdf-corpus-graph: hardening, editorial reshape, and the open scale questions
 
+> **STATUS 2026-08-10: PARKED.** Track A done by hand. `make up` is a proven
+> one-command rebuild (446s, measured against a destroyed project). Track C
+> (favicon + tooltips) done. **Track B (editorial entity extraction) and Track D
+> (G08/G09/G10) are NOT built** - the Anthropic API hit its usage limit
+> (2026-09-01 reset) so the loop could not run them, and they were left rather
+> than hand-built under time pressure. To resume: run `loop verify-sensors` then
+> `loop run --manifest .pi/harness-pdf-corpus-graph.json`. G02-G07 are preserve
+> sensors; only G08/G09/G10 are feature sensors.
+
 > **For agentic workers:** Steps use checkbox (`- [ ]`) syntax for tracking. Read
 > `experiments/pdf-corpus-graph/GUIDE.md` before touching anything under
 > `experiments/pdf-corpus-graph/` - it is binding, and its cardinal rule (a test
