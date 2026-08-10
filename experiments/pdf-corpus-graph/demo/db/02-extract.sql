@@ -1,3 +1,8 @@
+-- Pinned because these files run over the transaction pooler, where there is no
+-- ambient search_path - a fresh database fails with "no schema has been selected
+-- to create in" otherwise.
+set search_path = demo, corpus, public, extensions;
+
 -- Extraction: source text -> entities + mentions + co-citation edges.
 --
 -- Runs entirely server-side. No API key, no external service, no network. That

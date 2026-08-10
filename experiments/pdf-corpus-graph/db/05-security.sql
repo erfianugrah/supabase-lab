@@ -1,3 +1,8 @@
+-- Pinned because these files run over the transaction pooler, where there is no
+-- ambient search_path - a fresh database fails with "no schema has been selected
+-- to create in" otherwise.
+set search_path = demo, corpus, public, extensions;
+
 -- Security hardening for the demo + corpus schemas.
 --
 -- STARTING STATE, measured before writing this: RLS was OFF on all eight tables
