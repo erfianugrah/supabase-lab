@@ -28,9 +28,43 @@ export interface QueryResult {
   raw: string;
 }
 
+/**
+ * THE TIMEOUT IS A SEPARATE -c, AND -q IS LOAD-BEARING.
+ *
+ * This function used to send `set statement_timeout='600s'; <sql>` in ONE -c.
+ * psql prints the command status tag for a SET even under -At, so every result
+ * came back with a phantom leading row `["SET"]` and `scalar()` returned the
+ * string "SET" for every query in the suite. The damage was silent and plural:
+ * a fixture count read 8 instead of 7, a genre named "unknown" appeared with one
+ * member, every pg_total_relation_size came back null, a halfvec/vector ratio
+ * rendered as "unknown", and `Number("SET")` reached pgr_dijkstra as NaN, where
+ * Postgres answered `column "nan" does not exist`. One defect, five symptoms,
+ * none of which named its cause.
+ *
+ * It survived a fully green loop run. The defect sat in this shared helper,
+ * which was in the base rather than the diff, so the reviewing judge never saw
+ * it, and the per-test sensors asserted that a measurement EXISTED rather than
+ * that it was coherent - `"SET"` and `null` are both perfectly present values.
+ *
+ * Two rejected fixes, both measured here rather than assumed:
+ *
+ *   PGOPTIONS='-c statement_timeout=...' is libpq's own channel for
+ *   connection-time GUCs and it does NOT survive the transaction pooler.
+ *   Through port 6543 `show statement_timeout` reports the role default (2min)
+ *   whether PGOPTIONS is set or not - Supavisor does not forward startup
+ *   options. It fails silently, which is worse than the bug it replaced.
+ *
+ *   A single -c with `begin; set local ...; commit` just trades one phantom tag
+ *   for three.
+ *
+ * So: the SET goes in its own -c (which does take effect - verified by a 250ms
+ * timeout cancelling pg_sleep(2)), and -q suppresses the tag it would otherwise
+ * print. Removing -q silently reintroduces the original bug.
+ */
+
 /** One statement. Rows come back as arrays of column strings. */
 export async function q(ctx: Ctx, sql: string, timeoutS = 600): Promise<QueryResult> {
-  const p = await $`psql ${poolerUrl(ctx)} -At -F${"\t"} -v ON_ERROR_STOP=1 -c ${`set statement_timeout='${timeoutS}s'; ${sql}`}`
+  const p = await $`psql ${poolerUrl(ctx)} -qAt -F${"\t"} -v ON_ERROR_STOP=1 -c ${`set statement_timeout='${timeoutS}s'`} -c ${sql}`
     .quiet()
     .nothrow();
   const raw = (p.stdout.toString() + p.stderr.toString()).trim();
@@ -50,7 +84,7 @@ export async function scalar(ctx: Ctx, sql: string, timeoutS = 600): Promise<str
 
 /** Run a file of statements. Returns raw output; ON_ERROR_STOP is on. */
 export async function file(ctx: Ctx, path: string, timeoutS = 1800): Promise<QueryResult> {
-  const p = await $`psql ${poolerUrl(ctx)} -At -F${"\t"} -v ON_ERROR_STOP=1 -c ${`set statement_timeout='${timeoutS}s'`} -f ${path}`
+  const p = await $`psql ${poolerUrl(ctx)} -qAt -F${"\t"} -v ON_ERROR_STOP=1 -c ${`set statement_timeout='${timeoutS}s'`} -f ${path}`
     .quiet()
     .nothrow();
   const raw = (p.stdout.toString() + p.stderr.toString()).trim();
