@@ -15,8 +15,15 @@
 # Exits 0 whenever a run artifact was produced, INCLUDING when tests report
 # `fail`. A measured fail is data in this repo, and a runner that refuses to
 # finish on one would make the loop's cheapest path to green "delete the
-# measurement". The per-test sensors and the `no-throw` guard are what
-# discriminate; this script only proves the suite executed.
+# measurement".
+#
+# It DOES fail on the two things that are test bugs rather than findings: a
+# thrown error, and a skip with no reason. Both assertions live here rather
+# than in their own sensors because they are derived from the artifact THIS
+# script produces - as separate sensors they read whatever run-*.json was
+# lying in /tmp, so `verify-sensors` could never flip them (planting a
+# throwing test does not change a stale artifact) and they were reported
+# STUCK: passing forever, gating nothing.
 set -uo pipefail
 
 EXP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -72,4 +79,32 @@ if [ -z "$F" ]; then
   exit 1
 fi
 echo "artifact: $F"
-exit 0
+
+rc=0
+
+# A thrown error is a harness/test bug; the runner records it with a detail
+# prefixed "test threw". Distinct from a measured fail, which is data.
+THREW="$(jq -r '[.results[]|select((.detail//"")|startswith("test threw"))|"\(.id): \(.detail)"]|.[]' "$F")"
+if [ -n "$THREW" ]; then
+  echo "live-suite: test(s) THREW - a bug in the test, not a finding:" >&2
+  echo "$THREW" >&2
+  rc=1
+fi
+
+# A skip with no reason is a test that asserts nothing while looking fine.
+MUTE="$(jq -r '[.results[]|select(.status=="skip")|select((.detail//"")=="")|.id]|.[]' "$F")"
+if [ -n "$MUTE" ]; then
+  echo "live-suite: skip(s) with no reason in .detail - put the reason there:" >&2
+  echo "$MUTE" >&2
+  rc=1
+fi
+
+# Measured fails are printed for visibility and deliberately do NOT set rc.
+FAILED="$(jq -r '[.results[]|select(.status=="fail")|select(((.detail//"")|startswith("test threw"))|not)|"\(.id): \(.detail//"")"]|.[]' "$F")"
+if [ -n "$FAILED" ]; then
+  echo "live-suite: measured fail(s) - these are DATA, do not retry them to green:"
+  echo "$FAILED"
+fi
+
+jq -r '"summary: " + ([.results[]|.status]|group_by(.)|map("\(length) \(.[0])")|join(", "))' "$F"
+exit "$rc"
