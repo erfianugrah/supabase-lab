@@ -1,5 +1,7 @@
 # corpus-graph-demo
 
+**Live: <https://pggraph.erfi.dev>**
+
 A document corpus turned into a queryable citation graph in Postgres. Seven
 public-domain US federal documents (legislation, regulation, budget, standards,
 a tax form), extracted to text and indexed as entities, edges and byte-exact
@@ -81,6 +83,38 @@ bun run dev               # localhost:4321
 bun run check             # astro check + tsc
 bun run build
 ```
+
+## Deploying it
+
+```bash
+bun run build
+CLOUDFLARE_ACCOUNT_ID=<account> wrangler deploy
+```
+
+An assets-only Worker - no `main` script, because every byte served is a file and
+every data call goes from the browser straight to PostgREST. Putting a script in
+front would add a billable invocation ahead of static bytes for no gain.
+
+`not_found_handling` is deliberately left at its default, so an unknown path
+404s. This is a single-page STATIC site, not a client-routed SPA; setting
+`single-page-application` would return `index.html` with 200 for every typo and
+hide broken links.
+
+### Why not Supabase Storage
+
+Measured on the project, not assumed. Storage **records** `index.html` as
+`text/html` and **serves** it as `content-type: text/plain` with
+`x-content-type-options: nosniff`, so a browser renders the source as text. JS
+and CSS serve with correct types, so the downgrade is HTML-specific and
+deliberate - a public bucket accepts arbitrary uploads, and serving HTML as HTML
+would make it a stored-XSS surface on the project's own origin. There is no flag
+to change it.
+
+### DNS drift warning
+
+Wrangler creates the proxied `AAAA` record for the custom domain itself. If the
+zone's DNS is managed by IaC, that record will not be in its state and a plan
+will show it as an extra record until it is imported or declared.
 
 Database setup, in order, against a project that already has the corpus loaded:
 
