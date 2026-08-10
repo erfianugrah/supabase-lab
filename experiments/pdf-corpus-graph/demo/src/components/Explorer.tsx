@@ -23,6 +23,23 @@ import {
  * preference.
  */
 
+/**
+ * A native title-attribute tooltip. No library: `title` is accessible to keyboard
+ * and screen readers for free, and anything richer would fight the no-animation,
+ * no-shadow house style. The dotted underline is the only affordance, matching
+ * the appliance-manual register.
+ */
+function Hint({ children, tip }: { children: React.ReactNode; tip: string }) {
+  return (
+    <span
+      title={tip}
+      className="cursor-help underline decoration-dotted decoration-[var(--color-hairline-strong)] underline-offset-2"
+    >
+      {children}
+    </span>
+  );
+}
+
 function KindBadge({ kind }: { kind: string }) {
   return (
     <span
@@ -173,18 +190,18 @@ export default function Explorer() {
         <div>
           <Section
             title="Source corpus"
-            note="extract ratio = extracted text / source PDF bytes"
+            note="what got extracted from each document"
           >
             <table>
               <thead>
                 <tr>
                   <th>slug</th>
                   <th>genre</th>
-                  <th className="num">source</th>
-                  <th className="num">text</th>
-                  <th className="num">ratio</th>
-                  <th className="num">entities</th>
-                  <th className="num">mentions</th>
+                  <th className="num"><Hint tip="Size of the source PDF in bytes.">source</Hint></th>
+                  <th className="num"><Hint tip="Size of the text extracted from it.">text</Hint></th>
+                  <th className="num"><Hint tip="extracted text / source PDF bytes. Above 1.0 is real: a PDF already compresses its content streams, so dense regulation yields more text than its own file.">ratio</Hint></th>
+                  <th className="num"><Hint tip="Distinct cited entities found in this document.">entities</Hint></th>
+                  <th className="num"><Hint tip="Every individual occurrence of a citation in this document.">mentions</Hint></th>
                 </tr>
               </thead>
               <tbody>
@@ -208,7 +225,7 @@ export default function Explorer() {
             </p>
           </Section>
 
-          <Section title="Entity search" note="exact &gt; punctuation-insensitive &gt; prefix &gt; trigram">
+          <Section title="Entity search" note="find a control, statute or Public Law by name">
             <form
               className="mb-2 flex gap-1"
               onSubmit={(e) => {
@@ -228,11 +245,11 @@ export default function Explorer() {
             <table>
               <thead>
                 <tr>
-                  <th>kind</th>
+                  <th><Hint tip="Entity type: CTRL = NIST control, U.S.C. = statute, CFR = regulation, PUB.L = Public Law.">kind</Hint></th>
                   <th>label</th>
                   <th className="num">mentions</th>
                   <th className="num">docs</th>
-                  <th className="num">score</th>
+                  <th className="num"><Hint tip="Search rank: 4.0 exact, 3.9 punctuation-insensitive, 2.x prefix, 1.x trigram similarity.">score</Hint></th>
                   <th />
                 </tr>
               </thead>
@@ -257,10 +274,10 @@ export default function Explorer() {
             </table>
           </Section>
 
-          <Section title="Connected components" note="pgr_connectedComponents, size >= 2">
+          <Section title="Connected components" note="whether the corpus separates into topics on its own">
             <table>
               <thead>
-                <tr><th className="num">size</th><th>largest members</th></tr>
+                <tr><th className="num"><Hint tip="Number of entities in this cluster - mutually reachable via pgr_connectedComponents.">size</Hint></th><th><Hint tip="The most-mentioned entities in the cluster - its topic.">largest members</Hint></th></tr>
               </thead>
               <tbody>
                 {components.slice(0, 8).map((c) => (
@@ -323,7 +340,7 @@ export default function Explorer() {
 
           {selected ? (
             <>
-              <Section title="Shortest path" note="pgr_dijkstra, cost = 1 / co-citation weight">
+              <Section title="Shortest path" note="the strongest chain of references between two entities">
                 <div className="mb-2 flex flex-wrap items-center gap-2">
                   <span className="text-[11px] uppercase text-[var(--color-ink-muted)]">target</span>
                   <span>{pathTo ? pathTo.label : "unset - use SET TARGET"}</span>
@@ -337,7 +354,7 @@ export default function Explorer() {
                 {path && path.length > 0 ? (
                   <table>
                     <thead>
-                      <tr><th className="num">seq</th><th>kind</th><th>label</th><th className="num">agg cost</th></tr>
+                      <tr><th className="num"><Hint tip="Position in the path, 1 = start.">seq</Hint></th><th>kind</th><th>label</th><th className="num"><Hint tip="Accumulated cost from the start. Cost is 1/co-citation-weight, so a lower number means a more strongly evidenced chain, not just fewer hops.">agg cost</Hint></th></tr>
                     </thead>
                     <tbody>
                       {path.map((h) => (
@@ -357,11 +374,11 @@ export default function Explorer() {
                 <table>
                   <thead>
                     <tr>
-                      <th className="num">depth</th>
+                      <th className="num"><Hint tip="How many citation hops from the selected entity. 0 is the entity itself.">depth</Hint></th>
                       <th>kind</th>
                       <th>label</th>
-                      <th>via document</th>
-                      <th className="num">weight</th>
+                      <th><Hint tip="The document where this connection was found.">via document</Hint></th>
+                      <th className="num"><Hint tip="Co-citation count: how often the two entities appear within 400 characters. Higher = more strongly linked.">weight</Hint></th>
                       <th />
                     </tr>
                   </thead>
@@ -384,10 +401,10 @@ export default function Explorer() {
                 </table>
               </Section>
 
-              <Section title="Provenance" note="why this node exists">
+              <Section title="Provenance" note="the exact documents and character offsets this node came from">
                 <table>
                   <thead>
-                    <tr><th>document</th><th className="num">offset</th><th>source text</th></tr>
+                    <tr><th><Hint tip="The source document this mention came from.">document</Hint></th><th className="num"><Hint tip="Exact character position of this mention in the extracted text. Verified against the bytes, not asserted.">offset</Hint></th><th><Hint tip="The 150-character window of source text around the mention - the evidence.">source text</Hint></th></tr>
                   </thead>
                   <tbody>
                     {prov.map((p) => (
