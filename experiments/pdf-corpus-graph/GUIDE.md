@@ -108,9 +108,12 @@ The shape under test is the ordinary relational one:
 
 - `corpus.documents` - one row per source PDF (slug, genre, source bytes,
   extracted text, extraction metadata).
-- `corpus.entities` - one row per distinct entity. Needs a `bigint` surrogate
-  key: pgrouting's algorithms require `bigint` node ids, so a uuid-only entity
-  table cannot be handed to them without a join table.
+- `corpus.entities` - one row per distinct entity. Needs an INTEGER surrogate
+  key. pgrouting's Edges SQL contract types node ids `ANY-INTEGER`, which admits
+  smallint/integer/bigint - an earlier version of this guide said `bigint`
+  specifically and that was wrong. The practical consequence is unchanged: a
+  uuid-only entity table cannot be handed to `pgr_*` without a surrogate integer
+  key.
 - `corpus.edges` - `(source_id bigint, target_id bigint, cost double
   precision, ...)`. Those three column names are not stylistic - pgrouting's
   functions require exactly `id`, `source`, `target`, `cost` (and optionally
