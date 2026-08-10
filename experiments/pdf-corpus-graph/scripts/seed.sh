@@ -20,7 +20,7 @@
 #         make up              # apply + wait-ready + seed, one command
 #
 # Env: SUPABASE_ACCESS_TOKEN (PAT) and CLOUDFLARE_ACCOUNT_ID must be set.
-set -uo pipefail
+set -euo pipefail
 
 EXP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ROOT="$(cd "$EXP_DIR/../.." && pwd)"
@@ -49,30 +49,45 @@ pgurl() {
 }
 PG="$(pgurl)"
 
-t() { local s=$1; shift; local t0; t0=$(date +%s); "$@"; echo "    [$(($(date +%s)-t0))s] $s"; }
+# Every phase MUST fail the script, not log and continue. The first version used
+# `set -u` only, so each broken phase logged an error and the next phase ran
+# against the missing output - and the script still printed "seed complete" with
+# an empty database and a broken deploy. With `set -e` the t() helper's nonzero
+# return aborts here, at the step that actually failed.
+t() { local s=$1; shift; local t0; t0=$(date +%s); "$@" || { echo "    FAILED: $s" >&2; exit 1; }; echo "    [$(($(date +%s)-t0))s] $s"; }
 
 echo "== 1/7 extensions =="
 # pgrouting cascades postgis. Both, plus vector, land in `public` on install and
 # are relocated to `extensions` afterwards - except postgis, whose extrelocatable
 # is f, and vector, which stays put because corpus.chunks has columns of that
 # type. pg_trgm relocates cleanly. 04-api.sql installs pg_trgm itself.
+# pg_trgm must be created before it can be relocated, and 01-schema.sql owns its
+# creation with `if not exists` - so do not alter it here, or a fresh project
+# fails on a relocation of a not-yet-created extension. Relocate only what this
+# script itself creates (pgrouting). postgis cascades and is extrelocatable=f.
 t "extensions" psql "$PG" -qAt -v ON_ERROR_STOP=1 -c "
 create extension if not exists vector;
 create extension if not exists pgrouting cascade;
-alter extension pg_trgm set schema extensions;
 alter extension pgrouting set schema extensions;"
 
 echo "== 2/7 corpus schema + seed =="
 # The corpus tables are defined by the pvlab probes, not by demo/db. Creating the
 # shell here keeps the demo self-contained: the seed restores into it, and
 # G03/G05 would rebuild the rest if run.
+# All five corpus tables, not just documents: the RLS step (05-security.sql)
+# references entities/edges/chunks/chunks_halfvec, and the probes expect them.
+# Minimal shells here; the probes rebuild the heavy synthetic content if run.
 t "corpus schema" psql "$PG" -qAt -v ON_ERROR_STOP=1 -c "
 create schema if not exists corpus;
 create table if not exists corpus.documents (
   slug text primary key, genre text, source_url text,
   source_bytes bigint, extracted_text text, extracted_bytes bigint,
   loaded_at timestamptz default now()
-);"
+);
+create table if not exists corpus.entities (id bigint primary key, kind text, label text, norm text);
+create table if not exists corpus.edges (id bigint primary key, source bigint, target bigint, cost double precision, reverse_cost double precision, kind text, doc_slug text, weight integer);
+create table if not exists corpus.chunks (id bigint primary key, doc_slug text, content text, embedding vector(1536));
+create table if not exists corpus.chunks_halfvec (id bigint primary key, doc_slug text, content text, embedding halfvec(1536));"
 t "seed restore" bash -c "zcat '$EXP_DIR/demo/seed/corpus-documents.sql.gz' | psql '$PG' -q -v ON_ERROR_STOP=1"
 
 echo "== 3/7 demo schema =="
@@ -94,8 +109,19 @@ t "postgrest schema" curl -s -X PATCH "$API/projects/$REF/postgrest" "${auth[@]}
   -H 'Content-Type: application/json' \
   -d '{"db_schema":"public, graphql_public, demo","db_extra_search_path":"public, extensions, demo"}'
 # PostgREST caches its schema; force a reload or the new schema 404s for a while.
+# A NOTIFY is advisory and async - it does not guarantee the schema cache has
+# reloaded, and the first run through this returned PGRST202 "not found in the
+# schema cache" for functions that existed. Poll the actual API until a known
+# function answers, rather than assuming a sleep is enough.
 t "schema cache reload" psql "$PG" -qAt -c "notify pgrst, 'reload schema'"
-sleep 8
+echo -n "    waiting for PostgREST to see demo.stats"
+ANON_TMP="$(curl -s "${auth[@]}" "$API/projects/$REF/api-keys" | jq -r '.[]|select(.name=="anon")|.api_key')"
+for i in $(seq 1 30); do
+  code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "https://$REF.supabase.co/rest/v1/rpc/stats" \
+    -H "apikey: $ANON_TMP" -H 'Content-Type: application/json' -H 'Content-Profile: demo' -d '{}')
+  if [ "$code" = "200" ]; then echo " ok"; break; fi
+  echo -n "."; sleep 2
+done
 
 echo "== 7/7 build + deploy UI =="
 # .env is generated, not committed: the project ref and anon key change on rebuild.
