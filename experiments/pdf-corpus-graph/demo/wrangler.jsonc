@@ -1,0 +1,47 @@
+{
+  // Static-assets-only Worker. There is no `main`, and that is the point: every
+  // byte served here is a file, and every data call goes from the browser
+  // straight to PostgREST. Adding a script would put a billable invocation in
+  // front of static bytes for no gain.
+  //
+  // WHY NOT SUPABASE STORAGE. Measured on this project: Storage RECORDS
+  // index.html as text/html and SERVES it as `content-type: text/plain` with
+  // `x-content-type-options: nosniff`, so a browser renders the source as text.
+  // JS and CSS serve with correct types - the downgrade is HTML-specific, and it
+  // is deliberate: a public bucket takes arbitrary uploads, so serving HTML as
+  // HTML would make it a stored-XSS surface on the project's own origin. There
+  // is no flag to change it.
+  //
+  // WHY NOT PAGES. Pages would also work and the sibling IaC repo already
+  // manages Pages projects. Workers static assets was chosen so this stays a
+  // single self-contained directory deployable with one `wrangler deploy`,
+  // rather than splitting the demo across two repos.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "pggraph",
+  "compatibility_date": "2026-08-01",
+
+  "assets": {
+    "directory": "./dist"
+    // not_found_handling is deliberately left at its default ("none"), so an
+    // unknown path 404s. This is a single-page STATIC site, not a client-routed
+    // SPA - there is one route and no history API. Setting
+    // "single-page-application" would return index.html with 200 for every
+    // typo, which hides broken links instead of reporting them.
+  },
+
+  // Custom domain on a zone that an OpenTofu repo manages the DNS for. Wrangler
+  // creates the proxied DNS record for this hostname itself, and that record is
+  // NOT in the TF state - so `tofu plan` against that zone will show it as an
+  // extra record until it is either imported or declared. Recorded here rather
+  // than discovered later during an unrelated plan.
+  "routes": [
+    {
+      "pattern": "pggraph.erfi.dev",
+      "custom_domain": true
+    }
+  ],
+
+  "observability": {
+    "enabled": true
+  }
+}

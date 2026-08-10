@@ -1,0 +1,26 @@
+{
+  // Deployed to workers.dev, NOT to a route on a zone.
+  //
+  // erfi.dev is managed by an OpenTofu repo that does not manage Workers at all
+  // (it owns Pages, R2, DNS, tunnels and Zero Trust). Attaching a route to that
+  // zone from wrangler would create state the TF repo does not know about, which
+  // shows up later as drift on a zone that has nothing to do with this probe.
+  // A workers.dev subdomain needs no DNS record and no zone write.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "pdf-extract-probe",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-01",
+  // unpdf pulls in a pdf.js build that expects Node built-ins.
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "observability": {
+    "enabled": true
+  },
+  // Default CPU time is 30s on paid plans; the Supabase side took 1663ms to
+  // extract a 188-page document, so the interesting limit here is memory (a
+  // fixed 128 MB per isolate), not CPU. Raised anyway so a slow parse is
+  // attributable to size rather than to a timeout this probe imposed itself.
+  "limits": {
+    "cpu_ms": 300000
+  }
+}
