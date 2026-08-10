@@ -415,6 +415,36 @@ down the Worker or its route would need a separate step.
 
 ## Open gaps
 
-- **Maximum disk size for a single project.** G06 found throughput fields only.
+As of 2026-08-10 the project is **parked**, not finished. These are the known
+open items, in the order they matter:
+
+- **Editorial entity extraction (Track B).** The demo extracts citations, not
+  people or organisations, so it proves the mechanism without answering the
+  editorial question. The cross-document "who appears in more than one document"
+  panel is unbuilt.
+- **Scanned PDFs (G09).** The corpus in scope spans decades, and the early end is
+  likely scanned. form-1040 yielded 4.8% text and zero entities; OCR is needed
+  and is not available in-database.
+- **Maximum disk size for a single project (G08).** G06 found throughput fields
+  only. The ceiling question is the largest open commercial risk.
+- **Traversal under concurrency (G10).** Every latency here is single-query and
+  uncontended.
 - **Recall for the vector indexes.** Synthetic vectors cannot support it; needs a
   real embedding model over the real corpus.
+
+The loop for G08/G09/G10 and Track B is queued but the Anthropic API is
+rate-limited until 2026-09-01, so those were parked rather than hand-built under
+time pressure. See docs/plans/2026-08-10-pdf-corpus-graph-hardening.md for the
+exact resume command.
+
+## Teardown and teardown-cost
+
+`make destroy` removes the Supabase project and is proven safe: `make up`
+rebuilds the whole thing in 446s. The one thing `make up` does not reproduce is
+the Cloudflare custom-domain route for pggraph.erfi.dev, which lives in
+Cloudflare state rather than this repo - destroying the project is safe, tearing
+down the Worker needs a separate step.
+
+The throwaway project is `medium` compute in ap-southeast-1 and bills while it is
+up. Because a rebuild is 446s and one command, destroying between sessions is a
+genuine option rather than a destructive one.
