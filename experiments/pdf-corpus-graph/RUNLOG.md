@@ -123,7 +123,78 @@ Two details that change how this reads:
   assumption that bigger fails faster.
 
 So the platform's own runtime can host extraction for small documents only. For a
-corpus of this shape, extraction runs elsewhere.
+corpus of this shape, extraction runs elsewhere - and "elsewhere" turned out to
+matter a lot, see the runtime comparison below.
+
+---
+
+## Runtime comparison - the same extraction on Cloudflare Workers
+
+Same seven fixtures, same `unpdf`/pdf.js build, both V8 isolates. The difference
+measured is the runtime's resource envelope, not the parser.
+
+| Fixture | Bytes | Supabase Edge Function | Cloudflare Worker |
+|---|---|---|---|
+| `bill-hr3746` | 191290 | ok | ok - 40 pages, 108423 chars |
+| `form-1040` | 220237 | ok | ok - 2 pages, 10151 chars |
+| `budget-2025-bud` | 2504695 | **ok (ceiling)** | ok - 188 pages, 609446 chars |
+| `cfr-t17-v4` | 3595043 | HTTP 546 | **ok - 894 pages, 3913385 chars** |
+| `nist-sp-800-53r5` | 6073678 | HTTP 546 | **ok - 492 pages, 1550548 chars** |
+| `conan-2022` | 14034445 | HTTP 546 | **ok - 2780 pages, 11751448 chars** |
+| `budget-2025-app` | 14930674 | HTTP 546 | 1102 / HTTP 503 after 119.67s |
+
+**Workers clears roughly 5.6x more.** The ceiling moves from between
+2504695 and 3595043 bytes to between 14034445 and 14930674 bytes.
+
+**The failure was disambiguated rather than reported as "resource limit".** Error
+1102 covers CPU *or* memory and the HTTP response cannot tell them apart; the
+docs say the split is only visible in analytics. Querying the GraphQL analytics
+API for the script returned:
+
+```
+status=success         requests=15  errors=0
+status=exceededMemory  requests=1   errors=1
+```
+
+So it is the **128 MB per-isolate memory limit** (heap plus WebAssembly), not
+CPU. CPU was not the constraint: `cpu_ms` was set to 300000, which the docs
+confirm is the paid-plan maximum.
+
+### A measurement gotcha specific to Workers
+
+`extract_ms` came back **0 for every fixture**, and that is not a probe bug. In
+Workers, `Date.now()` returns the time of the last I/O and does not advance
+during code execution - a deliberate Spectre mitigation. Extraction is pure CPU
+with no I/O, so it measures as zero by construction. `total_ms` is real because
+it spans the fetch. Any in-Worker CPU timing needs an I/O bracket or an external
+clock.
+
+Containers and VMs were deliberately not tested: with gigabytes of memory
+available the outcome is predictable, so the measurement would not inform the
+decision.
+
+---
+
+## Hosting the read UI: Storage cannot, Workers can
+
+The demo UI is fully static and every data call goes browser-to-PostgREST, so it
+can live anywhere. Supabase Storage was tried first and cannot serve it.
+
+| | Recorded mimetype | Served `content-type` |
+|---|---|---|
+| `index.html` | `text/html` | **`text/plain`** plus `x-content-type-options: nosniff` |
+| `_astro/*.js` | - | `application/javascript` (correct) |
+
+Storage records the right mimetype and returns the wrong one, and `nosniff`
+forbids the browser from correcting it - confirmed by screenshotting the public
+URL and seeing raw source rendered as text. The downgrade is HTML-specific and
+deliberate: a public bucket accepts arbitrary uploads, so serving HTML as HTML
+would make it a stored-XSS surface on the project's own origin. There is no
+setting to change it, and the response also carried `cache-control: no-cache`.
+
+The UI therefore deploys as a Cloudflare Workers **static-assets** Worker, which
+serves `content-type: text/html` correctly. It is live at
+<https://pggraph.erfi.dev> and its config lives in `demo/wrangler.jsonc`.
 
 ---
 
