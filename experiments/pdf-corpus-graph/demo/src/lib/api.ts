@@ -15,14 +15,26 @@ import { z } from "zod";
  * Raw table access returns 42501. The functions are SECURITY DEFINER precisely
  * so anon never needs rights on the underlying document text.
  */
-const URL_BASE = import.meta.env.PUBLIC_SUPABASE_URL;
-const ANON = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
-
-if (!URL_BASE || !ANON) {
-  throw new Error(
-    "PUBLIC_SUPABASE_URL and PUBLIC_SUPABASE_ANON_KEY must be set - copy .env.example to .env",
-  );
+/**
+ * Narrow at the point of definition, not with a module-level guard.
+ *
+ * `import.meta.env.X` is typed `string | undefined`, and a top-level
+ * `if (!ANON) throw` does NOT narrow the const inside a function body - control
+ * flow analysis does not reach across into closures. The guard reads as if it
+ * works, the value stays `string | undefined`, and the error surfaces much later
+ * as "not assignable to HeadersInit" at the fetch call rather than here.
+ *
+ * A helper that throws and RETURNS `string` narrows once, at the binding.
+ */
+function requireEnv(name: string, value: string | undefined): string {
+  if (!value) {
+    throw new Error(`${name} must be set - copy .env.example to .env and fill it in`);
+  }
+  return value;
 }
+
+const URL_BASE = requireEnv("PUBLIC_SUPABASE_URL", import.meta.env.PUBLIC_SUPABASE_URL);
+const ANON = requireEnv("PUBLIC_SUPABASE_ANON_KEY", import.meta.env.PUBLIC_SUPABASE_ANON_KEY);
 
 async function rpc<T>(fn: string, args: Record<string, unknown>, schema: z.ZodType<T>): Promise<T> {
   const res = await fetch(`${URL_BASE}/rest/v1/rpc/${fn}`, {
