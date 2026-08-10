@@ -24,7 +24,7 @@ TS   := $(shell date +%Y%m%d-%H%M%S)
 TOK := $(SUPABASE_ACCESS_TOKEN)
 export TF_VAR_supabase_access_token = $(TOK)
 
-.PHONY: init fmt validate apply wait-ready pooler schema corpus deploy-fn probe diff destroy
+.PHONY: init fmt validate apply wait-ready pooler schema corpus deploy-fn probe diff destroy seed up
 
 init:
 	tofu init
@@ -77,6 +77,18 @@ schema:
 
 pgurl:
 	@echo "postgresql://postgres.$(REF):$(PW)@$$($(MAKE) --no-print-directory pooler):6543/postgres?connect_timeout=15"
+
+# Rebuild the whole demo from scratch on an already-applied project.
+seed: guard-tok
+	@test -n "$(CLOUDFLARE_ACCOUNT_ID)" || (echo "no CLOUDFLARE_ACCOUNT_ID"; exit 1)
+	@scripts/seed.sh
+
+# Zero to a working pggraph.erfi.dev in one command: provision, wait, seed.
+# After `make destroy`, this is what proves destruction was reversible.
+up: guard-tok
+	$(MAKE) apply
+	$(MAKE) wait-ready
+	$(MAKE) seed
 
 probe: guard-tok
 	@test -n "$(REF)" || (echo "no project_ref - run 'make apply' first"; exit 1)
