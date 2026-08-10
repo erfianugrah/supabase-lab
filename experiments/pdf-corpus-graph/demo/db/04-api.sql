@@ -1,3 +1,8 @@
+-- Pinned because these files run over the transaction pooler, where there is no
+-- ambient search_path - a fresh database fails with "no schema has been selected
+-- to create in" otherwise.
+set search_path = demo, corpus, public, extensions;
+
 -- The API. PostgREST exposes these automatically over HTTPS, so there is no
 -- separate API server in this demo: a Postgres function IS the endpoint.
 --
@@ -35,15 +40,34 @@ select d.slug,
 --   0.571, AC-1 vs AU-1 (a single character off) scores 0.429, and AC-1 vs
 --   SI-18 scores 0.100. So the default admits near-misses and rejects
 --   unrelated labels without a hand-tuned constant in the query.
+-- Tiered ranking. The first version scored every ILIKE-prefix hit 1.0, so a
+-- search for "AC-1" ranked AC-17, AC-19 and AC-18 above AC-1 itself - the exact
+-- match was not even in the top five. Exactness has to outrank prefix, and
+-- prefix has to outrank substring, or a search box is unusable on a corpus whose
+-- labels are systematically prefixes of each other (AC-1 / AC-11 / AC-17).
+--
+-- Punctuation-insensitive matching carries the typo tolerance, not trigrams.
+-- Measured: trigram similarity is too weak on 3-4 character labels ("AC1" vs
+-- "AC-1" shares almost no trigrams once the hyphen is counted, falling below
+-- pg_trgm's 0.300 default). Stripping non-alphanumerics from both sides is what
+-- makes "AC1", "ac-1" and "5USC552" find their nodes. Trigrams stay in the
+-- predicate because they still help on longer statute and Public Law labels.
 create or replace function demo.search_entities(q text, lim int default 25)
 returns table (id bigint, kind text, label text, mentions_count int, docs_count int, score real)
-language sql stable as $$
+language sql stable security definer set search_path = demo, corpus, public, extensions as $$
+  with nq as (select regexp_replace(upper(q), '[^A-Z0-9]', '', 'g') as sq)
   select e.id, e.kind, e.label, e.mentions_count, e.docs_count,
-         greatest(similarity(e.label, q),
-                  case when e.label ilike q || '%' then 1.0 else 0 end)::real
-    from demo.entities e
+         (case
+            when lower(e.label) = lower(q) then 4.0
+            when regexp_replace(upper(e.label), '[^A-Z0-9]', '', 'g') = (select sq from nq) then 3.9
+            when e.label ilike q || '%' then 3.0 - (length(e.label) - length(q))::real / 100
+            when e.label ilike '%' || q || '%' then 2.0
+            else 1.0 + similarity(e.label, q)
+          end)::real
+    from demo.entities e, nq
    where e.label ilike '%' || q || '%'
       or e.label % q
+      or regexp_replace(upper(e.label), '[^A-Z0-9]', '', 'g') like '%' || nq.sq || '%'
    order by 6 desc, e.mentions_count desc
    limit least(lim, 100)
 $$;
@@ -56,7 +80,7 @@ $$;
 -- graph is an outage, not a query.
 create or replace function demo.neighbourhood(root bigint, max_depth int default 2, lim int default 200)
 returns table (id bigint, kind text, label text, depth int, via_doc text, weight int)
-language sql stable as $$
+language sql stable security definer set search_path = demo, corpus, public, extensions as $$
   with recursive walk as (
     select e.id, 0 as depth, null::text as via_doc, 0 as weight
       from demo.entities e where e.id = root
@@ -91,7 +115,7 @@ $$;
 -- hops. directed := false because co-citation is symmetric.
 create or replace function demo.shortest_path(src bigint, dst bigint)
 returns table (seq int, id bigint, kind text, label text, cost double precision, agg_cost double precision)
-language sql stable as $$
+language sql stable security definer set search_path = demo, corpus, public, extensions as $$
   select r.seq, r.node, e.kind, e.label, r.cost, r.agg_cost
     from pgr_dijkstra(
            'select id, source, target, cost, reverse_cost from demo.edges',
@@ -104,7 +128,7 @@ $$;
 -- Connected components, so the UI can show the graph is not one blob.
 create or replace function demo.components(min_size int default 2)
 returns table (component bigint, size bigint, sample_labels text)
-language sql stable as $$
+language sql stable security definer set search_path = demo, corpus, public, extensions as $$
   with c as (
     select * from pgr_connectedComponents(
       'select id, source, target, cost, reverse_cost from demo.edges'
@@ -127,7 +151,7 @@ $$;
 -- verified against substr() rather than assumed.
 create or replace function demo.provenance(entity bigint, lim int default 20)
 returns table (doc_slug text, genre text, char_offset int, snippet text)
-language sql stable as $$
+language sql stable security definer set search_path = demo, corpus, public, extensions as $$
   select m.doc_slug, d.genre, m.char_offset, m.snippet
     from demo.mentions m
     join corpus.documents d on d.slug = m.doc_slug
@@ -140,7 +164,7 @@ $$;
 -- trip: nodes plus the edges among them. Fetching those separately would let the
 -- edge set disagree with the node set.
 create or replace function demo.subgraph(root bigint, max_depth int default 2, lim int default 120)
-returns jsonb language sql stable as $$
+returns jsonb language sql stable security definer set search_path = demo, corpus, public, extensions as $$
   with n as (select * from demo.neighbourhood(root, max_depth, lim)),
   e as (
     select g.id, g.source, g.target, g.weight, g.doc_slug, g.kind
@@ -156,7 +180,7 @@ $$;
 
 -- Corpus-level counters for the header strip.
 create or replace function demo.stats()
-returns jsonb language sql stable as $$
+returns jsonb language sql stable security definer set search_path = demo, corpus, public, extensions as $$
   select jsonb_build_object(
     'documents', (select count(*) from corpus.documents),
     'entities',  (select count(*) from demo.entities),
@@ -168,7 +192,12 @@ returns jsonb language sql stable as $$
 $$;
 
 grant usage on schema demo to anon, authenticated;
-grant select on demo.v_documents, demo.entities, demo.mentions, demo.edges to anon, authenticated;
+-- NO table grants. The seven functions are the entire surface. Granting select
+-- on demo.entities/mentions/edges would expose them through PostgREST's
+-- auto-generated table endpoint, and RLS alone then has to hold the line. The
+-- view v_documents was dropped in favour of demo.documents(), so this file used
+-- to reference a relation that no longer exists - which is exactly why a fresh
+-- run of the file failed silently on a rebuild.
 grant execute on function
   demo.search_entities(text, int),
   demo.neighbourhood(bigint, int, int),

@@ -1,3 +1,8 @@
+-- Pinned because these files run over the transaction pooler, where there is no
+-- ambient search_path - a fresh database fails with "no schema has been selected
+-- to create in" otherwise.
+set search_path = demo, corpus, public, extensions;
+
 -- Set-based extraction. Replaces the plpgsql per-match loop.
 --
 -- WHY. The loop version called regexp_instr once per match against a 1.5 MB
