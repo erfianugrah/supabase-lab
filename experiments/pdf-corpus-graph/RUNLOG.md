@@ -325,6 +325,36 @@ and what is structurally critical".
 
 ---
 
+## Search tier - document text search + cross-document discovery
+
+Added 2026-08-11. Two new read-only RPCs following the established contract
+(security definer, pinned search_path, execute granted to anon+authenticated).
+
+### search_documents - keyword search over extracted text
+
+`search_tsv` is a generated column (`to_tsvector('english', coalesce(extracted_text, ''))`
+stored) with a GIN index. Query uses `websearch_to_tsquery` which tolerates raw
+user input (quotes, stray operators) instead of erroring.
+
+```
+index_size=3192 kB
+search_documents_exec_ms=112.6 (median of 3 warm runs; cold discarded)
+instance_size=medium
+```
+
+Measured via EXPLAIN ANALYZE on the inner query directly (security definer
+functions do not inline, so the function-call EXPLAIN reports only "Function
+Scan"). On 7 rows the planner chooses a sequential scan; the GIN index is
+present (3192 kB) and the generated-column + index pattern is what scales to
+real corpus sizes.
+
+### cross_document_entities - the discovery surface
+
+20 of 1521 entities appear in 2+ documents (18 in 2, 2 in 3). Each row carries
+the document slugs so the UI can render them without a second query.
+
+---
+
 ## Cost shape
 
 Read-heavy, batch-loaded, low write volume - a good fit for one well-provisioned
