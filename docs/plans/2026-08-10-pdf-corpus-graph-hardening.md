@@ -1,13 +1,15 @@
 # pdf-corpus-graph: hardening, editorial reshape, and the open scale questions
 
-> **STATUS 2026-08-10: PARKED.** Track A done by hand. `make up` is a proven
+> **STATUS 2026-08-11: RESUMED.** Track A done by hand. `make up` is a proven
 > one-command rebuild (446s, measured against a destroyed project). Track C
-> (favicon + tooltips) done. **Track B (editorial entity extraction) and Track D
-> (G08/G09/G10) are NOT built** - the Anthropic API hit its usage limit
-> (2026-09-01 reset) so the loop could not run them, and they were left rather
-> than hand-built under time pressure. To resume: run `loop verify-sensors` then
-> `loop run --manifest .pi/harness-pdf-corpus-graph.json`. G02-G07 are preserve
-> sensors; only G08/G09/G10 are feature sensors.
+> (favicon + tooltips) done. **B2 is done too** - the search-tier loop
+> (2026-08-11) built `demo.cross_document_entities` and its panel, verified
+> against the live corpus. What remains is **B1 (person/org extraction) and
+> Track D (G08/G09/G10)**. The Anthropic limit (2026-09-01 reset) no longer
+> blocks: the manifest now runs the ladder the search-tier loop proved -
+> `openrouter/deepseek/deepseek-v4-pro` agent, `openrouter/moonshotai/kimi-k3`
+> judge. G02-G07 are preserve sensors; G08/G09/G10 and `b1-people-orgs-live`
+> are the feature sensors.
 
 > **For agentic workers:** Steps use checkbox (`- [ ]`) syntax for tracking. Read
 > `experiments/pdf-corpus-graph/GUIDE.md` before touching anything under
@@ -282,8 +284,12 @@ Reuse `.pi/harness-pdf-corpus-graph.json` with these changes:
 - [ ] Keep the existing `hygiene`, `no-stubs`, `g-prefix-ids` and `judge` gates.
 - [ ] **Run `loop verify-sensors` before `loop run`.** Last time it found five
       gates that gated nothing.
-- [ ] Model ladder: `anthropic/claude-sonnet-5` then `anthropic/claude-opus-4-8`.
-      Do not use the opencode-zen rungs - that workspace was out of credit and
+- [x] Model ladder: SUBSTITUTED 2026-08-11 - `openrouter/deepseek/deepseek-v4-pro`
+      then `openrouter/deepseek/deepseek-v4-flash`, judge
+      `openrouter/moonshotai/kimi-k3` (explicit `--model`). The Anthropic rungs
+      were parked on the 2026-09-01 usage limit, and the search-tier loop
+      proved the deepseek ladder builds to these sensors in one iteration.
+      Still true: no opencode-zen rungs - that workspace was out of credit and
       the failure presents as a stalled trial rather than an auth error.
 
 **Rules to add to the manifest:**
