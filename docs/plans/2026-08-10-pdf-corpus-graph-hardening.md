@@ -1,15 +1,15 @@
 # pdf-corpus-graph: hardening, editorial reshape, and the open scale questions
 
-> **STATUS 2026-08-11: RESUMED.** Track A done by hand. `make up` is a proven
-> one-command rebuild (446s, measured against a destroyed project). Track C
-> (favicon + tooltips) done. **B2 is done too** - the search-tier loop
-> (2026-08-11) built `demo.cross_document_entities` and its panel, verified
-> against the live corpus. What remains is **B1 (person/org extraction) and
-> Track D (G08/G09/G10)**. The Anthropic limit (2026-09-01 reset) no longer
-> blocks: the manifest now runs the ladder the search-tier loop proved -
-> `openrouter/deepseek/deepseek-v4-pro` agent, `openrouter/moonshotai/kimi-k3`
-> judge. G02-G07 are preserve sensors; G08/G09/G10 and `b1-people-orgs-live`
-> are the feature sensors.
+> **STATUS 2026-08-11: DONE.** Track A by hand. Track C done earlier. B2 done
+> by the search-tier loop. **B1 and Track D (G08/G09/G10) done** - committed
+> `327301c`. Loop ran: deepseek-v4-pro agent, kimi-k3 judge (3 reject-cycles:
+> grants-to-anon on the extractors, the `(t.m)[1]` capture-group contract,
+> G08's max_disk throughput-vs-size conflation). Finished by hand after two
+> machine reboots killed the tmuxed run mid-iteration-4. Live results: 561
+> persons + 2284 orgs extracted (precision measured NOISY, recorded honestly);
+> G08 disk ceiling not discoverable (recorded); G09 ~270 chars/page scanned
+> threshold (OCR required, plpython3u absent); G10 no knee to c=64 on the
+> 100k/400k graph. All feature sensors + judge PASS.
 
 > **For agentic workers:** Steps use checkbox (`- [ ]`) syntax for tracking. Read
 > `experiments/pdf-corpus-graph/GUIDE.md` before touching anything under
