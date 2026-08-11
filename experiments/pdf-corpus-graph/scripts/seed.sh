@@ -49,6 +49,12 @@ pgurl() {
 }
 PG="$(pgurl)"
 
+# NOTE on the corpus shell DDL below: do NOT inline it. The first version of
+# this script inlined a made-up shape (label/norm, bigint ids, source/target)
+# that diverged from sql/corpus-*.sql - the schema contract the pvlab probes
+# insert against - and G04/G05 failed on the rebuilt project while G07 skipped
+# itself. Apply the sql/ files, so the seed and the probes share one source.
+#
 # Every phase MUST fail the script, not log and continue. The first version used
 # `set -u` only, so each broken phase logged an error and the next phase ran
 # against the missing output - and the script still printed "seed complete" with
@@ -77,17 +83,7 @@ echo "== 2/7 corpus schema + seed =="
 # All five corpus tables, not just documents: the RLS step (05-security.sql)
 # references entities/edges/chunks/chunks_halfvec, and the probes expect them.
 # Minimal shells here; the probes rebuild the heavy synthetic content if run.
-t "corpus schema" psql "$PG" -qAt -v ON_ERROR_STOP=1 -c "
-create schema if not exists corpus;
-create table if not exists corpus.documents (
-  slug text primary key, genre text, source_url text,
-  source_bytes bigint, extracted_text text, extracted_bytes bigint,
-  loaded_at timestamptz default now()
-);
-create table if not exists corpus.entities (id bigint primary key, kind text, label text, norm text);
-create table if not exists corpus.edges (id bigint primary key, source bigint, target bigint, cost double precision, reverse_cost double precision, kind text, doc_slug text, weight integer);
-create table if not exists corpus.chunks (id bigint primary key, doc_slug text, content text, embedding vector(1536));
-create table if not exists corpus.chunks_halfvec (id bigint primary key, doc_slug text, content text, embedding halfvec(1536));"
+t "corpus schema" bash -c "psql '$PG' -qAt -v ON_ERROR_STOP=1 -f '$EXP_DIR/sql/corpus-documents.sql' && psql '$PG' -qAt -v ON_ERROR_STOP=1 -f '$EXP_DIR/sql/corpus-entities-edges.sql' && psql '$PG' -qAt -v ON_ERROR_STOP=1 -f '$EXP_DIR/sql/corpus-chunks.sql'"
 t "seed restore" bash -c "zcat '$EXP_DIR/demo/seed/corpus-documents.sql.gz' | psql '$PG' -q -v ON_ERROR_STOP=1"
 
 echo "== 3/7 demo schema =="
