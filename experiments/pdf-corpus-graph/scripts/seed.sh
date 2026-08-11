@@ -98,6 +98,7 @@ select demo.refresh_counters();"
 
 echo "== 5/7 API layer + security =="
 t "api" psql "$PG" -qAt -v ON_ERROR_STOP=1 -f "$EXP_DIR/demo/db/04-api.sql"
+t "search tier" psql "$PG" -qAt -v ON_ERROR_STOP=1 -f "$EXP_DIR/demo/db/07-search.sql"
 t "security (RLS etc.)" psql "$PG" -qAt -v ON_ERROR_STOP=1 -f "$EXP_DIR/db/05-security.sql"
 
 echo "== 6/7 expose demo to PostgREST =="
