@@ -34,7 +34,7 @@ export interface Fixture {
   /** Content-Length observed 2026-08-10, in bytes. */
   expectBytes: number;
   /** Document genre - the axis extraction difficulty actually varies along. */
-  genre: "legislation" | "regulation" | "budget" | "standard" | "form";
+  genre: "legislation" | "regulation" | "budget" | "standard" | "form" | "scanned";
   note: string;
 }
 
@@ -89,6 +89,13 @@ export const FIXTURES: Fixture[] = [
     expectBytes: 14930674,
     genre: "budget",
     note: "Budget appendix. Table-dominated and the largest fixture - the ceiling probe.",
+  },
+  {
+    slug: "jfk-104-10004-10143",
+    url: "https://www.archives.gov/files/research/jfk/releases/2025/0318/104-10004-10143.pdf",
+    expectBytes: 415346,
+    genre: "scanned",
+    note: "NARA JFK assassination record - image-only scanned PDF (2 chars from 2 pages via pdftotext). The deliverable is chars-per-page against born-digital.",
   },
 ];
 

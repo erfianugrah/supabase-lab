@@ -48,6 +48,9 @@ alter function demo.citation_patterns()                    set search_path = dem
 alter function demo.normalize_citation(text, text)         set search_path = demo, corpus, public, extensions;
 alter function demo.extract_document(text)                 set search_path = demo, corpus, public, extensions;
 alter function demo.extract_document_fast(text)            set search_path = demo, corpus, public, extensions;
+alter function demo.person_org_patterns()                  set search_path = demo, corpus, public, extensions;
+alter function demo.extract_people_orgs(text)              set search_path = demo, corpus, public, extensions;
+alter function demo.extract_all(text)                      set search_path = demo, corpus, public, extensions;
 alter function demo.build_edges(int)                       set search_path = demo, corpus, public, extensions;
 alter function demo.refresh_counters()                     set search_path = demo, corpus, public, extensions;
 

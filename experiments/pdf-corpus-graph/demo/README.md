@@ -24,9 +24,27 @@ No graph database. No bespoke API server. No LLM in the extraction path.
 
 ## Numbers from the loaded corpus
 
-1,521 entities (328 NIST control ids, 798 statutes, 359 Public Law numbers,
-36 CFR references), 10,016 mentions, 14,233 edges, over 7 documents,
-20 cross-document entities.
+4,806 entities across the four citation kinds plus person/org
+(798 statutes, 359 Public Law numbers, 328 NIST control ids, 36 CFR references,
+561 persons, 2,284 organizations from 06-entities-people-orgs.sql). Person and
+organization extraction uses honorific-prefixed names (Mr, Ms, Senator,
+Representative) and organization suffixes (Inc., LLC, Corporation, Commission,
+Authority, Department of X).
+
+**Precision note:** Citation extraction is exact (zero hallucination). Person
+and organization extraction via deterministic regex patterns is NOISY -- this is
+a measured finding, not a defect to tune away. A live sample of 24 random
+person/org mentions: roughly half of the person labels are truncated by the
+2-word name pattern ("Justice John" for Justice John Paul Stevens), several org
+labels are split across a line break ("Department of\nTransportation"), and
+occasionally an entire sentence matches an org suffix ("President was precluded
+from influencing the Commission"). The patterns are included to prove the
+extraction machinery handles entity kinds beyond citations, NOT as a production
+extractor. The extracted surface forms are usable as a candidate set for a
+human or LLM pass, but are not trustworthy as canonical entities. The useful
+deliverable from Track B1 is the honest measurement that deterministic regex
+org/person extraction on this corpus sits well below citation-extractor
+precision.
 
 The extracted-text-to-source-PDF ratio spans **0.048** (a positioned tax form,
 which yields almost no running text) to **1.0885** (dense regulation, where the
@@ -125,7 +143,9 @@ Database setup, in order, against a project that already has the corpus loaded:
 psql "$PGURL" -f db/01-schema.sql
 psql "$PGURL" -f db/02-extract.sql            # patterns + normalization + edges
 psql "$PGURL" -f db/03-extract-setbased.sql   # the fast extractor
-psql "$PGURL" -f db/04-api.sql                # the 7 endpoints + grants
+psql "$PGURL" -f db/06-entities-people-orgs.sql  # person/org patterns + extractor
+psql "$PGURL" -f db/04-api.sql                # the endpoints + grants
+psql "$PGURL" -f db/07-search.sql             # text search + cross-document
 ```
 
 `demo` must be added to the project's exposed PostgREST schemas, or every call
