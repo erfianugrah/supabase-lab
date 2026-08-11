@@ -138,6 +138,25 @@ const Component = z.object({
 });
 export type Component = z.infer<typeof Component>;
 
+const SearchResult = z.object({
+  slug: z.string(),
+  genre: z.string(),
+  source_bytes: z.number(),
+  rank: z.number(),
+  headline: z.string(),
+});
+export type SearchResult = z.infer<typeof SearchResult>;
+
+const CrossDocEntity = z.object({
+  id: z.number(),
+  kind: z.string(),
+  label: z.string(),
+  mentions_count: z.number(),
+  docs_count: z.number(),
+  docs: z.array(z.string()),
+});
+export type CrossDocEntity = z.infer<typeof CrossDocEntity>;
+
 export const api = {
   stats: () => rpc("stats", {}, Stats),
   documents: () => rpc("documents", {}, z.array(DocumentRow)),
@@ -149,6 +168,8 @@ export const api = {
   provenance: (entity: number, lim = 20) =>
     rpc("provenance", { entity, lim }, z.array(Provenance)),
   components: (min_size = 2) => rpc("components", { min_size }, z.array(Component)),
+  searchDocuments: (q: string, lim = 10) => rpc("search_documents", { q, lim }, z.array(SearchResult)),
+  crossDocumentEntities: (lim = 50) => rpc("cross_document_entities", { lim }, z.array(CrossDocEntity)),
 };
 
 export function bytes(n: number): string {

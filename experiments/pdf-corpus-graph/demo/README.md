@@ -19,11 +19,14 @@ No graph database. No bespoke API server. No LLM in the extraction path.
 | Does the corpus cluster? | `components()` - `pgr_connectedComponents` |
 | Why does this node exist? | `provenance()` - document + exact character offset + source snippet |
 | Find a thing despite a typo | `search_entities()` - tiered exact / punctuation-insensitive / prefix / trigram |
+| Search document text for a keyword | `search_documents()` - websearch_to_tsquery over a generated tsvector column |
+| Which entities bridge multiple documents | `cross_document_entities()` - the discovery surface for a new user |
 
 ## Numbers from the loaded corpus
 
 1,521 entities (328 NIST control ids, 798 statutes, 359 Public Law numbers,
-36 CFR references), 10,016 mentions, 14,233 edges, over 7 documents.
+36 CFR references), 10,016 mentions, 14,233 edges, over 7 documents,
+20 cross-document entities.
 
 The extracted-text-to-source-PDF ratio spans **0.048** (a positioned tax form,
 which yields almost no running text) to **1.0885** (dense regulation, where the
