@@ -59,6 +59,29 @@ function Headline({ text }: { text: string }) {
   return <span dangerouslySetInnerHTML={{ __html: escaped }} />;
 }
 
+type RequestError = {
+  heading: string;
+  message: string;
+  detail: string;
+};
+
+function requestError(error: unknown): RequestError {
+  const detail = error instanceof Error ? error.message : String(error);
+  if (/failed to fetch/i.test(detail)) {
+    return {
+      heading: "DIAGNOSTIC: DATA SOURCE UNAVAILABLE",
+      message:
+        "The interface is online, but its backing demo database is currently offline. Live document and graph queries cannot run until the project is reprovisioned.",
+      detail: "The browser could not reach the Supabase API.",
+    };
+  }
+  return {
+    heading: "DIAGNOSTIC: REQUEST FAILED",
+    message: "The data request was rejected by the API.",
+    detail,
+  };
+}
+
 function KindBadge({ kind }: { kind: string }) {
   return (
     <span
@@ -94,7 +117,7 @@ export default function Explorer() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [docs, setDocs] = useState<DocumentRow[]>([]);
   const [components, setComponents] = useState<Component[]>([]);
-  const [err, setErr] = useState<string | null>(null);
+  const [err, setErr] = useState<RequestError | null>(null);
 
   const [q, setQ] = useState("AC-1");
   const [hits, setHits] = useState<Entity[]>([]);
@@ -123,7 +146,7 @@ export default function Explorer() {
         setComponents(c);
         setCrossDoc(x);
       })
-      .catch((e) => setErr(String(e)));
+      .catch((e) => setErr(requestError(e)));
   }, []);
 
   const runSearch = useCallback(async (term: string) => {
@@ -131,7 +154,7 @@ export default function Explorer() {
     try {
       setHits(await api.search(term, 20));
     } catch (e) {
-      setErr(String(e));
+      setErr(requestError(e));
     }
   }, []);
 
@@ -151,13 +174,13 @@ export default function Explorer() {
       setNeighbours(n);
       setProv(p);
     } catch (x) {
-      setErr(String(x));
+      setErr(requestError(x));
     }
   }, [depth]);
 
   useEffect(() => {
     if (selected) {
-      api.neighbourhood(selected.id, depth, 200).then(setNeighbours).catch((e) => setErr(String(e)));
+      api.neighbourhood(selected.id, depth, 200).then(setNeighbours).catch((e) => setErr(requestError(e)));
     }
   }, [depth, selected]);
 
@@ -169,7 +192,7 @@ export default function Explorer() {
     try {
       setDocResults(await api.searchDocuments(term, 10));
     } catch (e) {
-      setErr(String(e));
+      setErr(requestError(e));
     }
   }, []);
 
@@ -188,15 +211,18 @@ export default function Explorer() {
         );
       }
     } catch (e) {
-      setErr(String(e));
+      setErr(requestError(e));
     }
   }, [selected, pathTo]);
 
   if (err) {
     return (
       <div className="border border-[var(--color-accent-red)] p-2">
-        <div className="font-semibold text-[var(--color-accent-red)]">DIAGNOSTIC: REQUEST FAILED</div>
-        <pre className="mt-1 whitespace-pre-wrap text-[11px]">{err}</pre>
+        <div className="font-semibold text-[var(--color-accent-red)]">{err.heading}</div>
+        <p className="mt-1 text-[12px]">{err.message}</p>
+        <p className="mt-2 border-t border-[var(--color-hairline-strong)] pt-1 text-[11px] text-[var(--color-ink-muted)]">
+          {err.detail}
+        </p>
       </div>
     );
   }
