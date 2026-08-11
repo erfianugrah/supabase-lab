@@ -519,3 +519,11 @@ schema co-hosted on this project). NOT visible to pgss: every recursive-CTE
 traversal - they run inside SQL functions and pg_stat_statements.track=top only
 records top-level calls, so zero traversal statements appear in top-by-time.
 Lesson recorded in the sbperf heuristics (585f613).
+
+## Teardown (2026-08-11)
+
+`make destroy` - supabase_project.probe (mliyxhgwobcurlssgfdu, medium,
+ap-southeast-1): plan 0 add / 0 change / 1 destroy, applied; ref unreachable,
+tofu state gone. The Cloudflare Worker serving pggraph.erfi.dev was left up as
+a separate wrangler step, with the demo redeployed to explain the dead backend
+("data source unavailable" error state, 6f527aa). Rebuild is `make up` (~446s).
