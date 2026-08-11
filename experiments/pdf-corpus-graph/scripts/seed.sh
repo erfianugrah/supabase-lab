@@ -87,12 +87,14 @@ t "corpus schema" bash -c "psql '$PG' -qAt -v ON_ERROR_STOP=1 -f '$EXP_DIR/sql/c
 t "seed restore" bash -c "zcat '$EXP_DIR/demo/seed/corpus-documents.sql.gz' | psql '$PG' -q -v ON_ERROR_STOP=1"
 
 echo "== 3/7 demo schema =="
-t "demo schema+extract fns" bash -c "psql '$PG' -qAt -v ON_ERROR_STOP=1 -f '$EXP_DIR/demo/db/01-schema.sql' && psql '$PG' -qAt -v ON_ERROR_STOP=1 -f '$EXP_DIR/demo/db/02-extract.sql' && psql '$PG' -qAt -v ON_ERROR_STOP=1 -f '$EXP_DIR/demo/db/03-extract-setbased.sql'"
+t "demo schema+extract fns" bash -c "psql '$PG' -qAt -v ON_ERROR_STOP=1 -f '$EXP_DIR/demo/db/01-schema.sql' && psql '$PG' -qAt -v ON_ERROR_STOP=1 -f '$EXP_DIR/demo/db/02-extract.sql' && psql '$PG' -qAt -v ON_ERROR_STOP=1 -f '$EXP_DIR/demo/db/03-extract-setbased.sql' && psql '$PG' -qAt -v ON_ERROR_STOP=1 -f '$EXP_DIR/demo/db/06-entities-people-orgs.sql'"
 
-echo "== 4/7 citation extraction (the slow step) =="
-# Measured at 6m11s for the seven documents on medium compute.
+echo "== 4/7 extraction (the slow step) =="
+# Citation extraction measured at 6m11s for the seven documents on medium compute.
+# Person/org extraction adds to this but runs the same set-based machinery.
 t "extract+edges" psql "$PG" -qAt -v ON_ERROR_STOP=1 -c "
 select demo.extract_document_fast(slug) from corpus.documents;
+select demo.extract_people_orgs(slug) from corpus.documents;
 select demo.build_edges(400);
 select demo.refresh_counters();"
 
