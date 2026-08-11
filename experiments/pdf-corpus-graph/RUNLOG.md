@@ -505,3 +505,17 @@ c=1,4,16,64 on the reused 100k/400k graph: aggregate p50=0.29ms, p95=3ms,
 then holds. No knee on a 2-vCPU medium - the graph fits working memory
 (medium instance). Prior single-query timings were representative (G04's
 0.32ms depth-3 number matches c=1 here).
+
+## sbperf audit (2026-08-11, pre-teardown)
+
+PAT-mode audit with the new vector/query-shape findings (sbperf 60f17bc).
+Evidence (local only, evidence/ is gitignored): sbperf-2026-08-11-analysis.json,
+sbperf-2026-08-11-report.html. Headline: 3 high (pdf-extract-g02 57% 5xx = the
+known shared-cpu-2x OOM; definer view; RLS off - both throwaway-project posture),
+disk 88% full (known). The graph schema itself is clean: all FKs covered by the
+traversal indexes (zero fkUnindexed hits on entities/mentions/edges after the
+zero-based-indkey fix; the 8 remaining hits are the unrelated game-benchmark
+schema co-hosted on this project). NOT visible to pgss: every recursive-CTE
+traversal - they run inside SQL functions and pg_stat_statements.track=top only
+records top-level calls, so zero traversal statements appear in top-by-time.
+Lesson recorded in the sbperf heuristics (585f613).
