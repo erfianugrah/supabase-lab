@@ -1,15 +1,17 @@
 # pdf-corpus-graph: hardening, editorial reshape, and the open scale questions
 
-> **STATUS 2026-08-11: DONE.** Track A by hand. Track C done earlier. B2 done
-> by the search-tier loop. **B1 and Track D (G08/G09/G10) done** - committed
-> `327301c`. Loop ran: deepseek-v4-pro agent, kimi-k3 judge (3 reject-cycles:
-> grants-to-anon on the extractors, the `(t.m)[1]` capture-group contract,
-> G08's max_disk throughput-vs-size conflation). Finished by hand after two
-> machine reboots killed the tmuxed run mid-iteration-4. Live results: 561
-> persons + 2284 orgs extracted (precision measured NOISY, recorded honestly);
-> G08 disk ceiling not discoverable (recorded); G09 ~270 chars/page scanned
-> threshold (OCR required, plpython3u absent); G10 no knee to c=64 on the
-> 100k/400k graph. All feature sensors + judge PASS.
+> **STATUS 2026-08-11: DESTROYED.** All tracks done and committed
+> (`327301c`, `883de45`), then the throwaway project was torn down
+> (`make destroy`, `supabase_project.probe` ref `mliyxhgwobcurlssgfdu`, medium,
+> ap-southeast-1) - plan: 0 add, 0 change, 1 destroy; apply complete; ref now
+> unreachable; tofu state gone. Rebuild is `make up` (~446s) whenever the demo
+> is wanted back. The Cloudflare Worker for `pggraph.erfi.dev` was NOT touched
+> by `make destroy` and remains in Cloudflare state - tearing it down is a
+> separate wrangler step if the dead demo page is not wanted.
+> Final measured findings: B1 561 persons/2284 orgs (precision NOISY, recorded
+> honestly); G08 disk ceiling not discoverable via Management API; G09 ~270
+> chars/page scanned threshold (OCR required, plpython3u absent); G10 no knee
+> to c=64 on the 100k/400k graph. All in RUNLOG + demo/README.
 
 > **For agentic workers:** Steps use checkbox (`- [ ]`) syntax for tracking. Read
 > `experiments/pdf-corpus-graph/GUIDE.md` before touching anything under
