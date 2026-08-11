@@ -3,11 +3,13 @@ import {
   api,
   bytes,
   type Component,
+  type CrossDocEntity,
   type DocumentRow,
   type Entity,
   type Neighbour,
   type PathHop,
   type Provenance,
+  type SearchResult,
   KIND_COLOR,
   KIND_LABEL,
   type Stats,
@@ -38,6 +40,23 @@ function Hint({ children, tip }: { children: React.ReactNode; tip: string }) {
       {children}
     </span>
   );
+}
+
+/**
+ * Render ts_headline output safely. ts_headline wraps matches in <b> markers.
+ * Escape-then-re-mark: all HTML-significant characters in the source text are
+ * escaped, then only the ts_headline <b> markers are re-opened. No raw
+ * dangerouslySetInnerHTML on the unprocessed string.
+ */
+function Headline({ text }: { text: string }) {
+  // Escape everything, then un-escape only <b> and </b>
+  const escaped = text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/&lt;b&gt;/g, "<b>")
+    .replace(/&lt;\/b&gt;/g, "</b>");
+  return <span dangerouslySetInnerHTML={{ __html: escaped }} />;
 }
 
 function KindBadge({ kind }: { kind: string }) {
@@ -88,16 +107,21 @@ export default function Explorer() {
   // Only id + label are needed to be a path endpoint, so the state is typed to
   // exactly that. Typing it as Entity forced a cast from Neighbour (which has no
   // mentions_count/docs_count) and the cast was a lie tsc correctly rejected.
+  const [crossDoc, setCrossDoc] = useState<CrossDocEntity[]>([]);
+  const [docQ, setDocQ] = useState("");
+  const [docResults, setDocResults] = useState<SearchResult[]>([]);
+
   const [pathTo, setPathTo] = useState<{ id: number; label: string } | null>(null);
   const [path, setPath] = useState<PathHop[] | null>(null);
   const [pathMsg, setPathMsg] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([api.stats(), api.documents(), api.components(2)])
-      .then(([s, d, c]) => {
+    Promise.all([api.stats(), api.documents(), api.components(2), api.crossDocumentEntities(50)])
+      .then(([s, d, c, x]) => {
         setStats(s);
         setDocs(d);
         setComponents(c);
+        setCrossDoc(x);
       })
       .catch((e) => setErr(String(e)));
   }, []);
@@ -136,6 +160,18 @@ export default function Explorer() {
       api.neighbourhood(selected.id, depth, 200).then(setNeighbours).catch((e) => setErr(String(e)));
     }
   }, [depth, selected]);
+
+  const runDocSearch = useCallback(async (term: string) => {
+    if (!term.trim()) {
+      setDocResults([]);
+      return;
+    }
+    try {
+      setDocResults(await api.searchDocuments(term, 10));
+    } catch (e) {
+      setErr(String(e));
+    }
+  }, []);
 
   const findPath = useCallback(async () => {
     if (!selected || !pathTo) return;
@@ -223,6 +259,88 @@ export default function Explorer() {
               regulation yields 1.089, because a PDF already compresses its own
               content streams. Source size does not predict database size.
             </p>
+          </Section>
+
+          <Section title="Cross-document entities" note={`${crossDoc.length} entities appear in 2+ documents`}>
+            <table>
+              <thead>
+                <tr>
+                  <th><Hint tip="Entity type: CTRL = NIST control, U.S.C. = statute, CFR = regulation, PUB.L = Public Law.">kind</Hint></th>
+                  <th>label</th>
+                  <th className="num"><Hint tip="How many documents this entity appears in.">docs</Hint></th>
+                  <th className="num"><Hint tip="Total mentions across all documents.">mentions</Hint></th>
+                  <th><Hint tip="The documents containing this entity.">found in</Hint></th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {crossDoc.map((e) => (
+                  <tr key={e.id}>
+                    <td><KindBadge kind={e.kind} /></td>
+                    <td>{e.label}</td>
+                    <td className="num">{e.docs_count}</td>
+                    <td className="num">{e.mentions_count}</td>
+                    <td className="text-[var(--color-ink-muted)]">{e.docs.join(", ")}</td>
+                    <td>
+                      <button type="button" onClick={() => {
+                        const ent: Entity = { id: e.id, kind: e.kind, label: e.label, mentions_count: e.mentions_count, docs_count: e.docs_count, score: 0 };
+                        select(ent);
+                      }}>OPEN</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="mt-2 text-[11px] text-[var(--color-ink-muted)]">
+              The discovery surface for a first-time user: entities that bridge
+              documents are the natural entry point. 20 of 1521 entities appear
+              in more than one document.
+            </p>
+          </Section>
+
+          <Section title="Document search" note="keyword search over extracted text">
+            <form
+              className="mb-2 flex gap-1"
+              onSubmit={(e) => {
+                e.preventDefault();
+                runDocSearch(docQ);
+              }}
+            >
+              <input
+                aria-label="search document text"
+                className="flex-1"
+                value={docQ}
+                onChange={(e) => setDocQ(e.target.value)}
+                placeholder="search document text"
+              />
+              <button type="submit">SEARCH</button>
+            </form>
+            {docResults.length > 0 ? (
+              <table>
+                <thead>
+                  <tr>
+                    <th>slug</th>
+                    <th>genre</th>
+                    <th className="num"><Hint tip="ts_rank over the tsvector: how well the document matches the query.">rank</Hint></th>
+                    <th><Hint tip="ts_headline snippet with match markers in bold.">snippet</Hint></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {docResults.map((r) => (
+                    <tr key={r.slug}>
+                      <td>{r.slug}</td>
+                      <td className="text-[var(--color-ink-muted)]">{r.genre}</td>
+                      <td className="num">{r.rank.toFixed(4)}</td>
+                      <td><Headline text={r.headline} /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : docQ.trim() ? (
+              <p className="text-[var(--color-ink-muted)]">NO MATCH</p>
+            ) : (
+              <p className="text-[var(--color-ink-muted)]">Enter a search term above.</p>
+            )}
           </Section>
 
           <Section title="Entity search" note="find a control, statute or Public Law by name">
