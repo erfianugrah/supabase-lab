@@ -527,3 +527,16 @@ ap-southeast-1): plan 0 add / 0 change / 1 destroy, applied; ref unreachable,
 tofu state gone. The Cloudflare Worker serving pggraph.erfi.dev was left up as
 a separate wrangler step, with the demo redeployed to explain the dead backend
 ("data source unavailable" error state, 6f527aa). Rebuild is `make up` (~446s).
+
+## Demo-readiness review (2026-08-14)
+
+A review of the demo against the editorial use case it stands for produced a
+gap list, folded into docs/plans/2026-08-14-pdf-corpus-graph-demo-readiness.md
+as the next iteration (Tracks E-H). Headline: the demo's clean half
+(citations, 1521 entities, regex-exact) is not the half the use case asks
+about (people and organisations, graded NOISY at B1); cross-document bridging
+is 1.3% (20 of 1521 entities in 2+ documents); there is no time axis on edges;
+and "it works" (seven real documents) and "it is fast" (synthetic
+100000/400000 graph) are two claims resting on two different artifacts that
+one ~100-document real-pipeline run would fuse. The open-gaps list above is
+superseded by that plan.
