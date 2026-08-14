@@ -540,3 +540,78 @@ and "it works" (seven real documents) and "it is fast" (synthetic
 100000/400000 graph) are two claims resting on two different artifacts that
 one ~100-document real-pipeline run would fuse. The open-gaps list above is
 superseded by that plan.
+
+## Editorial layer + AU corpus (2026-08-14, ap-southeast-2)
+
+The project was rebuilt in ap-southeast-2 (the deployment-target region; the
+G01 catalogue probe ran there as part of the live suite, which is also the
+G13 re-verification) and the corpus is no longer US-federal-only: 103
+Inverell Shire Council (NSW) public documents joined the seven US fixtures,
+enumerated via the council's open WordPress media API, dated from filenames,
+and loaded by scripts/load-au-corpus.ts with the manifest committed at
+demo/seed/au-corpus.json. Two tender notices are image-only scans and went
+through the loader's OCR path (pdftoppm + tesseract) under the G09
+chars/page threshold - the G14 OCR path, exercised by construction rather
+than built as a feature. Corpus is now 111 documents (103 AU + 7 US + the
+scan fixture).
+
+The editorial layer (demo/db/08-editorial.sql) adds: AU person/org patterns
+(Cr/Councillor/Mayor honorifics, Pty Ltd suffix - case-flexible after the
+first pass missed all-caps resolution text in 3 of 103 docs), ABN extraction
+with the mod-89 checksum as a hard gate, doc_date on mentions+edges (backfill
++ BEFORE INSERT trigger, so extractors and build_edges stay untouched), and
+four read RPCs: entity_timeline, neighbourhood_as_at, bridges_as_at,
+entity_registry_ids. Measured on the live project after the run:
+
+- AU person/org extraction over 103 docs: 292 distinct persons and 123
+  distinct organisations with inv-* mentions (853/2410 totals with the US
+  docs). Wall clock for the full re-extract (persons/orgs over the AU docs,
+  ABN over all 110, build_edges, refresh_counters): 31.6s.
+- ABN: 148 digit-group candidates across the corpus, 14 valid mentions, 134
+  rejected by checksum, 3 distinct ABNs (45 153 592 173 WRWF; 89 001 288 400
+  and 26 436 588 133 from the tender notices). Zero false positives survive;
+  that is the deterministic-resolution claim, made of arithmetic.
+- The closed loop closes: entity_registry_ids on WHITE ROCK WIND FARM PTY
+  LTD returns 45 153 592 173 via the co-proximity edge in
+  inv-wrwf-ccc-2015-08-06. The 2022-02-23 ordinary minutes (item 9.5) put
+  three councillors' nominations to the WRWF Community Fund on the record;
+  all three are person entities with mentions spanning the corpus.
+- Bridging, the number the citation corpus never had: Cr Wendy Wilks appears
+  in 93 documents, Cr Paul King 88, Cr Paul Harmon 87, Cr Kate Dight 86. (Top
+  of the list is also the honest-noise exhibit: "Director Corporate" spans 92
+  documents, an over-capture of the US Director pattern against AU
+  job-title text.)
+- As-at discrimination: the Hines organisation entity has 0 depth>0
+  neighbours as at 2020-01-01 and 171 as at 2026-12-31. The two organic
+  spellings HINES CONSTRUCTION PTY LTD / HINES CONSTRUCTIONS PTY LTD survive
+  as two entities, the fuzzy-resolution case the corpus provides for free.
+- Per-genre expansion ratios (AU): council-minutes 0.0238, committee-minutes
+  0.0362, contracts-registers 0.0289, tender-notices 0.0011. Aggregate AU
+  0.0256 against the US federal corpus's 0.7633 aggregate - genre swings the
+  ratio by 30x, which is why the cost model is per-genre measured or nothing.
+- Loop incident, recorded because it is instructive: during loop iteration 2
+  the agent ran its own edited seed.sh against the live project, whose
+  unrequested truncate lines wiped corpus.documents (and cascade-wiped
+  demo.mentions/edges), then re-seeded the US fixtures and re-extracted -
+  silently dropping the AU corpus. The scope fence watches files, not SQL
+  side effects. Recovery was the loader (cache-warm) plus re-extraction; the
+  truncate lines are removed and the rebuild path is make up, not make seed,
+  on a populated project.
+
+## The fusion run's first real finding (2026-08-14)
+
+The first traversal measurement on the REAL graph falsified the synthetic
+benchmark's transfer: demo.neighbourhood() at depth 3 from a degree-917
+councillor (attendance lists clique the whole chamber, so co-occurrence
+graphs of minutes have genuine hubs) ran 65,721 ms. The synthetic 100k/400k
+graph (average degree 8) never showed it: the walk enumerated PATHS (union
+all), and paths explode as degree^depth only when hubs exist. The fix is
+set semantics - a level-set UNION keeps each (id, depth) once and bounds
+the frontier by nodes, not paths. Same rows out: 344-node depth-3
+neighbourhood now 155-159 ms server-side on the 28778-edge real graph,
+measured warm over the pooler. Both demo.neighbourhood() and
+demo.neighbourhood_as_at() carry the fix; signatures unchanged.
+
+This is the finding the ~100-document run existed to produce: "it works"
+and "it is fast" now rest on one artifact, and the price was one real bug
+class the synthetic graph could not reveal.
