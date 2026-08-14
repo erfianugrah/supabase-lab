@@ -147,6 +147,24 @@ function Pager({
   );
 }
 
+// Padding, not scrolling: a partial last page gets empty rows so the table's
+// height never changes while paging - the pager stays put instead of chasing
+// the container edge up and down the layout. rowH approximates the panel's
+// typical row; exact sameness is not the point, immobility is.
+function pageSlice<T>(rows: T[], page: number, size: number): (T | null)[] {
+  const s: (T | null)[] = rows.slice(page * size, (page + 1) * size);
+  while (s.length < size) s.push(null);
+  return s;
+}
+
+function PadRow({ cols, rowH }: { cols: number; rowH: string }) {
+  return (
+    <tr aria-hidden="true">
+      <td colSpan={cols} className={rowH} />
+    </tr>
+  );
+}
+
 export default function Explorer() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [docs, setDocs] = useState<DocumentRow[]>([]);
@@ -363,9 +381,10 @@ export default function Explorer() {
                 </tr>
               </thead>
               <tbody>
-                {docs.slice(docsPage * 25, (docsPage + 1) * 25).map((d) => (
+                {pageSlice(docs, docsPage, 25).map((d, i) =>
+                  d === null ? <PadRow key={`pad-${i}`} cols={7} rowH="h-[42px]" /> : (
                   <tr key={d.slug}>
-                    <td>{d.slug}</td>
+                    <td className="cell-clamp" title={d.slug}>{d.slug}</td>
                     <td className="text-[var(--color-ink-muted)]">{d.genre}</td>
                     <td className="num">{bytes(d.source_bytes)}</td>
                     <td className="num">{bytes(d.extracted_bytes)}</td>
@@ -422,10 +441,11 @@ export default function Explorer() {
                 </tr>
               </thead>
               <tbody>
-                {(asAt ? bridgesAsAt : crossDoc).slice(bridgesPage * 20, (bridgesPage + 1) * 20).map((e) => (
+                {pageSlice(asAt ? bridgesAsAt : crossDoc, bridgesPage, 20).map((e, i) =>
+                  e === null ? <PadRow key={`pad-${i}`} cols={6} rowH="h-[22px]" /> : (
                   <tr key={e.id}>
                     <td><KindBadge kind={e.kind} /></td>
-                    <td>{e.label}</td>
+                    <td className="cell-clamp" title={e.label}>{e.label}</td>
                     <td className="num">{e.docs_count}</td>
                     <td className="num">{e.mentions_count}</td>
                     <td className="text-[var(--color-ink-muted)]">
@@ -688,14 +708,15 @@ export default function Explorer() {
                     </tr>
                   </thead>
                   <tbody>
-                    {neighbours.slice(neighboursPage * 25, (neighboursPage + 1) * 25).map((n) => (
+                    {pageSlice(neighbours, neighboursPage, 25).map((n, i) =>
+                      n === null ? <PadRow key={`pad-${i}`} cols={6} rowH="h-[22px]" /> : (
                       <tr key={n.id}>
                         <td className="num">{n.depth}</td>
                         <td><KindBadge kind={n.kind} /></td>
-                        <td>{n.label}</td>
-                        <td className="text-[var(--color-ink-muted)]">{n.via_doc ?? "-"}</td>
+                        <td className="cell-clamp" title={n.label}>{n.label}</td>
+                        <td className="cell-clamp text-[var(--color-ink-muted)]" title={n.via_doc ?? ""}>{n.via_doc ?? "-"}</td>
                         <td className="num">{n.weight}</td>
-                        <td>
+                        <td className="whitespace-nowrap">
                           <button type="button" onClick={() => setPathTo({ id: n.id, label: n.label })}>
                             SET TARGET
                           </button>
@@ -727,12 +748,13 @@ export default function Explorer() {
                       </tr>
                     </thead>
                     <tbody>
-                      {timeline.slice(timelinePage * 25, (timelinePage + 1) * 25).map((t) => (
+                      {pageSlice(timeline, timelinePage, 25).map((t, i) =>
+                        t === null ? <PadRow key={`pad-${i}`} cols={4} rowH="h-[22px]" /> : (
                         <tr key={`${t.doc_slug}-${t.char_offset}`}>
                           <td className="whitespace-nowrap">{t.doc_date ?? "-"}</td>
-                          <td className="text-[var(--color-ink-muted)]">{t.doc_slug}</td>
+                          <td className="cell-clamp text-[var(--color-ink-muted)]" title={t.doc_slug}>{t.doc_slug}</td>
                           <td className="num">{t.char_offset.toLocaleString()}</td>
-                          <td>{t.snippet}</td>
+                          <td className="cell-clamp" title={t.snippet}>{t.snippet}</td>
                         </tr>
                       ))}
                     </tbody>
