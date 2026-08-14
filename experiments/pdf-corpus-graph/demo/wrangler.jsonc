@@ -1,8 +1,8 @@
 {
-  // Static-assets-only Worker. There is no `main`, and that is the point: every
-  // byte served here is a file, and every data call goes from the browser
-  // straight to PostgREST. Adding a script would put a billable invocation in
-  // front of static bytes for no gain.
+  // Static assets plus a small script. The script owns only /rest/* - a
+  // caching reverse proxy in front of PostgREST (see worker/index.ts's header
+  // for why). Everything else falls through to the assets binding unchanged,
+  // so static bytes still never pay for an invocation.
   //
   // WHY NOT SUPABASE STORAGE. Measured on this project: Storage RECORDS
   // index.html as text/html and SERVES it as `content-type: text/plain` with
@@ -20,8 +20,19 @@
   "name": "pggraph",
   "compatibility_date": "2026-08-01",
 
+  "main": "./worker/index.ts",
+
+  // ORIGIN is deliberately NOT here: it contains the project ref, which the
+  // hygiene rules keep out of committed files. Deploys pass it as a var:
+  //   wrangler deploy --var "ORIGIN:https://<ref>.supabase.co"
+  // (seed.sh does exactly that.)
+
   "assets": {
-    "directory": "./dist"
+    "directory": "./dist",
+    "binding": "ASSETS",
+    // /rest/* always runs the script even if a stray file ever matches the
+    // path; everything else serves straight from assets.
+    "run_worker_first": ["/rest/*"]
     // not_found_handling is deliberately left at its default ("none"), so an
     // unknown path 404s. This is a single-page STATIC site, not a client-routed
     // SPA - there is one route and no history API. Setting
