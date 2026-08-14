@@ -40,6 +40,10 @@ returns text language sql immutable as $$
     when 'usc' then regexp_replace(upper(raw), '[^0-9A-Z]', '', 'g')
     when 'cfr' then regexp_replace(upper(raw), '[^0-9A-Z]', '', 'g')
     when 'publaw' then regexp_replace(upper(raw), '[^0-9]', '', 'g')
+    -- Registry identifiers normalize to digits alone: "45 153 592 173" and
+    -- "45153592173" are the same ABN, and the checksum in 08-editorial.sql
+    -- does the rest.
+    when 'abn' then regexp_replace(raw, '[^0-9]', '', 'g')
     else upper(trim(raw))
   end
 $$;

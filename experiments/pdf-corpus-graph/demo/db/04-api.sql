@@ -78,30 +78,39 @@ $$;
 -- edge table are worth: depth 3 over 100k/400k was 167.82ms without them and
 -- 0.26ms with them. depth is capped because an uncapped recursive CTE on a dense
 -- graph is an outage, not a query.
+--
+-- The walk is UNION (level-set), not UNION ALL (path-set). A path-set walk
+-- enumerates every route to every node, and on a REAL co-occurrence graph the
+-- hub nodes make that degree^depth: a degree-917 councillor (attendance lists
+-- clique the whole chamber) turned depth 3 into 65.7s on the 28778-edge AU
+-- graph, 2026-08-14 - the synthetic 100k/400k benchmark never showed it because
+-- its average degree is 8. Set semantics keep each (id, depth) once, so the
+-- frontier is bounded by nodes, not paths. Same rows out, measured below.
 create or replace function demo.neighbourhood(root bigint, max_depth int default 2, lim int default 200)
 returns table (id bigint, kind text, label text, depth int, via_doc text, weight int)
 language sql stable security definer set search_path = demo, corpus, public, extensions as $$
   with recursive walk as (
-    select e.id, 0 as depth, null::text as via_doc, 0 as weight
+    select e.id, 0 as depth
       from demo.entities e where e.id = root
-    union all
+    union
     select case when g.source = w.id then g.target else g.source end,
-           w.depth + 1,
-           g.doc_slug,
-           g.weight
+           w.depth + 1
       from walk w
       join demo.edges g on (g.source = w.id or g.target = w.id)
      where w.depth < least(max_depth, 4)
   ),
   best as (
-    select id, min(depth) as depth,
-           (array_agg(via_doc order by weight desc nulls last))[1] as via_doc,
-           max(weight) as weight
-      from walk group by id
+    select id, min(depth) as depth from walk group by id
   )
-  select b.id, e.kind, e.label, b.depth, b.via_doc, b.weight
-    from best b join demo.entities e on e.id = b.id
-   order by b.depth, b.weight desc
+  select b.id, e.kind, e.label, b.depth,
+         case when b.depth = 0 then null
+              else (array_agg(g.doc_slug order by g.weight desc))[1] end,
+         case when b.depth = 0 then 0 else max(g.weight) end
+    from best b
+    join demo.entities e on e.id = b.id
+    left join demo.edges g on (g.source = b.id or g.target = b.id)
+   group by b.id, e.kind, e.label, b.depth
+   order by b.depth, max(g.weight) desc nulls last
    limit least(lim, 500)
 $$;
 
