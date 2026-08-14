@@ -9,8 +9,15 @@ import { KIND_COLOR, type Neighbour, type SubgraphEdge } from "../lib/api";
  * ring, ordered by weight so the strongest links sit together at the top.
  * Deterministic: the same data always draws the same picture.
  *
- * Ring capacity is the real constraint, so it is stated rather than hidden:
- * at most `maxNodes` nodes by weight render, and the caller prints the count.
+ * Readability rules, learned from the first rendering (40 nodes with
+ * horizontal labels was a label pile-up, 2026-08-14):
+ * - labels are RADIAL: rotated to the ring, anchored outward, never upside
+ *   down (left half reads right-to-left, anchor flips);
+ * - at most 24 nodes by weight - past that no layout rescues a ring;
+ * - each node keeps only its top 3 edges by weight, because hub cliques
+ *   (an attendance list links the whole chamber) make full edge sets a
+ *   hairball: 120 nodes / 6561 edges on the deepest councillor;
+ * - edges are faint on purpose: structure, not spaghetti.
  */
 
 export interface VizNode {
@@ -22,6 +29,7 @@ export interface VizNode {
   kind: string;
   label: string;
   weight: number;
+  angle: number; // ring angle, radians; 0 for the root
 }
 
 export interface Layout {
@@ -31,16 +39,18 @@ export interface Layout {
   total: number;
 }
 
-const W = 760;
-const H = 520;
+const W = 800;
+const H = 640;
 const CX = W / 2;
 const CY = H / 2;
-const RING: Record<number, number> = { 1: 150, 2: 225, 3: 225 };
+const RING: Record<number, number> = { 1: 130, 2: 190, 3: 190 };
+const LABEL_DR = 14; // label radius offset beyond the ring
+const MAX_LABEL = 24;
 
 export function layout(
   nodes: Neighbour[],
   edges: SubgraphEdge[],
-  maxNodes = 40,
+  maxNodes = 24,
 ): Layout {
   // Strongest first, root always kept. Depth beyond 3 folds onto the outer
   // ring (the UI caps traversal at 3 anyway).
@@ -60,13 +70,13 @@ export function layout(
     if (depth === 0) {
       for (const n of ring) {
         placed.set(n.id, {
-          id: n.id, x: CX, y: CY, r: 12, depth: 0, kind: n.kind,
-          label: n.label, weight: n.weight,
+          id: n.id, x: CX, y: CY, r: 11, depth: 0, kind: n.kind,
+          label: n.label, weight: n.weight, angle: 0,
         });
       }
       continue;
     }
-    const radius = RING[depth] ?? 225;
+    const radius = RING[depth] ?? RING[3]!;
     ring.forEach((n, i) => {
       // Start at twelve o'clock and go clockwise.
       const angle = (2 * Math.PI * i) / ring.length - Math.PI / 2;
@@ -74,20 +84,16 @@ export function layout(
         id: n.id,
         x: CX + radius * Math.cos(angle),
         y: CY + radius * Math.sin(angle),
-        r: 4 + 9 * Math.sqrt(n.weight / maxWeight),
+        r: 4 + 8 * Math.sqrt(n.weight / maxWeight),
         depth,
         kind: n.kind,
         label: n.label,
         weight: n.weight,
+        angle,
       });
     });
   }
 
-  // Real co-occurrence graphs have hubs (an attendance list cliques the whole
-  // chamber), so drawing every edge draws a hairball: 120 nodes x 6561 edges
-  // measured on the deepest councillor, 2026-08-14. Each node keeps only its
-  // top 3 edges by weight - the picture shows the strongest ties, and
-  // click-through does the walking.
   const perNode = new Map<number, number>();
   const links = edges
     .filter((e) => keptIds.has(e.source) && keptIds.has(e.target))
@@ -104,6 +110,10 @@ export function layout(
     .filter((l) => l.a && l.b);
 
   return { nodes: [...placed.values()], links, shown: kept.length, total: nodes.length };
+}
+
+function truncate(label: string): string {
+  return label.length > MAX_LABEL ? `${label.slice(0, MAX_LABEL - 1)}...` : label;
 }
 
 export default function GraphViz({
@@ -133,33 +143,57 @@ export default function GraphViz({
           y1={l.a.y}
           x2={l.b.x}
           y2={l.b.y}
-          stroke="var(--color-hairline-strong)"
-          strokeWidth={Math.min(3, 0.5 + l.weight / 8)}
+          stroke="var(--color-ink-muted)"
+          strokeOpacity={0.3}
+          strokeWidth={Math.min(2, 0.5 + l.weight / 10)}
         />
       ))}
-      {placed.map((n) => (
-        <g
-          key={n.id}
-          className="cursor-pointer"
-          onClick={() => onOpen(n)}
-        >
-          <title>{`${n.label} (${n.kind}, depth ${n.depth}, weight ${n.weight}) - click to open`}</title>
-          <circle
-            cx={n.x}
-            cy={n.y}
-            r={n.r}
-            fill={n.depth === 0 ? "var(--color-ink)" : (KIND_COLOR[n.kind] ?? "var(--color-ink-muted)")}
-          />
-          <text
-            x={n.x}
-            y={n.y + n.r + 10}
-            textAnchor="middle"
-            className="fill-current text-[10px]"
-          >
-            {n.label.length > 22 ? `${n.label.slice(0, 21)}...` : n.label}
-          </text>
-        </g>
-      ))}
+      {placed.map((n) => {
+        if (n.depth === 0) {
+          return (
+            <g key={n.id} className="cursor-pointer" onClick={() => onOpen(n)}>
+              <title>{`${n.label} (${n.kind}) - click to open`}</title>
+              <circle cx={n.x} cy={n.y} r={n.r} fill="var(--color-ink)" />
+              <text
+                x={n.x}
+                y={n.y + n.r + 12}
+                textAnchor="middle"
+                className="fill-current text-[11px] font-semibold"
+              >
+                {truncate(n.label)}
+              </text>
+            </g>
+          );
+        }
+        // Radial label: walk out along the node's own angle, rotate the text
+        // onto the tangent, and flip it on the left half so it never reads
+        // upside down.
+        const deg = (n.angle * 180) / Math.PI;
+        const leftHalf = deg > 90 && deg < 270;
+        const lx = n.x + (n.r + LABEL_DR) * Math.cos(n.angle);
+        const ly = n.y + (n.r + LABEL_DR) * Math.sin(n.angle);
+        return (
+          <g key={n.id} className="cursor-pointer" onClick={() => onOpen(n)}>
+            <title>{`${n.label} (${n.kind}, depth ${n.depth}, weight ${n.weight}) - click to open`}</title>
+            <circle
+              cx={n.x}
+              cy={n.y}
+              r={n.r}
+              fill={KIND_COLOR[n.kind] ?? "var(--color-ink-muted)"}
+            />
+            <text
+              x={lx}
+              y={ly}
+              textAnchor={leftHalf ? "end" : "start"}
+              dominantBaseline="middle"
+              transform={`rotate(${leftHalf ? deg - 180 : deg} ${lx} ${ly})`}
+              className="fill-current text-[10px]"
+            >
+              {truncate(n.label)}
+            </text>
+          </g>
+        );
+      })}
     </svg>
   );
 }
