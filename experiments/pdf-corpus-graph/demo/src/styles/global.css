@@ -174,3 +174,13 @@
   white-space: nowrap;
   border: 0;
 }
+
+/* One-line clamp for table cells holding free text (snippets, slugs): keeps
+   paginated rows a uniform height so a full page and a partial page occupy the
+   same vertical space. The full string stays one hover away via title. */
+.cell-clamp {
+  max-width: 58ch;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
