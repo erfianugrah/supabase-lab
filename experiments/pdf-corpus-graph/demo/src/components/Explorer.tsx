@@ -2,18 +2,23 @@ import { useCallback, useEffect, useState } from "react";
 import {
   api,
   bytes,
+  type BridgesAsAtRow,
   type Component,
   type CrossDocEntity,
   type DocumentRow,
   type Entity,
+  type EntityRegistryIdRow,
+  type EntityTimelineRow,
   type Neighbour,
   type PathHop,
   type Provenance,
   type SearchResult,
+  type Subgraph,
   KIND_COLOR,
   KIND_LABEL,
   type Stats,
 } from "../lib/api";
+import GraphViz, { type VizNode } from "./GraphViz";
 
 /**
  * One island, not five. The panels share a selected entity and a path endpoint,
@@ -113,6 +118,35 @@ function Section({
   );
 }
 
+/**
+ * Client-side pagination over an already-fetched array. 111 documents is not
+ * a server-paging problem; it is a page-length problem. No library: a slice,
+ * two buttons, and the honest count.
+ */
+function Pager({
+  page,
+  pageSize,
+  total,
+  onPage,
+}: {
+  page: number;
+  pageSize: number;
+  total: number;
+  onPage: (p: number) => void;
+}) {
+  const pages = Math.max(1, Math.ceil(total / pageSize));
+  if (pages <= 1) return null;
+  const from = page * pageSize + 1;
+  const to = Math.min(total, (page + 1) * pageSize);
+  return (
+    <div className="mt-1 flex items-center gap-2 text-[11px] text-[var(--color-ink-muted)]">
+      <span className="num">{from}-{to} of {total}</span>
+      <button type="button" disabled={page === 0} onClick={() => onPage(page - 1)}>PREV</button>
+      <button type="button" disabled={page >= pages - 1} onClick={() => onPage(page + 1)}>NEXT</button>
+    </div>
+  );
+}
+
 export default function Explorer() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [docs, setDocs] = useState<DocumentRow[]>([]);
@@ -134,6 +168,21 @@ export default function Explorer() {
   const [docQ, setDocQ] = useState("");
   const [docResults, setDocResults] = useState<SearchResult[]>([]);
 
+  // The as-at filter on the bridging panel: empty means all time (the plain
+  // cross_document_entities read), a date means bridges_as_at recomputed
+  // within the window. BridgesAsAtRow and CrossDocEntity share a row shape,
+  // so one table renders both.
+  const [asAt, setAsAt] = useState("");
+  const [bridgesAsAt, setBridgesAsAt] = useState<BridgesAsAtRow[]>([]);
+  const [timeline, setTimeline] = useState<EntityTimelineRow[]>([]);
+  const [registryIds, setRegistryIds] = useState<EntityRegistryIdRow[]>([]);
+  const [graph, setGraph] = useState<Subgraph | null>(null);
+
+  const [docsPage, setDocsPage] = useState(0);
+  const [bridgesPage, setBridgesPage] = useState(0);
+  const [neighboursPage, setNeighboursPage] = useState(0);
+  const [timelinePage, setTimelinePage] = useState(0);
+
   const [pathTo, setPathTo] = useState<{ id: number; label: string } | null>(null);
   const [path, setPath] = useState<PathHop[] | null>(null);
   const [pathMsg, setPathMsg] = useState<string | null>(null);
@@ -148,6 +197,32 @@ export default function Explorer() {
       })
       .catch((e) => setErr(requestError(e)));
   }, []);
+
+  // Deep link: ?entity=<id> hydrates the selection directly, so a recording
+  // or a shared URL lands on the graph, not on the search box. Runs after the
+  // corpus load above because select() refetches everything it needs anyway.
+  useEffect(() => {
+    const raw = new URLSearchParams(window.location.search).get("entity");
+    const id = raw ? Number(raw) : NaN;
+    if (!Number.isInteger(id) || id <= 0) return;
+    api.entityGet(id)
+      .then((rows) => {
+        const e = rows[0];
+        if (e) select({ ...e, score: 0 });
+      })
+      .catch((x) => setErr(requestError(x)));
+    // select is stable enough for this mount-only intent; re-running on its
+    // identity change would reselect on every depth change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!asAt) return;
+    setBridgesPage(0);
+    api.bridgesAsAt(asAt, 50)
+      .then(setBridgesAsAt)
+      .catch((e) => setErr(requestError(e)));
+  }, [asAt]);
 
   const runSearch = useCallback(async (term: string) => {
     if (!term.trim()) return;
@@ -169,10 +244,24 @@ export default function Explorer() {
     setSelected(e);
     setPath(null);
     setPathMsg(null);
+    setTimeline([]);
+    setRegistryIds([]);
+    setGraph(null);
+    setNeighboursPage(0);
+    setTimelinePage(0);
     try {
-      const [n, p] = await Promise.all([api.neighbourhood(e.id, depth, 200), api.provenance(e.id, 12)]);
+      const [n, p, t, r, g] = await Promise.all([
+        api.neighbourhood(e.id, depth, 200),
+        api.provenance(e.id, 12),
+        api.entityTimeline(e.id),
+        api.entityRegistryIds(e.id),
+        api.subgraph(e.id, 2, 120),
+      ]);
       setNeighbours(n);
       setProv(p);
+      setTimeline(t);
+      setRegistryIds(r);
+      setGraph(g);
     } catch (x) {
       setErr(requestError(x));
     }
@@ -181,6 +270,8 @@ export default function Explorer() {
   useEffect(() => {
     if (selected) {
       api.neighbourhood(selected.id, depth, 200).then(setNeighbours).catch((e) => setErr(requestError(e)));
+      api.subgraph(selected.id, depth, 120).then(setGraph).catch((e) => setErr(requestError(e)));
+      setNeighboursPage(0);
     }
   }, [depth, selected]);
 
@@ -267,7 +358,7 @@ export default function Explorer() {
                 </tr>
               </thead>
               <tbody>
-                {docs.map((d) => (
+                {docs.slice(docsPage * 25, (docsPage + 1) * 25).map((d) => (
                   <tr key={d.slug}>
                     <td>{d.slug}</td>
                     <td className="text-[var(--color-ink-muted)]">{d.genre}</td>
@@ -280,6 +371,7 @@ export default function Explorer() {
                 ))}
               </tbody>
             </table>
+            <Pager page={docsPage} pageSize={25} total={docs.length} onPage={setDocsPage} />
             <p className="mt-2 text-[11px] text-[var(--color-ink-muted)]">
               The ratio is not a constant. A positioned form yields 0.048; dense
               regulation yields 1.089, because a PDF already compresses its own
@@ -287,7 +379,32 @@ export default function Explorer() {
             </p>
           </Section>
 
-          <Section title="Cross-document entities" note={`${crossDoc.length} entities appear in 2+ documents`}>
+          <Section
+            title="Cross-document entities"
+            note={asAt
+              ? `${bridgesAsAt.length} bridging entities as at ${asAt}`
+              : `${crossDoc.length} entities appear in 2+ documents`}
+          >
+            <div className="mb-2 flex items-center gap-2">
+              <label htmlFor="as-at" className="text-[11px] uppercase text-[var(--color-ink-muted)]">
+                as at
+              </label>
+              <input
+                id="as-at"
+                type="date"
+                value={asAt}
+                min="2015-08-06"
+                max="2026-12-31"
+                onChange={(e) => setAsAt(e.target.value)}
+              />
+              {asAt ? (
+                <button type="button" onClick={() => setAsAt("")}>CLEAR</button>
+              ) : (
+                <span className="text-[11px] text-[var(--color-ink-muted)]">
+                  only edges whose document existed by the date count
+                </span>
+              )}
+            </div>
             <table>
               <thead>
                 <tr>
@@ -300,13 +417,18 @@ export default function Explorer() {
                 </tr>
               </thead>
               <tbody>
-                {crossDoc.map((e) => (
+                {(asAt ? bridgesAsAt : crossDoc).slice(bridgesPage * 20, (bridgesPage + 1) * 20).map((e) => (
                   <tr key={e.id}>
                     <td><KindBadge kind={e.kind} /></td>
                     <td>{e.label}</td>
                     <td className="num">{e.docs_count}</td>
                     <td className="num">{e.mentions_count}</td>
-                    <td className="text-[var(--color-ink-muted)]">{e.docs.join(", ")}</td>
+                    <td className="text-[var(--color-ink-muted)]">
+                      <details>
+                        <summary>{e.docs.length} documents</summary>
+                        {e.docs.join(", ")}
+                      </details>
+                    </td>
                     <td>
                       <button type="button" onClick={() => {
                         const ent: Entity = { id: e.id, kind: e.kind, label: e.label, mentions_count: e.mentions_count, docs_count: e.docs_count, score: 0 };
@@ -317,10 +439,17 @@ export default function Explorer() {
                 ))}
               </tbody>
             </table>
+            <Pager
+              page={bridgesPage}
+              pageSize={20}
+              total={(asAt ? bridgesAsAt : crossDoc).length}
+              onPage={setBridgesPage}
+            />
             <p className="mt-2 text-[11px] text-[var(--color-ink-muted)]">
               The discovery surface for a first-time user: entities that bridge
-              documents are the natural entry point. 20 of 1521 entities appear
-              in more than one document.
+              documents are the natural entry point. Bridging is corpus-shaped:
+              20 of the 1521 US citation entities span documents, against
+              sitting councillors who span 86-93 of the 103 council documents.
             </p>
           </Section>
 
@@ -369,7 +498,7 @@ export default function Explorer() {
             )}
           </Section>
 
-          <Section title="Entity search" note="find a control, statute or Public Law by name">
+          <Section title="Entity search" note="find a control, person or organisation by name">
             <form
               className="mb-2 flex gap-1"
               onSubmit={(e) => {
@@ -382,7 +511,7 @@ export default function Explorer() {
                 className="flex-1"
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                placeholder="AC-1 / 5USC552 / Public Law 118"
+                placeholder="entity name - a control, a councillor, a company"
               />
               <button type="submit">SEARCH</button>
             </form>
@@ -484,6 +613,33 @@ export default function Explorer() {
 
           {selected ? (
             <>
+              <Section
+                title="Graph"
+                note={graph
+                  ? `${graph.nodes.length} nodes, ${graph.edges.length} edges (top 40 nodes, top 3 edges each drawn)`
+                  : "loading"}
+              >
+                {graph ? (
+                  <GraphViz
+                    nodes={graph.nodes}
+                    edges={graph.edges}
+                    onOpen={(n: VizNode) => {
+                      // Viz nodes carry edge weight, not entity counters, so a
+                      // graph click re-fetches the real entity row by exact
+                      // label rather than fabricate counts.
+                      api.search(n.label, 5)
+                        .then((hits) => {
+                          const exact = hits.find((h) => h.id === n.id) ?? hits[0];
+                          if (exact) select(exact);
+                        })
+                        .catch((x) => setErr(requestError(x)));
+                    }}
+                  />
+                ) : (
+                  <p className="text-[var(--color-ink-muted)]">LOADING</p>
+                )}
+              </Section>
+
               <Section title="Shortest path" note="the strongest chain of references between two entities">
                 <div className="mb-2 flex flex-wrap items-center gap-2">
                   <span className="text-[11px] uppercase text-[var(--color-ink-muted)]">target</span>
@@ -527,7 +683,7 @@ export default function Explorer() {
                     </tr>
                   </thead>
                   <tbody>
-                    {neighbours.slice(0, 60).map((n) => (
+                    {neighbours.slice(neighboursPage * 25, (neighboursPage + 1) * 25).map((n) => (
                       <tr key={n.id}>
                         <td className="num">{n.depth}</td>
                         <td><KindBadge kind={n.kind} /></td>
@@ -543,7 +699,79 @@ export default function Explorer() {
                     ))}
                   </tbody>
                 </table>
+                <Pager
+                  page={neighboursPage}
+                  pageSize={25}
+                  total={neighbours.length}
+                  onPage={setNeighboursPage}
+                />
               </Section>
+
+              <Section
+                title="Timeline"
+                note="every mention of this entity, in document-date order"
+              >
+                {timeline.length > 0 ? (
+                  <table>
+                    <thead>
+                      <tr>
+                        <th><Hint tip="The document's own date (meeting date, register snapshot). Nulls - the US federal documents - sort last.">date</Hint></th>
+                        <th>document</th>
+                        <th className="num"><Hint tip="Exact character position of this mention in the extracted text.">offset</Hint></th>
+                        <th>source text</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {timeline.slice(timelinePage * 25, (timelinePage + 1) * 25).map((t) => (
+                        <tr key={`${t.doc_slug}-${t.char_offset}`}>
+                          <td className="whitespace-nowrap">{t.doc_date ?? "-"}</td>
+                          <td className="text-[var(--color-ink-muted)]">{t.doc_slug}</td>
+                          <td className="num">{t.char_offset.toLocaleString()}</td>
+                          <td>{t.snippet}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <p className="text-[var(--color-ink-muted)]">NO MENTIONS</p>
+                )}
+                <Pager
+                  page={timelinePage}
+                  pageSize={25}
+                  total={timeline.length}
+                  onPage={setTimelinePage}
+                />
+              </Section>
+
+              {registryIds.length > 0 ? (
+                <Section title="Registry identifiers" note="deterministic identity pins co-located with this entity">
+                  <table>
+                    <thead>
+                      <tr><th>identifier</th><th className="num">canonical</th><th>printed in</th></tr>
+                    </thead>
+                    <tbody>
+                      {registryIds.map((r) => (
+                        <tr key={r.id}>
+                          <td>{r.label}</td>
+                          <td className="num">{r.norm}</td>
+                          <td className="text-[var(--color-ink-muted)]">
+                            <details>
+                              <summary>{r.docs.length} documents</summary>
+                              {r.docs.join(", ")}
+                            </details>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <p className="mt-2 text-[11px] text-[var(--color-ink-muted)]">
+                    Each identifier passed the ABN checksum at extraction -
+                    shape proposes, arithmetic disposes. Co-location is the
+                    existing 400-character proximity edge; no fuzzy matching is
+                    involved.
+                  </p>
+                </Section>
+              ) : null}
 
               <Section title="Provenance" note="the exact documents and character offsets this node came from">
                 <table>

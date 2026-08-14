@@ -316,9 +316,21 @@ set search_path = demo, corpus, public, extensions as $$
    group by a.id, a.label, a.norm
 $$;
 
+-- Entity lookup by id. Exists because of the UI's deep links: a shareable
+-- ?entity=<id> URL must hydrate the selection without a search round-trip.
+-- Reads the denormalized counters, so it is an index lookup, not a scan.
+create or replace function demo.entity_get(p_entity bigint)
+returns table (id bigint, kind text, label text, mentions_count int, docs_count int)
+language sql stable security definer
+set search_path = demo, corpus, public, extensions as $$
+  select e.id, e.kind, e.label, e.mentions_count, e.docs_count
+    from demo.entities e where e.id = p_entity
+$$;
+
 -- Grants: the four read RPCs join the existing nine. Mutating extractors and
 -- normalizers are pipeline functions and are deliberately NOT granted - anon
 -- reads through read-only RPCs or not at all.
+grant execute on function demo.entity_get(bigint) to anon, authenticated;
 grant execute on function demo.entity_timeline(bigint, int) to anon, authenticated;
 grant execute on function demo.neighbourhood_as_at(bigint, date, int, int) to anon, authenticated;
 grant execute on function demo.bridges_as_at(date, int) to anon, authenticated;

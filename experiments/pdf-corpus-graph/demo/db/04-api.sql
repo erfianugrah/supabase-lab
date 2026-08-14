@@ -200,8 +200,25 @@ returns jsonb language sql stable security definer set search_path = demo, corpu
   )
 $$;
 
+-- The document-inventory read. Until 2026-08-14 this function was a ghost:
+-- the UI, the README and the comment below all referenced demo.documents(),
+-- but no committed file defined it - it had only ever been created by hand in
+-- a live database, so every fresh rebuild silently shipped a UI whose corpus
+-- table 404'd (PGRST202). It is defined here now, as a thin wrapper over the
+-- view, because PostgREST exposes functions and the anon surface is functions
+-- only.
+create or replace function demo.documents()
+returns table (slug text, genre text, source_bytes bigint, extracted_bytes bigint,
+               extract_ratio numeric, entities bigint, mentions bigint)
+language sql stable security definer set search_path = demo, corpus, public, extensions as $$
+  select v.slug, v.genre, v.source_bytes, v.extracted_bytes, v.extract_ratio,
+         v.entities, v.mentions
+    from demo.v_documents v
+   order by v.slug
+$$;
+
 grant usage on schema demo to anon, authenticated;
--- NO table grants. The seven functions are the entire surface. Granting select
+-- NO table grants. The eight functions are the entire surface. Granting select
 -- on demo.entities/mentions/edges would expose them through PostgREST's
 -- auto-generated table endpoint, and RLS alone then has to hold the line. The
 -- view v_documents was dropped in favour of demo.documents(), so this file used
@@ -209,6 +226,7 @@ grant usage on schema demo to anon, authenticated;
 -- run of the file failed silently on a rebuild.
 grant execute on function
   demo.search_entities(text, int),
+  demo.documents(),
   demo.neighbourhood(bigint, int, int),
   demo.shortest_path(bigint, bigint),
   demo.components(int),

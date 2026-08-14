@@ -21,15 +21,23 @@ No graph database. No bespoke API server. No LLM in the extraction path.
 | Find a thing despite a typo | `search_entities()` - tiered exact / punctuation-insensitive / prefix / trigram |
 | Search document text for a keyword | `search_documents()` - websearch_to_tsquery over a generated tsvector column |
 | Which entities bridge multiple documents | `cross_document_entities()` - the discovery surface for a new user |
+| What was connected as at a date | `bridges_as_at()` / `neighbourhood_as_at()` - the same reads, restricted to documents dated on/before the cutoff |
+| When did this entity appear | `entity_timeline()` - mentions in document-date order |
+| What proves this organisation's identity | `entity_registry_ids()` - checksum-valid ABNs co-located with the entity via the existing proximity edges |
 
 ## Numbers from the loaded corpus
 
-4,806 entities across the four citation kinds plus person/org
-(798 statutes, 359 Public Law numbers, 328 NIST control ids, 36 CFR references,
-561 persons, 2,284 organizations from 06-entities-people-orgs.sql). Person and
-organization extraction uses honorific-prefixed names (Mr, Ms, Senator,
-Representative) and organization suffixes (Inc., LLC, Corporation, Commission,
-Authority, Department of X).
+111 documents: the seven US federal fixtures, 103 Inverell Shire Council (NSW)
+public documents (2022-2025 bulk, plus a 2015 committee paper and 2026 tender
+notices), and the scan fixture. 4,787 entities across the four citation kinds,
+person, org and abn: 798 statutes, 359 Public Law numbers, 328 NIST control
+ids, 36 CFR references, 853 persons, 2,410 organisations, 3 ABNs (every ABN
+checksum-valid at extraction; 134 shape-matched candidates rejected). The top
+bridging entities are sitting councillors - 86 to 93 documents each. Person
+and organization extraction uses honorific-prefixed names (Mr, Ms, Cr,
+Councillor, Mayor) and organization suffixes (Inc., LLC, Pty Ltd, Commission,
+Department of X) and remains candidate generation, not production NER - the
+noise classes are listed in the reference write-up.
 
 **Precision note:** Citation extraction is exact (zero hallucination). Person
 and organization extraction via deterministic regex patterns is NOISY -- this is
