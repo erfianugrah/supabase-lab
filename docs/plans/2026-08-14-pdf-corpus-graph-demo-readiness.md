@@ -1,6 +1,10 @@
 # pdf-corpus-graph: demo-readiness gaps and the next iteration
 
-> **STATUS 2026-08-14: PLANNING.** The throwaway project stays destroyed
+> **STATUS 2026-08-14: SUBSTANTIALLY LANDED.** Tracks E (headline), F
+> (corpus, time, resolution) and most of G (fusion run, region, OCR, per-PDF
+> arithmetic) shipped the same day; details in the RUNLOG. G12's write-up is
+> recorded; G15's headroom check rides along on the rebuild. Track H remains
+> conversation preparation. The throwaway project stays destroyed
 > (teardown 2026-08-11; rebuild is `make up`, ~446s). This plan folds a
 > demo-readiness review of the current artifacts into work items. Per the
 > experiment's hygiene rule it names no customer, account, deal or
@@ -58,11 +62,11 @@ Measured facts, all already in the RUNLOG:
 
 Demo-grade precision on the documents actually shown, not production NER.
 
-- [ ] **E1: Curate the recording corpus for person/org precision.** One to
+- [x] **E1: Curate the recording corpus for person/org precision.** One to
   five documents, hand-reviewed extraction output. A viewer will find a
   mangled name in the first minute of an unreviewed recording, and trust does
   not survive it.
-- [ ] **E2: Person/org graph becomes the headline panel.** Citations demoted
+- [x] **E2: Person/org graph becomes the headline panel.** Citations demoted
   to what they are genuinely good at: the verifiability story (regex-exact,
   byte-exact provenance).
 - [ ] **E3: Record the precision statement on the curated documents.** Same
@@ -73,21 +77,21 @@ Demo-grade precision on the documents actually shown, not production NER.
 
 The corpus is chosen, so choose it to demonstrate the thesis.
 
-- [ ] **F1: Pick an overlap-engineered public corpus.** One issuing body's
+- [x] **F1: Pick an overlap-engineered public corpus.** One issuing body's
   minutes across consecutive years, plus a listed company's filing that those
   minutes name. The bridging count becomes the demo instead of a footnote.
-- [ ] **F2: Put dates on edges.** Minutes and filings are dated, so the
+- [x] **F2: Put dates on edges.** Minutes and filings are dated, so the
   metadata is free at ingestion. Carry the document date onto mentions and
   edges, and add an "as at" query RPC: a date filter over the same tables,
   not a new structure.
-- [ ] **F3: Registry-identifier resolution.** Jurisdictions whose corporate
+- [x] **F3: Registry-identifier resolution.** Jurisdictions whose corporate
   documents carry a registry identifier (an ACN or ABN in Australian filings,
   a company number in UK ones) hand you a deterministic join key that US
   federal documents do not have. Extract the identifier as its own entity
   kind and resolve on it first; trigram similarity becomes the fallback, not
   the primary mechanism. Exact resolution is a stronger story than fuzzy
   matching, and the dedicated graph stores do not give it to you either.
-- [ ] **F4: Jurisdiction honesty.** The measured corpus is US federal. Genre
+- [x] **F4: Jurisdiction honesty.** The measured corpus is US federal. Genre
   match is not jurisdiction match: citation formats, registry identifiers and
   scan rates are all jurisdictional. The recording corpus should be drawn
   from the target jurisdiction's public documents.
@@ -100,7 +104,7 @@ works" and "it is fast" into a single artifact, and it produces the
 extraction-ratio measurement that turns the cost projection from a band into
 a number.
 
-- [ ] **G11: Real-pipeline scale probe.** Follows the established `G0n`
+- [x] **G11: Real-pipeline scale probe.** Follows the established `G0n`
   module contract in the `pvlab` harness. Asserts that the run completed and
   recorded; never what it recorded.
 - [ ] **G12: Cost per document.** The per-genre extraction ratios from G11
@@ -108,10 +112,10 @@ a number.
   units: a per-month infrastructure number cannot be compared against
   anything priced per document, and the comparison gets made in whatever
   units are quoted.
-- [ ] **G13: Region re-verification.** Everything was measured in
+- [x] **G13: Region re-verification.** Everything was measured in
   `ap-southeast-1`. Re-run the G01 catalogue probe in the deployment-target
   region before quoting `pgrouting` availability there.
-- [ ] **G14: OCR path, or a stated boundary.** Either a minimal external OCR
+- [x] **G14: OCR path, or a stated boundary.** Either a minimal external OCR
   stage for below-threshold documents, or the boundary stated explicitly in
   GUIDE.md and the demo copy - before a viewer discovers it. Detection is
   already measured (G09).
