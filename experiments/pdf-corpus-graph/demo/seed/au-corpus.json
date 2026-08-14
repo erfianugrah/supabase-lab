@@ -1,0 +1,745 @@
+{
+ "_meta": {
+  "corpus": "Inverell Shire Council (NSW, AU) public documents",
+  "enumeration": "WP media API /wp-json/wp/v2/media?search=minutes|tender|register, paginated per_page=100",
+  "built": "2026-08-14",
+  "note": "doc_date is the meeting/snapshot date parsed from the filename; registers and tender notices use upload month (day=01).",
+  "dropped_duplicates": [
+   {
+    "kept": "inv-ecs-committee-2022-04-13",
+    "dropped": "https://inverell.nsw.gov.au/wp-content/uploads/2022/04/EconomicCommunitySustainabilityCommitteeMinutes_13Apr2022-1.pdf"
+   },
+   {
+    "kept": "inv-minutes-2022-05-25",
+    "dropped": "https://inverell.nsw.gov.au/wp-content/uploads/2022/06/CouncilMinutes_25May2022.pdf"
+   },
+   {
+    "kept": "inv-ces-committee-2023-05-10",
+    "dropped": "https://inverell.nsw.gov.au/wp-content/uploads/2023/06/Civil-and-Environmental-Services-Committee-Minutes-10-May-2023.pdf"
+   }
+  ]
+ },
+ "documents": [
+  {
+   "slug": "inv-wrwf-ccc-2015-08-06",
+   "genre": "committee-minutes",
+   "doc_date": "2015-08-06",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2017/06/WRWF_CCC_ProposedMinutes_06August2015.pdf",
+   "source_bytes": 286687
+  },
+  {
+   "slug": "inv-minutes-2021-11-24",
+   "genre": "council-minutes",
+   "doc_date": "2021-11-24",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2022/01/Minutes_OrdinaryCouncilMeeting_24November2021.pdf",
+   "source_bytes": 380705
+  },
+  {
+   "slug": "inv-minutes-2022-01-12",
+   "genre": "council-minutes",
+   "doc_date": "2022-01-12",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2022/01/Minutes_OrdinaryCouncilMeeting_12January2022.pdf",
+   "source_bytes": 283314
+  },
+  {
+   "slug": "inv-ecs-committee-2022-02-09",
+   "genre": "committee-minutes",
+   "doc_date": "2022-02-09",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2022/02/EconomicCommunityMinutes_9Feb2022.pdf",
+   "source_bytes": 171966
+  },
+  {
+   "slug": "inv-minutes-2022-02-23",
+   "genre": "council-minutes",
+   "doc_date": "2022-02-23",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2022/03/OridnaryCouncilMinutes_23Feb2022.pdf",
+   "source_bytes": 322275
+  },
+  {
+   "slug": "inv-ecs-committee-2022-03-09",
+   "genre": "committee-minutes",
+   "doc_date": "2022-03-09",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2022/03/EconomicCommunitySustainabilityMinutes_9March2022.pdf",
+   "source_bytes": 157050
+  },
+  {
+   "slug": "inv-minutes-2022-03-23",
+   "genre": "council-minutes",
+   "doc_date": "2022-03-23",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2022/04/OrdinaryMinutes_23Mar22.pdf",
+   "source_bytes": 302605
+  },
+  {
+   "slug": "inv-ces-committee-2022-04-13",
+   "genre": "committee-minutes",
+   "doc_date": "2022-04-13",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2022/04/CivilEnvironmentalServicesCommitteeMinutes_13Apr2022.pdf",
+   "source_bytes": 45116
+  },
+  {
+   "slug": "inv-ecs-committee-2022-04-13",
+   "genre": "committee-minutes",
+   "doc_date": "2022-04-13",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2022/04/EconomicCommunitySustainabilityCommitteeMinutes_13Apr2022.pdf",
+   "source_bytes": 285608
+  },
+  {
+   "slug": "inv-minutes-2022-04-27",
+   "genre": "council-minutes",
+   "doc_date": "2022-04-27",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2022/05/Minutes_OrdinaryCouncilMeeting_270422.pdf",
+   "source_bytes": 293969
+  },
+  {
+   "slug": "inv-ces-committee-2022-05-11",
+   "genre": "committee-minutes",
+   "doc_date": "2022-05-11",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2022/05/CivilEnvironmentalCommittee_Minutes_11May2022.pdf",
+   "source_bytes": 392834
+  },
+  {
+   "slug": "inv-ecs-committee-2022-05-11",
+   "genre": "committee-minutes",
+   "doc_date": "2022-05-11",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2022/05/EconomicCommunitySustainabilityCommittee_Minutes_11May2022.pdf",
+   "source_bytes": 144294
+  },
+  {
+   "slug": "inv-minutes-2022-05-25",
+   "genre": "council-minutes",
+   "doc_date": "2022-05-25",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2022/06/OrdinaryCouncilMinutes_25-May2022.pdf",
+   "source_bytes": 427056
+  },
+  {
+   "slug": "inv-ces-committee-2022-06-08",
+   "genre": "committee-minutes",
+   "doc_date": "2022-06-08",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2022/06/CivilandEnvironmentalServicesCommitteeMinutes_8June2022.pdf",
+   "source_bytes": 204289
+  },
+  {
+   "slug": "inv-ecs-committee-2022-06-08",
+   "genre": "committee-minutes",
+   "doc_date": "2022-06-08",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2022/06/EconomicCommunitySustainabilityCommitteeMinutes_8June2022.pdf",
+   "source_bytes": 142667
+  },
+  {
+   "slug": "inv-minutes-2022-06-22",
+   "genre": "council-minutes",
+   "doc_date": "2022-06-22",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2022/07/OrdinaryMeeting_Council-Minutes_22June2022.pdf",
+   "source_bytes": 356013
+  },
+  {
+   "slug": "inv-ces-committee-2022-07-13",
+   "genre": "committee-minutes",
+   "doc_date": "2022-07-13",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2022/08/CivilandEnvironmentalServicesCommittee_Minutes_13July2022.pdf",
+   "source_bytes": 159840
+  },
+  {
+   "slug": "inv-ecs-committee-2022-07-13",
+   "genre": "committee-minutes",
+   "doc_date": "2022-07-13",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2022/07/EconomicandCommunitySustainabilityCommitteeMinutes_13July2022.pdf",
+   "source_bytes": 208840
+  },
+  {
+   "slug": "inv-minutes-2022-07-27",
+   "genre": "council-minutes",
+   "doc_date": "2022-07-27",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2022/08/Ordinary-Council-Minutes_27July2022.pdf",
+   "source_bytes": 272609
+  },
+  {
+   "slug": "inv-ces-committee-2022-08-10",
+   "genre": "committee-minutes",
+   "doc_date": "2022-08-10",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2022/08/Civil-and-Environmental-Services-Committee_Minutes_10August2022.pdf",
+   "source_bytes": 250519
+  },
+  {
+   "slug": "inv-ecs-committee-2022-08-10",
+   "genre": "committee-minutes",
+   "doc_date": "2022-08-10",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2022/08/Economic-and-Community-Sustainability-Committee_Minutes_10August2022.pdf",
+   "source_bytes": 198587
+  },
+  {
+   "slug": "inv-minutes-2022-08-24",
+   "genre": "council-minutes",
+   "doc_date": "2022-08-24",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2022/09/Council_Minutes-24_August_2022.pdf",
+   "source_bytes": 265321
+  },
+  {
+   "slug": "inv-ces-committee-2022-09-14",
+   "genre": "committee-minutes",
+   "doc_date": "2022-09-14",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2022/10/CivilandEnvironmentalServicesCommitteeMinutes-14September2022-1.pdf",
+   "source_bytes": 201354
+  },
+  {
+   "slug": "inv-ecs-committee-2022-09-14",
+   "genre": "committee-minutes",
+   "doc_date": "2022-09-14",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2022/10/EconomicandCommunitySustainabilityCommitteeMinutes-14September2022.pdf",
+   "source_bytes": 174555
+  },
+  {
+   "slug": "inv-minutes-2022-09-28",
+   "genre": "council-minutes",
+   "doc_date": "2022-09-28",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2022/10/Council-Minutes_28September2022-1.pdf",
+   "source_bytes": 298041
+  },
+  {
+   "slug": "inv-ces-committee-2022-10-12",
+   "genre": "committee-minutes",
+   "doc_date": "2022-10-12",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2022/10/CivilandEnvironmentalServicesCommitteeMinutes-12October2022-1.pdf",
+   "source_bytes": 204455
+  },
+  {
+   "slug": "inv-ecs-committee-2022-10-12",
+   "genre": "committee-minutes",
+   "doc_date": "2022-10-12",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2022/10/EconomicandCommunitySustainabilityCommitteeMinutes-12October2022.pdf",
+   "source_bytes": 139611
+  },
+  {
+   "slug": "inv-minutes-2022-10-26",
+   "genre": "council-minutes",
+   "doc_date": "2022-10-26",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2022/11/Council-Minutes-26October2022.pdf",
+   "source_bytes": 298117
+  },
+  {
+   "slug": "inv-ces-committee-2022-11-09",
+   "genre": "committee-minutes",
+   "doc_date": "2022-11-09",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2022/11/Civil_and_Environmental_Services_Committee-Minutes-9November2022.pdf",
+   "source_bytes": 157872
+  },
+  {
+   "slug": "inv-ecs-committee-2022-11-09",
+   "genre": "committee-minutes",
+   "doc_date": "2022-11-09",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2022/11/Economic_and_Community_Sustainability_Committee-Minutes-9November2022.pdf",
+   "source_bytes": 221719
+  },
+  {
+   "slug": "inv-minutes-2022-11-30",
+   "genre": "council-minutes",
+   "doc_date": "2022-11-30",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2022/12/Council_Minutes-30November2022.pdf",
+   "source_bytes": 278604
+  },
+  {
+   "slug": "inv-minutes-2022-12-14",
+   "genre": "council-minutes",
+   "doc_date": "2022-12-14",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2023/01/Council_Minutes-14December2022.pdf",
+   "source_bytes": 260542
+  },
+  {
+   "slug": "inv-special-minutes-2023-01-25",
+   "genre": "council-minutes",
+   "doc_date": "2023-01-25",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2023/01/Special_Council_Minutes-25_January_2023.pdf",
+   "source_bytes": 223844
+  },
+  {
+   "slug": "inv-ces-committee-2023-02-08",
+   "genre": "committee-minutes",
+   "doc_date": "2023-02-08",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2023/02/Civil-and-Environmental-Services-Committee-Minutes-8-February-2023.pdf",
+   "source_bytes": 350545
+  },
+  {
+   "slug": "inv-ecs-committee-2023-02-08",
+   "genre": "committee-minutes",
+   "doc_date": "2023-02-08",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2023/02/Economic-and-Community-Sustainability-Committee-Minutes-8-February-2023.pdf",
+   "source_bytes": 184091
+  },
+  {
+   "slug": "inv-minutes-2023-02-22",
+   "genre": "council-minutes",
+   "doc_date": "2023-02-22",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2023/03/Council-Minutes-22-February-2023.pdf",
+   "source_bytes": 561031
+  },
+  {
+   "slug": "inv-ces-committee-2023-03-08",
+   "genre": "committee-minutes",
+   "doc_date": "2023-03-08",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2023/03/Civil-and-Environmental-Services-Committee-Minutes-8-March-2023.pdf",
+   "source_bytes": 150059
+  },
+  {
+   "slug": "inv-ecs-committee-2023-03-08",
+   "genre": "committee-minutes",
+   "doc_date": "2023-03-08",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2023/03/Economic-and-Community-Sustainability-Committee-Minutes-8-March-2023.pdf",
+   "source_bytes": 154279
+  },
+  {
+   "slug": "inv-minutes-2023-03-08",
+   "genre": "council-minutes",
+   "doc_date": "2023-03-08",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2023/03/Joint-Committee-Meeting-Minutes-8-March-2023.pdf",
+   "source_bytes": 131399
+  },
+  {
+   "slug": "inv-minutes-2023-03-22",
+   "genre": "council-minutes",
+   "doc_date": "2023-03-22",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2023/04/Council-Minutes-22-March-2023.pdf",
+   "source_bytes": 298870
+  },
+  {
+   "slug": "inv-ces-committee-2023-04-12",
+   "genre": "committee-minutes",
+   "doc_date": "2023-04-12",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2023/04/23-11207-Civil-and-Environmental-Services-Committee-Minutes-12-April-2023.pdf",
+   "source_bytes": 100461
+  },
+  {
+   "slug": "inv-ecs-committee-2023-04-12",
+   "genre": "committee-minutes",
+   "doc_date": "2023-04-12",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2023/04/23-11205-Economic-and-Community-Sustainability-Committee-Minutes-12-April-2023.pdf",
+   "source_bytes": 165548
+  },
+  {
+   "slug": "inv-minutes-2023-04-12",
+   "genre": "council-minutes",
+   "doc_date": "2023-04-12",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2023/04/23-11366-Joint-Committee-Minutes-12-April-2023.pdf",
+   "source_bytes": 92216
+  },
+  {
+   "slug": "inv-minutes-2023-04-26",
+   "genre": "council-minutes",
+   "doc_date": "2023-04-26",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2023/05/Council-Minutes-26-April-2023.pdf",
+   "source_bytes": 483284
+  },
+  {
+   "slug": "inv-ces-committee-2023-05-10",
+   "genre": "committee-minutes",
+   "doc_date": "2023-05-10",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2023/06/Civil-and-Environmental-Services-Committee-Minutes-10-May-2023.pdf",
+   "source_bytes": 322381
+  },
+  {
+   "slug": "inv-ecs-committee-2023-05-10",
+   "genre": "committee-minutes",
+   "doc_date": "2023-05-10",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2023/05/Economic-and-Community-Sustainability-Committee-Minutes-10-May-2023.pdf",
+   "source_bytes": 48900
+  },
+  {
+   "slug": "inv-minutes-2023-05-24",
+   "genre": "council-minutes",
+   "doc_date": "2023-05-24",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2023/06/Council-Minutes-24-May-2023.pdf",
+   "source_bytes": 426177
+  },
+  {
+   "slug": "inv-ces-committee-2023-06-14",
+   "genre": "committee-minutes",
+   "doc_date": "2023-06-14",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2023/07/Civil-and-Environmental-Services-Committee-Minutes-14-June-2023.pdf",
+   "source_bytes": 194313
+  },
+  {
+   "slug": "inv-ecs-committee-2023-06-14",
+   "genre": "committee-minutes",
+   "doc_date": "2023-06-14",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2023/07/Economic-and-Community-Sustainability-Committee-Minutes-14-June-2023.pdf",
+   "source_bytes": 237943
+  },
+  {
+   "slug": "inv-minutes-2023-06-28",
+   "genre": "council-minutes",
+   "doc_date": "2023-06-28",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2023/07/Council-Minutes-28-June-2023.pdf",
+   "source_bytes": 394425
+  },
+  {
+   "slug": "inv-ces-committee-2023-07-12",
+   "genre": "committee-minutes",
+   "doc_date": "2023-07-12",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2023/07/Civil-and-Environmental-Services-Committee-Minutes-12-July-2023.pdf",
+   "source_bytes": 131137
+  },
+  {
+   "slug": "inv-ecs-committee-2023-07-12",
+   "genre": "committee-minutes",
+   "doc_date": "2023-07-12",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2023/07/Economic-and-Community-Sustainability-Committee-Minutes-12-July-2023.pdf",
+   "source_bytes": 43613
+  },
+  {
+   "slug": "inv-minutes-2023-07-26",
+   "genre": "council-minutes",
+   "doc_date": "2023-07-26",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2023/08/Council-Minutes-26-July-2023.pdf",
+   "source_bytes": 308072
+  },
+  {
+   "slug": "inv-ces-committee-2023-08-09",
+   "genre": "committee-minutes",
+   "doc_date": "2023-08-09",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2023/08/Civil-Environmental-Services-Committee-Meeting-Minutes-9-August-2023.pdf",
+   "source_bytes": 162592
+  },
+  {
+   "slug": "inv-ecs-committee-2023-08-09",
+   "genre": "committee-minutes",
+   "doc_date": "2023-08-09",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2023/08/Economic-Community-Sustainability-Committee-Meeting-Minutes-9-August-2023.pdf",
+   "source_bytes": 154924
+  },
+  {
+   "slug": "inv-minutes-2023-08-23",
+   "genre": "council-minutes",
+   "doc_date": "2023-08-23",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2023/08/Ordinary-Council-Meeting-Minutes-23-August-2023.pdf",
+   "source_bytes": 280887
+  },
+  {
+   "slug": "inv-ces-committee-2023-09-13",
+   "genre": "committee-minutes",
+   "doc_date": "2023-09-13",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2023/09/Civil-Environmental-Services-Committee-Meeting-Minutes-13-September-2023.pdf",
+   "source_bytes": 150517
+  },
+  {
+   "slug": "inv-ecs-committee-2023-09-13",
+   "genre": "committee-minutes",
+   "doc_date": "2023-09-13",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2023/09/Economic-Community-Sustainability-Committee-Meeting-Minutes-13-September-2023.pdf",
+   "source_bytes": 168221
+  },
+  {
+   "slug": "inv-minutes-2023-09-27",
+   "genre": "council-minutes",
+   "doc_date": "2023-09-27",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2023/10/Council-Minutes-27-September-2023.pdf",
+   "source_bytes": 303622
+  },
+  {
+   "slug": "inv-ces-committee-2023-10-11",
+   "genre": "committee-minutes",
+   "doc_date": "2023-10-11",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2023/10/Civil-Environmental-Services-Committee-Meeting-Minutes-11-October-2023.pdf",
+   "source_bytes": 158544
+  },
+  {
+   "slug": "inv-ecs-committee-2023-10-11",
+   "genre": "committee-minutes",
+   "doc_date": "2023-10-11",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2023/10/Economic-Community-Sustainability-Committee-Meeting-Minutes-11-October-2023.pdf",
+   "source_bytes": 191492
+  },
+  {
+   "slug": "inv-minutes-2023-10-25",
+   "genre": "council-minutes",
+   "doc_date": "2023-10-25",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2023/10/Council-Minutes-25-October-2023.pdf",
+   "source_bytes": 265440
+  },
+  {
+   "slug": "inv-ces-committee-2023-11-08",
+   "genre": "committee-minutes",
+   "doc_date": "2023-11-08",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2023/12/Civil-Environmental-Services-Committee-Meeting-Minutes-8-November-2023.pdf",
+   "source_bytes": 155505
+  },
+  {
+   "slug": "inv-ecs-committee-2023-11-08",
+   "genre": "committee-minutes",
+   "doc_date": "2023-11-08",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2023/12/Economic-Community-Sustainability-Committee-Meeting-Minutes-8-November-2023.pdf",
+   "source_bytes": 167168
+  },
+  {
+   "slug": "inv-minutes-2023-11-22",
+   "genre": "council-minutes",
+   "doc_date": "2023-11-22",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2023/12/Ordinary-Council-Meeting-Minutes-22-November-2023.pdf",
+   "source_bytes": 313510
+  },
+  {
+   "slug": "inv-minutes-2023-12-13",
+   "genre": "council-minutes",
+   "doc_date": "2023-12-13",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2023/12/Ordinary-Council-Meeting-Minutes-13-December-2023.pdf",
+   "source_bytes": 299560
+  },
+  {
+   "slug": "inv-ces-committee-2024-02-14",
+   "genre": "committee-minutes",
+   "doc_date": "2024-02-14",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2024/02/Civil-and-Environmental-Services-Committee-Minutes-14-February-2024.pdf",
+   "source_bytes": 169902
+  },
+  {
+   "slug": "inv-ecs-committee-2024-02-14",
+   "genre": "committee-minutes",
+   "doc_date": "2024-02-14",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2024/02/Economic-and-Community-Sustainability-Committee-Minutes-14-February-2024.pdf",
+   "source_bytes": 246845
+  },
+  {
+   "slug": "inv-minutes-2024-02-28",
+   "genre": "council-minutes",
+   "doc_date": "2024-02-28",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2024/03/Ordinary-Council-Minutes-28-February-2024.pdf",
+   "source_bytes": 327572
+  },
+  {
+   "slug": "inv-ces-committee-2024-03-13",
+   "genre": "committee-minutes",
+   "doc_date": "2024-03-13",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2024/03/Civil-and-Environmental-Services-Committee-Minutes-13-March-2024.pdf",
+   "source_bytes": 157716
+  },
+  {
+   "slug": "inv-ecs-committee-2024-03-13",
+   "genre": "committee-minutes",
+   "doc_date": "2024-03-13",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2024/03/Economic-and-Community-Sustainability-Committee-Minutes-13-March-2024.pdf",
+   "source_bytes": 150437
+  },
+  {
+   "slug": "inv-minutes-2024-03-27",
+   "genre": "council-minutes",
+   "doc_date": "2024-03-27",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2024/03/Council-Minutes-27-March-2024.pdf",
+   "source_bytes": 256660
+  },
+  {
+   "slug": "inv-ces-committee-2024-04-10",
+   "genre": "committee-minutes",
+   "doc_date": "2024-04-10",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2024/04/Civil-and-Environmental-Services-Committee-Minutes-10-April-2024.pdf",
+   "source_bytes": 151934
+  },
+  {
+   "slug": "inv-ecs-committee-2024-04-10",
+   "genre": "committee-minutes",
+   "doc_date": "2024-04-10",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2024/04/Economic-and-Community-Sustainability-Committee-Minutes-10-April-2024.pdf",
+   "source_bytes": 330560
+  },
+  {
+   "slug": "inv-minutes-2024-04-24",
+   "genre": "council-minutes",
+   "doc_date": "2024-04-24",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2024/04/Council-Minutes-24-April-2024.pdf",
+   "source_bytes": 410321
+  },
+  {
+   "slug": "inv-ces-committee-2024-05-08",
+   "genre": "committee-minutes",
+   "doc_date": "2024-05-08",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2024/05/Civil-and-Environmental-Services-Committee-Minutes-8-May-2024.pdf",
+   "source_bytes": 147139
+  },
+  {
+   "slug": "inv-ecs-committee-2024-05-08",
+   "genre": "committee-minutes",
+   "doc_date": "2024-05-08",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2024/05/Economic-and-Community-Sustainability-Committee-Minutes-8-May-2024.pdf",
+   "source_bytes": 210723
+  },
+  {
+   "slug": "inv-minutes-2024-05-22",
+   "genre": "council-minutes",
+   "doc_date": "2024-05-22",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2024/05/Council-Minutes-22-May-2024.pdf",
+   "source_bytes": 251574
+  },
+  {
+   "slug": "inv-ces-committee-2024-06-12",
+   "genre": "committee-minutes",
+   "doc_date": "2024-06-12",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2024/06/Civil-and-Environmental-Services-Committee-Minutes-12-June-2024.pdf",
+   "source_bytes": 213595
+  },
+  {
+   "slug": "inv-ecs-committee-2024-06-12",
+   "genre": "committee-minutes",
+   "doc_date": "2024-06-12",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2024/06/Economic-and-Community-Sustainability-Committee-Minutes-12-June-2024.pdf",
+   "source_bytes": 208636
+  },
+  {
+   "slug": "inv-minutes-2024-06-26",
+   "genre": "council-minutes",
+   "doc_date": "2024-06-26",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2024/07/Council-Minutes-26-June-2024.pdf",
+   "source_bytes": 390765
+  },
+  {
+   "slug": "inv-ces-committee-2024-07-10",
+   "genre": "committee-minutes",
+   "doc_date": "2024-07-10",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2024/07/Civil-and-Environmental-Services-Committee-Minutes-10-July-2024.pdf",
+   "source_bytes": 175810
+  },
+  {
+   "slug": "inv-ecs-committee-2024-07-10",
+   "genre": "committee-minutes",
+   "doc_date": "2024-07-10",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2024/07/Economic-and-Community-Sustainability-Committee-Minutes-10-July-2024.pdf",
+   "source_bytes": 224170
+  },
+  {
+   "slug": "inv-minutes-2024-07-24",
+   "genre": "council-minutes",
+   "doc_date": "2024-07-24",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2024/07/Council-Minutes-24-July-2024.pdf",
+   "source_bytes": 300030
+  },
+  {
+   "slug": "inv-minutes-2024-08-14",
+   "genre": "council-minutes",
+   "doc_date": "2024-08-14",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2024/08/Council-Minutes-14-August-2024.pdf",
+   "source_bytes": 365574
+  },
+  {
+   "slug": "inv-gipa-2024-09-01",
+   "genre": "contracts-register",
+   "doc_date": "2024-09-01",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2024/09/Government-Information-Public-Access-GIPA-Class-1-Contracts-Disclosure-Register.pdf",
+   "source_bytes": 374541
+  },
+  {
+   "slug": "inv-minutes-2024-09-04",
+   "genre": "council-minutes",
+   "doc_date": "2024-09-04",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2024/09/Council-Minutes-4-September-2024.pdf",
+   "source_bytes": 254048
+  },
+  {
+   "slug": "inv-minutes-2024-10-09",
+   "genre": "council-minutes",
+   "doc_date": "2024-10-09",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2024/10/Council-Minutes-9-October-2024.pdf",
+   "source_bytes": 232207
+  },
+  {
+   "slug": "inv-minutes-2024-10-30",
+   "genre": "council-minutes",
+   "doc_date": "2024-10-30",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2024/11/Ordinary-Council-Meeting-Minutes-30-October-2024.pdf",
+   "source_bytes": 1869458
+  },
+  {
+   "slug": "inv-minutes-2024-11-27",
+   "genre": "council-minutes",
+   "doc_date": "2024-11-27",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2024/12/Ordinary-Council-Meeting-Minutes-27-November-2024.pdf",
+   "source_bytes": 1872826
+  },
+  {
+   "slug": "inv-minutes-2024-12-18",
+   "genre": "council-minutes",
+   "doc_date": "2024-12-18",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2024/12/Ordinary-Council-Meeting-Minutes-18-December-2024.pdf",
+   "source_bytes": 1869590
+  },
+  {
+   "slug": "inv-minutes-2025-02-26",
+   "genre": "council-minutes",
+   "doc_date": "2025-02-26",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2025/03/Ordinary-Council-Meeting-Minutes-26-February-2025.pdf",
+   "source_bytes": 1870306
+  },
+  {
+   "slug": "inv-minutes-2025-03-26",
+   "genre": "council-minutes",
+   "doc_date": "2025-03-26",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2025/04/Ordinary-Council-Meeting-Minutes-26-March-2025.pdf",
+   "source_bytes": 1918055
+  },
+  {
+   "slug": "inv-minutes-2025-04-23",
+   "genre": "council-minutes",
+   "doc_date": "2025-04-23",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2025/05/Ordinary-Council-Meeting-Minutes-23-April-2025.pdf",
+   "source_bytes": 2112912
+  },
+  {
+   "slug": "inv-gipa-2025-05-01",
+   "genre": "contracts-register",
+   "doc_date": "2025-05-01",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2025/05/Updated-2025-Government-Information-Public-Access-GIPA-Class-1-Contracts-Disclosure-Register.pdf",
+   "source_bytes": 437581
+  },
+  {
+   "slug": "inv-minutes-2025-05-28",
+   "genre": "council-minutes",
+   "doc_date": "2025-05-28",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2025/06/Ordinary-Council-Meeting-Minutes-28-May-2025.pdf",
+   "source_bytes": 1927645
+  },
+  {
+   "slug": "inv-minutes-2025-06-18",
+   "genre": "council-minutes",
+   "doc_date": "2025-06-18",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2025/06/Ordinary-Council-Meeting-Minutes-18-June-2025.pdf",
+   "source_bytes": 2010526
+  },
+  {
+   "slug": "inv-minutes-2025-07-23",
+   "genre": "council-minutes",
+   "doc_date": "2025-07-23",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2025/07/Ordinary-Council-Meeting-Minutes-23-July-2025.pdf",
+   "source_bytes": 1474210
+  },
+  {
+   "slug": "inv-minutes-2025-08-27",
+   "genre": "council-minutes",
+   "doc_date": "2025-08-27",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2025/09/Ordinary-Council-Meeting-Minutes-27-August-2025.pdf",
+   "source_bytes": 1930582
+  },
+  {
+   "slug": "inv-minutes-2025-09-24",
+   "genre": "council-minutes",
+   "doc_date": "2025-09-24",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2025/09/Ordinary-Council-Meeting-Minutes-24-September-2025.pdf",
+   "source_bytes": 1977074
+  },
+  {
+   "slug": "inv-tenders-isc-netball-courts-upgrades-2026",
+   "genre": "tender-notice",
+   "doc_date": "2026-08-01",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2026/08/Tenders-Received-ISC-Netball-Courts-Upgrades-2026.pdf",
+   "source_bytes": 1695977
+  },
+  {
+   "slug": "inv-tenders-panel-of-contractors-for-green-waste-processing",
+   "genre": "tender-notice",
+   "doc_date": "2026-08-01",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2026/08/Tenders-Received-Panel-of-Contractors-for-Green-Waste-Processing.pdf",
+   "source_bytes": 179841
+  },
+  {
+   "slug": "inv-tenders-provision-of-cleaning-services-2026",
+   "genre": "tender-notice",
+   "doc_date": "2026-08-01",
+   "source_url": "https://inverell.nsw.gov.au/wp-content/uploads/2026/08/Tenders-Received-Provision-of-Cleaning-Services-2026.pdf",
+   "source_bytes": 58576
+  }
+ ]
+}
