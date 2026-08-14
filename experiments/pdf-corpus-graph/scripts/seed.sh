@@ -86,6 +86,10 @@ echo "== 2/7 corpus schema + seed =="
 t "corpus schema" bash -c "psql '$PG' -qAt -v ON_ERROR_STOP=1 -f '$EXP_DIR/sql/corpus-documents.sql' && psql '$PG' -qAt -v ON_ERROR_STOP=1 -f '$EXP_DIR/sql/corpus-entities-edges.sql' && psql '$PG' -qAt -v ON_ERROR_STOP=1 -f '$EXP_DIR/sql/corpus-chunks.sql'"
 t "seed restore" bash -c "zcat '$EXP_DIR/demo/seed/corpus-documents.sql.gz' | psql '$PG' -q -v ON_ERROR_STOP=1"
 
+# The AU council corpus (demo/seed/au-corpus.json) loads between restore and
+# extraction so phase 4 sees all 110 documents. Fetches only on cache miss.
+t "au corpus" bash -c "cd '$EXP_DIR' && bun scripts/load-au-corpus.ts >/dev/null"
+
 echo "== 3/7 demo schema =="
 t "demo schema+extract fns" bash -c "psql '$PG' -qAt -v ON_ERROR_STOP=1 -f '$EXP_DIR/demo/db/01-schema.sql' && psql '$PG' -qAt -v ON_ERROR_STOP=1 -f '$EXP_DIR/demo/db/02-extract.sql' && psql '$PG' -qAt -v ON_ERROR_STOP=1 -f '$EXP_DIR/demo/db/03-extract-setbased.sql' && psql '$PG' -qAt -v ON_ERROR_STOP=1 -f '$EXP_DIR/demo/db/06-entities-people-orgs.sql'"
 
@@ -95,12 +99,17 @@ echo "== 4/7 extraction (the slow step) =="
 t "extract+edges" psql "$PG" -qAt -v ON_ERROR_STOP=1 -c "
 select demo.extract_document_fast(slug) from corpus.documents;
 select demo.extract_people_orgs(slug) from corpus.documents;
+select demo.extract_abn(slug) from corpus.documents;
 select demo.build_edges(400);
 select demo.refresh_counters();"
 
 echo "== 5/7 API layer + security =="
 t "api" psql "$PG" -qAt -v ON_ERROR_STOP=1 -f "$EXP_DIR/demo/db/04-api.sql"
 t "search tier" psql "$PG" -qAt -v ON_ERROR_STOP=1 -f "$EXP_DIR/demo/db/07-search.sql"
+
+# The editorial layer comes AFTER 06: it replaces person_org_patterns() with
+# the extended (US + AU) set, and applying it earlier would let 06 revert it.
+t "editorial layer" psql "$PG" -qAt -v ON_ERROR_STOP=1 -f "$EXP_DIR/demo/db/08-editorial.sql"
 t "security (RLS etc.)" psql "$PG" -qAt -v ON_ERROR_STOP=1 -f "$EXP_DIR/db/05-security.sql"
 
 echo "== 6/7 expose demo to PostgREST =="
