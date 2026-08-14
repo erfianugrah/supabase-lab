@@ -84,24 +84,40 @@ echo "== 2/7 corpus schema + seed =="
 # references entities/edges/chunks/chunks_halfvec, and the probes expect them.
 # Minimal shells here; the probes rebuild the heavy synthetic content if run.
 t "corpus schema" bash -c "psql '$PG' -qAt -v ON_ERROR_STOP=1 -f '$EXP_DIR/sql/corpus-documents.sql' && psql '$PG' -qAt -v ON_ERROR_STOP=1 -f '$EXP_DIR/sql/corpus-entities-edges.sql' && psql '$PG' -qAt -v ON_ERROR_STOP=1 -f '$EXP_DIR/sql/corpus-chunks.sql'"
-t "seed restore" bash -c "zcat '$EXP_DIR/demo/seed/corpus-documents.sql.gz' | psql '$PG' -q -v ON_ERROR_STOP=1"
 
-# The AU council corpus (demo/seed/au-corpus.json) loads between restore and
-# extraction so phase 4 sees all 110 documents. Fetches only on cache miss.
-t "au corpus" bash -c "cd '$EXP_DIR' && bun scripts/load-au-corpus.ts >/dev/null"
+# The committed data dump (corpus.documents + demo.entities/mentions/edges)
+# skips fetch AND the ~17-minute extraction phase. REEXTRACT=1 forces the
+# full pipeline instead - fetch, OCR, extract, build - which is how the dump
+# itself gets refreshed.
+if [ -z "${REEXTRACT:-}" ] && [ -f "$EXP_DIR/demo/seed/demo-data.pgdump" ]; then
+  FAST_DATA=1
+fi
+
+if [ -z "${FAST_DATA:-}" ]; then
+  t "seed restore" bash -c "zcat '$EXP_DIR/demo/seed/corpus-documents.sql.gz' | psql '$PG' -q -v ON_ERROR_STOP=1"
+
+  # The AU council corpus (demo/seed/au-corpus.json) loads between restore and
+  # extraction so phase 4 sees all 110 documents. Fetches only on cache miss.
+  t "au corpus" bash -c "cd '$EXP_DIR' && bun scripts/load-au-corpus.ts >/dev/null"
+fi
 
 echo "== 3/7 demo schema =="
 t "demo schema+extract fns" bash -c "psql '$PG' -qAt -v ON_ERROR_STOP=1 -f '$EXP_DIR/demo/db/01-schema.sql' && psql '$PG' -qAt -v ON_ERROR_STOP=1 -f '$EXP_DIR/demo/db/02-extract.sql' && psql '$PG' -qAt -v ON_ERROR_STOP=1 -f '$EXP_DIR/demo/db/03-extract-setbased.sql' && psql '$PG' -qAt -v ON_ERROR_STOP=1 -f '$EXP_DIR/demo/db/06-entities-people-orgs.sql'"
 
-echo "== 4/7 extraction (the slow step) =="
-# Citation extraction measured at 6m11s for the seven documents on medium compute.
-# Person/org extraction adds to this but runs the same set-based machinery.
-t "extract+edges" psql "$PG" -qAt -v ON_ERROR_STOP=1 -c "
+if [ -n "${FAST_DATA:-}" ]; then
+  echo "== 4/7 demo data restore (fast path; REEXTRACT=1 forces the pipeline) =="
+  t "demo data restore" bash -c "pg_restore --data-only --no-owner --no-privileges --exit-on-error -d '$PG' '$EXP_DIR/demo/seed/demo-data.pgdump'"
+else
+  echo "== 4/7 extraction (the slow step) =="
+  # Citation extraction measured at 6m11s for the seven documents on medium compute.
+  # Person/org extraction adds to this but runs the same set-based machinery.
+  t "extract+edges" psql "$PG" -qAt -v ON_ERROR_STOP=1 -c "
 select demo.extract_document_fast(slug) from corpus.documents;
 select demo.extract_people_orgs(slug) from corpus.documents;
 select demo.extract_abn(slug) from corpus.documents;
 select demo.build_edges(400);
 select demo.refresh_counters();"
+fi
 
 echo "== 5/7 API layer + security =="
 t "api" psql "$PG" -qAt -v ON_ERROR_STOP=1 -f "$EXP_DIR/demo/db/04-api.sql"
