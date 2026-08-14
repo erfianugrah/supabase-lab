@@ -616,7 +616,7 @@ export default function Explorer() {
               <Section
                 title="Graph"
                 note={graph
-                  ? `${graph.nodes.length} nodes, ${graph.edges.length} edges (top 40 nodes, top 3 edges each drawn)`
+                  ? `${graph.nodes.length} nodes, ${graph.edges.length} edges (top 24 nodes, top 3 edges each drawn)`
                   : "loading"}
               >
                 {graph ? (
