@@ -615,3 +615,61 @@ demo.neighbourhood_as_at() carry the fix; signatures unchanged.
 This is the finding the ~100-document run existed to produce: "it works"
 and "it is fast" now rest on one artifact, and the price was one real bug
 class the synthetic graph could not reveal.
+
+## Editorial UI + edge cache (2026-08-14)
+
+The read surface is now the editorial graph: person/org/ABN kinds with their
+own colours, an as-at date filter on the cross-document panel, an entity
+timeline, registry-identifier pins, a radial node-link graph over subgraph()
+(radial labels, top-24 nodes by weight with top-3 edges each - hub cliques
+make full edge sets a hairball: 120 nodes/6561 edges on the deepest
+councillor), client-side pagination on the long tables, <details> collapse on
+the document slug lists, and refresh-stable deep links (?entity=<id> written
+by replaceState on selection; hydrated on load via the new demo.entity_get()
+lookup RPC).
+
+Two bugs found by looking at the deployed site rather than the code:
+
+- demo.documents() was a ghost: referenced by the UI, the README and a
+  comment in 04-api.sql, defined in no committed file - it had only ever been
+  created by hand in a past live database, so every fresh rebuild shipped a
+  corpus table 404ing with PGRST202. Now defined in 04-api.sql and granted.
+- First cache deploy: every request a permanent MISS because the Cache API
+  rejects put() of responses carrying Set-Cookie, and Cloudflare's edge adds
+  __cf_bm to everything. The put threw inside waitUntil, invisible. Strip
+  set-cookie on the stored copy.
+
+The worker now runs a 90-line script owning /rest/* only: POST bodies hashed
+into synthetic GET cache keys (the documented Cache-API POST pattern), 6h
+freshness tracked via x-cached-at, and serve-stale regardless of age when the
+origin errors - the demo now keeps answering while the disposable project is
+destroyed between engagements. x-pggraph-cache: HIT/MISS/STALE on every RPC
+response; MISS->HIT verified on the deployed domain. seed.sh deploys with
+--var ORIGIN so the project ref stays out of committed files.
+
+## E2E suite (2026-08-14)
+
+demo/e2e/ (Playwright, serial, against the live deployment): landing,
+bridging (as-at empties and restores the table), entity (graph renders,
+timeline dated, refresh persists selection, shortest path), search (entity
+search -> White Rock org -> the ABN 45 153 592 173 pin appears - the closed
+loop proven from a browser; document search), offline (route-abort -> the
+DIAGNOSTIC panel). Loop-built on the local rung; see the loop plan and the
+defect review for what the rung did and did not do.
+
+## G12 - cost per document (2026-08-14)
+
+All inputs measured this engagement; list rates dated 2026-08-10.
+
+- AU council corpus: 103 docs, 44,317,522 source bytes -> 1,134,495 extracted
+  bytes (aggregate 0.0256; 0.4893 after TOAST, measured on the loaded rows).
+- Per document, this genre: ~430 KB source, ~11 KB logical, ~5.4 KB on disk.
+  Disk: 5.4 KB x $0.125/GB/mo = $0.0000007/doc/mo. Raw PDF in Storage:
+  430 KB x $0.0213/GB/mo = $0.0000092/doc/mo. Call it a cent per thousand
+  documents per month, Supabase side, plus compute (not priced here).
+- Their 4 TB at the minutes-like ratio: ~102 GB logical -> ~50 GB disk ->
+  ~$6/mo gp3 + $85/mo raw storage = ~$92/mo. At the US federal corpus's
+  0.7633 aggregate ratio the same 4 TB was ~$239/mo. Genre swings the cost
+  projection 2.6x between two measured corpora - the per-PDF conversation is
+  unanswerable until their own genres are sampled, which is exactly the
+  100-document run argument.
