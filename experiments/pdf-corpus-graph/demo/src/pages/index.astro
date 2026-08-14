@@ -32,14 +32,15 @@ import "../styles/global.css";
         </span>
       </div>
       <p class="mt-1 max-w-[110ch] text-[12px] text-[var(--color-ink-muted)]">
-        111 public documents - an Australian council's minutes, committee papers,
-        contracts registers and tender notices (2015-2026), plus seven US federal
-        references - extracted to text and indexed as an entity graph. Entities
-        are people, organisations, checksum-validated ABNs, and citations; edges
-        are co-occurrence within a 400-character window, dated by their document,
-        so every query has an as-at form. Traversal is a recursive CTE; shortest
-        path and components are pgrouting over the same ordinary edge table.
-        No graph database.
+        An Australian council's minutes, committee papers, contracts registers
+        and tender notices (2015-2026), plus seven US federal references,
+        extracted to text and indexed as a graph database in ordinary Postgres.
+        The counts above are live from the database, and they are the corpus.
+        Entities are people, organisations, checksum-validated ABNs, and
+        citations. Edges are co-occurrence within a 400-character window, dated
+        by their document, so every query has an as-at form. Traversal is a
+        recursive CTE, shortest path and components are pgrouting, and the
+        whole read surface is PostgREST over one edge table.
       </p>
     </header>
 
