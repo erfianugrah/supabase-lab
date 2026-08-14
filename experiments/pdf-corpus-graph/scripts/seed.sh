@@ -137,7 +137,7 @@ ANON="$(curl -s "${auth[@]}" "$API/projects/$REF/api-keys" | jq -r '.[]|select(.
 printf 'PUBLIC_SUPABASE_URL=https://%s.supabase.co\nPUBLIC_SUPABASE_ANON_KEY=%s\n' "$REF" "$ANON" > "$EXP_DIR/demo/.env"
 t "bun install" bash -c "cd '$EXP_DIR/demo' && bun install >/dev/null 2>&1"
 t "build" bash -c "cd '$EXP_DIR/demo' && bun run build >/dev/null"
-t "wrangler deploy" bash -c "cd '$EXP_DIR/demo' && CLOUDFLARE_ACCOUNT_ID='$CF_ACC' wrangler deploy 2>&1 | grep -E 'Deployed|error' | head -3"
+t "wrangler deploy" bash -c "cd '$EXP_DIR/demo' && CLOUDFLARE_ACCOUNT_ID='$CF_ACC' wrangler deploy --var \"ORIGIN:https://$REF.supabase.co\" 2>&1 | grep -E 'Deployed|error' | head -3"
 
 echo
 echo "seed complete:"

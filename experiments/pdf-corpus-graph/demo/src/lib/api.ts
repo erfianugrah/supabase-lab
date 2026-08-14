@@ -35,8 +35,14 @@ string | undefined): string {
 const URL_BASE = requireEnv("PUBLIC_SUPABASE_URL", import.meta.env.PUBLIC_SUPABASE_URL);
 const ANON = requireEnv("PUBLIC_SUPABASE_ANON_KEY", import.meta.env.PUBLIC_SUPABASE_ANON_KEY);
 
+// Production builds read through the Worker's caching proxy at the same
+// origin (edge HITs in single-digit ms, and the demo keeps answering STALE
+// responses if the disposable database is down). `astro dev` has no worker,
+// so local development talks to PostgREST directly.
+const API_BASE = import.meta.env.PROD ? "" : URL_BASE;
+
 async function rpc<T>(fn: string, args: Record<string, unknown>, schema: z.ZodType<T>): Promise<T> {
-  const res = await fetch(`${URL_BASE}/rest/v1/rpc/${fn}`, {
+  const res = await fetch(`${API_BASE}/rest/v1/rpc/${fn}`, {
     method: "POST",
     headers: {
       apikey: ANON,
