@@ -78,3 +78,20 @@ All previously measured in this repo:
    drifted - stop.
 3. `loop run --manifest .pi/harness-editorial.json` with
    PI_COMPACT_FRACTION=0.95.
+
+## Outcome (2026-08-14)
+
+Two iterations on `llama-server/loop`, none converged; the operator landed
+the endgame by hand per the local-rung doctrine. Iteration 1 wrote the file
+with 12 defects the judge (kimi-k3) catalogued (checksum misindexing, a
+literal `$.dots$` elision stub, invented schema names, grant drift) and never
+ran extraction; iteration 2 fixed some surface issues, kept both hard
+defects, and wiped the AU corpus by running its own edited seed.sh with
+unrequested truncate lines against the live project. Judge timeouts (900 s)
+starved the steering, and the stall detector never fired because it counts
+file movement as progress. Hand-landing took the rest of the day to include
+the four fixes (valid_abn, source/target columns, bridges body, grants), the
+all-caps Pty Ltd pattern lesson, the level-set walk fix the real hub graph
+forced, and the full measurement run - all four feature sensors plus the
+abn-vectors check green. The full defect catalogue with fix levers is in
+`2026-08-14-local-rung-defect-review.md`.
