@@ -368,11 +368,11 @@ export default function Explorer() {
             title="Source corpus"
             note="what got extracted from each document"
           >
-            <table>
+            <table className="w-full table-fixed">
               <thead>
                 <tr>
-                  <th>slug</th>
-                  <th>genre</th>
+                  <th className="w-[36%]">slug</th>
+                  <th className="w-[14%]">genre</th>
                   <th className="num"><Hint tip="Size of the source PDF in bytes.">source</Hint></th>
                   <th className="num"><Hint tip="Size of the text extracted from it.">text</Hint></th>
                   <th className="num"><Hint tip="extracted text / source PDF bytes. Above 1.0 is real: a PDF already compresses its content streams, so dense regulation yields more text than its own file.">ratio</Hint></th>
@@ -429,15 +429,15 @@ export default function Explorer() {
                 </span>
               )}
             </div>
-            <table>
+            <table className="w-full table-fixed">
               <thead>
                 <tr>
                   <th><Hint tip="Entity type: CTRL = NIST control, U.S.C. = statute, CFR = regulation, PUB.L = Public Law.">kind</Hint></th>
-                  <th>label</th>
+                  <th className="w-[24%]">label</th>
                   <th className="num"><Hint tip="How many documents this entity appears in.">docs</Hint></th>
                   <th className="num"><Hint tip="Total mentions across all documents.">mentions</Hint></th>
                   <th><Hint tip="The documents containing this entity.">found in</Hint></th>
-                  <th />
+                  <th className="w-[64px]" />
                 </tr>
               </thead>
               <tbody>
@@ -496,11 +496,11 @@ export default function Explorer() {
               <button type="submit">SEARCH</button>
             </form>
             {docResults.length > 0 ? (
-              <table>
+              <table className="w-full table-fixed">
                 <thead>
                   <tr>
-                    <th>slug</th>
-                    <th>genre</th>
+                    <th className="w-[30%]">slug</th>
+                    <th className="w-[16%]">genre</th>
                     <th className="num"><Hint tip="ts_rank over the tsvector: how well the document matches the query.">rank</Hint></th>
                     <th><Hint tip="ts_headline snippet with match markers in bold.">snippet</Hint></th>
                   </tr>
@@ -511,7 +511,7 @@ export default function Explorer() {
                       <td>{r.slug}</td>
                       <td className="text-[var(--color-ink-muted)]">{r.genre}</td>
                       <td className="num">{r.rank.toFixed(4)}</td>
-                      <td><Headline text={r.headline} /></td>
+                      <td className="cell-clamp" title={r.headline.replace(/<\/?b>/g, "")}><Headline text={r.headline} /></td>
                     </tr>
                   ))}
                 </tbody>
@@ -540,15 +540,15 @@ export default function Explorer() {
               />
               <button type="submit">SEARCH</button>
             </form>
-            <table>
+            <table className="w-full table-fixed">
               <thead>
                 <tr>
                   <th><Hint tip="Entity type: CTRL = NIST control, U.S.C. = statute, CFR = regulation, PUB.L = Public Law.">kind</Hint></th>
-                  <th>label</th>
+                  <th className="w-[34%]">label</th>
                   <th className="num">mentions</th>
                   <th className="num">docs</th>
                   <th className="num"><Hint tip="Search rank: 4.0 exact, 3.9 punctuation-insensitive, 2.x prefix, 1.x trigram similarity.">score</Hint></th>
-                  <th />
+                  <th className="w-[160px]" />
                 </tr>
               </thead>
               <tbody>
@@ -573,9 +573,9 @@ export default function Explorer() {
           </Section>
 
           <Section title="Connected components" note="whether the corpus separates into topics on its own">
-            <table>
+            <table className="w-full table-fixed">
               <thead>
-                <tr><th className="num"><Hint tip="Number of entities in this cluster - mutually reachable via pgr_connectedComponents.">size</Hint></th><th><Hint tip="The most-mentioned entities in the cluster - its topic.">largest members</Hint></th></tr>
+                <tr><th className="num"><Hint tip="Number of entities in this cluster - mutually reachable via pgr_connectedComponents.">size</Hint></th><th className="w-[80%]"><Hint tip="The most-mentioned entities in the cluster - its topic.">largest members</Hint></th></tr>
               </thead>
               <tbody>
                 {components.slice(0, 8).map((c) => (
@@ -677,7 +677,7 @@ export default function Explorer() {
                   <div className="text-[var(--color-accent-red)]">{pathMsg}</div>
                 ) : null}
                 {path && path.length > 0 ? (
-                  <table>
+                  <table className="w-full table-fixed">
                     <thead>
                       <tr><th className="num"><Hint tip="Position in the path, 1 = start.">seq</Hint></th><th>kind</th><th>label</th><th className="num"><Hint tip="Accumulated cost from the start. Cost is 1/co-citation-weight, so a lower number means a more strongly evidenced chain, not just fewer hops.">agg cost</Hint></th></tr>
                     </thead>
@@ -696,15 +696,15 @@ export default function Explorer() {
               </Section>
 
               <Section title="Neighbourhood" note={`${neighbours.length} nodes within depth ${depth}`}>
-                <table>
+                <table className="w-full table-fixed">
                   <thead>
                     <tr>
                       <th className="num"><Hint tip="How many citation hops from the selected entity. 0 is the entity itself.">depth</Hint></th>
                       <th>kind</th>
-                      <th>label</th>
-                      <th><Hint tip="The document where this connection was found.">via document</Hint></th>
+                      <th className="w-[34%]">label</th>
+                      <th className="w-[30%]"><Hint tip="The document where this connection was found.">via document</Hint></th>
                       <th className="num"><Hint tip="Co-citation count: how often the two entities appear within 400 characters. Higher = more strongly linked.">weight</Hint></th>
-                      <th />
+                      <th className="w-[96px]" />
                     </tr>
                   </thead>
                   <tbody>
@@ -738,11 +738,11 @@ export default function Explorer() {
                 note="every mention of this entity, in document-date order"
               >
                 {timeline.length > 0 ? (
-                  <table>
+                  <table className="w-full table-fixed">
                     <thead>
                       <tr>
                         <th><Hint tip="The document's own date (meeting date, register snapshot). Nulls - the US federal documents - sort last.">date</Hint></th>
-                        <th>document</th>
+                        <th className="w-[26%]">document</th>
                         <th className="num"><Hint tip="Exact character position of this mention in the extracted text.">offset</Hint></th>
                         <th>source text</th>
                       </tr>
@@ -772,9 +772,9 @@ export default function Explorer() {
 
               {registryIds.length > 0 ? (
                 <Section title="Registry identifiers" note="deterministic identity pins co-located with this entity">
-                  <table>
+                  <table className="w-full table-fixed">
                     <thead>
-                      <tr><th>identifier</th><th className="num">canonical</th><th>printed in</th></tr>
+                      <tr><th className="w-[34%]">identifier</th><th className="num">canonical</th><th>printed in</th></tr>
                     </thead>
                     <tbody>
                       {registryIds.map((r) => (
@@ -801,16 +801,16 @@ export default function Explorer() {
               ) : null}
 
               <Section title="Provenance" note="the exact documents and character offsets this node came from">
-                <table>
+                <table className="w-full table-fixed">
                   <thead>
-                    <tr><th><Hint tip="The source document this mention came from.">document</Hint></th><th className="num"><Hint tip="Exact character position of this mention in the extracted text. Verified against the bytes, not asserted.">offset</Hint></th><th><Hint tip="The 150-character window of source text around the mention - the evidence.">source text</Hint></th></tr>
+                    <tr><th className="w-[30%]"><Hint tip="The source document this mention came from.">document</Hint></th><th className="num"><Hint tip="Exact character position of this mention in the extracted text. Verified against the bytes, not asserted.">offset</Hint></th><th><Hint tip="The 150-character window of source text around the mention - the evidence.">source text</Hint></th></tr>
                   </thead>
                   <tbody>
                     {prov.map((p) => (
                       <tr key={`${p.doc_slug}-${p.char_offset}`}>
                         <td className="whitespace-nowrap">{p.doc_slug}</td>
                         <td className="num">{p.char_offset.toLocaleString()}</td>
-                        <td>{p.snippet}</td>
+                        <td className="cell-clamp" title={p.snippet}>{p.snippet}</td>
                       </tr>
                     ))}
                   </tbody>
