@@ -249,6 +249,11 @@ export default function Explorer() {
     setGraph(null);
     setNeighboursPage(0);
     setTimelinePage(0);
+    // The URL always carries the selection, so a refresh (or a shared link)
+    // returns to exactly this view rather than the empty landing state.
+    // replaceState, not pushState: OPEN clicks are navigation within one
+    // page's working set, and none of them deserve a history entry.
+    window.history.replaceState(null, "", `?entity=${e.id}`);
     try {
       const [n, p, t, r, g] = await Promise.all([
         api.neighbourhood(e.id, depth, 200),
