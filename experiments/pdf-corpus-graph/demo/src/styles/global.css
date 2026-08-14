@@ -27,6 +27,9 @@
   --color-kind-usc: #b59a52;
   --color-kind-cfr: #8c8378;
   --color-kind-publaw: #c8102e;
+  --color-kind-person: #375a7f;
+  --color-kind-org: #7f5230;
+  --color-kind-abn: #2f6f6a;
 
   --font-mono: "IBM Plex Mono", "JetBrains Mono", "Menlo", "Consolas", monospace;
 
@@ -46,6 +49,9 @@
     --color-kind-usc: #d9b96a;
     --color-kind-cfr: #605a50;
     --color-kind-publaw: #ff5460;
+    --color-kind-person: #6a92c4;
+    --color-kind-org: #c49060;
+    --color-kind-abn: #5fb0a8;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
@@ -60,6 +66,9 @@
       --color-kind-usc: #d9b96a;
       --color-kind-cfr: #605a50;
       --color-kind-publaw: #ff5460;
+    --color-kind-person: #6a92c4;
+    --color-kind-org: #c49060;
+    --color-kind-abn: #5fb0a8;
     }
   }
 
