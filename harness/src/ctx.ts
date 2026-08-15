@@ -29,6 +29,7 @@ export interface CtxInput {
   phzHost?: string;
   dbPassword?: string;
   anonKey?: string;
+  serviceKey?: string;
   pat?: string;
   region?: string;
   endpointIps?: string[];
@@ -130,6 +131,7 @@ export async function buildCtx(input: CtxInput): Promise<Ctx> {
   const phzHost = input.phzHost ?? env.PHZ_HOST ?? (ref ? `db.${ref}.supabase.co` : "");
   const dbPassword = input.dbPassword ?? process.env.DB_PASSWORD ?? "";
   const anonKey = input.anonKey ?? process.env.SUPABASE_ANON_KEY ?? undefined;
+  const serviceKey = input.serviceKey ?? process.env.SUPABASE_SERVICE_ROLE_KEY ?? undefined;
   const pat = input.pat ?? process.env.SUPABASE_ACCESS_TOKEN ?? undefined;
   let endpointIps =
     input.endpointIps ??
@@ -177,6 +179,7 @@ export async function buildCtx(input: CtxInput): Promise<Ctx> {
     apiHost: ref ? `${ref}.supabase.co` : "",
     dbPassword,
     anonKey,
+    serviceKey,
     pat,
     region: input.region ?? env.REGION ?? process.env.AWS_REGION ?? "ap-southeast-1",
     endpointIps,
