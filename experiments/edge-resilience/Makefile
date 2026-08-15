@@ -4,7 +4,9 @@ TS := $(shell date +%Y%m%d-%H%M%S)
 
 # A project ref is 20 lowercase letters (see platform-downtime Makefile for why
 # the shape guard exists: tofu's "No outputs found" warning lands on stdout).
-REF := $(shell tofu output -raw project_ref 2>/dev/null | tr -d '\n' | grep -Eo '^[a-z]{20}$$' || true)
+# Lazy (= not :=): after `make down`, parse-time evaluation would cache an
+# empty ref for the whole `make up` run. Lazy re-reads per recipe line.
+REF = $(shell tofu output -raw project_ref 2>/dev/null | tr -d '\n' | grep -Eo '^[a-z]{20}$$' || true)
 
 FILE_TOK := $(shell grep -E '^supabase_access_token' $(ROOT)/secrets.tfvars 2>/dev/null | cut -d'"' -f2)
 TOK := $(if $(SUPABASE_ACCESS_TOKEN),$(SUPABASE_ACCESS_TOKEN),$(FILE_TOK))
@@ -16,7 +18,25 @@ PW := $(shell grep -E '^db_password' $(ROOT)/secrets.tfvars 2>/dev/null | cut -d
 ONLY ?= W01,W02,W03
 RUNNER_FLAGS ?=
 
-.PHONY: init validate apply keygen worker-deploy worker-outage worker-normal seed probe probe-destructive destroy
+.PHONY: init validate apply keygen worker-deploy worker-outage worker-normal seed probe probe-destructive destroy up down battery
+
+# Battery ids - every module in the experiment.
+BATTERY := W01,W02,W03,W04,W05,W06,W07,W08,W09,W10,W11,W12,W13
+
+# One-command lifecycle. `make down` tears everything down (worker + both
+# projects); `make up` returns to an equivalent state: fresh projects, same
+# persisted JWKS keypair (jwks/ survives locally), worker redeployed, probe
+# table seeded. `make battery` is the unattended full run for CI/cron.
+up: init validate apply keygen worker-deploy seed
+	@echo "lab up: primary=$$(tofu output -raw project_ref) standby=$$(tofu output -raw standby_ref)"
+
+down:
+	-wrangler delete --name edge-resilience-drill 2>/dev/null || true
+	tofu plan -destroy $(VARS) -var="supabase_access_token=$(TOK)" -out=tfplan-destroy
+	tofu apply tfplan-destroy
+
+battery: up
+	$(ROOT)/.pi/probe-edge-resilience.sh $(BATTERY)
 
 init:
 	tofu init

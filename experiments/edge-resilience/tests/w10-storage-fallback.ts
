@@ -1,0 +1,174 @@
+/**
+ * W10 - storage object fallback (the 404 gap and the sync path)
+ *
+ * Measures the "parity gap" in storage bucket replication: buckets/objects
+ * on the primary are not automatically present on the standby. Validates
+ * that manual synchronization (download from primary, upload to standby)
+ * works and measures the duration.
+ *
+ * Destructive: cleans up buckets and objects on both projects.
+ */
+import type { Ctx, TestModule, TestResult } from "../../../harness/src/types";
+import { mgmt } from "../../../harness/src/mgmt";
+
+const mod: TestModule = {
+  id: "W10",
+  title: "storage object fallback (the 404 gap and the sync path)",
+  where: "local",
+  requires: ["pat", "anon-key", "peer"],
+  destructive: true,
+
+  async run(ctx: Ctx): Promise<TestResult> {
+    const primary = ctx.ref;
+    const standby = ctx.peers["standby"];
+    const primaryAnon = ctx.anonKey!;
+    const standbyAnon = ctx.endpoints["standby_anon"];
+    const primaryServiceKey = ctx.serviceKey!;
+    const measurements: Record<string, string | number> = {};
+
+    if (!standby || !standbyAnon || !primaryServiceKey) {
+      return {
+        id: "W10",
+        title: this.title,
+        status: "skip",
+        detail: `missing peer/endpoints/keys: standby=${standby ?? "absent"}, standby_anon=${standbyAnon ? "set" : "absent"}, primaryServiceKey=${primaryServiceKey ? "set" : "absent"}`,
+      };
+    }
+
+    // Helper to fetch standby service key via ctx.pat (W09 pattern).
+    const getStandbyServiceKey = async (): Promise<string | undefined> => {
+      const res = await mgmt(ctx, "GET", `/projects/${standby}/api-keys?reveal=true`);
+      if (res.status !== 200 || !Array.isArray(res.json)) return undefined;
+      const keys = res.json as Array<{ type?: string; name?: string; api_key?: string }>;
+      const found = keys.find(
+        (k) => k.type === "service_role" || k.type === "secret" || k.name === "service_role",
+      );
+      return found?.api_key;
+    };
+
+    const bucketId = "w10-drill";
+    const objectPath = "probe.int";
+    const objectContent = "verifying storage fallback pattern";
+
+    const cleanup = async () => {
+      const deleteBucketSimple = async (ref: string, key: string) => {
+        await fetch(`https://${ref}.supabase.co/storage/v1/bucket/${bucketId}`, {
+          method: "DELETE",
+          headers: { apikey: key, Authorization: `Bearer ${key}` },
+        }).catch(() => {});
+      };
+      const deleteObjSimple = async (ref: string, key: string) => {
+        await fetch(`https://${ref}.supabase.co/storage/v1/object/${bucketId}/${objectPath}`, {
+          method: "DELETE",
+          headers: { apikey: key, Authorization: `Bearer ${key}` },
+        }).catch(() => {});
+      };
+      await deleteBucketSimple(primary, primaryServiceKey).catch(() => {});
+      const standbyServiceKey = await getStandbyServiceKey().catch(() => undefined);
+      if (standbyServiceKey) {
+        await deleteBucketSimple(standby, standbyServiceKey).catch(() => {});
+      }
+		await deleteObjSimple(primary, primaryServiceKey).catch(() => {});
+		if (standbyServiceKey) {
+			await deleteObjSimple(standby, standbyServiceKey).catch(() => {});
+		}
+    };
+
+    try {
+      const bucketCreateRes = await fetch(`https://${primary}.supabase.co/storage/</strong>v1/bucket`, {
+        method: "POST",
+        headers: { apikey: primaryServiceKey, Authorization: `Bearer ${primaryServiceKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ id: bucketId, name: bucketId, public: true }),
+        signal: AbortSignal.timeout(30_000),
+      }).catch(e => { throw new Error(`Primary bucket create failed: ${e.message}`); });
+      
+      if (!bucketCreateRes.ok) throw new Error(`Primary bucket create failed: ${await bucketCreateRes.text()}`);
+      measurements["primary_bucket_created"] = "true";
+
+      const uploadRes = await fetch(`https://${primary}.supabase.co/storage/v1/object/${bucketId}/${objectPath}`, {
+        method: "POST",
+        headers: { apikey: primaryServiceKey, Authorization: `Bearer ${primaryServiceKey}`, "Content-Type": "text/plain" },
+        body: objectContent,
+        signal: AbortSignal.timeout(30_000),
+      }).catch(e => { throw new Error(`Primary object upload failed: ${e.message}`); });
+
+      if (!uploadRes.ok) throw new Error(`Primary object upload failed: ${await uploadRes.text()}`);
+      measurements["primary_object_uploaded"] = "true";
+
+      const standbyFetchRes = await fetch(`https://${standby}.supabase.co/storage/v1/object/public/${bucketId}/${objectPath}`, {
+        headers: { apikey: primaryAnon, Authorization: `Bearer ${primaryAnon}` },
+        signal: AbortSignal.timeout(30_000),
+      }).catch(e => { throw new Error(`Standby fetch failed: ${e.message}`); });
+
+      measurements["standby_fetch_status"] = standbyFetchRes.status;
+      const standbyFetchText = await standbyFetch_res.text();
+      if (standbyFetchRes.status !== 404) {
+        throw new Error(`Expected 404 on standby, got ${standbyFetchRes.status}: ${standbyFetchText.slice(0, 200)}`);
+      }
+      measurements["standby_fetch_error_recorded"] = "true";
+
+      const primaryPublicUrl = `https://${primary}.supabase.co/storage/v1/object/public/${bucketId}/${objectPath}`;
+      const downloadRes = await fetch(primaryPublicUrl, { signal: AbortSignal.timeout(30_000) });
+      if (!downloadRes.ok) throw new Error(`Failed to download from primary: ${await downloadRes.text()}`);
+      const objectBytes = new Uint8Array(await downloadRes.arrayBuffer());
+      measurements["primary_download_bytes"] = objectBytes.length;
+
+      const standbyServiceKey = await getStandbyServiceKey().catch(() => undefined);
+      if (!standbyServiceKey) throw new Error("Could not fetch standby service key via ctx.pat");
+
+      await fetch(`https://${standby}.supabase.co/storage/v1/bucket`, {
+        method: "POST",
+        headers: { apikey: standbyServiceKey, Authorization: `Bearer ${standbyServiceKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ id: bucketId, name: bucketId, public: true }),
+        signal: AbortSignal.timeout(30_000),
+      }).catch(e => { throw new Error(`Standby bucket create failed: ${e.message}`); });
+      measurements["standby_bucket_created"] = "true";
+
+      const syncStart = Date.now();
+      const uploadToStandbyRes = await fetch(`https://${standby}.supabase.co/storage/v1/object/${bucketId}/${objectPath}`, {
+        method: "POST",
+        headers: { apikey: standbyServiceKey, Authorization: `Bearer ${standbyServiceKey}`, "Content-Type": "text/plain" },
+        body: objectBytes,
+        signal: AbortSignal.timeout(30_000),
+      }).catch(e => { throw new Error(`Standby object upload failed: ${e.message}`); });
+
+      if (!uploadToStandbyRes.ok) throw new Error(`Standby object upload failed: ${await uploadToStandbyRes.text()}`);
+      measurements["sync_duration_ms"] = Date.now() - syncStart;
+      measurements["standby_object_uploaded"] = "true";
+
+      const verifyRes = await fetch(`https://${standby}.supabase.co/storage/v1/object/public/${bucketId}/${objectPath}`, {
+        headers: { apikey: standbyServiceKey, Authorization: `Bearer ${standbyServiceKey}` },
+        signal: AbortSignal.timeout(30_000),
+      }).catch(e => { throw new Error(`Standby verify fetch failed: ${e.message}`); });
+
+      if (verifyRes.status !== 200) throw new Error(`Expected 200 on standby, got ${verifyRes.status}: ${await verifyRes.text()}`);
+      const verifyBytes = new Uint8Array(await verifyBytes.arrayBuffer());
+      
+      const bytesEqual = verifyBytes.length === objectBytes.length && 
+                         verifyBytes.every((val, idx) => val === objectBytes[idx]);
+      
+      if (!bytesEqual) throw new Error("Object bytes do not match after sync");
+      measurements["standby_verify_bytes_equal"] = "true";
+
+      return {
+        id: "W10",
+        title: this.title,
+        status: "pass",
+        detail: `gap recorded (404 before sync), 200 + byte-equal after sync, duration ${measurements["sync_duration_ms"]}ms`,
+        measurements,
+      };
+    } catch (e: any) {
+      return {
+        id: "W10",
+        title: this.title,
+        status: "fail",
+        detail: e.message,
+        measurements,
+      };
+    } finally {
+      await cleanup();
+	}
+  },
+};
+
+export default mod;

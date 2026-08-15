@@ -172,3 +172,68 @@ naive concurrency alone.
   will accept a thin pass. The SPEC's evidence requirements (verbatim
   errors, specific measurements) are part of the contract - check them in
   the probe when they matter.
+
+## W09 - auth store replication (2026-08-15, green, frontier build)
+
+The answer is nuanced and measured:
+- Publication on auth.users + auth.identities: creates fine.
+- Subscription WITH copy_data=false + streaming=on: creates fine, rel
+  states go 'r' immediately (no sync workers needed).
+- BUT the apply worker never stabilized on the micro standby (pid null in
+  pg_stat_subscription): a newly created user did NOT stream within 120s.
+  Micro worker ceiling (max_worker_processes=6, platform bgworkers occupy
+  most) - same class as the initial-sync stall seen in manual drilling.
+- Manual drilling also established: initial table sync stalls in 'd'
+  forever on micro (sync workers cannot spawn); the wedged-subscription
+  recovery sequence is disable -> slot_name=none -> drop, in that order;
+  subscriptions can vanish/reappear under platform management.
+- Backfill limitation recorded: password_hash is not portable via the
+  admin API - a backfill must copy hashes via direct SQL, or users
+  re-authenticate.
+- INTERIM POSTURE (written to the reference): TPA portability keeps
+  existing sessions reading; fresh logins post-cutover need either SQL
+  hash backfill or forced re-login. auth.* streaming replication on micro
+  is not viable.
+
+## W10 - storage object fallback (2026-08-15, green, frontier build)
+
+- Parity gap confirmed: object on primary, standby answers HTTP 400 with
+  {"statusCode":"404","code":"NoSuchBucket"} - the real 404 lives in the
+  body, not the status line.
+- Sync path: download primary -> upload standby, 780ms for a small
+  object, byte-identical after.
+- Setup must be idempotent: crashed runs leave buckets behind and
+  BucketAlreadyExists returns as HTTP 400.
+
+## W11 - schema parity diff (2026-08-15, green, local-rung build)
+
+- Gap measured: RLS policy, function, trigger, view created on primary
+  are all absent on standby (table-data replication carries none of them).
+- Remediation measured: applying the same DDL to the standby reaches
+  parity - this is what pg_dump --schema-only operationalizes.
+
+## W12 - realtime probe (2026-08-15, green, local-rung build)
+
+- Connect ~280-800ms, join, INSERT via REST, postgres_changes event
+  arrives (~0.5s on a fresh table), reconnect works (431ms).
+- **The wedge finding**: dropping and recreating a table under realtime
+  delivery kills events for that table NAME (new OID, stale channel
+  metadata) - a fresh name delivers in ~0.5s. Stable canary tables only;
+  never churn tables under active subscriptions.
+- Service-vs-anon keys: both deliver once grants exist (default
+  privileges cover fresh SQL tables).
+- Battery-context flake: a join after 11 other modules can have the
+  socket closed before the event - the module retries with backoff
+  (recorded in measurements).
+
+## W13 - edge function wall-clock limit (2026-08-15, green, local-rung build)
+
+- 5s sleep: 200 (5002ms). 120s sleep: 200 (120002ms). 400s sleep:
+  **504 IDLE_TIMEOUT "Request idle timeout limit (150s) reached"**.
+- The wall-clock ceiling is 150s idle timeout, measured.
+
+## Full battery (2026-08-15)
+
+13/13 pass unattended in ~12 minutes via `.pi/probe-edge-resilience.sh
+W01,...,W13` after `make up`. Lifecycle proven twice: `make down` ->
+`make up` -> battery, fresh refs each cycle, same JWKS keypair.

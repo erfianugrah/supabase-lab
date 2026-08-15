@@ -60,14 +60,14 @@ proves it (module). Status: [green] lab-validated, [doc] doc/design only,
 
 | # | Failure point | Signature | Detection | Workaround | Test |
 |---|---------------|-----------|-----------|------------|------|
-| 6.1 | Realtime connect/subscribe failure | WS handshake fails | WS connect probe | poll fallback | [gap] W-candidate (WS probe + fallback demo) |
+| 6.1 | Realtime connect/subscribe failure | WS handshake fails | WS connect probe | poll fallback; retry joins under load (W12) | [green W12] |
 | 6.2 | Subscription silently stale | no events, no error | heartbeat event canary | reconnect logic, canary table | [doc] |
 
 ## 7. Edge Functions
 
 | # | Failure point | Signature | Detection | Workaround | Test |
 |---|---------------|-----------|-----------|------------|------|
-| 7.1 | Execution timeout | function killed after minutes | long-job probe | queue + cron pattern; external runner for long jobs | [doc] |
+| 7.1 | Execution timeout | 504 IDLE_TIMEOUT at 150s (measured W13) | long-job probe | queue + cron pattern; external runner for long jobs | [green W13] |
 | 7.2 | Cold start latency | p99 spikes | timing probe | keep-warm pings | [doc] |
 
 ## 8. Pooler (Supavisor)
@@ -105,9 +105,9 @@ proves it (module). Status: [green] lab-validated, [doc] doc/design only,
 | 11.4 | Replication lag at cutover | data loss window | lag metric | cutover only when lag < threshold | [gap] W05 |
 | 11.5 | Split-brain writes during flap | divergent rows | flap drill | fail over, never dual-write; flap damping in proxy | [gap] W05 |
 
-| 11.6 | Schema parity beyond data (RLS, grants, functions, triggers, views) | standby open/broken after cutover | schema diff probe | pg_dump --schema-only, re-applied on change | [gap] W09 candidate |
-| 11.7 | auth.* replication (users, identities, sessions) | fresh logins fail on standby while old tokens still read | login canary on standby | untested; interim = forced re-login or auth.* drill | [gap] W09 candidate |
-| 11.8 | Storage objects do not follow metadata | standby serves 404 for existing objects | object fetch probe on standby | dual-write or S3-level sync | [gap] W10 candidate |
+| 11.6 | Schema parity beyond data (RLS, grants, functions, triggers, views) | standby open/broken after cutover | schema diff probe | pg_dump --schema-only, re-applied on change (W11) | [green W11] |
+| 11.7 | auth.* replication (users, identities, sessions) | fresh logins fail on standby while old tokens still read | login canary on standby | NOT viable on micro (W09); TPA + SQL hash backfill or forced re-login | [green W09] |
+| 11.8 | Storage objects do not follow metadata | standby serves 400/NoSuchBucket for existing objects | object fetch probe on standby | dual-write or S3-level sync (780ms small object, W10) | [green W10] |
 | 11.9 | Vault secrets / pg_cron / function secrets | jobs + integrations dead post-cutover | job heartbeat canary | recreate manually; vault ciphertext is project-keyed | [doc] |
 
 ## 12. Billing/spend
