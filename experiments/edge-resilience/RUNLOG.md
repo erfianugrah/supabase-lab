@@ -237,3 +237,33 @@ The answer is nuanced and measured:
 13/13 pass unattended in ~12 minutes via `.pi/probe-edge-resilience.sh
 W01,...,W13` after `make up`. Lifecycle proven twice: `make down` ->
 `make up` -> battery, fresh refs each cycle, same JWKS keypair.
+
+## W14 - instance size vs the auth-replication wall (2026-08-15, manual drill)
+
+The W09 "worker exhaustion on micro" hypothesis was WRONG - size is not
+the variable. Standby recreated at `small` (tofu -replace; micro stays on
+the primary):
+
+- pg_settings DO scale: max_connections 60 -> 90, shared_buffers 256MB ->
+  512MB. max_worker_processes stays 6 on BOTH sizes (platform-fixed).
+- auth.* with copy_data=false: WAL sender connects, received_lsn stays
+  NULL - zero changes stream, at any size.
+- auth.* with copy_data=true: initial sync stalls in 'd' at any size; the
+  sync worker hangs at IPC/BgworkerStartup with its publisher sync slot
+  inactive.
+- **The discriminator**: a CUSTOM non-public schema (lab_schema.t)
+  replicates in ~4s on the same instances. storage.buckets does NOT
+  replicate either. The wall is specific to PLATFORM-MANAGED schemas
+  (auth, storage) - not size, not workers, not schema privacy.
+- Writer role is not the filter: inserts via the postgres role into
+  storage.buckets also fail to replicate.
+- Cleanup lesson: slot_name=none + drop leaves the PUBLISHER slot behind;
+  the full recovery is disable -> slot_name=none -> drop subscription ->
+  pg_drop_replication_slot on the publisher.
+
+**Conclusion (supersedes the W09 worker-ceiling note):** managed ->
+managed replication works for public and custom schemas only. The
+platform-managed schemas (auth.*, storage.*) do not replicate by any
+tested path, at any tested size. Auth portability posture stands: TPA for
+existing sessions + SQL-level backfill + forced re-login. Storage
+portability: object sync (W10), not replication.
