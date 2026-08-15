@@ -4,7 +4,7 @@
   "compatibility_date": "2026-01-01",
   "workers_dev": true,
   "vars": {
-    "UPSTREAM": "https://gprajovipehpdzsrzxhc.supabase.co",
+    "UPSTREAM": "https://zcvongntlbxmquoawuap.supabase.co",
     "JWKS_JSON": "{\"kty\":\"EC\",\"x\":\"R7udHFvZIxqX4ghA-UalLqXfl-C2V6RtrMi7IFogssU\",\"y\":\"7Cd63K9YSTzB7Ol-iG_mXEW4VbPBcekOuJ411V4x6N0\",\"crv\":\"P-256\",\"kid\":\"5afedf5bb5fa4a8888a54d4d6932e6c9\",\"alg\":\"ES256\",\"use\":\"sig\"}",
     "OUTAGE": "false",
     "EDGE_URL": "https://edge-resilience-drill.anugrah.workers.dev"

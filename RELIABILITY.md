@@ -202,6 +202,17 @@ ap-southeast-2 -> ap-southeast-1).**
   path; restore time varies (tooManyConnections observed - drain first).
 - Email-send rate limits: hosted signup is not a scriptable probe surface
   (over_email_send_rate_limit); use admin-create + password grant.
+- auth.* streaming replication between managed projects is NOT viable on
+  micro (W09): subscription creates fine with copy_data=false but the
+  apply worker never stabilizes (worker ceiling); password hashes are not
+  portable via the admin API. Posture: TPA for existing sessions + SQL
+  hash backfill or forced re-login.
+- Edge functions have a 150s idle-timeout wall (W13): 120s sleep returns
+  200, 400s returns 504 IDLE_TIMEOUT. Long jobs need queue+cron or an
+  external runner.
+- Realtime delivery wedges when a subscribed table is dropped and
+  recreated (W12): the new OID never delivers under the old name. Stable
+  tables under subscription; also retry joins under load.
 
 ## Cross-cutting verification playbook (from lab RUNLOGs)
 
