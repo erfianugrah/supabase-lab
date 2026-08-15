@@ -174,3 +174,120 @@ Pass criteria: warm read under outage is 200 with byte-identical body; cold
 URL under outage is 503/empty; worker restored afterwards. Measurements:
 prime attempts, deploy durations, warm status+tag, cold status+tag,
 body-equal boolean.
+
+## W05 - standby replication + token portability (the HA gate)
+
+File: `tests/w05-standby-replication.ts`. where: "local".
+requires: ["pat", "anon-key", "peer"]. destructive: true (replication
+objects + auth config on BOTH projects; restore everything in finally).
+
+The standby project ref is `ctx.peers["standby"]`; its publishable key is
+`ctx.endpoints["standby_anon"]`. Both projects share the lab db_password
+(ctx.dbPassword). Run ALL SQL through the Management query endpoint:
+`POST /v1/projects/{ref}/database/query` body `{"query":"..."}` (via the
+harness mgmt helper with ctx.pat).
+
+Background: this module measures whether a managed->managed warm standby is
+even possible, and what cutover costs. Known constraints to VERIFY, not
+assume: the pooler cannot stream WAL (sbshift runbook), so the subscription
+CONNECTION must use the primary's DIRECT host (db.<ref>.supabase.co), which
+is IPv6-only by default - whether a managed project's walreceiver can reach
+it is THE open question.
+
+Steps:
+1. Seed primary: `create table if not exists public.w_repl(id serial
+   primary key, val text, updated_at timestamptz default now())` + 3 rows;
+   `create publication w05_pub for table public.w_repl` (drop if exists
+   first for idempotency).
+2. Same table DDL on standby (apply-both-sides discipline; record it).
+3. Connectivity gate A (direct): on standby,
+   `create subscription w05_sub connection 'host=db.<PRIMARY_REF>.supabase.co
+   port=5432 dbname=postgres user=postgres password=<pw> sslmode=require
+   connect_timeout=15' publication w05_pub`. Record success or the VERBATIM
+   error. If it fails, that is a finding, not a bug - continue to gate B.
+4. Connectivity gate B (pooler, expected to fail): retry with
+   `host=aws-0-ap-southeast-2.pooler.supabase.com port=5432` (session mode).
+   Record the verbatim error - evidence that the pooler cannot stream WAL.
+5. If gate A succeeded: poll standby until the 3 seed rows appear (initial
+   sync, budget 120s); then insert a canary row on primary and measure
+   replication lag (ms until visible on standby). Record both.
+6. Token portability: register the PRIMARY's OIDC issuer as TPA on the
+   standby: `POST /projects/<standby>/config/auth/third-party-auth` body
+   `{"oidc_issuer_url": "https://<PRIMARY_REF>.supabase.co/auth/v1"}`;
+   await resolution (X01 pattern). On the primary, admin-create a user and
+   password-grant a token (W03 pattern). Call the STANDBY's
+   `/rest/v1/w_probe?select=id` with apikey=standby_anon and the
+   primary-issued bearer token. Expect 200 - sessions survive cutover
+   without copying secrets (X02 mechanism re-validated in the DR context).
+7. Finally (always): drop subscription on standby, drop publication on
+   primary, delete the TPA integration, delete the admin user.
+
+Pass criteria: every gate outcome recorded with verbatim evidence; IF gate
+A succeeded then initial sync + lag + portability(200) must all hold. If
+gate A failed, the module still passes ONLY IF gates A and B both produced
+recorded verbatim errors (a clean negative finding) - and detail must say
+"managed->managed replication blocked: <reason>".
+Measurements: gateA_ok, gateA_error, gateB_error, initial_sync_ms,
+replication_lag_ms, portability_status.
+
+## W06 - cold DR timing (pg_dump + restore)
+
+File: `tests/w06-cold-dr-timing.ts`. where: "local".
+requires: ["pat"]. destructive: true (creates/drops tables on the drill
+project). NOT a standby test - measures the dump/restore RTO floor.
+
+Steps:
+1. Seed: table `w_dr` with 10k rows (~1MB payload) via the query endpoint.
+2. pg_dump the table through the pooler session host
+   (aws-0-ap-southeast-2.pooler.supabase.com, port 5432, user
+   postgres.<ref>, dbname postgres, password ctx.dbPassword; PGPASSWORD env
+   on the child process). Record dump duration + file size.
+3. Drop the table. Time the restore (psql -f through the pooler).
+4. Verify row count == 10000. Record dump_ms, restore_ms, rows, bytes.
+5. Finally: drop w_dr, remove the dump file (keep under /tmp, gitignored).
+
+Pass criteria: restore completes with exact row count; measurements
+recorded. pg_dump/psql binaries are on PATH.
+
+## W07 - break-glass edge token minting (escape hatch validation)
+
+File: `tests/w07-breakglass-mint.ts`. where: "local".
+requires: ["pat", "anon-key"]. destructive: false.
+
+Background: `GET /v1/projects/{ref}/postgrest` returns the project's
+jwt_secret (http-tier-lockdown run 2 finding). Whoever holds it can mint
+valid HS256 user tokens WITHOUT GoTrue - an escape hatch during an Auth
+outage, and a crown-jewel exposure. Validate the hatch exists, then the
+reference documents the security posture.
+
+Steps:
+1. GET /projects/{ref}/postgrest via mgmt; record whether jwt_secret is
+   present in the body (do NOT put the secret itself in evidence -
+   redact to first 6 chars + length).
+2. Mint HS256 locally (openssl or node:crypto HMAC-SHA256, base64url no
+   padding) with claims {role:"authenticated", aud:"authenticated",
+   sub:<uuid>, iat:now, exp:now+3600}. Header {alg:"HS256",typ:"JWT"}.
+3. GET /rest/v1/w_probe?select=id with apikey=ctx.anonKey + bearer=minted.
+   Expect 200 => escape hatch CONFIRMED (Auth-independent token minting
+   works against the live project).
+4. Wrong-secret control: same with a random secret => expect 401.
+Pass criteria: real secret 200, wrong secret 401, secret redacted in all
+recorded evidence.
+
+## W08 - refresh-token rotation race (multi-tab failure mode)
+
+File: `tests/w08-refresh-race.ts`. where: "local".
+requires: ["pat", "anon-key"]. destructive: false (creates+deletes one
+auth user).
+
+Steps:
+1. Admin-create a user (W03 pattern), password-grant to get
+   access_token + refresh_token.
+2. Fire TWO concurrent refreshes of the SAME refresh_token
+   (`POST /auth/v1/token?grant_type=refresh_token` x2 simultaneously).
+   Record both outcomes verbatim (status + error codes).
+3. Document: does the second fail (rotation enforced), do both succeed
+   (no rotation), or does the whole family get revoked (reuse detection)?
+4. Cleanup: delete the user.
+Pass criteria: both outcomes recorded verbatim; the module passes with ANY
+behavior as long as it is measured - the behavior IS the finding.

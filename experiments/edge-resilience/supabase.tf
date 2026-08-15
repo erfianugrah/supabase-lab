@@ -13,3 +13,15 @@ resource "supabase_project" "probe" {
   region            = var.region
   instance_size     = var.instance_size
 }
+
+# Standby for the W05 cutover drill. Different region because the drill is
+# about surviving a regional/platform event, not a single-project one. The
+# module measures whether managed->managed logical replication is even
+# possible (pooler cannot stream WAL; direct host is IPv6-only by default).
+resource "supabase_project" "standby" {
+  organization_id   = var.supabase_org_id
+  name              = "${var.project_name}-standby"
+  database_password = var.db_password
+  region            = var.standby_region
+  instance_size     = var.instance_size
+}

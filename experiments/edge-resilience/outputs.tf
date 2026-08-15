@@ -6,3 +6,11 @@ output "project_ref" {
 output "api_host" {
   value = "${supabase_project.probe.id}.supabase.co"
 }
+
+output "standby_ref" {
+  value = supabase_project.standby.id
+}
+
+output "standby_api_host" {
+  value = "${supabase_project.standby.id}.supabase.co"
+}
