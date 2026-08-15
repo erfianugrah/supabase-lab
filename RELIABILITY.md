@@ -202,11 +202,15 @@ ap-southeast-2 -> ap-southeast-1).**
   path; restore time varies (tooManyConnections observed - drain first).
 - Email-send rate limits: hosted signup is not a scriptable probe surface
   (over_email_send_rate_limit); use admin-create + password grant.
-- auth.* streaming replication between managed projects is NOT viable on
-  micro (W09): subscription creates fine with copy_data=false but the
-  apply worker never stabilizes (worker ceiling); password hashes are not
-  portable via the admin API. Posture: TPA for existing sessions + SQL
-  hash backfill or forced re-login.
+- auth.* (and storage.*) replication between managed projects is NOT
+  viable at ANY size (W09/W14): the wall is specific to platform-managed
+  schemas - public and custom schemas replicate in ~4s on the same
+  instances, auth/storage stream nothing (received_lsn null) and initial
+  sync hangs at BgworkerStartup. Instance size does not matter
+  (max_worker_processes is platform-fixed at 6 across micro and small;
+  connections/buffers do scale). Password hashes are not portable via the
+  admin API. Posture: TPA for existing sessions + SQL hash backfill or
+  forced re-login; storage objects via sync (W10), never replication.
 - Edge functions have a 150s idle-timeout wall (W13): 120s sleep returns
   200, 400s returns 504 IDLE_TIMEOUT. Long jobs need queue+cron or an
   external runner.
