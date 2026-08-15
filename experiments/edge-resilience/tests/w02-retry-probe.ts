@@ -1,108 +1,133 @@
-
+/**
+ * W02 - supabase-js retry behaviour under JWT rejection vs 5xx.
+ *
+ * No project access - local mock only. Measures whether the default client
+ * retries a 401 PGRST303 (it must not) and whether it rides out a transient
+ * 503 (it must).
+ */
 import type { TestModule, Ctx, TestResult } from "../../../harness/src/types";
 import { createClient } from "@supabase/supabase-js";
+import sbPkg from "@supabase/supabase-js/package.json" with { type: "json" };
 
-export default {
+const mod: TestModule = {
   id: "W02",
-  title: "W02 - supabase-js retry behaviour under JWT rejection vs 5xx",
-  where: "local" as const,
+  title: "supabase-js retry behaviour under JWT rejection vs 5xx",
+  where: "local",
   requires: [],
+
   async run(ctx: Ctx): Promise<TestResult> {
-    let requests = 0;
-    let server: any = null;
-    let port = 0;
-
-    const cleanup = async () => {
-      if (server) {
-        server.close();
-      }
-    };
-
-    const startServer = (behavior: (req: any) => Promise<Response>) => {
-      return new Promise<number>((resolve) => {
-        server = Bun.serve({
-          port: 0,
-          async fetch(req) {
-            requests++;
-            return behavior(req);
-          },
-        });
-        resolve(server.server!.port);
-      });
-    };
+    const sbVersion: string = (sbPkg as { version?: string }).version ?? "unknown";
 
     const measurements: Record<string, number | string> = {
-      "supabase-js-version": "v2.102.0", // From package.json as instructed
+      "supabase-js-version": sbVersion,
     };
 
+    // --- Case A: 401 PGRST303 must NOT be retried ---
+    let serverA: ReturnType<typeof Bun.serve> | null = null;
+    let requestsA = 0;
     try {
-      // Case A: 401 PGRST303
-      requests = 0;
-      port = await startServer(async () => {
-        return new Response(JSON.stringify({ code: "PGRST303" }), {
-          status: 401,
-          headers: { "Content-Type": "application/json" },
-        });
-      });
-      const url = `http://127.0.0.1:${port}/rest/v1/t`;
-      const clientA = createClient(url, "anon-key");
-      const startA = Date.now();
-      await clientA.from("t").select("*").execute();
-      measurements["caseA-attempts"] = requests;
-      measurements["caseA-elapsed-ms"] = Date.now() - startA;
-
-      // Case B: 503 then 200
-      requests = 0;
-      const startB = Date.now();
-      port = await startServer(async () => {
-        if (requests <= 3) {
-          return new Response(JSON.stringify({ code: "PGRST002" }), {
-            status: 503,
+      serverA = Bun.serve({
+        port: 0,
+        fetch(_req) {
+          requestsA++;
+          return new Response(JSON.stringify({ code: "PGRST303" }), {
+            status: 401,
             headers: { "Content-Type": "application/json" },
           });
-        }
-        return new Response(JSON.stringify([]), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        });
+        },
       });
-      const urlB = `http://127.0.0.1:${port}/rest/v1/t`;
-      const clientB = createClient(urlB, "anon-key");
-      await clientB.from("t").select("*").execute();
-      measurements["caseB-attempts"] = requests;
-      measurements["caseB-elapsed-ms"] = Date.now() - startB;
-
-      // Case C: Closed port
-      requests = 0;
-      const startC = Date.now();
-      // We don't start a server for Case C, just use a dead port
-      const urlC = `http://127.0.0.1:1`;
-      const clientC = createClient(urlC, "anon-key");
-      try {
-        await clientC.from("t").select("*").execute();
-      } catch (e) {
-        // Expect failure
-      }
-      measurements["caseC-attempts"] = requests; // Note: Bun.serve handles the requests, but if port is closed, no request reaches it.
-      // If port is closed, requests will stay 0.
-      measurements["caseC-elapsed-ms"] = Date.now() - startC;
-
-      return {
-        id: "W02",
-        title: "W02 - supabase-js retry behaviour under JWT rejection vs 5xx",
-        status: "pass" as const,
-        measurements,
-      };
-    } catch (e: any) {
-      return {
-        id: "W02",
-        title: "W02 - supabase-js retry behaviour under JWT rejection vs 5xx",
-        status: "fail" as const,
-        detail: e.message,
-        measurements,
-      };
+      const urlA = `http://127.0.0.1:${serverA.port}`;
+      const startA = Date.now();
+      await createClient(urlA, "anon").from("t").select("*");
+      measurements["caseA-attempts"] = requestsA;
+      measurements["caseA-elapsed-ms"] = Date.now() - startA;
     } finally {
-      await cleanup();
+      serverA?.stop();
+      serverA = null;
     }
+
+    // --- Case B: 503 x3 then 200 must succeed after >1 attempt ---
+    let serverB: ReturnType<typeof Bun.serve> | null = null;
+    let requestsB = 0;
+    let caseBSuccess = false;
+    try {
+      serverB = Bun.serve({
+        port: 0,
+        fetch(_req) {
+          requestsB++;
+          if (requestsB <= 3) {
+            return new Response(JSON.stringify({ code: "PGRST002" }), {
+              status: 503,
+              headers: { "Content-Type": "application/json" },
+            });
+          }
+          return new Response(JSON.stringify([]), {
+            status: 200,
+            headers: {
+              "Content-Type": "application/json",
+              "Content-Range": "0-0/*",
+            },
+          });
+        },
+      });
+      const urlB = `http://127.0.0.1:${serverB.port}`;
+      const startB = Date.now();
+      const resultB = await createClient(urlB, "anon").from("t").select("*");
+      caseBSuccess = resultB.error === null;
+      measurements["caseB-attempts"] = requestsB;
+      measurements["caseB-elapsed-ms"] = Date.now() - startB;
+      measurements["caseB-success"] = caseBSuccess ? 1 : 0;
+    } finally {
+      serverB?.stop();
+      serverB = null;
+    }
+
+    // --- Case C: closed port (document; do not assert) ---
+    let serverC: ReturnType<typeof Bun.serve> | null = null;
+    try {
+      // Start a server, get a port, then stop it so the port is closed.
+      serverC = Bun.serve({ port: 0, fetch(_req) { return new Response(""); } });
+      const closedPort = serverC.port;
+      serverC.stop();
+      serverC = null;
+
+      const startC = Date.now();
+      const resultC = await createClient(`http://127.0.0.1:${closedPort}`, "anon")
+        .from("t")
+        .select("*");
+      measurements["caseC-error"] = resultC.error?.message?.slice(0, 80) ?? "none";
+      measurements["caseC-elapsed-ms"] = Date.now() - startC;
+    } catch (e: unknown) {
+      measurements["caseC-error"] = e instanceof Error ? e.message.slice(0, 80) : String(e);
+    } finally {
+      serverC?.stop();
+      serverC = null;
+    }
+
+    const caseAOk = requestsA === 1;
+    const caseBOk = caseBSuccess && requestsB > 1;
+
+    if (!caseAOk || !caseBOk) {
+      const failing: string[] = [];
+      if (!caseAOk) failing.push(`caseA: expected 1 attempt, got ${requestsA}`);
+      if (!caseBOk) failing.push(`caseB: success=${caseBSuccess}, attempts=${requestsB}`);
+      return {
+        id: "W02",
+        title: this.title,
+        status: "fail",
+        detail: failing.join("; "),
+        measurements,
+      };
+    }
+
+    return {
+      id: "W02",
+      title: this.title,
+      status: "pass",
+      detail: `caseA: 1 attempt (no retry on PGRST303); caseB: ${requestsB} attempts then success`,
+      measurements,
+    };
   },
 };
+
+export default mod;
