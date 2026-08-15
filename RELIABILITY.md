@@ -15,7 +15,7 @@ issuer's clock runs ahead of the validator's (NTP drift/failure), freshly
 minted tokens carry a future `iat` and are rejected. Auth (`/auth/v1/user`)
 can return 200 while the data API rejects the SAME token - the services
 validate on different hosts (public: GitHub Discussion #48123, 2026-07-21,
-ap-southeast-1, ticket SU-427553).
+ap-southeast-1).
 
 **Client sees.** `401 {"code":"PGRST303","message":"JWT issued at future"}`
 on /rest/v1 and other JWT-validating paths. Only tokens minted DURING the
