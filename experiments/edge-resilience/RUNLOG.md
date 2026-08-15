@@ -104,3 +104,71 @@ make probe ONLY=W01,W02,W03
 make probe-destructive    # W04 (redeploys the worker twice)
 make destroy              # when done
 ```
+
+## W05 - standby replication + token portability (2026-08-15, green)
+
+The HA question: is a managed->managed warm standby possible, and what does
+cutover cost? Standby: lab-edge-resilience-standby (ap-southeast-1; primary
+ap-southeast-2), both tofu-managed.
+
+- **Managed->managed logical replication WORKS**: subscription on the
+  standby against the primary's DIRECT host (db.<ref>.supabase.co). A
+  managed project's walreceiver reaches it fine - the IPv6 worry did not
+  materialize.
+- **The pooler gate fails at the tenant layer** (verbatim): `could not
+  connect to the publisher ... FATAL: (ENOIDENTIFIER) no tenant identifier
+  provided (external_id or sni_hostname required)` - consistent with the
+  sbshift runbook's "pooler cannot stream WAL".
+- **Initial sync ~3.1-6.5s** (3 rows + table sync machinery, two runs).
+- **Replication lag 34ms-1057ms** across regions (three runs; sub-second
+  typical).
+- **Sessions survive cutover via TPA-OIDC**: register the primary's issuer
+  (`https://<primary>.supabase.co/auth/v1`) as third-party-auth on the
+  standby (resolves in ~60-120ms); a primary-issued user token then reads
+  the standby's API with 200. No secret copying needed - and copying would
+  be impossible anyway (jwt_secret PATCH is a no-op).
+- **JWKS trust lag applies to cutover**: a first-time issuer's kid takes
+  the cold ~30s PostgREST trust path (PGRST301 until warm, seen in the full
+  suite); a previously-seen JWKS warms instantly (302ms). Rehearse cutover
+  BEFORE you need it - the first real one otherwise eats the cold path.
+- Module mechanics (hard-won): CREATE SUBSCRIPTION must be its own
+  single-statement query (the query endpoint wraps multi-statement strings
+  in a transaction, and Postgres rejects CREATE SUBSCRIPTION there);
+  standby REST reads need the standby's own publishable key; dropping a
+  subscription leaves its slot on the primary pinning WAL (dropped in
+  cleanup).
+
+## W06 - cold DR timing (2026-08-15, green, local-rung build)
+
+10k rows (~681KB): pg_dump 12.4s, restore 6.4s through the pooler session
+host, exact row count verified. The cold-DR floor for small datasets.
+
+## W07 - break-glass edge minting (2026-08-15, green, local-rung build)
+
+Escape hatch CONFIRMED: `GET /v1/projects/{ref}/postgrest` returns the
+project's `jwt_secret`; an HS256 user token minted locally with it reads
+the live API (200) with zero GoTrue involvement; wrong secret => 401.
+During an Auth outage, valid tokens can be minted without Auth - but the
+secret is the crown jewels: holding it at the edge trades outage
+resilience for a much worse compromise blast radius. Document, don't
+deploy casually.
+
+## W08 - refresh-token rotation race (2026-08-15, green, local-rung build)
+
+Two CONCURRENT refreshes of the same refresh token: both returned 200.
+Simultaneous reuse does not hard-fail (rotation tolerates it within the
+reuse window) - the multi-tab "intermittent 401" mode is NOT reproduced by
+naive concurrency alone.
+
+## Loop-build notes (W05-W08)
+
+- The local rung one-shotted W06, W07, W08 (small, mechanical, tightly
+  specced) - its confirmed weight class. W05 (two projects, replication,
+  auth) exceeded it: 6 iterations across two runs with systematic "int"
+  token corruption and a thin-pass that gamed the probe while missing the
+  SPEC's evidence bar; the final module was hand-corrected against
+  manually validated ground truth.
+- Probe discipline lesson: a probe that checks only `status == "pass"`
+  will accept a thin pass. The SPEC's evidence requirements (verbatim
+  errors, specific measurements) are part of the contract - check them in
+  the probe when they matter.

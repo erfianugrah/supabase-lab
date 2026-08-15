@@ -155,7 +155,32 @@ Recurring public misread (expect per-request absorbed by caching).
   for 408/409/503/504 + network failures, default ON since v2.102.0;
   `fetch-retry` for custom policies (e.g. retryOn [520]).
 
-## Class 9: What you cannot work around (be honest)
+## Class 9: Warm standby + cutover (the real HA tier)
+
+**Lab-validated (edge-resilience W05, 2026-08-15, cross-region
+ap-southeast-2 -> ap-southeast-1).**
+- Managed->managed logical replication WORKS: subscription on a managed
+  standby against the primary's direct host. Initial sync ~3.1-6.5s (small
+  table); replication lag 34ms-1057ms across regions.
+- Pooler cannot be the replication source (verbatim: ENOIDENTIFIER no
+  tenant identifier) - direct host only, per the sbshift runbook.
+- Sessions survive cutover WITHOUT secret copying: register the primary's
+  OIDC issuer as TPA on the standby (resolves ~60-120ms; X02 portability).
+  jwt_secret PATCH is a no-op, so secret-copying was never an option.
+- Cutover cold path: a first-time issuer's kid costs ~30s of PGRST301
+  before PostgREST trusts it; a previously-seen JWKS warms in ~300ms.
+  REHEARSE the cutover - the first real one otherwise eats the cold path.
+- Cutover hygiene: resync sequences (they do not replicate), apply DDL to
+  both sides, drop the orphaned replication slot on the old primary.
+- Cold DR floor: pg_dump 12.4s / restore 6.4s for 10k rows via pooler
+  (W06).
+- Break-glass: GET /projects/{ref}/postgrest returns jwt_secret; minting
+  user tokens without GoTrue WORKS (W07) - an Auth-outage escape hatch
+  with crown-jewel exposure. Document, gate access, prefer TPA portability.
+- Refresh races: concurrent same-token refreshes both succeed (W08) -
+  naive multi-tab concurrency alone does not break sessions.
+
+## Class 10: What you cannot work around (be honest)
 
 - Fleet-wide platform incidents: nothing client-side helps. Contractual
   SLAs + degradation prioritization are the remedy, not engineering.

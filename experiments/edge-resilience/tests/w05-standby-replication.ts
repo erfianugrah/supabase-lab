@@ -207,13 +207,28 @@ const mod: TestModule = {
         if (!tokenRes.ok) throw new Error(`password grant failed: HTTP ${tokenRes.status}`);
         const { access_token } = (await tokenRes.json()) as { access_token: string };
 
-        const probeRes = await fetch(`https://${standby}.supabase.co/rest/v1/w_probe?select=id`, {
-          headers: { apikey: standbyAnon, Authorization: `Bearer ${access_token}` },
-          signal: AbortSignal.timeout(30_000),
-        });
-        measurements["portability_status"] = probeRes.status;
-        if (probeRes.status !== 200) {
-          throw new Error(`portability probe failed: HTTP ${probeRes.status}: ${(await probeRes.text()).slice(0, 200)}`);
+        // JWKS trust lags TPA resolution (W01 finding: ~30s cold path).
+        // Poll the probe - PGRST301 means PostgREST has not loaded the kid yet.
+        const probeStart = Date.now();
+        let attempts = 0;
+        let lastStatus = 0;
+        let lastBody = "";
+        while (Date.now() - probeStart < 120_000) {
+          attempts++;
+          const probeRes = await fetch(`https://${standby}.supabase.co/rest/v1/w_probe?select=id`, {
+            headers: { apikey: standbyAnon, Authorization: `Bearer ${access_token}` },
+            signal: AbortSignal.timeout(30_000),
+          });
+          lastStatus = probeRes.status;
+          if (probeRes.status === 200) break;
+          lastBody = (await probeRes.text()).slice(0, 200);
+          await new Promise((r) => setTimeout(r, 3000));
+        }
+        measurements["portability_status"] = lastStatus;
+        measurements["portability_attempts"] = attempts;
+        measurements["portability_warmup_ms"] = Date.now() - probeStart;
+        if (lastStatus !== 200) {
+          throw new Error(`portability probe failed after ${attempts} attempts: HTTP ${lastStatus}: ${lastBody}`);
         }
       } finally {
         await fetch(`https://${ctx.apiHost}/auth/v1/admin/users/${user.id}`, {
