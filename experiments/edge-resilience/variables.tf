@@ -32,6 +32,11 @@ variable "standby_region" {
   default = "ap-southeast-1"
 }
 
+variable "standby_instance_size" {
+  type    = string
+  default = "micro"
+}
+
 # Unused here, but the shared secrets.tfvars carries them and tofu rejects
 # unknown values passed with -var-file.
 variable "aws_account_id" {

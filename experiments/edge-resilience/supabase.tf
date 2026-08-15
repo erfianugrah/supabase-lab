@@ -23,5 +23,5 @@ resource "supabase_project" "standby" {
   name              = "${var.project_name}-standby"
   database_password = var.db_password
   region            = var.standby_region
-  instance_size     = var.instance_size
+  instance_size     = var.standby_instance_size
 }
