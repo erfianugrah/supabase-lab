@@ -11,7 +11,7 @@ proves it (module). Status: [green] lab-validated, [doc] doc/design only,
 | # | Failure point | Signature | Detection | Workaround | Test |
 |---|---------------|-----------|-----------|------------|------|
 | 0.1 | Client device clock wrong | supabase-js refreshes too early/late; expired tokens sent | client telemetry on 401s | server-side validation unaffected (iat is issuer-set); client SDK logic only | [doc] |
-| 0.2 | Refresh-token rotation race (multi-tab) | intermittent 401s, session loss | reproduce with N parallel refreshes | single-tab refresh leader / lock | [gap] W-candidate (two concurrent refresh calls against live project) |
+| 0.2 | Refresh-token rotation race (multi-tab) | intermittent 401s, session loss | reproduce with N parallel refreshes | single-tab refresh leader / lock | [green W08] |
 | 0.3 | Token storage cleared (localStorage) | logged out | n/a | session design, not infra | [doc] |
 
 ## 1. DNS / edge ingress (customer's own front)
