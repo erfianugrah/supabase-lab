@@ -291,3 +291,191 @@ Steps:
 4. Cleanup: delete the user.
 Pass criteria: both outcomes recorded verbatim; the module passes with ANY
 behavior as long as it is measured - the behavior IS the finding.
+
+## W09 - auth store replication (fresh logins after cutover)
+
+File: `tests/w09-auth-replication.ts`. where: "local".
+requires: ["pat", "anon-key", "peer"]. destructive: true (replication
+objects + auth users on BOTH projects; restore everything in finally).
+
+Background: W05 proved public-schema table replication and TPA token
+portability, but fresh logins on the standby hit the standby's OWN auth
+store. Manual drilling (2026-08-15) established the mechanics this module
+must encode:
+
+- A publication on auth.users + auth.identities creates fine, and a
+  subscription connects - but the INITIAL TABLE SYNC stalls permanently
+  in pg_subscription_rel state 'd' on a micro standby: the table-sync
+  workers never spawn because max_worker_processes=6 is exhausted by
+  platform background workers (autovacuum launcher, pg_cron launcher,
+  pg_net worker, logical replication launcher, apply worker). ALTER
+  SYSTEM is permission-denied on managed. The apply worker also HOLDS
+  streaming changes for tables not yet in 'r' state, so a stalled sync
+  blocks everything.
+- The recovery sequence for a wedged subscription (publisher slot lost):
+  `alter subscription <s> disable;` then `alter subscription <s> set
+  (slot_name = none);` then `drop subscription <s>;` - in that order,
+  each single-statement.
+- The workable pattern on a micro: CREATE SUBSCRIPTION ... WITH
+  (copy_data = false, streaming = on) - no sync workers needed - plus a
+  MANUAL BACKFILL of existing rows via the API, plus streaming for new
+  writes.
+
+Steps (single-statement SQL - W05 lesson):
+1. Primary: `create publication w09_auth_pub for table auth.users,
+   auth.identities` (drop if exists first).
+2. Standby: `create subscription w09_auth_sub connection
+   'host=db.<PRIMARY_REF>.supabase.co port=5432 dbname=postgres
+   user=postgres password=<pw> sslmode=require connect_timeout=15'
+   publication w09_auth_pub with (copy_data = false, streaming = on)`.
+   Record verbatim success/error.
+3. Backfill: read existing auth.users emails via the primary query
+   endpoint; confirm the standby lacks them (pre-backfill count
+   recorded).
+4. Admin-create a NEW user on the primary (W03 pattern). Poll the
+   standby's auth.users (query endpoint) until the row appears via
+   STREAMING; record lag ms. If it never appears in 120s, record
+   verbatim evidence (pg_subscription, pg_subscription_rel,
+   pg_stat_subscription snapshots) - that is the finding.
+5. Fresh password grant ON THE STANDBY for the streamed user
+   (apikey=standby_anon). Record status + body verbatim. Success here =
+   no forced re-login for users created after the replication start.
+6. Manual backfill demonstration: copy one pre-existing user's row from
+   primary to standby via the admin API (GET user on primary admin API,
+   POST /auth/v1/admin/users on the standby with the standby's secret
+   key - fetch standby keys via ctx.pat; include the user's id and
+   password hash is NOT portable via admin API - record THAT as the
+   backfill limitation verbatim).
+7. Finally: disable + slot_name=none + drop the subscription (recovery
+   sequence), drop the publication, drop the primary slot, delete
+   created users on both projects.
+Pass criteria: all outcomes recorded verbatim; the module passes with
+ANY measured behavior as long as steps 2-6 each produced recorded
+evidence. The behavior IS the finding.
+
+## W10 - storage object fallback (the 404 gap and the sync path)
+
+File: `tests/w10-storage-fallback.ts`. where: "local".
+requires: ["pat", "anon-key", "peer"]. destructive: true (buckets/objects
+on both projects; clean up in finally).
+
+Steps:
+1. IDEMPOTENT SETUP (crashed prior runs leave the bucket behind - a 409
+   BucketAlreadyExists returns as HTTP 400 and must not fail the run):
+   first empty + delete bucket `w10-drill` if it exists (POST
+   /storage/v1/bucket/w10-drill/empty then DELETE
+   /storage/v1/bucket/w10-drill, both with the primary service key,
+   ignoring 404s), recording the sweep. THEN create it fresh (POST
+   /storage/v1/bucket, body {"id":"w10-drill","name":"w10-drill",
+   "public":true}) and upload a small object (POST
+   /storage/v1/object/w10-drill/probe.txt, text body).
+2. Standby: fetch the same path (GET
+   https://<standby>.supabase.co/storage/v1/object/public/w10-drill/probe.txt).
+   Expect the gap signal: the storage API answers a MISSING BUCKET with
+   HTTP 400 carrying {"statusCode":"404","code":"NoSuchBucket"} in the body
+   (measured - the real 404 lives in the body, not the status line).
+   Accept HTTP 400 or 404; match on the body code. Record verbatim.
+3. Sync path: download the object from the primary public URL, upload it
+   to the standby (create the bucket on the standby first with the
+   standby's secret key - fetch standby keys via ctx.pat like W09 step 5).
+   Measure sync duration.
+4. Re-fetch on the standby: expect 200 with identical bytes.
+5. Finally: delete objects and buckets on both projects.
+Pass criteria: gap recorded (404 before sync), 200 + byte-equal after
+sync, durations in measurements.
+
+## W11 - schema parity diff (what table-data replication misses)
+
+File: `tests/w11-schema-parity.ts`. where: "local".
+requires: ["pat", "peer"]. destructive: true (schema objects on both
+projects; clean up in finally).
+
+Steps:
+1. Primary only: table `w11_t(id serial primary key, val text)` with RLS
+   ENABLED + one policy (`create policy w11_p on public.w11_t for select
+   to authenticated using (true)`), one function
+   (`create or replace function public.w11_f() returns int language sql
+   as 'select 1'`), one trigger function + trigger, one view
+   (`create or replace view public.w11_v as select * from public.w11_t`).
+2. Diff probe (both projects via query endpoint): row counts from
+   pg_policies, pg_proc (namespace public, names like 'w11%'), pg_trigger,
+   pg_views where names match 'w11%'. Record primary vs standby counts -
+   expect primary > 0, standby = 0 (the parity gap, measured).
+3. Remediation: apply the SAME DDL to the standby (this is what
+   `pg_dump --schema-only` operationalizes), re-run the diff, expect
+   parity. Record both diff snapshots in evidence.
+4. Finally: drop the objects on both projects.
+Pass criteria: gap measured, parity after remediation measured.
+
+## W12 - realtime probe (connect, subscribe, event latency, reconnect)
+
+File: `tests/w12-realtime-probe.ts`. where: "local".
+requires: ["pat", "anon-key"]. destructive: true (alters the
+supabase_realtime publication for the canary table; restores in finally).
+
+Steps:
+1. STABLE canary table (measured 2026-08-15: dropping and recreating a
+   table under realtime wedges event delivery for that table NAME - the
+   recreated table has a new OID while realtime's channel metadata
+   references the dead one; a fresh name delivers in ~0.5s). Create
+   public.probe_canary(id serial primary key, payload text) IF ABSENT
+   and NEVER drop it - cleanup deletes ROWS only. Add it to
+   supabase_realtime if not already a member, and leave it a member
+   (record prior membership state for evidence only).
+2. Bun WebSocket to
+   `wss://<ref>.supabase.co/realtime/v1/websocket?apikey=<publishable>&vsn=1.0.0`.
+   Send phoenix join: topic `realtime:public:probe_canary`, event
+   `phx_join`, payload `{config:{postgres_changes:[{event:"INSERT",
+   schema:"public",table:"probe_canary"}]}}`, ref "1". Handle phx_reply.
+3. Insert a row via REST; measure ms until the postgres_changes event
+   arrives on the socket. Record.
+4. Close the socket, reconnect, rejoin, insert again, measure again.
+5b. VERIFIED-WORKING skeleton (measured 2026-08-15: open at ~388ms,
+   phx_reply ok at ~396ms on the drill project) - use this shape:
+   const url = new URL(`wss://${ctx.apiHost}/realtime/v1/websocket`);
+   url.searchParams.set("apikey", ctx.anonKey);
+   url.searchParams.set("vsn", "1.0.0");
+   const ws = new WebSocket(url);
+   // on open, send:
+   {topic:"realtime:public:probe_canary", event:"phx_join",
+    payload:{config:{postgres_changes:[{event:"INSERT",schema:"public",
+    table:"probe_canary"}]}}, ref:"1"}
+   // expect phx_reply with payload.status === "ok" before inserting.
+5b. VERIFIED-WORKING skeleton (measured 2026-08-15: open at ~388ms,
+   phx_reply ok at ~396ms on the drill project) - use this shape:
+   const url = new URL(`wss://${ctx.apiHost}/realtime/v1/websocket`);
+   url.searchParams.set("apikey", ctx.anonKey);
+   url.searchParams.set("vsn", "1.0.0");
+   const ws = new WebSocket(url);
+   // on open, send:
+   {topic:"realtime:public:probe_canary", event:"phx_join",
+    payload:{config:{postgres_changes:[{event:"INSERT",schema:"public",
+    table:"probe_canary"}]}}, ref:"1"}
+   // expect phx_reply with payload.status === "ok" before inserting.
+5. Finally: delete inserted ROWS only - never drop the table or alter
+   the publication.
+Pass criteria: connect + join + event received with latency recorded;
+reconnect + second event recorded. Any measured behavior passes; record
+verbatim errors if the socket fails.
+
+## W13 - edge function wall-clock limit
+
+File: `tests/w13-function-timeout.ts`. where: "local".
+requires: ["pat", "anon-key"]. destructive: true (deploys + deletes a
+function).
+
+Steps:
+1. Deploy via Management API: POST /v1/projects/{ref}/functions with body
+   {"slug":"w13-sleeper","name":"w13-sleeper","verify_jwt":false,
+   "body":"Deno.serve(async (req)=>{const t=Date.now();const
+   ms=Number(new URL(req.url).searchParams.get('ms')||'0');await new
+   Promise(r=>setTimeout(r,ms));return new
+   Response(JSON.stringify({elapsed:Date.now()-t}))})"} (confirm the
+   exact deploy payload shape from the API response; record verbatim
+   errors and adapt).
+2. Invoke with ms=5000 (expect 200, elapsed ~5000), then ms=120000,
+   then ms=400000. Record where it stops returning (status/body
+   verbatim). The wall-clock limit IS the finding.
+3. Finally: DELETE /v1/projects/{ref}/functions/w13-sleeper.
+Pass criteria: each invocation outcome recorded verbatim; module passes
+with any measured limit.
