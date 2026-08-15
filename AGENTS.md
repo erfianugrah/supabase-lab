@@ -472,6 +472,38 @@ Ported from throwaway bash that produced the same findings; see RUNLOG.md.
   destroy and passed as `PVLAB_DEAD_REF`, because afterwards the tofu output is
   empty and probing an empty ref returns a meaningless 404.
 
+## experiments/edge-resilience - key facts (validated 2026-08-15)
+
+- What a CLIENT can do about platform incidents. Full matrix in
+  experiments/edge-resilience/FAILURE-MATRIX.md; consolidated reference in
+  RELIABILITY.md at the repo root.
+- **PostgREST skew tolerance is exactly ~30s** as documented (W01): iat +30s
+  accepted, +31s rejected with 401 PGRST303. Expired also PGRST303; unknown
+  key PGRST301. The drill path for arbitrary-claim minting is a lab ES256
+  issuer via TPA jwks_url (first-party secrets are not mintable).
+- **JWKS trust lags config APIs**: ~30s cold after TPA registration (PGRST301
+  until warm), instant (~300ms) for a previously-seen JWKS. jwt_exp changes
+  take effect ~6.5s after acceptance. jwt_secret PATCH is a 200 NO-OP.
+- **Managed->managed warm standby works** (W05): direct-host subscription
+  cross-region, initial sync ~3.1-6.5s, lag 34ms-1057ms. Pooler cannot be the
+  source (ENOIDENTIFIER tenant error). Sessions survive cutover via TPA-OIDC
+  registration of the primary issuer on the standby - no secret copying.
+- **CREATE SUBSCRIPTION must be a single-statement query** - the Management
+  query endpoint wraps multi-statement strings in one transaction and
+  Postgres rejects CREATE SUBSCRIPTION inside one. Dropping a subscription
+  leaves its slot on the primary pinning WAL.
+- **Cache proxies must strip Set-Cookie**: the gateway's CF front sets
+  __cf_bm on every response and caches.default.put refuses it silently -
+  a naive edge cache never caches. Cache-first serving makes an origin
+  outage invisible for warm URLs (W04); cold URLs fail.
+- **supabase-js 2.112.3 retries 5xx, not claim rejections** (W02): 1 attempt
+  on PGRST303, 4 attempts/7s through 503s.
+- **Cold DR floor** (W06): dump 12.4s / restore 6.4s for 10k rows via pooler.
+- **Break-glass**: GET /projects/{ref}/postgrest returns jwt_secret (W07) -
+  minting without GoTrue works; crown jewels, prefer TPA portability.
+- **Concurrent refreshes both succeed** (W08) - naive multi-tab reuse does
+  not break sessions.
+
 ## Commands
 
 Root: `make secrets-decrypt`, `make secrets-encrypt`, `make experiments`.
