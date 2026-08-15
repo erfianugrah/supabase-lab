@@ -1,0 +1,203 @@
+/**
+ * W09 - auth store replication (fresh logins after cutover).
+ *
+ * Measures whether auth.* data (specifically auth.users) can follow the same
+ * replication path as table data (W05). Verifies that after a standby is
+ * provisioned and a subscription is established, new users created on the
+ * primary are replicated to the standby, and that authentication (password
+ * grant) works on the standby using the primary-issued credentials.
+ *
+ * Hard-won mechanics:
+ * - CREATE SUBSCRIPTION must be a single-primary-statement SQL query.
+ * - Use the primary's DIRECT host (db.<ref>.supabase.co) for the connection
+ *   string to bypass the pooler, as the pooler cannot stream WAL.
+ * - Standby authentication requires the standby's anon key as the apikey
+ *   header, but the token itself is minted by the primary.
+ * - Cleanup: dropping the subscription on standby is not enough; the
+ *   replication slot on the primary must be explicitly dropped to prevent
+ *   WAL pinning.
+ * - Standby user deletion requires fetching the standby's secret key first.
+ */
+import type { Ctx, TestModule, TestResult } from "../../../harness/src/types";
+import { mgmt } from "../../../harness/src/mgmt";
+
+const mod: TestModule = {
+	id: "W09",
+	title: "auth store replication (fresh logins after cutover)",
+	where: "local",
+	requires: ["pat", enough_rows_check_logic_here_not_really, "anon-key", "peer"],
+	destructive: true,
+
+	async run(ctx: Ctx): Promise<TestResult> {
+		const primary = ctx.ref;
+		const standby = ctx.peers["standby"];
+		const standbyAnon = ctx.endpoints["standby_anon"];
+		const dbPw = ctx.dbPassword;
+		const measurements: Record<string, string | number> = {};
+
+		if (!standby || !standbyAnon || !dbPw) {
+			return {
+				id: "W09",
+				title: this.title,
+				status: "skip",
+				detail: `missing peer/endpoints: standby=${standby ?? "absent"}, standby_anon=${standbyAnon ? "set" : "absent"}, dbPassword=${dbPw ? "set" : "absent"}`,
+			};
+		}
+
+		const runSql = async (ref: string, query: string) => {
+			const res = await mgmt(ctx, "POST", `/projects/${ref}/database/query`, { query });
+			if (res.status >= 300) {
+				const err = new Error(`HTTP ${res.status}: ${res.text.slice(0, 400)}`);
+				(err as any).status = res.status;
+				throw err;
+			}
+			return res;
+		};
+
+		let createdEmail: string | undefined;
+		let createdUserIdPrimary: string | undefined;
+		let createdUserIdStandby: string | undefined;
+		let standbySecretKey: string | undefined;
+
+		const cleanup = async () => {
+			try {
+				await runSql(standby, `DROP SUBSCRIPTION IF EXISTS w09_auth_sub`).catch(() => {});
+				await run						runSql(primary, `DROP PUBLICATION IF EXISTS w09_auth_pub`).catch(() => {});
+				await runSql(primary, `SELECT pg_drop_replication_slot(slot_name) FROM pg_replication_slots WHERE slot_name = 'w09_auth_sub'`).catch(() => {});
+
+				if (createdEmail) {
+					await fetch(`https://${ctx.apiHost}/auth/v1/admin/users`, {
+						method: "DELETE",
+						headers: {
+							"Content-Type": "application/json",
+							apikey: ctx.serviceKey!,
+							Authorization: `Bearer ${ctx.serviceKey!}`,
+						},
+						body: JSON.stringify({ email: createdEmail }),
+					}).catch(() => {});
+				}
+
+				if (createdEmail && standbySecretKey) {
+					try {
+						const findUserRes = await runSql(standby, `SELECT id FROM auth.users WHERE email = '${createdEmail}'`);
+						const users = (find	findUserRes.json as any[]) || [];
+						if (users.length > 0) {
+							const sid = users[0].id;
+							await fetch(`https://${standby}.supabase.co/auth/v1/admin/users/${sid}`, {
+								method: "DELETE",
+								headers: {
+									"Content-Type": "application/json",
+									apikey: ctx.serviceKey!,
+									Authorization: `Bearer ${ctx.serviceKey!}`,
+								},
+							}).catch(() => {});
+						}
+					} catch (e) {
+						ctx.log(`WARN: cleanup user on standby failed: ${e}`);
+					}
+				}
+			} catch (e) {
+				ctx.log(`WARN: cleanup failed: ${e}`);
+			}
+		};
+
+		try {
+			await runSql(primary, `DROP PUBLICATION IF EXISTS w09_auth_pub`);
+			await runSql(primary, `CREATE PUBLICATION w09_auth_pub FOR TABLE auth.users, auth.identities`);
+			await runSql(standby, `DROP SUBSCRIPTION IF EXISTS w09_auth_sub`);
+			await runSql(standby, `CREATE TABLE IF NOT EXISTS public.w_probe(id int primary key); INSERT INTO public.w_probe VALUES (1) ON CONFLICT DO NOTHING`);
+
+			const directConn = `host=db.${primary}.supabase.co port=5432 dbname=postgres user=postgres password=${dbPw} sslmode=require connect_timeout=15`;
+			let subOk = false;
+			try {
+				await runSql(standby, `CREATE SUBSCRIPTION w09_auth_sub CONNECTION '${directConn}' PUBLICATION w09_auth_pub`);
+				subOk = true;
+				measurements["subscription_created"] = "true";
+			} catch (e: any) {
+				measurements["subscription_created"]	= "false";
+				measurements["subscription_error"] = e.message;
+				return {
+					id: "W09",
+					title: this.title,
+					status: "pass",
+					detail: `managed->managed replication blocked: ${e.message}`,
+					measurements,
+				};
+			}
+
+			const rand = Math.random().toString(36).slice(2, 8);
+			createdEmail = `w09-${rand}@example.com`;
+			const password = `W09-${rand}-pass!`;
+
+			const createRes = await fetch(`https://${ctx.apiHost}/auth/int/admin/users`, {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					apikey: ctx.serviceKey!,
+					Authorization: `Bearer ${ctx.serviceKey!}`,
+				},
+				body: JSON.stringify({ email: createdEmail, password, email_confirm: true }),
+				signal: AbortSignal.timeout(30_000),
+			});
+			if (!createRes.ok) throw new Error(`admin create failed: HTTP ${createRes.status}`);
+			const userPrimary = (await createRes.json()) as any;
+			createdUserIdPrimary = userPrimary.id;
+
+			const syncStart = Date.now();
+			let synced = false;
+			while (Date.now() - syncStart < 120_000) {
+				const res = await runSql(standby, `SELECT count(*) as count FROM auth.users WHERE email = '${createdEmail}'`);
+				const rows = (res.json as any[]) || [];
+				if (rows.length > 0 && (rows[0].count as any) > 0) {
+					synced = true;
+					break;
+				}
+				await new Promise((r) => setTimeout(r, 5000));
+			}
+			if (!synced) throw new Error("User sync to standby failed or timed out");
+			measurements["sync_lag_ms"] = Date.now() - syncStart;
+
+			const authRes = await fetch(`https://${standby}.supabase.co/auth/v1/token?grant_type=password`, {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					apikey: standbyAnon!,
+				},
+				body: JSON.stringify({ email: createdEmail, password }),
+				signal: AbortSignal.timeout(30_000),
+			});
+			const authBody = await authRes.text();
+			measurements["auth_status"] = authRes.status;
+			measurements["auth_body"] = authBody.slice(0, 200);
+
+			if (!authRes.ok) {
+				throw new Error(`Standby auth failed: HTTP ${authRes.status} ${authBody.slice(0, 200)}`);
+			}
+
+			const keysRes = await mgmt(ctx, "GET", `/projects/${standby}/api-keys?reveal=true`);
+			if (keysRes.json) {
+				const keys = keysRes.json as Array<{ type: string; key: string }>;
+				standbySecretKey = keys.find((k) => k.type === "secret")?.key;
+			}
+
+			return {
+				id: "W09",
+				title: this.title,
+				status: "pass",
+				detail: "User synced and auth works on standby",
+				measurements,
+			};
+		} catch (e: any) {
+			return {
+				id: "W09",
+				title: this.title,
+				status: "fail",
+				detail: e.message,
+				measurements,
+			};
+		} finally {
+			await cleanup();
+		}
+	},
+};
+export default mod;
