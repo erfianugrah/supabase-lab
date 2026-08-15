@@ -441,7 +441,12 @@ export default function Explorer() {
                 </tr>
               </thead>
               <tbody>
-                {pageSlice(asAt ? bridgesAsAt : crossDoc, bridgesPage, 20).map((e, i) =>
+                {/* Zero results render zero rows (not a page of pad rows): an
+                    empty answer is a fact, the note above states it, and the
+                    e2e suite counts DOM rows. */}
+                {(asAt ? bridgesAsAt : crossDoc).length === 0
+                  ? null
+                  : pageSlice(asAt ? bridgesAsAt : crossDoc, bridgesPage, 20).map((e, i) =>
                   e === null ? <PadRow key={`pad-${i}`} cols={6} rowH="h-[22px]" /> : (
                   <tr key={e.id}>
                     <td><KindBadge kind={e.kind} /></td>

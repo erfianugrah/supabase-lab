@@ -6,5 +6,8 @@
     "test": "bun test",
     "gen": "bun scripts/gen-registry.ts",
     "build": "bun scripts/gen-registry.ts && bun build --compile --target=bun-linux-x64 src/run.ts --outfile dist/pvlab"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.112.3"
   }
 }

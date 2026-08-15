@@ -106,7 +106,8 @@ t "demo schema+extract fns" bash -c "psql '$PG' -qAt -v ON_ERROR_STOP=1 -f '$EXP
 
 if [ -n "${FAST_DATA:-}" ]; then
   echo "== 4/7 demo data restore (fast path; REEXTRACT=1 forces the pipeline) =="
-  t "demo data restore" bash -c "pg_restore --data-only --no-owner --no-privileges --exit-on-error -d '$PG' '$EXP_DIR/demo/seed/demo-data.pgdump'"
+  echo "    (deferred until after the editorial layer: the kind constraint"
+  echo "     only gains 'abn' in 08, and the dump contains abn entities)"
 else
   echo "== 4/7 extraction (the slow step) =="
   # Citation extraction measured at 6m11s for the seven documents on medium compute.
@@ -126,6 +127,17 @@ t "search tier" psql "$PG" -qAt -v ON_ERROR_STOP=1 -f "$EXP_DIR/demo/db/07-searc
 # The editorial layer comes AFTER 06: it replaces person_org_patterns() with
 # the extended (US + AU) set, and applying it earlier would let 06 revert it.
 t "editorial layer" psql "$PG" -qAt -v ON_ERROR_STOP=1 -f "$EXP_DIR/demo/db/08-editorial.sql"
+
+# The fast-path restore waits until here: 08 widens the entities kind
+# constraint with 'abn', and a restore against the 01-schema constraint fails
+# on the abn rows (measured on the first fast rebuild, 2026-08-14).
+# The truncate makes the restore idempotent against a partially-restored
+# project: pg_restore copies documents first, so a failed earlier attempt
+# leaves them populated and a bare re-run collides on the slug PK (second
+# fast rebuild, same day).
+if [ -n "${FAST_DATA:-}" ]; then
+  t "demo data restore" bash -c "psql '$PG' -qAt -v ON_ERROR_STOP=1 -c 'truncate corpus.documents, demo.entities, demo.mentions, demo.edges cascade' && pg_restore --data-only --no-owner --no-privileges --exit-on-error -d '$PG' '$EXP_DIR/demo/seed/demo-data.pgdump'"
+fi
 t "security (RLS etc.)" psql "$PG" -qAt -v ON_ERROR_STOP=1 -f "$EXP_DIR/db/05-security.sql"
 
 echo "== 6/7 expose demo to PostgREST =="
