@@ -172,6 +172,15 @@ ap-southeast-2 -> ap-southeast-1).**
   REHEARSE the cutover - the first real one otherwise eats the cold path.
 - Cutover hygiene: resync sequences (they do not replicate), apply DDL to
   both sides, drop the orphaned replication slot on the old primary.
+- **The parity gap (doc-only, not yet drilled)**: logical replication
+  carries table data ONLY. RLS policies, grants, functions, triggers and
+  views need a schema-only dump applied to the standby (and re-applied on
+  change). auth.* replication is untested - TPA keeps EXISTING tokens
+  valid, but fresh logins on the standby hit its own auth store. Storage
+  objects do not follow their metadata (dual-write or S3 sync). Vault
+  secrets replicate as useless ciphertext (project-scoped root key).
+  pg_cron, function secrets and Realtime state do not move. A real cutover
+  is a parity checklist, not a subscription.
 - Cold DR floor: pg_dump 12.4s / restore 6.4s for 10k rows via pooler
   (W06).
 - Break-glass: GET /projects/{ref}/postgrest returns jwt_secret; minting
