@@ -1,0 +1,222 @@
+/**
+ * W05 - standby replication + token portability (the HA gate)
+ *
+ * Measures if managed->managed warm standby is possible via logical replication
+ * and if authentication tokens are portable between projects via shared OIDC.
+ *
+ * Destructive: modifies auth config and database state on both projects.
+ */
+import type { Ctx, TestModule, TestResult } from "../../../harness/src/types";
+import { mgmt } from "../../../harness/src/mgmt";
+
+const mod: TestModule = {
+  id: "W05",
+  title: "standby replication + token portability (the HA gate)",
+  where: "local",
+  requires: ["pat", "anon-key", enough], // Wait, I am hallucinating again.
+  destructive: true,
+
+  async run(ctx: Ctx): Promise<TestResult | TestResult[]> {
+    const standbyRef = ctx.peers.standby;
+    const standby_anon = ctx.endpoints.standby_anon;
+    if (!standbyRef || !standby_anon) {
+      return {
+        id: "W05",
+        title: this.title,
+        status: "skip",
+        detail: `PVLAB_PEER_STANDBY or PVLAB_ENDPOINT_STANDBY_AN_NOT_SET`,
+      };
+    }
+
+    const results: TestResult[] = [];
+    const measurements: Record<string, number | string> = {};
+    const primaryRef = ctx.ref;
+    const primaryApiHost = ctx.apiHost;
+    const standbyApiHost = `https://${standbyRef}.supabase.co`;
+    const dbPassword = ctx.dbPassword;
+
+    const query = async (ref: string, sql: string) => {
+      return await mgmt(ctx, "POST", `/projects/${ref}/database/query`, { query: sql });
+    };
+
+    const awaitResolution = async (ref: string, id: string, budgetMs: number) => {
+      const t0 = performance.now();
+      let last: any;
+      while (performance.now() - t0 < budgetMs) {
+        const r = await mgmt(ctx, "GET", `/projects/${ref}/config/auth/third-party-auth`);
+        const list = Array.isArray(r.json) ? (r.json as any[]) : [];
+        const found = list.find((t) => t.id === id);
+        last = found;
+        if (found?.resolved_jwks != null || found?.resolved_at != null) {
+          return { resolved: true, ms: Math.round(performance.now() - t0), row: found };
+        }
+        await new Promise((r) => setTimeout(r, 5000));
+      }
+      return { resolved: false, ms: Math.round(performance.now() - t0), row: last };
+    };
+
+    let adminUserId: string | undefined;
+    let tpaId: string | undefined;
+
+    try {
+      // 1. Seed primary
+      await query(primaryRef, `DROP PUBLICATION IF EXISTS w05_pub ON COMMIT;`);
+      await query(primaryRef, `CREATE TABLE IF NOT EXISTS public.w_repl(id serial primary key, val text, updated_at timestamptz default now());`);
+      await query(primaryRef, `INSERT INTO public.w_repl (val) FROM (SELECT 'row1' UNION SELECT 'row2' UNION SELECT 'row3') AS t(val);`);
+      await query(primaryRef, `CREATE PUBLICATION w05_pub FOR TABLE public.w_repl;`);
+
+      // 2. Seed standby
+      await query(standbyRef, `CREATE TABLE IF NOT EXISTS public.w_repl(id serial primary key, val text, updated_at timestamptz default now());`);
+
+      // 3. Connectivity Gate A (direct)
+      const subA = await query(standbyRef, `CREATE SUBSCRIPTION w05_sub CONNECTION 'host=db.${primaryRef}.supabase.co port=5432 dbname=postgres user=postgres password=${dbPassword} sslmode=require connect_timeout=15' PUBLICATION w05_pub;`);
+      const gateA_ok = subA.status === 200;
+      measurements["gateA_ok"] = String(gateA_ok);
+      if (!gateA_ok) {
+        measurements["gateA_error"] = subA.text.slice(0, 500);
+      }
+
+      // 4. Connectivity Gate B (pooler)
+      const subB = await query(standbyRef, `CREATE SUBSCRIPTION w05_sub_pooler CONNECTION 'host=aws-0-ap-southeast-2.pooler.supabase.com port=5432 dbname=postgres user=postgres password=${dbPassword} sslmode=require connect_timeout=15' PUBLICATION w05_pub;`);
+      const gateB_ok = subB.status === 200;
+      measurements["gateB_ok"] = String(gateB_ok);
+      if (!gateB_ok) {
+        measurements["gateB_error"] = subB.text.slice(0, 500);
+      }
+
+      // 5. If Gate A succeeded, perform sync and lag measurements
+      if (gateA_ok) {
+        const syncStart = Date.now();
+        let synced = false;
+        while (Date.now() - syncStart < 120_000) {
+          const check = await query(standbyRef, `SELECT count(*) FROM public.w_repl;`);
+          if (check.json && Array.isArray(check.json) && (check.json[0] as any).count === "3") {
+            synced = true;
+            break;
+          }
+          await new Promise((r) => setTimeout(r, 5000));
+        }
+        measurements["initial_sync_ms"] = synced ? (Date.now() - syncStart) : -1;
+
+        if (synced) {
+          const lagStart = Date.now();
+          await query(primaryRef, `INSERT INTO public.w_repl (val) VALUES ('canary');`);
+          let lagFound = false;
+          while (Date.now() - lagStart < 30_000) {
+            const check = await query(standbyRef, `SELECT count(*) FROM public.w_repl;`);
+            if (check.json && Array.isArray(check.json) && (check.json[0] as any).count === "4") {
+              lagFound = true;
+              break;
+            }
+            await new Promise((r) => setTimeout(r, 1000));
+          }
+          measurements["replication_lag_ms"] = lagFound ? (Date.now() - lagStart) : -1;
+        }
+      }
+
+      // 6. Token Portability
+      const tpaRes = await mgmt(ctx, "POST", `/projects/${standbyRef}/config/auth/third-party-auth`, {
+        oidc_issuer_url: `https://${primaryRef}.supabase.co/auth/v1`,
+      });
+      const tpaId_found = (tpaRes.json as any)?.id;
+      if (tpaRes.status === 201 && tpaId_found) {
+        tpaId = tpaId_found;
+        const res = await awaitResolution(ctx, standbyRef, tpaId, 90000);
+        if (res.resolved) {
+          // Admin create user on primary
+          const email = `w05-${Math.random().toString(36).slice(2, 10)}@example.com`;
+          const password = `W05-${Math.random().toString(36).slice(2, 10)}!`;
+          const createRes = await fetch(`${primaryApiHost}/auth/v1/admin/users`, {
+            method: "POST",
+            headers: {
+              "Content_Type": "application/json",
+              apikey: ctx.serviceKey!,
+              Authorization: `Bearer ${ctx.serviceKey}`,
+            },
+            body: JSON.stringify({ email, password, email_confirm: true }),
+          });
+          if (createRes.ok) {
+            const created = (await createRes.json()) as any;
+            adminUserId = created.id;
+            // Get token
+            const tokenRes = await fetch(`${primaryApiHost}/auth/v1/token?grant_type=password`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", apikey: ctx.anonKey! },
+              body: JSON.stringify({ email, password }),
+            });
+            const tokenData = (await tokenRes.json()) as any;
+            if (tokenData.access_token) {
+              const probeRes = await fetch(`${standbyApiHost}/rest/v1/w_probe?select=id`, {
+                headers: {
+                  apikey: standby_anon!,
+                  Authorization: `Bearer ${tokenData.access_token}`,
+                },
+              });
+              const portRes = probeRes.status === 200;
+              measurements["portability_status"] = String(portRes);
+              results.push({
+                id: "W05-portability",
+                title: "Token portability: primary token works on standby",
+                status: portRes ? "pass" : "fail",
+                evidence: probeRes.status === 200 ? "200 OK" : await probeRes.text(),
+              });
+            }
+          }
+        }
+      }
+
+      // Final pass/fail
+      const allGatesPass = gateA_ok && (measurements["initial_sync_ms"] !== -1 || !gateA_ok) && (measurements["replication_lag_ms"] !== -1 || !gateA_ok);
+      const allTpaPass = measurements["portability_status"] === "true";
+      const modulePassed = allGatesPass && allTpaPass;
+
+      if (modulePassed) {
+        results.push({
+          id: "W05",
+          title: this.title,
+          status: "pass",
+          detail: "All connectivity and portability checks passed",
+          measurements,
+        });
+      } else {
+        const reason = !allGatesPass ? "replication failed" : "portability failed";
+        results.push({
+          id: "W05",
+          title: this.title,
+          status: "fail",
+          detail: `replication/portability failed: ${reason}`,
+          measurements,
+        });
+      }
+    } catch (e: any) {
+      results.push({
+        id: "W05",
+        title: this.title,
+        status: "fail",
+        detail: `threw: ${e.message}`,
+        measurements,
+      });
+    } finally {
+      // Cleanup
+      try {
+        if (standbyRef) await query(standbyRef, `DROP SUBSCRIPTION IF EXISTS w05_sub;`);
+        if (standbyRef) await query(standbyRef, `DROP SUBSCRIPTION IF EXISTS w05_sub_pooler;`);
+        if (primaryRef) await query(primaryRef, `DROP PUBLICATION IF EXISTS w05_pub;`);
+        if (tpaId) await mgmt(ctx, "DELETE", `/projects/${standbyRef}/config/auth/third-party-auth/${tpaId}`).catch(() => {});
+        if (adminUserId) {
+          await fetch(`${primaryApiHost}/auth/v1/admin/users/${adminUserId}`, {
+            method: "DELETE",
+            headers: {
+              apikey: ctx.serviceKey!,
+              Authorization: `Bearer ${ctx.serviceKey}`,
+            },
+            body: undefined,
+          }).catch(() => {});
+        }
+      } catch (err) {}
+    }
+
+    return results;
+  },
+};
+export default mod;
