@@ -56,6 +56,7 @@ export interface Ctx {
   apiHost: string;
   dbPassword: string;
   anonKey?: string;
+  serviceKey?: string;
   pat?: string;
   region: string;
   endpointIps: string[];

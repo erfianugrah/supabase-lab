@@ -1,0 +1,9 @@
+# Key material and run output never leave the machine.
+jwks/private.json
+evidence/
+.wrangler/
+secrets.tfvars
+.terraform/
+terraform.tfstate*
+tfplan*
+__pycache__/
