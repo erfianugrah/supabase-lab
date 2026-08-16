@@ -552,3 +552,137 @@ Steps:
 4. Restore the primary's original values; confirm readback.
 Pass criteria: baseline + post-change diffs recorded verbatim; restore
 confirmed. Any measured diff passes.
+
+## W18 - edge function cold start
+
+File: `tests/w18-function-coldstart.ts`. where: "local".
+requires: ["pat", "anon-key"]. destructive: true (deploys + deletes a
+function).
+
+Steps:
+1. Deploy `w18-sleeper` (verify_jwt false) via the Management API
+   (W13's deploy payload shape works - reuse
+   tests/w13-function-timeout.ts's deploy call): a function that sleeps
+   `?ms=` (default 0) and returns {elapsed}.
+2. Cold: after deploy, wait 60s of no invocations, then invoke 5 times
+   with 60s gaps (ms=0). Record each elapsed and the client-observed
+   duration (response time) - the first call after idle carries the
+   cold start.
+3. Warm: invoke 20 times back-to-back (ms=0). Record durations.
+4. Report cold p50/p99 vs warm p50/p99 in measurements.
+5. Finally: delete the function.
+Pass criteria: cold and warm distributions recorded. Any measured
+behavior passes.
+
+## W19 - imgproxy render-path failure modes
+
+File: `tests/w19-render-failures.ts`. where: "local".
+requires: ["pat", "anon-key"]. destructive: true (bucket + objects;
+cleanup in finally).
+
+Steps:
+1. Idempotent bucket `w19-drill` public (W10 sweep pattern). Upload:
+   a. a valid small PNG (generate 64x64 in code - no external deps),
+   b. `corrupt.png` (text bytes with a .png name),
+   c. an SVG file (vector - render path handles differently or errors).
+2. For each object: GET /storage/v1/render/image/public/w19-drill/<name>
+   ?width=32 AND the plain public URL. Record status + body code
+   verbatim per case.
+3. Record: does the valid PNG transform (200, resized), does the
+   corrupt file error (what code), does the original always serve even
+   when the transform fails.
+Pass criteria: all six outcomes recorded verbatim. Any measured
+behavior passes.
+
+## W20 - statement timeout and lock-wait signature
+
+File: `tests/w20-statement-timeout.ts`. where: "local".
+requires: ["pat"]. destructive: false (creates+drops one table).
+
+Steps:
+1. SQL: `create table if not exists public.w20_t(id int primary key)`.
+2. Timeout signature: `set local statement_timeout = '2s'; select
+   pg_sleep(5);` via the query endpoint - record the verbatim error
+   (expected 57014 query_canceled) and the measured wall time.
+3. Lock-wait: this needs two concurrent DB sessions, which the query
+   endpoint does not give - use psql via the pooler session host
+   (aws-0-ap-southeast-2.pooler.supabase.com:5432, user
+   postgres.<ref>, PGPASSWORD=ctx.dbPassword): session A holds
+   `select pg_advisory_lock(42)`; session B
+   `select pg_advisory_lock(42)` with `lock_timeout = '3s'` - record
+   the verbatim 55P03 lock_not_available error and wall time.
+4. Finally: drop the table.
+Pass criteria: both verbatim errors + wall times recorded. Any measured
+behavior passes.
+
+## W22 - initial sync at real table size
+
+File: `tests/w22-bulk-sync.ts`. where: "local".
+requires: ["pat", "peer"]. destructive: true.
+
+Steps:
+1. Primary: table public.w22_t(id serial primary key, payload text);
+   seed 1,000,000 rows server-side:
+   `insert into public.w22_t(payload) select md5(random()::text) from
+   generate_series(1,1000000)` (single statement; expect 10-30s - poll
+   the row count until 1000000, budget 120s).
+2. Publication w22_pub; standby same table; subscription with DEFAULT
+   copy_data=true (initial sync IS the measurement). Record when the
+   standby row count reaches 1000000 (poll every 10s, budget 30 min);
+   if the sync stalls in 'd' past 10 min, record the stall verbatim
+   (that is a finding: the micro/small worker ceiling at scale).
+3. After sync: insert one canary on the primary, record streaming lag.
+4. Finally: cleanup (subscription, publication, publisher slot, table
+   both sides).
+Pass criteria: sync duration + lag recorded verbatim; a recorded stall
+is a pass-with-finding. Measurements: sync_ms (or -1 + state), lag_ms,
+rows.
+
+## W23 - pg_cron across a restart
+
+File: `tests/w23-cron-restart.ts`. where: "local".
+requires: ["pat", "pgbench"]. destructive: true (restarts the project;
+cron job created+removed).
+
+Steps:
+1. SQL: `create table if not exists public.w23_hb(ts timestamptz
+   default now())`; schedule `select cron.schedule('w23-hb','* * * * *',
+   $$insert into public.w23_hb default values$$)` (create extension
+   pg_cron first if needed - record verbatim if it fails).
+2. Wait for 2 heartbeat rows (~2 min 10s, poll every 15s).
+3. Restart the project: POST /projects/{ref}/restart via mgmt. Record
+   restart start; poll the REST API (probe table) until 200 - record
+   the outage seconds.
+4. Keep polling w23_hb rows for 4 minutes post-restart. Record: rows
+   before, outage window, rows after, and whether the schedule SKIPPED
+   beats during the outage (no catch-up) or doubled after.
+Pass criteria: heartbeat gaps + outage window recorded verbatim. Any
+measured behavior passes.
+
+## W24 - edge failover proxy with flap damping
+
+File: `tests/w24-failover-proxy.ts` + worker changes (the drill worker
+gains a failover mode). where: "local". requires: ["anon-key", "peer"].
+destructive: true (redeploys the worker several times; restores after).
+
+Background: the drill worker currently cache-proxies to UPSTREAM. Add a
+FAILOVER mode (env var FAILOVER_PRIMARY / FAILOVER_STANDBY): GETs to
+/rest/v1/* health-check the primary on failure (5xx or throw) by
+re-fetching from the standby; tag responses x-drill-origin: primary|
+standby. Flap damping: after a failover, hold on standby for a
+HOLD_MS window even if the primary recovers.
+
+Steps:
+1. Update worker/worker.ts with the failover mode (small, surgical -
+   keep the cache path untouched).
+2. Deploy with FAILOVER vars set (both project URLs). Prime: GET the
+   probe table -> 200 x-drill-origin: primary.
+3. Outage on primary: point... simulate by deploying with
+   FAILOVER_PRIMARY set to an unroutable URL (redeploy ~10s). GET ->
+   expect 200 x-drill-origin: standby.
+4. Restore primary URL while... measure holdover: immediately after
+   restore the worker should still serve standby until HOLD_MS passes;
+   then a later GET returns to primary. Record the timings.
+5. Restore default deploy (no outage vars).
+Pass criteria: primary/standby/holdover/return sequence recorded with
+timings. Any measured behavior passes.

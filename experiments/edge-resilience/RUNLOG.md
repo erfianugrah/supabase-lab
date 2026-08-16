@@ -267,3 +267,81 @@ platform-managed schemas (auth.*, storage.*) do not replicate by any
 tested path, at any tested size. Auth portability posture stands: TPA for
 existing sessions + SQL-level backfill + forced re-login. Storage
 portability: object sync (W10), not replication.
+
+## W15 - DDL lands on the primary while a subscription is live (2026-08-16, green, module + manual drill)
+
+- After a primary-side ALTER, zero rows arrive on the standby - even rows
+  not using the new column. The stall is not table-scoped.
+- Applying the same ALTER on the standby resumes replication in ~6.1s with
+  both rows backfilled, no subscription recreation.
+- Migration procedure: standby DDL first, or accept the stall window.
+
+## W16 - sequence resync at cutover (2026-08-16, green, local-rung one-shot)
+
+- First standby insert after cutover hits duplicate key - sequence values
+  do not follow table-data replication (sequence drift).
+- setval resync on the standby restores inserts.
+
+## W17 - auth config parity inventory (2026-08-16, green, local-rung one-shot)
+
+- Per-project auth config does not follow a cutover; baseline +
+  post-change diffs recorded verbatim, restore confirmed.
+
+## W18 - edge function cold start (2026-08-16, green, probe)
+
+- Cold p50 284ms, p99 1433ms (5 invokes at 60s idle gaps); warm p50 98ms
+  over 20 back-to-back invokes.
+- Only the first invoke after deploy+idle carries the real cold start
+  (~1.4s); idle-cold invokes 2-5 land at 121-302ms - the steady-state
+  cold/warm gap is ~100-200ms, not seconds.
+
+## W19 - imgproxy render-path failure modes (2026-08-16, green, probe)
+
+- Valid PNG: render 200 (resized), plain 200.
+- corrupt.png (text bytes under a .png name): render 400 InvalidRequest
+  "The source image is invalid or unsupported for rendering"; the plain
+  public URL still serves the original bytes (200).
+- SVG: render path 200 returning the original SVG unchanged (no
+  rasterization on this path); plain 200.
+- The original always serves even when the transform fails - the render
+  path degrades to the source object, never to a 5xx.
+
+## W20 - statement timeout and lock-wait signature (2026-08-16, green, probe)
+
+- statement_timeout '2s' against pg_sleep(5): HTTP 400 with verbatim
+  ERROR 57014 "canceling statement due to statement timeout", wall 3467ms.
+- Advisory-lock contender with lock_timeout '3s' (two pooler sessions):
+  verbatim ERROR 55P03 "canceling statement due to lock timeout",
+  wall 4533ms.
+- The 04:54-05:00 battery artifacts show W20 failing with "JWT could not
+  be decoded" - that battery ran without SUPABASE_ACCESS_TOKEN in env;
+  an environment failure, not a module bug. Green on re-probe.
+
+## W22 - initial sync at real table size (2026-08-16, green, probe)
+
+- 1,000,000-row initial sync: 22728ms; streaming lag after sync 245ms.
+
+## W23 - pg_cron across a restart (2026-08-16, green, probe)
+
+- rows_before=2, rows_after=5, diff=3 - pg_cron resumes across a project
+  restart and keeps firing on schedule.
+
+## W24 - edge failover proxy with flap damping (2026-08-16, green, probe)
+
+- Full sequence measured, all HTTP 200: prime=primary -> outage=standby
+  -> holdover=standby (HOLD_MS=60000) -> return=primary.
+- Worker bugs the drill surfaced: (1) the cache-first path ran before the
+  failover logic, so HITs carried no x-drill-origin and masked the
+  failover entirely - failover mode now skips cache-first; (2) CF Workers
+  wraps TCP failures to unroutable origins as a 403 RESPONSE (the W04
+  finding), not a throw and not a 5xx, so a >=500 failover condition
+  never trips - the worker now treats 5xx, 403, and (under OUTAGE) any
+  non-ok as origin failure.
+- Drill-design fix: the _w24 cache-buster query param reached PostgREST,
+  which treats unknown params as column filters and 400s every probe; the
+  worker strips _-prefixed params from the origin URL while keeping the
+  full URL in the cache key.
+- Hold-window sizing: HOLD_MS=15000 was marginal against the ~11s redeploy
+  + settle path between the last outage probe (which refreshes the failure
+  timestamp) and the holdover probe, and measured an expired window;
+  60000 holds.
