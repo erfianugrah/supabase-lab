@@ -479,3 +479,76 @@ Steps:
 3. Finally: DELETE /v1/projects/{ref}/functions/w13-sleeper.
 Pass criteria: each invocation outcome recorded verbatim; module passes
 with any measured limit.
+
+## W15 - DDL lands on the primary while a subscription is live
+
+File: `tests/w15-ddl-during-replication.ts`. where: "local".
+requires: ["pat", "anon-key", "peer"]. destructive: true.
+
+Steps (single-statement SQL for CREATE SUBSCRIPTION; disable ->
+slot_name=none -> drop + drop publisher slot for cleanup):
+1. Establish replication of public.w_repl in THIS EXACT ORDER (there is
+   NO initial sync phase with copy_data=false - do not wait for seed rows
+   to appear; they never will):
+   a. primary: create table public.w_repl(id serial primary key, val
+      text) (drop if exists); create publication w15_pub for table
+      public.w_repl (drop if exists first).
+   b. standby: same table DDL (drop if exists first).
+   c. standby: create subscription w15_sub connection
+      'host=db.<PRIMARY_REF>.supabase.co port=5432 dbname=postgres
+      user=postgres password=<pw> sslmode=require connect_timeout=15'
+      publication w15_pub with (copy_data = false, streaming = on)
+      (single-statement).
+   d. CANARY: insert a row on the PRIMARY; poll the standby (using the
+      standby's OWN publishable key, ctx.endpoints["standby_anon"]) until
+      the row appears (budget 60s). Record lag ms. This is the only sync
+      check - rows written BEFORE the subscription do not replicate.
+2. On the PRIMARY only: `alter table public.w_repl add column w15_extra
+   text`. Then insert a row that sets w15_extra.
+3. Observe the standby for 60s: does the row arrive? Record
+   pg_stat_subscription + pg_subscription_rel snapshots and any verbatim
+   error state. Prediction (do not assert): apply errors on the missing
+   column and replication stalls - including for rows that do NOT use the
+   new column. Test that too: insert a second row with w15_extra NULL.
+4. Recovery: apply the same ALTER on the standby, then measure whether
+   replication resumes and both rows arrive (record resume lag).
+5. Finally: full cleanup (subscription, publication, publisher slot,
+   table both sides).
+Pass criteria: every outcome recorded verbatim (stall evidence, NULL-row
+behavior, resume behavior). Any measured behavior passes.
+
+## W16 - sequence resync at cutover
+
+File: `tests/w16-sequence-resync.ts`. where: "local".
+requires: ["pat", "peer"]. destructive: true.
+
+Steps:
+1. Replicate public.w16_t(id serial primary key, val text) W05-style
+   (copy_data=false, streaming=on).
+2. Insert 5 rows on the primary; confirm they stream to the standby.
+3. Simulate cutover: insert a row DIRECTLY on the standby. Record the
+   verbatim error (expected: duplicate key - the standby's sequence is
+   behind because sequences do not replicate).
+4. Resync on the standby: `select setval(pg_get_serial_sequence(
+   'public.w16_t','id'), coalesce((select max(id) from public.w16_t),0)
+   + 1, false)`. Insert again; expect success. Record both attempts.
+5. Finally: cleanup as W15.
+Pass criteria: duplicate-key error recorded verbatim, resync success
+recorded. Any measured behavior passes.
+
+## W17 - auth config parity inventory
+
+File: `tests/w17-config-parity.ts`. where: "local".
+requires: ["pat", "peer"]. destructive: true (sets + restores config on
+the primary).
+
+Steps:
+1. GET /config/auth on primary and standby; record baseline diff.
+2. On the primary PATCH distinguishable values: jwt_exp=42222,
+   uri_allow_list="https://w17.example.com/cb", rate_limit_otp=77.
+   Wait for readback.
+3. GET /config/auth on both again; produce the verbatim diff inventory:
+   which fields differ (the parity gap a cutover must re-apply).
+4. Restore the primary's original values; confirm readback.
+Pass criteria: baseline + post-change diffs recorded verbatim; restore
+confirmed. Any measured diff passes.
