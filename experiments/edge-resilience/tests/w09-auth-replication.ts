@@ -115,8 +115,9 @@ const mod: TestModule = {
             `SELECT count(*)::int AS n FROM auth.users WHERE email NOT LIKE 'w09-%'`,
           );
           const rows = res.json as Array<{ n: number | string }>;
-          if (Array.isArray(rows) && rows.length > 0) {
-            return typeof rows[0].n === "number" ? rows[0].n : parseInt(String(rows[0].n), 10) || 0;
+          if (Array.isArray(rows) && rows.length > 0 && rows[0]) {
+            const n = rows[0].n;
+            return typeof n === "number" ? n : parseInt(String(n), 10) || 0;
           }
         } catch { /* fall through to -1 */ }
         return -1;
@@ -235,7 +236,7 @@ const mod: TestModule = {
             `SELECT id::text, email FROM auth.users WHERE email NOT LIKE 'w09-%' LIMIT 1`,
           );
           const rows = usersRes.json as Array<{ id: string; email: string }>;
-          if (Array.isArray(rows) && rows.length > 0) {
+          if (Array.isArray(rows) && rows.length > 0 && rows[0]) {
             const target = rows[0];
             measurements["backfill_target_email"] = target.email ?? "(present)";
             // POST to standby without password_hash - the limitation is that

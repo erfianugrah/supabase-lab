@@ -189,6 +189,7 @@ const mod: TestModule = {
         // Decode payload (no verification needed; just measure exp - iat).
         try {
           const parts = tokenData.access_token.split(".");
+          if (!parts[1]) throw new Error("malformed JWT payload segment");
           const padded = parts[1].replace(/-/g, "+").replace(/_/g, "/");
           const payload = JSON.parse(
             Buffer.from(padded, "base64").toString("utf8"),
