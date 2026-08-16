@@ -51,6 +51,8 @@ const mod: TestModule = {
     };
 
     const cleanup = async () => {
+      // ALTER SUBSCRIPTION has no IF EXISTS (W09 note) - the .catch swallows
+      // the not-exists error.
       await runSql(standby, `ALTER SUBSCRIPTION IF EXISTS w16_sub DISABLE`).catch(() => {});
       await runSql(standby, `ALTER SUBSCRIPTION w16_sub SET (slot_name = none)`).catch(() => {});
       await runSql(standby, `DROP SUBSCRIPTION IF EXISTS w16_sub`).catch(() => {});
@@ -67,10 +69,8 @@ const mod: TestModule = {
       await runSql(primary, `CREATE PUBLICATION w16_pub FOR TABLE public.w16_t`);
       await runSql(standby, `DROP TABLE IF EXISTS public.w16_t; CREATE TABLE public.w16_t(id serial primary key, val text)`);
       
-      const directConn = `host=db.${primary}.supabase.co port=543::5432 dbname=postgres user=postgres password=${dbPw} sslmode=require connect_timeout=15`;
-      // Fixing port to 5432
-      const directConnFixed = `host=db.${primary}.supabase.co port=5432 dbname=postgres user=postgres password=${dbPw} sslmode=require connect_timeout=15`;
-      await runSql(standby, `CREATE SUBSCRIPTION w16_sub CONNECTION '${directConnFixed}' PUBLICATION w16_pub WITH (copy_data = false, streaming = on)`);
+      const directConn = `host=db.${primary}.supabase.co port=5432 dbname=postgres user=postgres password=${dbPw} sslmode=require connect_timeout=15`;
+      await runSql(standby, `CREATE SUBSCRIPTION w16_sub CONNECTION '${directConn}' PUBLICATION w16_pub WITH (copy_data = false, streaming = on)`);
       
       measurements["replication_setup"] = "true";
 
