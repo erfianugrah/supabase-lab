@@ -5,7 +5,8 @@ actually sees, what a client can DO about it, and which of those claims are
 lab-validated (with numbers and dates) vs doc-claimed vs anecdotal.
 
 Lab evidence lives in this repo (experiments/<name>/RUNLOG.md + evidence/);
-the newest entries are from experiments/edge-resilience (2026-08-15).
+the newest entries are from experiments/edge-resilience (2026-08-16,
+W01-W24 all green - see its RUNLOG.md).
 Public evidence is cited per class.
 
 ## Class 1: JWT claim-validation rejection (PGRST303 "JWT issued at future")

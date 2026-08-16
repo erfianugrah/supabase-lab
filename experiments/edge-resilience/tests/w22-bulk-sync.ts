@@ -159,7 +159,7 @@ const mod: TestModule = {
           id: "W22",
           title: this.title,
           status: "pass",
-          detail: `sync stalled in 'd' state past 10 min: ${syncRows} rows replicated; micro/small worker ceiling at scale`,
+          detail: `sync stalled in 'd' state past 10 min: ${syncRows} rows replicated; per W14 the wall is platform-managed schemas, not a size/worker ceiling`,
           measurements: {
             ...measurements,
             sync_ms: -1,
