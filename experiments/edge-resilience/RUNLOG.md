@@ -345,3 +345,11 @@ portability: object sync (W10), not replication.
   + settle path between the last outage probe (which refreshes the failure
   timestamp) and the holdover probe, and measured an expired window;
   60000 holds.
+
+## Full battery (2026-08-16)
+
+22/22 pass unattended in ~27 minutes via `.pi/probe-edge-resilience.sh
+W01,...,W24` (W14/W21 do not exist as modules). W24 exercised the fixed
+failover worker against every other drill in sequence - no cross-test
+interference from the cache/failover changes. Artifact:
+out/run-2026-08-16T07-50-20-504Z.{json,md}.
