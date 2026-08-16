@@ -8,13 +8,13 @@
  * 1. SQL: Create table `public.w23_hb(ts timestamptz default now())`.
  *    Ensure `pg_cron` extension is installed.
  *    Schedule `cron.schedule('w23-hb', '* * * * *', $$insert into public.w23_hb default values$$)`.
- * 2. Wait for 2 heartbeat rows (~2 min 10s, poll every 15s).
+ * 2. Wait for 2 heartbeat rows (150s budget, poll every 10s).
  * 3. Restart the project: `POST /projects/{ref}/restart` via mgmt.
- *    Record restart start; poll the REST API (probe table) until 2/200 - record
- *    the outage seconds.
- * 4. Keep polling `w23_hb` rows for 4 minutes post-restart.
- * 5. Record: rows before, outage window, rows after, and whether the schedule
- *    SKIPPED beats during the outage or doubled after.
+ *    Record restart start; poll the REST API (probe table) until HTTP 200
+ *    (120s budget) - record the outage seconds.
+ * 4. Wait 4 minutes post-restart, then count `w23_hb` rows once.
+ * 5. Record: rows before, outage window, rows after, and diff (skip/double
+ *    inference is left to the reader).
  *
  * Pass criteria: heartbeat gaps + outage window recorded verbatim. Any
  * measured behavior passes.
@@ -26,7 +26,7 @@ const mod: TestModule = {
   id: "W23",
   title: "pg_cron across a restart",
   where: "local",
-  requires: ["pat", "pgbench"],
+  requires: ["pat"],
   destructive: true,
 
   async run(ctx: Ctx): Promise<TestResult> {

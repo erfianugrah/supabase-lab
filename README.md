@@ -22,6 +22,23 @@ facts):
   same-region only): endpoint + SG (5432 AND 6543), Route53 PHZ for
   verify-full, in-VPC runner, CLI migration paths, network-restriction
   closure, restart behaviour.
+- `edge-resilience` - what a client can do about platform incidents that
+  are not theirs to fix: 22 measured modules (W01-W24) across JWT skew,
+  edge cache/failover (Cloudflare worker), warm-standby replication and
+  cutover, storage, realtime, edge functions, and pg_cron. Full battery
+  22/22 unattended. See its FAILURE-MATRIX.md + RUNLOG.md.
+- `platform-downtime` - what a platform operation (restart, resize,
+  upgrade, pause) costs a client, per connection path, in measured
+  seconds.
+- `platform-facts` - not a behaviour test; harvests per-project facts
+  (pg_settings, extensions, versions) for reference.
+- `pooler-semantics` - Supavisor session-vs-transaction mode behaviour,
+  error codes, and capacity signatures.
+- `pdf-corpus-graph` - PDF corpus ingestion + entity graph experiment.
+- `stripe-sync-schema` - does the Stripe Sync Engine's projected Postgres
+  schema stay in sync with the Stripe API surface.
+- `vault-root-key` - two projects; the migration-guide item about vault
+  secrets and the project root key.
 
 ## Setup (once)
 

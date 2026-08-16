@@ -24,8 +24,8 @@ import type { Ctx, TestModule, TestResult } from "../../../harness/src/types";
 
 const UNROUTABLE = "https://192.0.2.1";
 // The hold window must comfortably exceed the redeploy+settle path between
-// the last outage probe and the holdover probe (~15s observed) - 15s was
-// marginal and measured an expired window.
+// the last outage probe and the holdover probe (~11s observed) - HOLD_MS=15000
+// was marginal and measured an expired window.
 const HOLD_MS = 60_000;
 
 const mod: TestModule = {
@@ -85,9 +85,12 @@ const mod: TestModule = {
       return { status: res.status, cache, origin, body };
     };
 
-    /** Invalidate the cache for the probe URL by re-deploying - the worker
-     *  restores its in-memory failover state on each deploy. We also bust the
-     *  CF edge cache by using a unique cache-buster query param per step. */
+    /** Unique cache-buster query param per step. The worker strips
+     *  _-prefixed params from the origin URL (PostgREST would 400 on unknown
+     *  params) but keeps the full URL in the cache key, so each step gets a
+     *  fresh cache entry. Failover hold state lives in the Cache API
+     *  (https://worker/last-failure) and persists across redeploys - that is
+     *  what the holdover probe exercises. */
     const freshUrl = () => `${edgeUrl}/rest/v1/w_probe?select=id&_w24=${Date.now()}`;
 
     let restoredDeployPending = false;
@@ -211,10 +214,15 @@ const mod: TestModule = {
         evidence: evidence.join("\n"),
       };
     } finally {
-      // Always restore the default deploy.
+      // Always restore the default deploy (same var-clearing as step 4).
       if (restoredDeployPending) {
         try {
-          await deploy({ OUTAGE: "false" });
+          await deploy({
+            OUTAGE: "false",
+            FAILOVER_PRIMARY: "",
+            FAILOVER_STANDBY: "",
+            HOLD_MS: "",
+          });
         } catch {
           // best effort
         }

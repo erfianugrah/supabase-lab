@@ -56,8 +56,10 @@ const mod: TestModule = {
     };
 
     const cleanup = async () => {
-      // Subscription first (stops the slot), then publication, then TPA,
-      // then the user. Best-effort throughout.
+      // Subscription first, then publication, then TPA. (User deletion
+      // happens in the run's inner finally.) Plain DROP is fine for a healthy
+      // subscription; the wedged-subscription recovery (disable -> slot_name=
+      // none -> drop) is the W09/W14 pattern. Best-effort throughout.
       await runSql(standby, `DROP SUBSCRIPTION IF EXISTS w05_sub`).catch(() => {});
       await runSql(primary, `DROP PUBLICATION IF EXISTS w05_pub`).catch(() => {});
       // Dropping the subscription on the standby leaves its replication slot

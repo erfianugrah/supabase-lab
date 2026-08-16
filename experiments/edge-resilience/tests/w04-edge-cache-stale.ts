@@ -123,12 +123,12 @@ const mod: TestModule = {
       );
 
       // Step 6: cold read under outage - unique query string bypasses cache.
-      // The worker fetches from the BLACKHOLE (192.0.2.1 TEST-NET-1). In CF
-      // Workers the underlying TCP connect fails fast but the platform wraps it
-      // as an HTTP error response (403) rather than a JS network exception, so
-      // the catch branch (503/EMPTY) is not reached. The worker's fallthrough
-      // returns the origin's error with tag PASS. Either way, the cold read is
-      // non-200 and not serving cached data - which is the finding.
+      // The worker fetches from the BLACKHOLE (192.0.2.1 TEST-NET-1). CF
+      // Workers wraps the TCP failure as a 403 RESPONSE (not a JS exception),
+      // which the worker's isFailure() treats as origin failure (5xx, 403, or
+      // any non-ok under OUTAGE) - so the catch branch runs: no standby, cold
+      // URL not cached -> 503 with x-drill-cache EMPTY. (Pre-W24 workers fell
+      // through to 403/PASS here; see RUNLOG W04/W24.)
       const cb = Math.random().toString(36).slice(2, 10);
       const coldUrl = `${edgeUrl}/rest/v1/w_probe?select=id&cb=${cb}`;
       const coldProbe = await fetchProbe(coldUrl);
@@ -161,10 +161,10 @@ const mod: TestModule = {
       //   cold read: 503, tag EMPTY
       //   after restore: 200, tag MISS or HIT
       // Cold read pass criteria: status is non-200 AND tag is not HIT/STALE
-      // (the worker did not serve a cached response). The SPEC describes the
-      // intended 503/EMPTY path; CF Workers instead returns 403/PASS because
-      // its fetch to 192.0.2.1 fails as a non-ok HTTP response rather than a
-      // JS exception. Both satisfy the finding: "cold reads fail during outage".
+      // (the worker did not serve a cached response). Today's worker maps the
+      // CF-wrapped 403 onto the SPEC's intended 503/EMPTY path via isFailure();
+      // pre-W24 workers returned 403/PASS here. Both satisfy the finding:
+      // "cold reads fail during outage".
       const crit = {
         warm_200: warmProbe.status === 200,
         warm_body_equal: warmProbe.body === hitBody,

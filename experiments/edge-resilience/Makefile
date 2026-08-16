@@ -20,8 +20,9 @@ RUNNER_FLAGS ?=
 
 .PHONY: init validate apply keygen worker-deploy worker-outage worker-normal seed probe probe-destructive destroy up down battery
 
-# Battery ids - every module in the experiment.
-BATTERY := W01,W02,W03,W04,W05,W06,W07,W08,W09,W10,W11,W12,W13
+# Battery ids - every module in the experiment (W14/W21 do not exist as
+# modules: W14 was a manual drill, W21 is unbuilt pending a Pro org).
+BATTERY := W01,W02,W03,W04,W05,W06,W07,W08,W09,W10,W11,W12,W13,W15,W16,W17,W18,W19,W20,W22,W23,W24
 
 # One-command lifecycle. `make down` tears everything down (worker + both
 # projects); `make up` returns to an equivalent state: fresh projects, same
@@ -97,10 +98,12 @@ probe:
 		--only $(ONLY) $(RUNNER_FLAGS) --out evidence/$(TS)
 	@echo "== evidence/$(TS)/ =="
 
-# W04 flips the edge worker's outage switch mid-run. Separate target so a bare
-# `make probe` never mutates the worker by accident.
+# W04 flips the edge worker's outage switch and W24 redeploys it four times
+# mid-run. Separate target so a bare `make probe` never mutates the worker by
+# accident. The full destructive set runs via `make battery` (or the probe
+# script, which always passes --destructive).
 probe-destructive:
-	@$(MAKE) probe RUNNER_FLAGS=--destructive ONLY=W04
+	@$(MAKE) probe RUNNER_FLAGS=--destructive ONLY=W04,W24
 
 destroy:
 	tofu plan -destroy $(VARS) -var="supabase_access_token=$(TOK)" -out=tfplan-destroy
