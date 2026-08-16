@@ -128,7 +128,7 @@ const mod: TestModule = {
         if (arr.length === 0) return 0;
         const sorted = [...arr].sort((a, b) => a - b);
         const index = Math.ceil((p / 100) * sorted.length) - 1;
-        return sorted[index];
+        return sorted[index] ?? 0;
       };
 
       if (coldDurations.length > 0) {

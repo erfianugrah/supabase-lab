@@ -98,7 +98,7 @@ const mod: TestModule = {
           title: this.title,
           status: "fail",
           detail: `minted token failed: HTTP ${probeRes.status}`,
-          evidence: probeRes.text.slice(0, 400),
+          evidence: (await probeRes.text()).slice(0, 400),
           measurements,
         };
       }
@@ -130,7 +130,7 @@ const mod: TestModule = {
           title: this.title,
           status: "fail",
           detail: `wrong secret failed to 401: HTTP ${wrongProbeRes.status}`,
-          evidence: wrongProbeRes.text.slice(0, 400),
+          evidence: (await wrongProbeRes.text()).slice(0, 400),
           measurements,
         };
       }
