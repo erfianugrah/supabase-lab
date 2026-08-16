@@ -19,7 +19,8 @@ Shared rules for every module in this experiment:
   IS the finding (see AGENTS.md key-rotation note on pgrst_code).
 - Measurements become report columns: put offset/attempt/status values in
   `measurements`, not only in prose.
-- 30s timeouts on fetches (`AbortSignal.timeout(30_000)`).
+- Explicit timeouts on fetches (`AbortSignal.timeout(...)`) - 30s for
+  origin probes, 10s for standby/replication polls.
 
 ## W01 - JWT issued-at skew map (the PGRST303 incident class)
 
@@ -143,16 +144,19 @@ File: `tests/w04-edge-cache-stale.ts`. where: "local".
 requires: ["anon-key"]. destructive: true (redeploys the drill worker twice).
 
 Background: the edge worker (worker/worker.ts) caches GETs of the probe
-table and serves the last good response with `x-drill-cache: stale` when the
+table and serves the last good response with `x-drill-cache: STALE` when the
 origin errors or is unreachable. `make worker-outage` repoints origin
 fetches at an unroutable address. This module proves a read path survives a
-full origin outage with zero client change.
+full origin outage with zero client change. (The worker's full failure
+semantics - 5xx, the CF-wrapped 403, `_`-param stripping, and the failover
+mode that bypasses cache-first - are documented under W24; W04 runs in the
+default non-failover deploy.)
 
 Steps:
 1. `edge = ctx.endpoints["edge_url"]`; skip with reason if absent.
 2. Prime: GET `<edge>/rest/v1/w_probe?select=id` (headers apikey +
    Authorization: Bearer ctx.anonKey) until a response carries
-   `x-drill-cache: hit` (up to 5 attempts, 1s apart; record attempts).
+   `x-drill-cache: HIT` (up to 5 attempts, 1s apart; record attempts).
 3. Capture the HIT body.
 4. Trigger outage: run `wrangler deploy --config <wrangler.jsonc path
    resolved relative to this module file> --var "OUTAGE:true"` via Bun `$`.
@@ -160,18 +164,18 @@ Steps:
 5. Warm read under outage: GET the same URL again. The worker checks its
    cache BEFORE the origin, so a warm URL serves `hit` (or `stale`) while the
    origin is unreachable - expect 200 with a body byte-identical to step 3
-   and `x-drill-cache` of `hit` or `stale`. This is the resilience finding:
+   and `x-drill-cache` of `HIT` or `STALE`. This is the resilience finding:
    a warm edge cache makes an origin outage invisible to reads.
 6. The boundary: GET the same path with a unique query (e.g.
    `?select=id&cb=<random>`) - an UNcached URL during the outage must come
-   back `503` with `x-drill-cache: empty`. Records that only warm reads
+   back `503` with `x-drill-cache: EMPTY`. Records that only warm reads
    survive; cold reads fail.
 7. Restore: `wrangler deploy --config <same> --var "OUTAGE:false"`, then GET:
-   expect 200 with `x-drill-cache: miss` or `hit`.
+   expect 200 with `x-drill-cache: MISS` or `HIT`.
 8. Always restore OUTAGE:false in a finally, even on throw.
 
 Pass criteria: warm read under outage is 200 with byte-identical body; cold
-URL under outage is 503/empty; worker restored afterwards. Measurements:
+URL under outage is 503/EMPTY; worker restored afterwards. Measurements:
 prime attempts, deploy durations, warm status+tag, cold status+tag,
 body-equal boolean.
 
@@ -304,22 +308,26 @@ store. Manual drilling (2026-08-15) established the mechanics this module
 must encode:
 
 - A publication on auth.users + auth.identities creates fine, and a
-  subscription connects - but the INITIAL TABLE SYNC stalls permanently
-  in pg_subscription_rel state 'd' on a micro standby: the table-sync
-  workers never spawn because max_worker_processes=6 is exhausted by
-  platform background workers (autovacuum launcher, pg_cron launcher,
-  pg_net worker, logical replication launcher, apply worker). ALTER
-  SYSTEM is permission-denied on managed. The apply worker also HOLDS
-  streaming changes for tables not yet in 'r' state, so a stalled sync
-  blocks everything.
+  subscription connects - but auth.* never streams. The early hypothesis
+  was worker exhaustion on micro (max_worker_processes=6 eaten by
+  platform background workers); W14 DISPROVED it: max_worker_processes
+  is 6 on both micro and small, a custom non-public schema replicates
+  in ~4s on the same instances, and auth.*/storage.* do not replicate
+  by any tested path at any size. The wall is PLATFORM-MANAGED SCHEMAS,
+  not size or workers. With copy_data=true the initial sync stalls in
+  pg_subscription_rel state 'd'; with copy_data=false the WAL sender
+  connects but received_lsn stays NULL - zero changes stream either
+  way. ALTER SYSTEM is permission-denied on managed.
 - The recovery sequence for a wedged subscription (publisher slot lost):
   `alter subscription <s> disable;` then `alter subscription <s> set
   (slot_name = none);` then `drop subscription <s>;` - in that order,
   each single-statement.
-- The workable pattern on a micro: CREATE SUBSCRIPTION ... WITH
+- The attempted pattern: CREATE SUBSCRIPTION ... WITH
   (copy_data = false, streaming = on) - no sync workers needed - plus a
-  MANUAL BACKFILL of existing rows via the API, plus streaming for new
-  writes.
+  MANUAL BACKFILL of existing rows via the API. Streaming never
+  delivered an auth row (this module's own measurement: new user absent
+  after 120s); auth portability rests on TPA + SQL-level backfill +
+  forced re-login, per the W14 conclusion.
 
 Steps (single-statement SQL - W05 lesson):
 1. Primary: `create publication w09_auth_pub for table auth.users,
@@ -441,17 +449,6 @@ Steps:
     payload:{config:{postgres_changes:[{event:"INSERT",schema:"public",
     table:"probe_canary"}]}}, ref:"1"}
    // expect phx_reply with payload.status === "ok" before inserting.
-5b. VERIFIED-WORKING skeleton (measured 2026-08-15: open at ~388ms,
-   phx_reply ok at ~396ms on the drill project) - use this shape:
-   const url = new URL(`wss://${ctx.apiHost}/realtime/v1/websocket`);
-   url.searchParams.set("apikey", ctx.anonKey);
-   url.searchParams.set("vsn", "1.0.0");
-   const ws = new WebSocket(url);
-   // on open, send:
-   {topic:"realtime:public:probe_canary", event:"phx_join",
-    payload:{config:{postgres_changes:[{event:"INSERT",schema:"public",
-    table:"probe_canary"}]}}, ref:"1"}
-   // expect phx_reply with payload.status === "ok" before inserting.
 5. Finally: delete inserted ROWS only - never drop the table or alter
    the publication.
 Pass criteria: connect + join + event received with latency recorded;
@@ -533,8 +530,9 @@ Steps:
    'public.w16_t','id'), coalesce((select max(id) from public.w16_t),0)
    + 1, false)`. Insert again; expect success. Record both attempts.
 5. Finally: cleanup as W15.
-Pass criteria: duplicate-key error recorded verbatim, resync success
-recorded. Any measured behavior passes.
+Pass criteria: the module hard-fails if fewer than 5 rows stream OR if
+the cutover insert error does not contain "duplicate key"; the verbatim
+error and the resync success are recorded in measurements.
 
 ## W17 - auth config parity inventory
 
@@ -582,7 +580,7 @@ cleanup in finally).
 
 Steps:
 1. Idempotent bucket `w19-drill` public (W10 sweep pattern). Upload:
-   a. a valid small PNG (generate 64x64 in code - no external deps),
+   a. a valid small PNG (embedded 1x1 transparent PNG as base64),
    b. `corrupt.png` (text bytes with a .png name),
    c. an SVG file (vector - render path handles differently or errors).
 2. For each object: GET /storage/v1/render/image/public/w19-drill/<name>
@@ -597,23 +595,25 @@ behavior passes.
 ## W20 - statement timeout and lock-wait signature
 
 File: `tests/w20-statement-timeout.ts`. where: "local".
-requires: ["pat"]. destructive: false (creates+drops one table).
+requires: ["pat"]. destructive: true (creates+drops one table).
 
 Steps:
 1. SQL: `create table if not exists public.w20_t(id int primary key)`.
-2. Timeout signature: `set local statement_timeout = '2s'; select
-   pg_sleep(5);` via the query endpoint - record the verbatim error
-   (expected 57014 query_canceled) and the measured wall time.
-3. Lock-wait: this needs two concurrent DB sessions, which the query
-   endpoint does not give - use psql via the pooler session host
-   (aws-0-ap-southeast-2.pooler.supabase.com:5432, user
-   postgres.<ref>, PGPASSWORD=ctx.dbPassword): session A holds
-   `select pg_advisory_lock(42)`; session B
-   `select pg_advisory_lock(42)` with `lock_timeout = '3s'` - record
-   the verbatim 55P03 lock_not_available error and wall time.
+2. Timeout signature: `BEGIN; SET LOCAL statement_timeout = '2s';
+   SELECT pg_sleep(5); COMMIT;` via the Management API query endpoint -
+   record the verbatim error (expected 57014 query_canceled) and the
+   measured wall time.
+3. Lock-wait needs two concurrent sessions: session A is psql via the
+   pooler host from `ctx.endpoints["pooler"]` (user postgres.<ref>,
+   PGPASSWORD=ctx.dbPassword) holding `select pg_advisory_lock(42)`;
+   session B runs through the Management API query endpoint itself -
+   `BEGIN; SET LOCAL lock_timeout = '3s'; SELECT pg_advisory_lock(42);
+   COMMIT;` - record the verbatim 55P03 lock_not_available error and
+   wall time. Skip with reason if the pooler endpoint is absent.
 4. Finally: drop the table.
-Pass criteria: both verbatim errors + wall times recorded. Any measured
-behavior passes.
+Pass criteria: the module hard-fails unless the timeout error contains
+57014 AND the lock error contains 55P03; both verbatim errors + wall
+times recorded.
 
 ## W22 - initial sync at real table size
 
@@ -629,8 +629,9 @@ Steps:
 2. Publication w22_pub; standby same table; subscription with DEFAULT
    copy_data=true (initial sync IS the measurement). Record when the
    standby row count reaches 1000000 (poll every 10s, budget 30 min);
-   if the sync stalls in 'd' past 10 min, record the stall verbatim
-   (that is a finding: the micro/small worker ceiling at scale).
+   if the sync stalls in 'd' past 10 min, record the replicated row
+   count at the 10-min mark (that is a finding - per W14, suspect the
+   platform-managed-schema wall, not a size/worker ceiling).
 3. After sync: insert one canary on the primary, record streaming lag.
 4. Finally: cleanup (subscription, publication, publisher slot, table
    both sides).
@@ -641,7 +642,7 @@ rows.
 ## W23 - pg_cron across a restart
 
 File: `tests/w23-cron-restart.ts`. where: "local".
-requires: ["pat", "pgbench"]. destructive: true (restarts the project;
+requires: ["pat"]. destructive: true (restarts the project;
 cron job created+removed).
 
 Steps:
@@ -649,40 +650,69 @@ Steps:
    default now())`; schedule `select cron.schedule('w23-hb','* * * * *',
    $$insert into public.w23_hb default values$$)` (create extension
    pg_cron first if needed - record verbatim if it fails).
-2. Wait for 2 heartbeat rows (~2 min 10s, poll every 15s).
+2. Wait for 2 heartbeat rows (150s budget, poll every 10s).
 3. Restart the project: POST /projects/{ref}/restart via mgmt. Record
-   restart start; poll the REST API (probe table) until 200 - record
-   the outage seconds.
-4. Keep polling w23_hb rows for 4 minutes post-restart. Record: rows
-   before, outage window, rows after, and whether the schedule SKIPPED
-   beats during the outage (no catch-up) or doubled after.
+   restart start; poll the REST API (probe table) until HTTP 200 within
+   120s - record the outage seconds.
+4. Wait 4 minutes post-restart, then count w23_hb rows once. Record:
+   rows before, outage window, rows after, and diff (skip-vs-double
+   inference is left to the reader of the artifact).
 Pass criteria: heartbeat gaps + outage window recorded verbatim. Any
 measured behavior passes.
 
 ## W24 - edge failover proxy with flap damping
 
-File: `tests/w24-failover-proxy.ts` + worker changes (the drill worker
-gains a failover mode). where: "local". requires: ["anon-key", "peer"].
-destructive: true (redeploys the worker several times; restores after).
+File: `tests/w24-edge-failover-proxy.ts` + worker changes (the drill
+worker has a failover mode). where: "local". requires: ["anon-key"].
+destructive: true (redeploys the worker four times; restores after).
 
-Background: the drill worker currently cache-proxies to UPSTREAM. Add a
-FAILOVER mode (env var FAILOVER_PRIMARY / FAILOVER_STANDBY): GETs to
-/rest/v1/* health-check the primary on failure (5xx or throw) by
-re-fetching from the standby; tag responses x-drill-origin: primary|
-standby. Flap damping: after a failover, hold on standby for a
-HOLD_MS window even if the primary recovers.
+Background: the drill worker cache-proxies GETs of /rest/v1/w_probe to
+UPSTREAM. Its failover mode (env FAILOVER_PRIMARY / FAILOVER_STANDBY /
+HOLD_MS) re-fetches from the standby when the primary fails; every
+tagged response carries x-drill-origin: primary|standby. The drill
+uses the SAME project for both failover targets - what is tested is
+the failover PATH, distinguished by the origin tag (the standby's
+data parity is W05's job).
+
+Shipped failure semantics (three drills' worth of bug fixes - do not
+regress):
+- Origin failure = status >= 500 OR status == 403 OR (OUTAGE == "true"
+  and any non-ok). The 403 clause is load-bearing: CF Workers wraps
+  TCP failures to unroutable origins as a 403 RESPONSE (the W04
+  finding), so a >=500-only condition never trips.
+- Failover mode SKIPS the cache-first read. HIT responses carry no
+  x-drill-origin and would mask the failover entirely (the first
+  iteration measured prime/outage origin "none" because of this).
+  Failover applies only to the CACHEABLE /rest/v1/w_probe path; other
+  paths stay plain passthrough.
+- The worker strips query params starting with "_" from the ORIGIN
+  URL (PostgREST treats unknown params as column filters and 400s -
+  the module's ?_w24= cache-buster 400'd every probe) while keeping
+  the full URL in the cache key, so busting still works.
+- Flap damping: after a failover, hold on standby for HOLD_MS even if
+  the primary recovers. The last-failure timestamp is persisted in the
+  CF Cache API under https://worker/last-failure (colo-local - fine
+  for a drill) and survives redeploys; that persistence is what the
+  holdover step exercises.
+- HOLD_MS=60000 in the module: 15000 was marginal against the ~11s
+  redeploy+settle path between the last outage probe (which refreshes
+  the failure timestamp) and the holdover probe, and measured an
+  expired window.
+- The cleanup deploy explicitly sets FAILOVER_PRIMARY /
+  FAILOVER_STANDBY / HOLD_MS to empty strings (falsy in the worker) -
+  covers wrangler keeping CLI-set vars from a previous deploy, which
+  would silently leave the worker in failover mode and break the
+  cache-first drills (W04 etc.).
 
 Steps:
-1. Update worker/worker.ts with the failover mode (small, surgical -
-   keep the cache path untouched).
-2. Deploy with FAILOVER vars set (both project URLs). Prime: GET the
-   probe table -> 200 x-drill-origin: primary.
-3. Outage on primary: point... simulate by deploying with
-   FAILOVER_PRIMARY set to an unroutable URL (redeploy ~10s). GET ->
-   expect 200 x-drill-origin: standby.
-4. Restore primary URL while... measure holdover: immediately after
-   restore the worker should still serve standby until HOLD_MS passes;
-   then a later GET returns to primary. Record the timings.
-5. Restore default deploy (no outage vars).
+1. Deploy with FAILOVER vars set (primary = real URL, standby = same
+   project). Prime: GET the probe URL -> 200 x-drill-origin: primary.
+2. Outage on primary: redeploy with FAILOVER_PRIMARY set to an
+   unroutable URL (https://192.0.2.1, ~10s). GET -> expect 200
+   x-drill-origin: standby.
+3. Restore primary URL; measure holdover: immediately after restore
+   the worker should still serve standby until HOLD_MS passes; a GET
+   after HOLD_MS + buffer returns to primary. Record the timings.
+4. Restore default deploy (OUTAGE:false + the failover vars cleared).
 Pass criteria: primary/standby/holdover/return sequence recorded with
 timings. Any measured behavior passes.

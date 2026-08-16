@@ -1,8 +1,9 @@
 /**
  * W07 - break-glass edge token minting.
  *
- * Validates that the jwt_secret is exposed via the PostgREST endpoint,
- * allowing for HS256 token minting as an escape hatch during Auth outages.
+ * Validates that the jwt_secret is exposed via the Management API's
+ * /projects/{ref}/postgrest config endpoint, allowing for HS256 token
+ * minting as an escape hatch during Auth outages.
  */
 import type { TestModule, Ctx, TestResult } from "../../../harness/src/types";
 import { mgmt } from "../../../harness/src/mgmt";

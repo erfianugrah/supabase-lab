@@ -99,11 +99,16 @@ and serves the cache before touching the origin.
 ```
 make secrets-decrypt      # repo root, once
 cd experiments/edge-resilience
-make init apply keygen worker-deploy seed
-make probe ONLY=W01,W02,W03
-make probe-destructive    # W04 (redeploys the worker twice)
-make destroy              # when done
+make up                   # init + apply + keygen + worker-deploy + seed
+make battery              # all 22 modules (W01-W13, W15-W20, W22-W24)
+make down                 # when done
 ```
+
+The acceptance gate is `.pi/probe-edge-resilience.sh W01[,W02...]` from
+the repo root - it runs `make up`-equivalent checks and exits nonzero
+unless every named module passes. `make probe ONLY=W04,W24
+RUNNER_FLAGS=--destructive` (target: probe-destructive) covers the two
+worker-mutating modules on their own.
 
 ## W05 - standby replication + token portability (2026-08-15, green)
 

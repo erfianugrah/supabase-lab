@@ -1,5 +1,5 @@
 /**
- * Renders worker/wrangler.jsonc from the tofu-created project ref and the
+ * Renders wrangler.jsonc (experiment root) from the tofu-created project ref and the
  * public JWKS key. Idempotent; worker-deploy runs it every time so the file
  * can never drift from the tofu state.
  *

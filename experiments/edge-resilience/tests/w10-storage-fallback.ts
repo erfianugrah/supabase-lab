@@ -5,8 +5,8 @@
  * exist on the standby. Then verifies the manual sync path (download from
  * primary, upload to standby) closes the gap.
  *
- * Pass criteria: gap recorded (404 before sync), 200 + byte-equal after
- * sync, durations in measurements.
+ * Pass criteria: gap recorded (HTTP 400 with statusCode:404 in the body
+ * before sync), 200 + byte-equal after sync, durations in measurements.
  */
 import type { Ctx, TestModule, TestResult } from "../../../harness/src/types";
 import { mgmt } from "../../../harness/src/mgmt";
@@ -162,7 +162,8 @@ const mod: TestModule = {
         throw new Error(`upload object HTTP ${uploadRes.status}: ${errText.slice(0, 200)}`);
       }
 
-      // Step 2: fetch same path on standby - expect 404 (parity gap).
+      // Step 2: fetch same path on standby - expect HTTP 400 with
+      // statusCode:404 in the body (parity gap).
       const gapRes = await fetch(
         `https://${standby}.supabase.co/storage/v1/object/public/${bucket}/${object}`,
         { signal: AbortSignal.timeout(30_000) },

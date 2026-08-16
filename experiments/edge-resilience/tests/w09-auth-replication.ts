@@ -2,8 +2,11 @@
  * W09 - auth store replication (fresh logins after cutover)
  *
  * Encodes the mechanics from manual drilling (2026-08-15):
- * - copy_data=false avoids the sync-worker stall on micro (max_worker_processes=6
- *   exhausted by platform background workers; ALTER SYSTEM is permission-denied).
+ * - copy_data=false skips the initial-sync worker (which stalls in 'd' for
+ *   auth.*). Per W14 the wall is platform-managed schemas - auth.* and
+ *   storage.* do not replicate at ANY tested size - not the micro worker
+ *   ceiling; the earlier exhaustion hypothesis was disproved (ALTER SYSTEM
+ *   is permission-denied regardless).
  * - The recovery sequence for a wedged subscription is:
  *     ALTER SUBSCRIPTION <s> DISABLE;
  *     ALTER SUBSCRIPTION <s> SET (slot_name = none);
@@ -88,8 +91,8 @@ const mod: TestModule = {
       measurements["publication_created"] = "true";
 
       // Step 2: CREATE SUBSCRIPTION on standby - single-statement (W05 lesson).
-      // copy_data=false: no sync workers needed; avoids the stall on micro where
-      // max_worker_processes=6 is exhausted by platform background workers.
+      // copy_data=false: no sync workers needed; sidesteps the initial-sync
+      // stall. Per W14, auth.* still never streams (platform-schema wall).
       let subCreated = false;
       try {
         await runSql(
@@ -266,7 +269,7 @@ const mod: TestModule = {
       const detail = subCreated
         ? userFound
           ? `subscription active; user streamed in ${measurements["streaming_lag_ms"]}ms; standby password grant HTTP ${measurements["standby_password_grant_status"]}`
-          : `subscription created (copy_data=false); user did not stream within 120s (worker exhaustion on micro expected - see SPEC); evidence recorded`
+          : `subscription created (copy_data=false); user did not stream within 120s (platform-managed schema wall - see W14); evidence recorded`
         : `subscription not created: ${measurements["subscription_error"] ?? "unknown"}; evidence recorded`;
 
       return {

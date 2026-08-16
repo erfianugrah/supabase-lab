@@ -70,7 +70,7 @@ const mod: TestModule = {
       measurements["baseline_diff"] = JSON.stringify(baselineDiff);
       originalConfig = { ...pBaseObj };
 
-      // 2. On the primary PATCH distinguishable values: jwt_exp=42200,
+      // 2. On the primary PATCH distinguishable values: jwt_exp=42222,
       //    uri_allow_list="https://w17.example.com/cb", rate_limit_otp=77.
       //    Wait for readback.
       const patchBody = {
