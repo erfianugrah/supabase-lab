@@ -472,11 +472,15 @@ Ported from throwaway bash that produced the same findings; see RUNLOG.md.
   destroy and passed as `PVLAB_DEAD_REF`, because afterwards the tofu output is
   empty and probing an empty ref returns a meaningless 404.
 
-## experiments/edge-resilience - key facts (validated 2026-08-15)
+## experiments/edge-resilience - key facts (validated 2026-08-16)
 
 - What a CLIENT can do about platform incidents. Full matrix in
   experiments/edge-resilience/FAILURE-MATRIX.md; consolidated reference in
-  RELIABILITY.md at the repo root.
+  RELIABILITY.md at the repo root. 22 modules (W01-W13, W15-W20, W22-W24;
+  W14 was a manual drill, W21 unbuilt), all green, full battery 22/22
+  unattended in ~27 min via `.pi/probe-edge-resilience.sh W01,...,W24`
+  (or `make battery` inside the experiment; lifecycle is `make up` /
+  `make down`, not the AWS-style suite targets).
 - **PostgREST skew tolerance is exactly ~30s** as documented (W01): iat +30s
   accepted, +31s rejected with 401 PGRST303. Expired also PGRST303; unknown
   key PGRST301. The drill path for arbitrary-claim minting is a lab ES256
@@ -503,6 +507,44 @@ Ported from throwaway bash that produced the same findings; see RUNLOG.md.
   minting without GoTrue works; crown jewels, prefer TPA portability.
 - **Concurrent refreshes both succeed** (W08) - naive multi-tab reuse does
   not break sessions.
+- **Platform-managed schemas do not replicate** (W09/W14, supersedes the
+  W09 worker-ceiling note): auth.* and storage.* stream zero changes
+  managed->managed at ANY tested size (micro/small); public and custom
+  schemas replicate fine (~4s). max_worker_processes is 6 on both sizes.
+  Auth portability: TPA + SQL backfill + forced re-login.
+- **DDL on the primary stalls ALL table replication** (W15) - even rows
+  not using the new column; applying the same DDL on the standby resumes
+  in ~6.1s with backfill, no subscription recreation. Migrate standby
+  first.
+- **Cutover trilogy** (W16/W17): sequences do not replicate (first insert
+  duplicate-key; setval resync fixes); per-project auth config (SMTP,
+  SITE_URL, jwt_exp, rate limits) does not follow a cutover - re-apply
+  via mgmt API.
+- **Edge function limits** (W13/W18): 150s idle wall clock (504
+  IDLE_TIMEOUT); cold start is ~1.4s only on the first invoke after
+  deploy+idle - steady-state cold/warm gap is ~100-200ms (p50 284 vs
+  98ms).
+- **Storage render path** (W19): 400 InvalidRequest on an invalid source,
+  SVG passes through unchanged, and the plain URL always serves the
+  original - never a 5xx.
+- **Statement/lock timeouts** (W20): verbatim 57014 at 3467ms wall, 55P03
+  at 4533ms wall via the Management query endpoint (session B) + psql
+  via pooler (session A).
+- **1M-row initial sync** (W22): 22.7s (12.5s in battery), streaming lag
+  ~245-276ms after sync.
+- **pg_cron resumes across a project restart** (W23), no catch-up
+  doubling.
+- **Edge failover worker** (W04/W24 semantics): origin failure = 5xx OR
+  403 (CF Workers wraps TCP failures to unroutable origins as a 403
+  RESPONSE) OR any non-ok under OUTAGE. Failover mode (FAILOVER_* vars)
+  skips cache-first - HITs carry no x-drill-origin and would mask
+  failover. The worker strips `_`-prefixed query params from the origin
+  URL (PostgREST 400s on unknown params) but keeps them in the cache
+  key. Flap damping = HOLD_MS holdover persisted in the Cache API
+  (survives redeploys); HOLD_MS=60000 because 15000 was marginal against
+  the ~11s redeploy+settle path. Cleanup deploys must clear FAILOVER_*
+  vars explicitly (empty string) or the worker can stay in failover
+  mode and break the cache-first drills.
 
 ## Commands
 

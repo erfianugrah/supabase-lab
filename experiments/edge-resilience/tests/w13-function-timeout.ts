@@ -89,8 +89,8 @@ const mod: TestModule = {
       };
     } catch (e: any) {
       return {
-        id: "DSS", // using DSS as placeholder for error context
-        title: "Deployment error",
+        id: "W13",
+        title: this.title,
         status: "fail",
         detail: e.message,
         measurements,
