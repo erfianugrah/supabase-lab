@@ -43,7 +43,9 @@ const mod: TestModule = {
       return res;
     };
 
-    const diffProbe = async (ref: string) => {
+    const diffProbe = async (
+      ref: string,
+    ): Promise<Record<"policies" | "procs" | "triggers" | "views", number>> => {
       const queries = {
         policies: `SELECT count(*) FROM pg_policies WHERE tablename = 'w11_t'`,
         procs: `SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON p.pronamespace = n.oid WHERE n.nspname = 'public' AND p.proname LIKE 'w11%'`,
