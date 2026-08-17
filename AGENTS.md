@@ -536,6 +536,14 @@ Ported from throwaway bash that produced the same findings; see RUNLOG.md.
   ~245-276ms after sync.
 - **pg_cron resumes across a project restart** (W23), no catch-up
   doubling.
+- **Tenant routing isolation + eject cost** (W25): a poisoned routing
+  row degrades only its tenant (502 while others 200); ejecting a row
+  from an env-var table costs a redeploy (~10.6s) - a KV/D1 table
+  ejects without one. Probes must retry toward expected status (deploy
+  propagation lags a fixed settle).
+- **Storage dual-write** (W26): parallel write 200/200 with 107ms skew,
+  bytes equal; partial failure is not atomic (200/400 leaves the object
+  on one side); sync-after closes the gap in 97ms.
 - **The spend cap is not a request-path circuit breaker** (W21,
   Pro-org drill): 105 renders against a 100-transform quota all
   returned 200 - no synchronous disallow at quota+5. Consequences ride

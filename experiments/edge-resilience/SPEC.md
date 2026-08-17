@@ -750,3 +750,56 @@ Steps:
 4. Restore default deploy (OUTAGE:false + the failover vars cleared).
 Pass criteria: primary/standby/holdover/return sequence recorded with
 timings. Any measured behavior passes.
+
+## W25 - tenant routing table: stale row and the eject path
+
+File: `tests/w25-routing-eject.ts` + the worker's /t/<tenant>/ router.
+where: "local". requires: ["anon-key"]. destructive: true (redeploys
+the worker three times; restores after).
+
+Background: matrix 1.2 - a multi-tenant edge worker keeps a
+tenant->origin routing table (KV/D1 in production); a row pointing at a
+dead project degrades that tenant only, and recovery depends on how the
+row gets ejected. The worker gains a router mode: GET
+/t/<tenant>/rest/v1/* looks the tenant up in ROUTE_TABLE (a JSON env
+var), strip-prefixes the tenant segment, drops _-prefixed drill params
+(the W24 PostgREST-400 lesson), and tags every response x-drill-tenant +
+x-drill-origin (live tenant name, "<tenant>->dead", or "ejected").
+
+Steps:
+1. Deploy ROUTE_TABLE={"tenant-a": <live>, "tenant-b": <unroutable>}.
+   Probe both until the expected statuses show (deploy propagation lags
+   a fixed settle - retry, up to ~24s): tenant-a 200, tenant-b 502.
+   That is tenant isolation.
+2. Eject: redeploy with ROUTE_TABLE={"tenant-a": <live>} (tenant-b
+   removed). Probe until tenant-b 404 "tenant ejected". Record the
+   eject cost - with an env-var table it is a redeploy (~10.6s
+   measured); a KV/D1 table ejects without a redeploy, and that
+   difference is the finding.
+3. Restore the default deploy (ROUTE_TABLE cleared).
+Pass criteria: isolation + eject signatures recorded with timings. Any
+measured behavior passes.
+
+## W26 - storage dual-write viability
+
+File: `tests/w26-storage-dual-write.ts`. where: "local".
+requires: ["pat", "peer"]. destructive: true (creates, empties and
+deletes buckets on both projects).
+
+Background: matrix 5.1 - storage objects do not follow their metadata
+(W10), so the documented mitigation is dual-write or an external object
+store. This measures the dual-write pattern's actual shape.
+
+Steps:
+1. Ensure a public bucket on primary AND standby (standby service key
+   via the Management API, the W09/W10 pattern).
+2. Parallel dual-write of one object to both; record per-side durations
+   and skew; read both back and compare bytes.
+3. Partial failure: dual-write where the standby write targets a
+   nonexistent bucket - record the not-atomic signature (one 200, one
+   400; the object exists on one side only).
+4. Recovery: sync-after (download from primary, upload to standby) -
+   record duration; read back on standby.
+5. Finally: empty + delete the bucket on both sides.
+Pass criteria: all three shapes recorded with timings. Any measured
+behavior passes.

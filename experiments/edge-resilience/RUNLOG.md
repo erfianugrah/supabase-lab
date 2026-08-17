@@ -375,3 +375,40 @@ out/run-2026-08-16T07-50-20-504Z.{json,md}.
   (429 SlowDown) for the first minutes.
 - Cost of the drill: ~3 min of Nano compute (covered by credits) and
   zero overage charges - the cap being on is what makes it free.
+
+## W25 - tenant routing table: stale row and the eject path (2026-08-17, green, probe)
+
+- Poisoned routing row: tenant-a serves 200 while tenant-b (pointed at an
+  unroutable origin) gets 502 - tenant isolation holds; a stale row
+  degrades one tenant only.
+- The eject cost is the finding: with the routing table in an env var,
+  ejecting a tenant is a redeploy (10635ms). A production table in
+  KV/D1 ejects without a redeploy; the drill's number is the deploy-bound
+  floor.
+- Drill mechanics worth keeping: deploy propagation to all PoPs lags the
+  settle window (probes must retry toward the expected status, not probe
+  once), and the tenant router strips _-prefixed drill params before the
+  origin fetch (the W24 PostgREST-400 lesson).
+
+## W26 - storage dual-write viability (2026-08-17, green, probe)
+
+- Parallel dual-write of one object to primary + standby: 200/200, skew
+  107ms, bytes equal both sides - the pattern's cost is the slower of
+  the two writes, not a serialization.
+- Partial failure is NOT atomic: primary 200 / standby 400 (aimed at a
+  nonexistent bucket) leaves the object on one side only. Dual-write
+  clients must handle the split-brain signature themselves.
+- Recovery: sync-after (download primary, upload standby) closes the gap
+  in 97ms for a small object - consistent with W10's 780ms first-sync.
+
+## Full battery (2026-08-17)
+
+25 modules (W01-W13, W15-W26), 24/25 pass unattended in ~30 minutes.
+W17 failed on a race: the config-restore readback ran immediately after
+the PATCH and read the pre-restore value (the config apply is async).
+Fixed - the module now polls the readback - and W17 passes on re-probe
+(artifact out/run-2026-08-17T08-13-34-645Z). The baseline diff also
+recorded a platform finding: `custom_oauth_max_providers` defaults
+differ across project generations (32767 vs 3) - auth config defaults
+are not stable across time, which is itself config-parity-relevant.
+Battery artifact: out/run-2026-08-17T07-41-07-229Z.{json,md}.
