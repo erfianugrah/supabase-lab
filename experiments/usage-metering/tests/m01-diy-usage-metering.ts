@@ -166,38 +166,51 @@ const mod: TestModule = {
 
           // ---- M01b: REST-count reconstruction + analytics lag ----
           try {
-            const sentAt = Date.now();
-            let restOk = 0;
+            // Warm-up: wait out the PostGREST schema-cache reload. These GETs
+            // also hit total_rest_requests, so count them separately - the
+            // comparison target is warmup + REST_SENT, not a bare constant.
+            let warmupRequests = 0;
             let lastRestStatus = 0;
-            for (let attempt = 0; attempt < 30 && restOk === 0; attempt++) {
-              // first GET doubles as the schema-cache wait (PGRST205 retry)
+            for (let attempt = 0; attempt < 30; attempt++) {
               const r0 = await fetch(`${base}/rest/v1/m01_payload?select=id&limit=1`, {
                 headers: { apikey: anon, Authorization: `Bearer ${anon}` },
                 signal: AbortSignal.timeout(15_000),
               });
               await r0.text();
+              warmupRequests++;
               lastRestStatus = r0.status;
-              if (r0.status === 200) restOk = 1;
-              else await sleep(5_000);
+              if (r0.status === 200) break;
+              // A 404/PGRST205 here means the table is not exposed yet -
+              // that is data too, recorded via last_rest_status.
+              await sleep(5_000);
             }
-            if (restOk === 1) {
-              for (let i = 1; i < REST_SENT; i++) {
+            // The counted dozen, with count=exact so each also carries a
+            // content-range total (a second observable per request).
+            let lastSentAt = 0;
+            if (lastRestStatus === 200) {
+              for (let i = 0; i < REST_SENT; i++) {
                 const r = await fetch(`${base}/rest/v1/m01_payload?select=id&limit=1`, {
-                  headers: { apikey: anon, Authorization: `Bearer ${anon}` },
+                  headers: {
+                    apikey: anon,
+                    Authorization: `Bearer ${anon}`,
+                    Prefer: "count=exact",
+                  },
                   signal: AbortSignal.timeout(15_000),
                 });
                 await r.text();
                 lastRestStatus = r.status;
+                lastSentAt = Date.now();
               }
             }
             const measurements: Record<string, number | string> = {
-              rest_requests_sent: restOk === 1 ? REST_SENT : 0,
+              rest_requests_sent: lastSentAt > 0 ? REST_SENT : 0,
+              warmup_requests: warmupRequests,
               last_rest_status: lastRestStatus,
             };
             let observed: number | string = "absent";
             let lag: number | string = "not_observed";
             let buckets = 0;
-            if (restOk === 1) {
+            if (lastSentAt > 0) {
               for (let poll = 0; poll < 8; poll++) {
                 await sleep(60_000);
                 const usage = await mgmt(ctx, "GET", `/projects/${ref}/analytics/endpoints/usage.api-counts?interval=15min`);
@@ -207,7 +220,7 @@ const mod: TestModule = {
                 const restCount = latest?.total_rest_requests ?? 0;
                 if (restCount > 0) {
                   observed = restCount;
-                  lag = Math.round((Date.now() - sentAt) / 1000);
+                  lag = Math.round((Date.now() - lastSentAt) / 1000);
                   break;
                 }
               }
@@ -227,18 +240,24 @@ const mod: TestModule = {
 
           // ---- M01c: Prometheus metrics scrape ----
           try {
-            const m = await mgmt(ctx, "GET", `/projects/${ref}/analytics/endpoints/metrics`);
-            const families = (m.text.match(/^# TYPE /gm) ?? []).length;
+            // Direct fetch (not mgmt) so the real Content-Type header is
+            // observable; the Authorization header is the same PAT.
+            const mRes = await fetch(`https://api.supabase.com/v1/projects/${ref}/analytics/endpoints/metrics`, {
+              headers: { Authorization: `Bearer ${ctx.pat}` },
+              signal: AbortSignal.timeout(30_000),
+            });
+            const mText = await mRes.text();
+            const families = (mText.match(/^# TYPE /gm) ?? []).length;
             put({
               id: "M01c",
               title: "M01c: per-project Prometheus metrics endpoint",
               status: "info",
               measurements: {
-                metrics_http_status: m.status,
-                content_type: m.throttled ? "throttled" : m.text.startsWith("{") ? "json" : "text",
+                metrics_http_status: mRes.status,
+                content_type: mRes.headers.get("content-type") ?? "absent",
                 metric_families: families,
               },
-              evidence: m.text.slice(0, 300),
+              evidence: mText.slice(0, 300),
             });
           } catch (e) {
             put({ id: "M01c", title: "M01c: per-project Prometheus metrics endpoint", status: "fail", detail: `threw: ${e}` });
@@ -264,7 +283,7 @@ const mod: TestModule = {
               bucketStatus = r.status;
               if (r.status === 200) break;
               // TenantNotFound = storage tenant still provisioning (see w21)
-              await sleep(5_000);
+              await sleep(3_000 * (attempt + 1));
             }
             const payload = new Uint8Array(UPLOAD_BYTES);
             crypto.getRandomValues(payload);
