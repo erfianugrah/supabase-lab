@@ -71,7 +71,7 @@ const mod: TestModule = {
       .map((t) => `select '${t}' as t, count(*) as n from stripe."${t}"`)
       .join(" union all ");
     const countRes = await q(ctx, countSql);
-    const populated = countRes.rows.filter(([, n]) => Number(n) > 0).map(([t]) => t);
+    const populated = countRes.rows.filter(([, n]) => Number(n) > 0).map(([t]) => t).filter((t): t is string => Boolean(t));
     if (populated.length === 0) {
       return [
         { id: "E03", title: mod.title, status: "skip", detail: "no populated stripe tables yet" },
@@ -87,12 +87,12 @@ const mod: TestModule = {
     }
 
     const typed = new Map<string, Set<string>>();
-    for (const [t, c] of colsRes.rows) {
+    for (const [t = "", c = ""] of colsRes.rows) {
       if (!typed.has(t)) typed.set(t, new Set());
       typed.get(t)!.add(c);
     }
     const returned = new Map<string, Set<string>>();
-    for (const [t, k] of keyRes.rows) {
+    for (const [t = "", k = ""] of keyRes.rows) {
       if (!returned.has(t)) returned.set(t, new Set());
       returned.get(t)!.add(k);
     }
