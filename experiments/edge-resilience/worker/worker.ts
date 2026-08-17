@@ -5,9 +5,11 @@ export interface Env {
   FAILOVER_PRIMARY?: string;
   FAILOVER_STANDBY?: string;
   HOLD_MS?: string;
+  ROUTE_TABLE?: string; // W25: JSON {"tenant": "https://<base>"} tenant->origin map
 }
 
 const CACHEABLE = /^\/rest\/v1\/w_probe/;
+const TENANT = /^\/t\/([^/]+)\/rest\/v1\//;
 const BLACKHOLE = "https://192.0.2.1";
 
 function withTag(r: Response, tag: string, originStr?: string): Response {
@@ -25,6 +27,42 @@ export default {
       return new Response(JSON.stringify({ keys: [JSON.parse(env.JWKS_JSON)] }), {
         headers: { "content-type": "application/json", "cache-control": "public, max-age=60" },
       });
+    }
+
+    // W25 tenant routing mode: /t/<tenant>/rest/v1/* looks the tenant up in
+    // ROUTE_TABLE and proxies there; an unknown tenant is the eject
+    // signature, a dead origin is the stale-route signature. Every response
+    // carries x-drill-tenant so tenant isolation is measurable.
+    const tenantMatch = urlObj.pathname.match(TENANT);
+    if (tenantMatch) {
+      const tenant = tenantMatch[1]!;
+      const table = env.ROUTE_TABLE ? (JSON.parse(env.ROUTE_TABLE) as Record<string, string>) : {};
+      const base = table[tenant];
+      const tag = (r: Response, originStr?: string) => {
+        const n = withTag(r, "ROUTE", originStr);
+        n.headers.set("x-drill-tenant", tenant);
+        return n;
+      };
+      if (!base) {
+        return tag(new Response(JSON.stringify({ error: "tenant ejected" }), { status: 404 }), "ejected");
+      }
+      // Strip the /t/<tenant> prefix before the origin fetch, and drop
+      // _-prefixed drill params (PostgREST 400s on unknown params - the
+      // W24 lesson; the tenant router is a plain proxy, no cache key).
+      const originUrl = new URL(urlObj);
+      for (const key of [...originUrl.searchParams.keys()]) {
+        if (key.startsWith("_")) originUrl.searchParams.delete(key);
+      }
+      const originPath = originUrl.pathname.replace(/^\/t\/[^/]+/, "");
+      try {
+        const origin = await fetch(new Request(`${base}${originPath}${originUrl.search}`, req));
+        if (origin.status >= 500 || origin.status === 403) {
+          return tag(new Response(JSON.stringify({ error: "origin failed", upstream: origin.status }), { status: 502 }), `${tenant}->dead`);
+        }
+        return tag(origin, tenant);
+      } catch {
+        return tag(new Response(JSON.stringify({ error: "origin unreachable" }), { status: 502 }), `${tenant}->dead`);
+      }
     }
 
     if (req.method !== "GET" || !CACHEABLE.test(urlObj.pathname)) {

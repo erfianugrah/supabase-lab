@@ -22,7 +22,7 @@ RUNNER_FLAGS ?=
 
 # Battery ids - every module in the experiment (W14/W21 do not exist as
 # modules: W14 was a manual drill, W21 is unbuilt pending a Pro org).
-BATTERY := W01,W02,W03,W04,W05,W06,W07,W08,W09,W10,W11,W12,W13,W15,W16,W17,W18,W19,W20,W21,W22,W23,W24
+BATTERY := W01,W02,W03,W04,W05,W06,W07,W08,W09,W10,W11,W12,W13,W15,W16,W17,W18,W19,W20,W21,W22,W23,W24,W25,W26
 
 # One-command lifecycle. `make down` tears everything down (worker + both
 # projects); `make up` returns to an equivalent state: fresh projects, same

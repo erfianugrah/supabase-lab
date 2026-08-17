@@ -19,7 +19,7 @@ proves it (module). Status: [green] lab-validated, [doc] doc/design only,
 | # | Failure point | Signature | Detection | Workaround | Test |
 |---|---------------|-----------|-----------|------------|------|
 | 1.1 | Worker exception (CPU limit, bug) | 1101/1102 error page | synthetic probe through worker | keep proxy logic minimal; exceptions logged via workers tail/logs | [doc] |
-| 1.2 | Worker routing data stale (D1/KV routing table points at dead project) | 5xx for some tenants only | per-tenant canary | routing health-check loop, auto-eject | [gap] W-candidate (poison routing row, watch eject) |
+| 1.2 | Worker routing data stale (routing table points at dead project) | 502 for the poisoned tenant only (200 elsewhere) | per-tenant canary | routing health-check loop, auto-eject; env-var table = eject costs a redeploy (10.6s, W25) - KV/D1 ejects without one | [green W25] |
 | 1.3 | CDN/zone issue at customer's own provider | widespread 5xx before origin | compare direct-origin vs via-proxy probes | direct-origin fallback hostname | [doc] |
 
 ## 2. Supabase gateway (shared CF front + kong)
@@ -52,7 +52,7 @@ proves it (module). Status: [green] lab-validated, [doc] doc/design only,
 
 | # | Failure point | Signature | Detection | Workaround | Test |
 |---|---------------|-----------|-----------|------------|------|
-| 5.1 | Storage API down | uploads/downloads 5xx | real-object probe | externalize bulk objects (R2/S3) + dual-write or sync | [gap] W-candidate (dual-write drill) |
+| 5.1 | Storage API down | uploads/downloads 5xx | real-object probe | externalize bulk objects (R2/S3) + dual-write or sync (W26: dual-write viable, 107ms skew; partial failure not atomic; sync-after 97ms) | [green W26] |
 | 5.2 | imgproxy render path failure/timeout | transform URLs fail while originals serve (400 InvalidRequest on invalid source; SVG passes through unchanged) | render-URL probe | pre-generated renditions at upload (billing fix doubles as resilience fix); the plain URL always serves the original | [green W19] |
 | 5.3 | Billing-model surprise | invoice shock, not a request failure | weekly usage-page check | per-item monitoring (no alerting exists) | [green class 6 doc] |
 
@@ -119,14 +119,13 @@ proves it (module). Status: [green] lab-validated, [doc] doc/design only,
 
 ## Coverage summary
 
-green (lab-validated): 0.2 (W08), 2.1 (W04), 2.2 (worker), 3.1
-(W01/W03), 3.2 (W01), 3.3 (L-series), 3.4 (F7), 3.5 (W20), 4.1
-(partial - restart gap measured), 4.2 (W03), 5.3 (class 6 doc), 6.1
-(W12), 7.1 (W13), 7.2 (W18), 8.x, 9.1 (D-series), 9.2, 9.4 (W05),
-10.2 (D-series), 11.1 (W16), 11.2 (W15), 11.3 (W05/W07), 11.4 (W22),
-11.5 (W24), 11.6 (W11), 11.7 (W09), 11.8 (W10), 11.9 (partial W23),
-11.10 (W17).
-W-candidates (worth building): 1.2 routing eject, 5.1 storage
-dual-write.
+green (lab-validated): 0.2 (W08), 1.2 (W25), 2.1 (W04), 2.2 (worker),
+3.1 (W01/W03), 3.2 (W01), 3.3 (L-series), 3.4 (F7), 3.5 (W20), 4.1
+(partial - restart gap measured), 4.2 (W03), 5.1 (W26), 5.3 (class 6
+doc), 6.1 (W12), 7.1 (W13), 7.2 (W18), 8.x, 9.1 (D-series), 9.2, 9.4
+(W05), 10.2 (D-series), 11.1 (W16), 11.2 (W15), 11.3 (W05/W07),
+11.4 (W22), 11.5 (W24), 11.6 (W11), 11.7 (W09), 11.8 (W10), 11.9
+(partial W23), 11.10 (W17), 12.1 (W21).
+W-candidates: none left (1.2 built as W25, 5.1 as W26).
 doc/design only (no lab value or not ours to fix): 0.1, 0.3, 1.1, 1.3,
 2.3, 4.3, 6.2, 9.3, 10.1, 12.x.
