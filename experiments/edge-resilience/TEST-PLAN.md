@@ -1,7 +1,7 @@
 # Test plan - W14 onward
 
 STATUS (2026-08-16): fully executed. W14 answered (manual drill), W15-W20
-and W22-W24 built and green, W21 doc-only (no Pro org). Full battery
+and W22-W24 built and green, W21 built and green in the Pro org. Full battery
 22/22 unattended - see RUNLOG.md. Sections below keep the original
 plans with their measured outcomes appended.
 
@@ -120,7 +120,7 @@ OUTCOME (2026-08-16, green - RUNLOG W20): 57014 at 3467ms wall, 55P03
 at 4533ms wall, both verbatim.
 Public anchor: https://www.postgresql.org/docs/current/errcodes-appendix.html
 
-## W21 - spend cap trip behavior (BLOCKED - needs a Pro org)
+## W21 - spend cap trip behavior
 
 Issue: what a Pro project does when the spend cap trips (usage
 disallowed - but which status codes, which paths?).
@@ -175,9 +175,9 @@ all HTTP 200.
 ## Execution order (completed)
 
 Executed as planned: W14 (manual drill) -> W15 -> W16 -> W17 -> W18 ->
-W19 -> W20 -> W22 -> W23 -> W24. All green 2026-08-15/16; full battery
-22/22 unattended in ~27 min (RUNLOG, 2026-08-16). W21 stays unbuilt
-until a Pro org exists.
+W19 -> W20 -> W21 (Pro-org spend cap) -> W22 -> W23 -> W24. All green 2026-08-15/16/17; full battery
+22/22 unattended in ~27 min (RUNLOG, 2026-08-16). Every planned module now exists
+and is green.
 
 Local rung first for all (single-file modules; the pattern now proven:
 tight SPEC + filename rule + verbatim-evidence rule). Frontier is the

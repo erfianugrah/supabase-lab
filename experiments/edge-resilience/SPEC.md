@@ -615,6 +615,40 @@ Pass criteria: the module hard-fails unless the timeout error contains
 57014 AND the lock error contains 55P03; both verbatim errors + wall
 times recorded.
 
+## W21 - spend cap trip behavior
+
+File: `tests/w21-spend-cap.ts`. where: "local".
+requires: ["pat"]. destructive: true (provisions and deletes a project
+in the Pro org; trips the org's transform quota for the cycle).
+
+Background: the spend cap is a Pro-plan org feature with no Management
+API surface (dashboard-only toggle; on by default on Pro). The only way
+to measure the boundary is to cross it: the Pro transform quota is 100
+distinct origin-image transformations per billing cycle per org, and
+the documented cap behavior is "further usage of that item is
+disallowed until the next billing cycle". What the API answers at #101
+is the measurement. The module is self-contained - it provisions its
+own project rather than touching the drill pair, because the free org
+cannot have a spend cap.
+
+Steps:
+1. POST /v1/projects in the Pro org (ErfiCorp), poll ACTIVE_HEALTHY
+   (~154s measured). Note the fresh-project storage lags: TenantNotFound
+   until the tenant provisions, 429 SlowDown while the pool settles -
+   both need retry, not failure.
+2. Create a public bucket; upload 105 DISTINCT images (per-origin
+   distinctness via a varying tEXt chunk - the quota counts distinct
+   origins).
+3. Render each once (?width=32); record status per index. Find the
+   first non-200 (the boundary) and record its status+body verbatim.
+4. Re-check the boundary image after 30s (is enforcement lagging?) and
+   re-render an already-transformed origin past the boundary.
+5. Finally: DELETE the project (Management API).
+Pass criteria: boundary behavior recorded verbatim. Any measured
+behavior passes. Measured 2026-08-17: NO synchronous enforcement at
+quota+5 (all renders 200) - the cap is not a request-path circuit
+breaker; consequences ride the billing/grace-period path.
+
 ## W22 - initial sync at real table size
 
 File: `tests/w22-bulk-sync.ts`. where: "local".
