@@ -1,0 +1,51 @@
+{
+  "startedAt": "2026-08-17T07:29:55.666Z",
+  "finishedAt": "2026-08-17T07:30:45.781Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "vdxmzjwftkndrhkkbpka",
+  "experiment": "edge-resilience",
+  "labCommit": "f25fdf7",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "OpenSSL 3.6.3 9 Jun 2026 (Library: OpenSSL 3.6.3 9 Jun 2026)"
+  },
+  "results": [
+    {
+      "id": "W25",
+      "title": "tenant routing table - stale row and the eject path",
+      "status": "pass",
+      "detail": "isolation: tenant-a 400 while tenant-b 502 on the poisoned row; eject = a 11701ms redeploy (tenant-b -> 404)",
+      "measurements": {
+        "deploy1_ms": 14476,
+        "tenant_a_status": 400,
+        "tenant_b_status": 502,
+        "eject_deploy_ms": 11701,
+        "tenant_a_after_eject": 400,
+        "tenant_b_after_eject": 404
+      },
+      "evidence": "poisoned table: tenant-a 400 (origin=tenant-a), tenant-b 502 (origin=tenant-b->dead)\nafter eject: tenant-a 400 (unaffected), tenant-b 404 (ejected)",
+      "durationMs": 45519
+    },
+    {
+      "id": "W26",
+      "title": "storage dual-write viability (parallel write, partial failure, sync-after)",
+      "status": "pass",
+      "detail": "dual-write 200/200 (skew 107ms, bytes equal); partial failure 200/400 is not atomic; sync-after 97ms closes the gap",
+      "measurements": {
+        "dualwrite_primary_ms": 432,
+        "dualwrite_standby_ms": 325,
+        "dualwrite_skew_ms": 107,
+        "dualwrite_statuses": "200/200",
+        "bytes_equal": "yes",
+        "partial_statuses": "200/400",
+        "sync_after_ms": 97,
+        "sync_after_status": 200
+      },
+      "evidence": "dual-write shared.bin: primary 200 in 432ms, standby 200 in 325ms\nread-back: primary 200, standby 200, bytes equal: yes\npartial failure shape: primary 200, standby 400 ({\"statusCode\":\"404\",\"error\":\"Bucket not found\",\"message\":\"Bucket not found\",\"code\":\"NoSuchBucket\"}) - dual-write is not atomic; the object exists on one side only\nsync-after partial.bin -> standby: HTTP 200 in 97ms",
+      "durationMs": 4599
+    }
+  ]
+}
