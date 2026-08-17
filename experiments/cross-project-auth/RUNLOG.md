@@ -119,3 +119,21 @@ that fail in the same direction for different reasons is the point.
 ## Cost / teardown
 
 Two Micro projects, ~20 minutes, destroyed same session. `make destroy`.
+
+## 2026-08-17 - X03 green: refresh goes to the ISSUING project, measured
+
+The "Refresh" gap in *What this does NOT answer* is now closed. X03 creates a
+user at the hub, takes two independent password-grant sessions, then presents
+session A's refresh token to the SPOKE's `/auth/v1/token?grant_type=refresh_token`
+while session B's goes to the HUB as the control.
+
+| Probe | Result | Evidence (verbatim) |
+|---|---|---|
+| X03a: hub refresh token at the SPOKE | HTTP 400 | `{"code":400,"error_code":"refresh_token_not_found","msg":"Invalid Refresh Token: Refresh Token Not Found"}` |
+| X03-control: same token kind at the HUB | 200 | (success bodies are never recorded - they carry rotated tokens) |
+
+Read: the spoke can VERIFY a hub-issued access token (X02) but cannot refresh
+one - refresh tokens live in the issuing project's auth store, so a promoted
+tenant depends on the hub being alive at refresh time, exactly as the gap
+suspected. Success-body evidence is deliberately absent: GoTrue rotates on
+refresh, so a recorded 200 body would carry live rotated tokens.
