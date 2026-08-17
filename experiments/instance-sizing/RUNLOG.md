@@ -32,3 +32,13 @@ The floor on a paid org really is Micro ($10/mo class, always-on; paid projects
 cannot be paused), which is the number the tenant-placement cost model stands
 on. Scale-to-zero economics require whatever gated arrangement makes Nano
 available; none of these three doors opens without it.
+
+## 2026-08-17 - I02 green: smart region selection works on a normal paid org
+
+Run artifact: `evidence/run-2026-08-17T22-53-13-608Z.{json,md}` (local).
+
+`region_selection: { type: "smartGroup", code: "apac" }` on POST /v1/projects
+is accepted on the Pro org: HTTP 201, the platform picked `ap-northeast-2`,
+healthy in 135s. So the capacity-driven placement knob is not SfP-gated - a
+platform on a normal paid org can defer the city choice to the platform
+instead of pinning a concrete region per tenant.

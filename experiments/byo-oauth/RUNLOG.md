@@ -47,3 +47,17 @@ redirect behaviour is only observable once a real client_id exists (the
 drill). The lifecycle rows (refresh grant shape, Management API access
 with the OAuth token, revoke time-to-effect) are built and self-skip with
 the reason until the drill supplies them.
+
+## 2026-08-17 - O02 green: the contract-gated edge, measured
+
+Run artifact: `evidence/run-2026-08-17T22-51-31-586Z.{json,md}` (local).
+
+| Probe | Result | Evidence (verbatim) |
+|---|---|---|
+| O02a: POST /v1/oauth/authorize/project-claim with a Pro-org PAT | HTTP 404 | `{"message":"Cannot POST /v1/oauth/authorize/project-claim"}` |
+| O02b: jwt-bearer grant, no client_id | HTTP 422 | `{"message":"Required parameter: client_id"}` |
+
+Read: the claim route is not merely forbidden for a normal org, it does not
+exist for the credential class (404, not 403). The jwt-bearer grant validates
+parameters before any gating - reaching the actual plan gate needs a
+client_id, which is what the manual drill supplies.
