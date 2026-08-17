@@ -120,12 +120,18 @@ const mod: TestModule = {
       }
       measurements["post_patch_diff"] = JSON.stringify(postPatchDiff);
 
-      // 4. Restore the primary's original values; confirm readback.
+      // 4. Restore the primary's original values; confirm readback. The
+      // config apply is async - poll the readback (a single immediate GET
+      // raced the apply in the 2026-08-17 battery and read the patched
+      // value back).
       await mgmt(ctx, "PATCH", `/projects/${primary}/config/auth`, originalConfig);
-      const rRestore = await mgmt(ctx, "GET", `/projects/${primary}/config/auth`);
-      if (rRestore.json && JSON.stringify((rRestore.json as any).jwt_exp) !== JSON.stringify(originalConfig.jwt_exp)) {
-        throw new Error("Restore failed");
+      let restored = false;
+      for (let i = 0; i < 10 && !restored; i++) {
+        const rRestore = await mgmt(ctx, "GET", `/projects/${primary}/config/auth`);
+        restored = !!rRestore.json && JSON.stringify((rRestore.json as any).jwt_exp) === JSON.stringify(originalConfig.jwt_exp);
+        if (!restored) await new Promise((r) => setTimeout(r, 3_000));
       }
+      if (!restored) throw new Error("Restore failed");
       measurements["restore_success"] = "true";
 
       return {
