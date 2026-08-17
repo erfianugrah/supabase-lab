@@ -51,7 +51,7 @@ const mod: TestModule = {
       ctx,
       "select coalesce(api_version::text,'null') from stripe._managed_webhooks",
     );
-    const webhookVersion = wh.ok && wh.rows.length > 0 ? wh.rows[0][0] : "unknown";
+    const webhookVersion = wh.ok && wh.rows.length > 0 ? (wh.rows[0]?.[0] ?? "unknown") : "unknown";
 
     const specDate = pin?.split(":")[2] ?? "unknown";
 

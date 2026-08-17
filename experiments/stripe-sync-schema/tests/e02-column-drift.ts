@@ -81,7 +81,7 @@ const mod: TestModule = {
         { id: "E02", title: mod.title, status: "fail", detail: "table enumeration failed", evidence: tablesRes.raw },
       ];
     }
-    const tables = tablesRes.rows.map((r) => r[0]).filter(Boolean);
+    const tables = tablesRes.rows.map((r) => r[0]).filter((t): t is string => Boolean(t));
     if (tables.length === 0) {
       return [{ id: "E02", title: mod.title, status: "fail", detail: "no stripe object tables found" }];
     }
@@ -94,7 +94,7 @@ const mod: TestModule = {
         order by table_name, column_name`,
     );
     const typed = new Map<string, Set<string>>();
-    for (const [t, c] of colsRes.rows) {
+    for (const [t = "", c = ""] of colsRes.rows) {
       if (!typed.has(t)) typed.set(t, new Set());
       typed.get(t)!.add(c);
     }
@@ -105,7 +105,7 @@ const mod: TestModule = {
       .join(" union all ");
     const countRes = await q(ctx, countSql);
     const counts = new Map<string, number>();
-    for (const [t, n] of countRes.rows) counts.set(t, Number(n));
+    for (const [t = "", n] of countRes.rows) counts.set(t, Number(n));
 
     // Payload keys for every table in one round trip. Table names come from
     // information_schema, not from user input, but they are quoted anyway.
@@ -131,7 +131,7 @@ const mod: TestModule = {
       return [{ id: "E02", title: mod.title, status: "fail", detail: "payload key scan failed", evidence: keyRes.raw }];
     }
     const returned = new Map<string, Set<string>>();
-    for (const [t, k] of keyRes.rows) {
+    for (const [t = "", k = ""] of keyRes.rows) {
       if (!returned.has(t)) returned.set(t, new Set());
       returned.get(t)!.add(k);
     }
