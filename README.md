@@ -23,10 +23,10 @@ facts):
   verify-full, in-VPC runner, CLI migration paths, network-restriction
   closure, restart behaviour.
 - `edge-resilience` - what a client can do about platform incidents that
-  are not theirs to fix: 22 measured modules (W01-W24) across JWT skew,
+  are not theirs to fix: 23 measured modules (W01-W24) across JWT skew,
   edge cache/failover (Cloudflare worker), warm-standby replication and
   cutover, storage, realtime, edge functions, and pg_cron. Full battery
-  22/22 unattended. See its FAILURE-MATRIX.md + RUNLOG.md.
+  battery unattended. See its FAILURE-MATRIX.md + RUNLOG.md.
 - `platform-downtime` - what a platform operation (restart, resize,
   upgrade, pause) costs a client, per connection path, in measured
   seconds.
