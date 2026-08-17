@@ -114,7 +114,7 @@ proves it (module). Status: [green] lab-validated, [doc] doc/design only,
 
 | # | Failure point | Signature | Detection | Workaround | Test |
 |---|---------------|-----------|-----------|------------|------|
-| 12.1 | Spend cap trips (Pro only) | usage disallowed at quota, app degrades | usage watch | intentional cap policy | [doc] |
+| 12.1 | Spend cap trips (Pro only) | usage disallowed at quota - NOT synchronously (quota+5 renders all 200, W21); restriction rides the billing/grace path | usage watch | intentional cap policy | [green W21] |
 | 12.2 | Missed payment -> suspension | project suspended | billing hygiene | billing alerts (Stripe side) | [doc] |
 
 ## Coverage summary

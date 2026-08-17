@@ -100,7 +100,7 @@ and serves the cache before touching the origin.
 make secrets-decrypt      # repo root, once
 cd experiments/edge-resilience
 make up                   # init + apply + keygen + worker-deploy + seed
-make battery              # all 22 modules (W01-W13, W15-W20, W22-W24)
+make battery              # all 23 modules (W01-W13, W15-W24)
 make down                 # when done
 ```
 
@@ -358,3 +358,20 @@ W01,...,W24` (W14/W21 do not exist as modules). W24 exercised the fixed
 failover worker against every other drill in sequence - no cross-test
 interference from the cache/failover changes. Artifact:
 out/run-2026-08-16T07-50-20-504Z.{json,md}.
+
+## W21 - spend cap trip behavior (2026-08-17, green, module)
+
+- Self-contained drill: provisions a Nano project in the Pro org
+  (ErfiCorp) via the Management API, uploads 105 distinct images, and
+  renders each once (Pro transform quota: 100 origin images/cycle).
+- Finding: NO synchronous enforcement at quota+5 - all 105 renders
+  returned 200, including the five past the documented "further usage
+  disallowed" boundary. Already-transformed origins serve fine (200).
+- Meaning: the spend cap is not a request-path circuit breaker. The
+  observable consequences ride the billing path - notification, grace
+  period, then Fair Use restrictions (402/pause/read-only) - not the
+  API response at quota+1. Provisioning: fresh project healthy in 154s;
+  storage tenant lags ACTIVE_HEALTHY (TenantNotFound), pool contended
+  (429 SlowDown) for the first minutes.
+- Cost of the drill: ~3 min of Nano compute (covered by credits) and
+  zero overage charges - the cap being on is what makes it free.
