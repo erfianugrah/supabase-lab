@@ -476,11 +476,13 @@ Ported from throwaway bash that produced the same findings; see RUNLOG.md.
 
 - What a CLIENT can do about platform incidents. Full matrix in
   experiments/edge-resilience/FAILURE-MATRIX.md; consolidated reference in
-  RELIABILITY.md at the repo root. 22 modules (W01-W13, W15-W20, W22-W24;
-  W14 was a manual drill, W21 unbuilt), all green, full battery 22/22
-  unattended in ~27 min via `.pi/probe-edge-resilience.sh W01,...,W24`
-  (or `make battery` inside the experiment; lifecycle is `make up` /
-  `make down`, not the AWS-style suite targets).
+  RELIABILITY.md at the repo root. 23 modules (W01-W13, W15-W24;
+  W14 was a manual drill), all green, full battery 22/22 unattended in
+  ~27 min via `.pi/probe-edge-resilience.sh W01,...,W24` (or
+  `make battery` inside the experiment; lifecycle is `make up` /
+  `make down`, not the AWS-style suite targets). W21 runs in the Pro org
+  (ErfiCorp) and provisions/deletes its own project - it needs no drill
+  pair and no `make up`.
 - **PostgREST skew tolerance is exactly ~30s** as documented (W01): iat +30s
   accepted, +31s rejected with 401 PGRST303. Expired also PGRST303; unknown
   key PGRST301. The drill path for arbitrary-claim minting is a lab ES256
@@ -534,6 +536,13 @@ Ported from throwaway bash that produced the same findings; see RUNLOG.md.
   ~245-276ms after sync.
 - **pg_cron resumes across a project restart** (W23), no catch-up
   doubling.
+- **The spend cap is not a request-path circuit breaker** (W21,
+  Pro-org drill): 105 renders against a 100-transform quota all
+  returned 200 - no synchronous disallow at quota+5. Consequences ride
+  the billing path (notification, grace period, Fair Use restrictions),
+  not the API response at quota+1. Also: fresh-project storage lags
+  ACTIVE_HEALTHY (TenantNotFound, then 429 SlowDown for the first
+  minutes - retry, don't fail).
 - **Edge failover worker** (W04/W24 semantics): origin failure = 5xx OR
   403 (CF Workers wraps TCP failures to unroutable origins as a 403
   RESPONSE) OR any non-ok under OUTAGE. Failover mode (FAILOVER_* vars)
