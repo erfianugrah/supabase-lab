@@ -675,6 +675,30 @@ Always pass `--experiment <dir>` in probes.
   experiments/byo-oauth/RUNLOG.md.
 - `.pi/sweep-all.sh` runs every acceptance probe in a burst-safe order.
 
+## experiments/auth-refresh-race - key facts (validated 2026-08-19)
+
+- The defect, reproduced: gotrue-dart 2.21.0 (supabase_flutter 2.14.0 pins it)
+  destroys the CURRENT, still-valid session when GoTrue rejects a stale
+  refresh token with refresh_token_already_used - _removeSession() +
+  signedOut event. Fixed in gotrue 2.22.0 / supabase_flutter 2.15.0
+  (PR 1351): the rejection is absorbed and the existing session returned.
+- GoTrue reuse semantics (v2.195.0 source + live probes): direct-parent
+  reuse of a revoked token is tolerated without any time limit; older
+  generation reuse rejects only past refresh_token_reuse_interval;
+  concurrent same-token refreshes dedupe to one network call even pre-fix.
+- Hosted platform quirk: PATCH of security_refresh_token_reuse_interval is
+  accepted and reads back, but the running auth service kept the ~10s
+  default (measured 2s tolerated / 15s rejected). Config does not propagate.
+- Still-signed-out playbook (on >= 2.15.0): expired-session + stale token =
+  deliberate sign-out (repro scenario T1, jwt_expiry=30s locally);
+  cross-isolate refresh (dedup is per AuthClient instance, no
+  BroadcastChannel off-web); app-side signOut-on-401; tracker residual
+  #1372 retryable-fetch recovery and #1687 WASM session deser; recoverSession
+  via custom LocalStorage resurrecting old tokens.
+- Differential harness: dart/ holds the repro; make repro / repro-local
+  (REUSE_WINDOW_SEC default 12) prints VERDICT=defect-reproduced vs fixed;
+  both hosted and local environments verified. Dart SDK at ~/sdk/dart-sdk.
+
 ## Commands
 
 Root: `make secrets-decrypt`, `make secrets-encrypt`, `make experiments`.
