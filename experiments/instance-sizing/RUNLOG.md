@@ -42,3 +42,28 @@ is accepted on the Pro org: HTTP 201, the platform picked `ap-northeast-2`,
 healthy in 135s. So the capacity-driven placement knob is not SfP-gated - a
 platform on a normal paid org can defer the city choice to the platform
 instead of pinning a concrete region per tenant.
+
+## 2026-08-18 - I03: legacy free-era project lifecycle on a Pro org
+
+Subject: a pre-existing project created while the org was on the free plan,
+found INACTIVE (paused) in the now-Pro org. Run artifact:
+`evidence/run-2026-08-18T00-19-19-226Z.{json,md}` (local).
+
+| Probe | Result | Read |
+|---|---|---|
+| I03-control | initial_status INACTIVE | a legacy paused project keeps its paused state after the org upgrade |
+| I03a: restore | HTTP 200 accepted, but NOT ACTIVE_HEALTHY within the 20-min bound (wake_s = -1) | the legacy wake is slow; the project did reach ACTIVE_HEALTHY later (observed ~30 min after the restore call). Compute while healthy: no selected addon |
+| I03b: pause | not attempted by the module (project not healthy in-bound) | attempted directly afterwards: HTTP 400, verbatim below |
+
+The pause attempt, verbatim:
+
+```
+POST /v1/projects/{ref}/pause
+400 {"message":"Project is not free-tier. Please downgrade it to free-tier first and try again."}
+```
+
+Read: pause eligibility follows the org's CURRENT plan, not the project's
+creation lineage. A legacy paused project is a one-way door: once woken it
+cannot be re-paused and joins the always-on compute floor. For a platform
+carrying dormant tenants, "wake on demand" for a legacy/free-era project
+permanently changes its cost basis.
