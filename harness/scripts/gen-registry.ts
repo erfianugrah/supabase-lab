@@ -59,8 +59,16 @@ found.forEach(({ dir, file }, i) => {
   lines.push(`import m${i} from "${spec.startsWith(".") ? spec : `./${spec}`}";`);
 });
 
+// Stamp each module with the experiment dir it came from. Module ids collide
+// across experiments (I01 in one dir, I01 in another); without the stamp,
+// `--only` selects every module with that id and `--experiment` cannot
+// disambiguate.
+const expOf = (dir: string) => relative(experimentsRoot, dir).split("/")[0] ?? "";
+
 lines.push("");
-lines.push(`export const tests: TestModule[] = [${found.map((_, i) => `m${i}`).join(", ")}];`);
+lines.push(
+  `export const tests: TestModule[] = [${found.map((f, i) => `{ ...m${i}, experiment: ${JSON.stringify(expOf(f.dir))} }`).join(", ")}];`,
+);
 lines.push("");
 
 await Bun.write(outFile, lines.join("\n"));

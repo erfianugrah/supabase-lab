@@ -140,6 +140,7 @@ const main = async () => {
     where,
     capabilities: ctx.capabilities,
     only,
+    experiment,
     allowDestructive: flag("destructive"),
   });
 
