@@ -33,6 +33,18 @@ const mod: TestModule = {
       if (p.status === 200) {
         const json = p.json as { status?: string } | undefined;
         initialStatus = json?.status ?? "unknown";
+      } else if (p.status === 400 || p.status === 404) {
+        // The legacy subject is a one-shot resource: once consumed (or
+        // deleted), the module skips rather than failing forever.
+        for (const id of ["I03-control", "I03a", "I03b"] as const) {
+          results.push({
+            id,
+            title: id,
+            status: "skip",
+            detail: "legacy subject project no longer exists (consumed or deleted)",
+          });
+        }
+        return results;
       } else {
         controlStatus = "fail";
         controlDetail = `HTTP ${p.status}`;
@@ -83,9 +95,7 @@ const mod: TestModule = {
         // Poll until ACTIVE_HEALTHY (max 20 min, every 15s)
         for (let i = 0; i < 80; i++) {
           await sleep(15_000);
-          const p = await mgmt(ctx, "GET", `/projects/${ctx.
-            ref
-          }`);
+          const p = await mgmt(ctx, "GET", `/projects/${LEGACY_REF}`);
           const json = p.json as { status?: string } | undefined;
           if (json?.status === "ACTIVE_HEALTHY") {
             wakeS = Math.round((Date.now() - t0) / 1000);
