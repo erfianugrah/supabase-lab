@@ -78,6 +78,11 @@ Future<void> main(List<String> args) async {
       print('waiting ${reuseWindowSec}s for the reuse window to lapse...');
       await Future.delayed(Duration(seconds: reuseWindowSec));
 
+      // Capture whether the current session had ALREADY expired before
+      // presenting the stale token - the fixed client only absorbs
+      // already-used when the session is still valid (T1 scenario).
+      final wasExpired = client.currentSession?.isExpired ?? true;
+
       // The resumed-app path: present the stale token.
       Object? error;
       try {
@@ -96,6 +101,7 @@ Future<void> main(List<String> args) async {
       await Future.delayed(const Duration(milliseconds: 500));
       print('---RESULT---');
       print('error_code=${error is AuthApiException ? error.code : '-'}');
+      print('session_expired_before_stale=$wasExpired');
       print('session_survived=$survived');
       print('signed_out_emitted=${events.contains('signedOut')}');
       print('events=${events.join(',')}');
@@ -106,8 +112,13 @@ Future<void> main(List<String> args) async {
       // returns WITHOUT throwing. The grandparent-token server rejection
       // itself was verified out-of-band with curl (see RUNLOG).
       if (error != null && !survived) {
-        print('VERDICT=defect-reproduced (valid session destroyed by a '
-            'stale-token race)');
+        if (wasExpired) {
+          print('VERDICT=correct-signout (session was already expired; '
+              'fixed client deliberately signs out when it cannot absorb)');
+        } else {
+          print('VERDICT=defect-reproduced (valid session destroyed by a '
+              'stale-token race)');
+        }
       } else if (error == null && survived) {
         print('VERDICT=fixed (stale-token rejection absorbed, valid session '
             'returned)');
