@@ -33,3 +33,15 @@ treat "non-JSON body" and "JSON 429" as the same back-off signal - but the
 measured breach here is machine-readable, and the remaining-budget headers
 make pre-emptive shaping possible: read `x-ratelimit-remaining` rather
 than inferring the budget.
+
+## 2026-08-18 - L01b: the budget is cumulative across a user's PATs
+
+Two PATs from the same user, alternating calls on the same scoped read:
+
+- PAT1 remaining: 116 -> 114 -> 112 -> 110
+- PAT2 remaining: 115 -> 113 -> 111 -> 109
+
+Each token's remaining count drops when the OTHER token calls - one shared
+counter per user per scope (matching the documented identity priority:
+OAuth App ID, then User ID for a PAT, then IP). PAT sharding does not
+multiply the budget.
