@@ -34,3 +34,8 @@ node_modules/
 # Loop harness manifests: local tooling, and they carry absolute paths from
 # whichever machine wrote them.
 .pi/
+
+# dart pub artifacts
+.dart_tool/
+.pub/
+pubspec.lock

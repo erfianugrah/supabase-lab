@@ -1,0 +1,12 @@
+name: auth_refresh_race_repro
+description: >-
+  Repro harness for the supabase_flutter concurrent-refresh defect
+  (issues 895/930, fixed upstream by PR 1351 in gotrue v2.22.0).
+  Runs against a disposable lab project; no account-specific data anywhere.
+publish_to: none
+
+environment:
+  sdk: ^3.13.1
+
+dependencies:
+  gotrue: 2.27.2
