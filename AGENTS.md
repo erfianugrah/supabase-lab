@@ -563,6 +563,34 @@ Ported from throwaway bash that produced the same findings; see RUNLOG.md.
   vars explicitly (empty string) or the worker can stay in failover
   mode and break the cache-first drills.
 
+## experiments/image-transformations - key facts (validated 2026-08-18)
+
+One project, no AWS. Storage image transformation billing + runtime surface.
+See RUNLOG.md. Complements edge-resilience W19/W21.
+
+- Only the four `/render/image/*` surfaces transform; `/object/public` and
+  `/object/sign` SILENTLY IGNORE appended transform params (200 + full
+  original). supabase-js `createSignedUrl(path, exp, {transform})` embeds
+  the transform in the token and returns a `/render/image/sign/` URL.
+- Docs' 1-2500px bound is wrong at runtime: 2501 accepted, silent clamp at
+  3000 and at source dims, never an error. 25MB/50MP source limits ARE
+  enforced (400 at render time; the objects upload fine first).
+- Signed render URLs fail closed: edited query params are ignored (the
+  token's transform is what renders); expiry enforced.
+- `/render/image/authenticated` enforces storage RLS - denied without a
+  select policy, allowed with one (negative control included).
+- No `Vary: Accept` on render responses despite content negotiation -
+  first-warm fixes the format at that URL until TTL.
+- Overwrite invalidation is unreliable: 4 of 5 valid trials served the
+  stale variant past the poll window (up to 60s) after a confirmed x-upsert
+  overwrite. Version object paths; do not rely on Smart CDN purge-on-update.
+- Rate ceiling exists: ~2% 429s at 500 parallel fresh renders, ~9% at
+  1000. The earlier ad-hoc 200-parallel probe was simply under it.
+- Storage POST without `x-upsert: true` 400s on an existing path - check
+  the mutation landed before reading the effect (an early I06 "stale
+  cache" fail was exactly this harness bug).
+- Billing counter remains dashboard-only (I10 needs PVLAB_PLATFORM_JWT).
+
 ## Commands
 
 Root: `make secrets-decrypt`, `make secrets-encrypt`, `make experiments`.
