@@ -33,3 +33,31 @@ recording a constant 12; it should count actual requests sent, send
 `Prefer: count=exact`, and anchor `observation_lag_s` to the LAST sent
 request. M01c's `content_type` is body-sniffed, not the response header
 (mgmt() does not expose headers).
+
+## 2026-08-18 - M02 green: scoped per-tenant metrics through a credential-proxy gateway
+
+The god-mode-credential problem: scraping per-tenant metrics with a raw PAT
+(or project secret) hands the scraper a full-privilege credential. M02
+validates the PAT-proxy pattern end to end against the operator's own
+gateway deployment (a Cloudflare Workers credential proxy with an IAM-style
+policy engine and a D1 audit log): the PAT is registered server-side, a key
+scoped to `supabase:metrics:read` on `project:<ref>` is minted, and only
+that key leaves the control plane.
+
+Run artifact: `evidence/` is gitignored; reproduce with
+`.pi/probe-usage-metering.sh M02` (needs GATEKEEPER_URL + GATEKEEPER_ADMIN_KEY).
+
+| Probe | Result | Read |
+|---|---|---|
+| M02-control | gateway + admin key 200 | - |
+| M02a | project healthy in 134s; upstream register 200, 0 warnings | the gateway probes the PAT against the live Management API on registration |
+| M02b | scoped key minted (200) | the key id IS the bearer (44 chars, `sbp_`-shaped because it is bound to a supabase upstream) |
+| M02c | proxied scrape 200, 278 metric families; unclassified path 403; other project ref 403 | deny-by-default and per-resource scoping both enforced - a leaked key reaches exactly one project's metrics and nothing else |
+| M02d | proxied calls visible in the proxy-events feed, ~1s flush | the feed never stores the bearer: key_id is the non-secret `first4...last4` preview - correlate on that, not the raw key |
+
+Contract corrections discovered while testing (the live gateway API, not
+the docs, is authoritative): POST /admin/keys requires `upstream_token_id`;
+proxy usage events live at `/admin/supabase/analytics/events`
+(`/admin/audit/events` is the admin-lifecycle log); event `key_id` is the
+preview form, so server-side filtering by the full bearer silently matches
+nothing.
