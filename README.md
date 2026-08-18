@@ -53,6 +53,12 @@ facts):
 - `rate-limits` - the Management API throttle surface: headers, 120/min,
   JSON 429 with retry-after, and the budget being cumulative across a
   user's PATs.
+- `auth-refresh-race` - the supabase_flutter stale-refresh-token sign-out:
+  reproduced the pre-fix defect (gotrue 2.21.0 destroys a valid session on
+  `refresh_token_already_used`), confirmed the fix boundary (gotrue 2.22.0 /
+  supabase_flutter 2.15.0), mapped the remaining deliberate sign-out paths on
+  >= 2.15.0, and measured the GoTrue reuse semantics (parent tolerance,
+  grandparent cutoff, config-propagation gap).
 - `usage-metering` - per-project cost attribution: the estimator against a
   live org, exact per-key gateway metering, the control-plane store,
   idempotent rollups, and invoice-PDF reconciliation.
