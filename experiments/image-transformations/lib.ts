@@ -9,7 +9,7 @@
  */
 import { deflateSync } from "node:zlib";
 import { randomBytes } from "node:crypto";
-import type { Ctx } from "../../../harness/src/types";
+import type { Ctx } from "../../harness/src/types";
 
 // ---------------------------------------------------------------------------
 // PNG encoder (8-bit truecolor, filter 0)
@@ -28,7 +28,7 @@ const CRC_TABLE = (() => {
 function crc32(buf: Buffer): number {
   let c = 0xffffffff;
   for (let i = 0; i < buf.length; i++)
-    c = CRC_TABLE[(c ^ buf[i]) & 0xff] ^ (c >>> 8);
+    c = (CRC_TABLE[(c ^ (buf[i] ?? 0)) & 0xff] ?? 0) ^ (c >>> 8);
   return (c ^ 0xffffffff) >>> 0;
 }
 
