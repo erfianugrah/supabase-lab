@@ -61,3 +61,22 @@ Read: the claim route is not merely forbidden for a normal org, it does not
 exist for the credential class (404, not 403). The jwt-bearer grant validates
 parameters before any gating - reaching the actual plan gate needs a
 client_id, which is what the manual drill supplies.
+
+## 2026-08-18 - O03 green: the project's own OAuth IdP, and client_id in RLS, headless
+
+A different OAuth surface from O01/O02: the PROJECT's own OAuth 2.1
+authorization server (Supabase-as-IdP for third-party apps). The
+shared-tenancy guide carried "tokens issued through it carry a `client_id`
+claim, usable in RLS" as documented-not-tested. This run executes the whole
+flow headless on a throwaway project (artifact: `evidence/run-2026-08-18T04-31-39-932Z.{json,md}`).
+
+| Probe | Result | Read |
+|---|---|---|
+| O03-control | pass (175s to healthy, config PATCH 200) | `oauth_server_enabled` + `oauth_server_authorization_path` settable via `PATCH /v1/projects/{ref}/config/auth` |
+| O03a | info | OAuth client registered via `POST /auth/v1/admin/oauth/clients` (needs BOTH `apikey` and `Authorization` headers) |
+| O03b | pass: client_id claim present, aud=authenticated, scope=email | the consent flow is fully headless: GET authorize (302 -> authorization_id) -> GET `/oauth/authorizations/{id}` (binds the user) -> POST `.../consent {action:"approve"}` -> code -> token with `client_secret_basic` + PKCE (PKCE is REQUIRED even for confidential clients) |
+| O03c | info: visible_with_matching_client=1, hidden_with_other_client=1 | an RLS policy on `auth.jwt() ->> 'client_id'` shows the row to the matching client's token and hides it from a second client's token for the same user |
+
+Read: the second scoping dimension is real and works exactly as documented -
+one shared project can distinguish third-party client applications in RLS,
+not just users.
