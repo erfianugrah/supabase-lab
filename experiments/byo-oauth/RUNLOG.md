@@ -80,3 +80,18 @@ flow headless on a throwaway project (artifact: `evidence/run-2026-08-18T04-31-3
 Read: the second scoping dimension is real and works exactly as documented -
 one shared project can distinguish third-party client applications in RLS,
 not just users.
+
+## 2026-08-18 - O01 lifecycle green: the full BYO OAuth token story, measured
+
+After the manual drill (OAuth app registered with Organizations:Read +
+Projects:Read, consent approved via the localhost listener):
+
+| Probe | Result | Read |
+|---|---|---|
+| O01c: refresh_token grant | pass: 200, `expires_in: 86400`, `token_type: Bearer`, new refresh token returned | access tokens live 24h and refresh ROTATES the refresh token - a platform must persist the new one or lose the grant |
+| O01d: Management API with the OAuth token | orgs 200 (1 org), projects 200 (3 projects) | the grant is org-scoped: the token sees exactly the one org approved at consent (3 standing projects), not the account's other orgs |
+| O01e: revoke | 204, refresh grant immediately 404, time-to-effect 0s (first poll) | revocation is instant and the revoked refresh token answers 404, not 401/400 |
+
+The full Path B loop is now measured end to end: register (dashboard-only)
+-> authorize (422 client validation first) -> consent -> code -> token ->
+refresh rotates -> org-scoped access -> revoke kills instantly.
