@@ -43,6 +43,19 @@ facts):
   surface: which URL surfaces transform, docs-vs-runtime limits, edge cache
   and overwrite invalidation, signed-URL tampering, RLS on the render path,
   the rate ceiling, and the (dashboard-gated) billing counter.
+- `instance-sizing` - compute-size gating across org classes: Nano rejected
+  three ways on paid orgs, accepted on free orgs; smart region selection;
+  the legacy paused-project one-way door; the free-org pause lifecycle.
+- `byo-oauth` - the Management API OAuth2 surface: authorize behaviour,
+  the full token lifecycle (24 h tokens, refresh rotation, org-scoped
+  grants, instant revocation), the contract-gated claim flow, and the
+  project's own OAuth IdP with `client_id` in RLS.
+- `rate-limits` - the Management API throttle surface: headers, 120/min,
+  JSON 429 with retry-after, and the budget being cumulative across a
+  user's PATs.
+- `usage-metering` - per-project cost attribution: the estimator against a
+  live org, exact per-key gateway metering, the control-plane store,
+  idempotent rollups, and invoice-PDF reconciliation.
 
 ## Setup (once)
 
