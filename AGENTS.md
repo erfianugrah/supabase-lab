@@ -591,6 +591,90 @@ See RUNLOG.md. Complements edge-resilience W19/W21.
   cache" fail was exactly this harness bug).
 - Billing counter remains dashboard-only (I10 needs PVLAB_PLATFORM_JWT).
 
+## experiments/instance-sizing - key facts (validated 2026-08-17/18)
+
+Compute-size gating across org classes; no tofu (self-provisioning, W21
+pattern). I01: on a normal paid org Nano is rejected at create
+(`400 Minimum instance size on paid plans is Micro`), at the addon PATCH
+(`400 addon_variant: Invalid input`), and absent from `available_addons` -
+the floor is Micro. I02: `region_selection {smartGroup, apac}` accepted on
+a paid org (picked ap-northeast-2, 135 s). I03: a legacy free-era project
+keeps its paused state after the org upgrade but CANNOT be re-paused
+(`400 Project is not free-tier`) - pause follows the org's current plan,
+not lineage; the subject was consumed and the module now retires (skips)
+cleanly. I04: free org - nano create 201, no compute addon catalogue at
+all, pause/restore lifecycle live (wake 162-204 s, data API answers
+`HTTP 540 Project paused` while parked).
+
+## experiments/byo-oauth - key facts (validated 2026-08-17/18)
+
+The Management API OAuth2 surface (BYO-backend / Path B). O01: bogus
+client_id -> `422 Unrecognized client_id` (client validation before
+session validation); the lifecycle is gated on `PVLAB_OAUTH_*` from the
+manual drill (app registration is dashboard-only; a localhost listener
+captures the consent code) - measured: 24 h access tokens, refresh
+ROTATES the refresh token, grants are org-scoped to the approved org,
+revocation is instant (204, then 404 on the next refresh). A green O01e
+burns the grant. O02: project-claim 404s for a normal org's credential
+class; jwt-bearer validates params before gating. O03: the project's OWN
+OAuth 2.1 IdP is fully headless-automatable (authorize -> GET
+authorizations/{id} binds the user -> POST consent approve -> token with
+client_secret_basic; PKCE required even for confidential clients) and its
+tokens carry `client_id`, usable in RLS (two-client isolation measured).
+
+## experiments/rate-limits - key facts (validated 2026-08-17/18)
+
+L01: `x-ratelimit-limit/remaining/reset` on every response; limit 120,
+1:1 decrement on a scoped read; a burst trips JSON
+`429 ThrottlerException` with `retry-after: 60` and recovers after the
+window. L01b: the budget is CUMULATIVE across a user's PATs (each token's
+remaining drops on the other's calls) - PAT sharding does not multiply
+it. L01b needs `PVLAB_PAT2` in the env.
+
+## experiments/usage-metering - key facts (validated 2026-08-17/18)
+
+The per-project cost-attribution stack. M01: ground truth exact
+(pg_database_size - TOAST compresses, use random payloads; storage
+listing byte-exact), `usage.api-counts` exact (13/13) at ~61 s lag,
+metrics endpoint 300+ families via PAT. M02/M04: credential-proxy gateway
+(gatekeeper) scoped keys - 200/278 families for the allowed key, 403
+deny-by-default + resource scoping, and EXACT per-key event counting
+(7 calls -> 7 events). Gateway live-API corrections: `POST /admin/keys`
+requires `upstream_token_id`; proxy events live at
+`/admin/supabase/analytics/events` (not `/admin/audit/events`); event
+`key_id` is the non-secret `first4...last4` preview. M03: read-only
+estimator against the live org (3 projects, $29.43/mo compute). M05:
+control-plane store incl. itself (self-inclusion); in-DB per-tenant
+attribution exact via `pg_column_size`; PostgREST exposes only
+`db-schemas` (default public). M06: idempotent rollup properties
+(replay-safe flush, late-event recompute, duplicate-key rejection). M07:
+invoice PDF parses to per-ref rows and reconciles against the live org
+(91 lines, 32 refs; standing projects billed 592/600 h); gated on
+`PVLAB_INVOICE_PDF`; a ref can appear in multiple invoice sections.
+
+## Harness - id collisions and the experiment filter (2026-08-18)
+
+Module ids collide across experiments (image-transformations and
+instance-sizing both use I01-I04). gen-registry stamps each module with
+its experiment dir and planRun honours `--experiment` as a REAL filter -
+before 2026-08-18 it was a label only, and `--only I04` ran both twins.
+Always pass `--experiment <dir>` in probes.
+
+## Pending / gated work
+
+- O01c/d/e need `PVLAB_OAUTH_CLIENT_ID/SECRET/REFRESH_TOKEN` in
+  `.pi/oauth-drill.env` (gitignored); a green O01e burns the grant -
+  re-consent to re-run.
+- L01b needs `PVLAB_PAT2` in the same file.
+- M07 needs `PVLAB_INVOICE_PDF=<path>` (any Supabase invoice PDF).
+- M02/M04 need `GATEKEEPER_URL` + `GATEKEEPER_ADMIN_KEY` (sourced from
+  ~/gatekeeper/.env by the probes).
+- The consent drill: dashboard org settings -> OAuth Apps -> add app,
+  callback `http://localhost:54321/callback`, then run a listener on
+  54321 and open the authorize URL. Steps in
+  experiments/byo-oauth/RUNLOG.md.
+- `.pi/sweep-all.sh` runs every acceptance probe in a burst-safe order.
+
 ## Commands
 
 Root: `make secrets-decrypt`, `make secrets-encrypt`, `make experiments`.
