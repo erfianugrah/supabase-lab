@@ -9,6 +9,8 @@ export interface PlanOptions {
   capabilities: Set<Capability>;
   /** Only these ids (case-insensitive). Empty = all. */
   only?: string[];
+  /** Only modules from this experiment dir. Empty = all experiments. */
+  experiment?: string;
   /** Destructive tests are excluded unless this is true. */
   allowDestructive?: boolean;
 }
@@ -34,6 +36,8 @@ export function planRun(modules: TestModule[], opts: PlanOptions): Plan {
       skipped.push({ id: m.id, title: m.title, status: "skip", detail });
 
     if (only?.length && !only.includes(m.id.toLowerCase())) continue;
+
+    if (opts.experiment && m.experiment !== opts.experiment) continue;
 
     if (m.where !== opts.where) {
       skip(`runs on "${m.where}", this process is "${opts.where}"`);
