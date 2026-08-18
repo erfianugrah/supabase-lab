@@ -17,7 +17,9 @@ DART := $(HOME)/sdk/dart-sdk/bin/dart
 # the PR-1351 dedup/session-version guard.
 GOTRUE_VERSION ?= 2.21.0
 
-# GoTrue's default refresh-token reuse interval is 10s; wait past it.
+# GoTrue reuse interval defaults to 10s; 12 waits past it. T1 (deliberate
+# expired-session sign-out on the fixed client) pairs REUSE_WINDOW_SEC=40 with
+# jwt_expiry=30 on the local stack config.
 REUSE_WINDOW_SEC ?= 12
 
 .PHONY: init validate apply destroy repro repro-both
