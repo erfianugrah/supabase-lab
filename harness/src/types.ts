@@ -96,6 +96,12 @@ export interface TestModule {
    * runner is invoked with destructive mode enabled.
    */
   destructive?: boolean;
+  /**
+   * Which experiment dir this module came from. Stamped by gen-registry
+   * (never set by hand) - module ids collide across experiments, and this is
+   * what lets `--experiment` scope a run to one dir.
+   */
+  experiment?: string;
   run(ctx: Ctx): Promise<TestResult | TestResult[]>;
 }
 
