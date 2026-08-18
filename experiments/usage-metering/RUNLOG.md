@@ -61,3 +61,17 @@ proxy usage events live at `/admin/supabase/analytics/events`
 (`/admin/audit/events` is the admin-lifecycle log); event `key_id` is the
 preview form, so server-side filtering by the full bearer silently matches
 nothing.
+
+## 2026-08-18 - M01 re-run with corrected request accounting: analytics count is EXACT
+
+Run artifact: `evidence/run-2026-08-18T02-14-23-125Z.{json,md}` (local).
+
+After fixing the M01b accounting (warm-up requests counted separately,
+`Prefer: count=exact` on the counted dozen, lag anchored to the last sent
+request): 12 counted + 1 warm-up = 13 REST requests sent, and
+usage.api-counts reported **13** after **61s** - an exact match. The
+earlier 10/12 was warm-up confounding, not platform undercounting. The
+DIY metering verdict strengthens: the analytics signal is exact at
+minute-scale lag, ground truth (pg_database_size, storage listing) is
+exact to the byte, and the Prometheus endpoint (text/plain, 326 families)
+answers a plain PAT. M01c now records the real Content-Type header.
