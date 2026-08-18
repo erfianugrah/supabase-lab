@@ -39,6 +39,10 @@ facts):
   schema stay in sync with the Stripe API surface.
 - `vault-root-key` - two projects; the migration-guide item about vault
   secrets and the project root key.
+- `image-transformations` - Storage image transformation billing and runtime
+  surface: which URL surfaces transform, docs-vs-runtime limits, edge cache
+  and overwrite invalidation, signed-URL tampering, RLS on the render path,
+  the rate ceiling, and the (dashboard-gated) billing counter.
 
 ## Setup (once)
 
