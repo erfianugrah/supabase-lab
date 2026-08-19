@@ -62,6 +62,12 @@ facts):
 - `usage-metering` - per-project cost attribution: the estimator against a
   live org, exact per-key gateway metering, the control-plane store,
   idempotent rollups, and invoice-PDF reconciliation.
+- `compute-disk` - everything about compute sizing and disk across plans:
+  per-size pg limits (D01), disk semantics + modification quota (D02/D03),
+  the autoscale config surface (D04/D07), the free-org autoscale/read-only
+  lifecycle (D05/D06/D06b), the dashboard-only IOPS gate (D08), and
+  upgrade/downgrade timing + sampled downtime (D09). Root reference:
+  COMPUTE-DISK.md.
 
 ## Setup (once)
 
