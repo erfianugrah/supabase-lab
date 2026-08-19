@@ -660,6 +660,36 @@ its experiment dir and planRun honours `--experiment` as a REAL filter -
 before 2026-08-18 it was a label only, and `--only I04` ran both twins.
 Always pass `--experiment <dir>` in probes.
 
+## experiments/rls-policy-cost - key facts (validated 2026-08-19)
+
+One project, no AWS. Planner/RLS-cost matrix over synthetic fixtures; see
+experiments/rls-policy-cost/RUNLOG.md and sql/rls-cost.sql.
+
+- `(select auth.uid())` IS access-control-neutral (InitPlan hoist, identical
+  row digests); the assumption that it changes policy semantics is wrong, and
+  deferring it with an index in place was measured defensible
+  (bare 2 calls vs wrapped 1; the per-row evaluation disappeared at the index).
+- A table joined INSIDE a policy's EXISTS evaluates its own RLS recursively,
+  and the joined policy's wrapped form appears as an InitPlan inside the
+  subplan. At demo scale Postgres decorrelates EXISTS to a hashed subplan
+  (loops=1); the bare form's auth.helper cost is per subplan-scanned row, the
+  wrapped form's is O(1). Plan form is a choice, not a guarantee.
+- Grant target beats predicate: `TO public` on a SELECT policy exposes it to
+  anon; `TO authenticated` does not. Predicate shape is secondary.
+- Client-side filters compose by conjunction against RLS - drift hides rows,
+  never reveals them.
+- SET ROLE tests need the Supavisor SESSION pooler (port 5432), not the
+  transaction pooler (6543); claims GUCs are session-scoped. The Makefile's
+  pgurl target picks 5432 for this reason.
+- Sequence-based function-call counting in policies: `GRANT SELECT` on the
+  sequence is needed if you read `last_value` as a RELATION (`select last_value
+  from seq`); the psql hint message names it explicitly.
+- First-run trap: decrypted secrets.tfvars carried an UNCOMMENTED placeholder
+  `supabase_access_token` on line 1, which made plan/apply fail with
+  "Mismatch between input and plan variable value". The root convention
+  (comment the placeholder out locally) fixes it; pdf-corpus-graph's Makefile
+  comment documents the same trap.
+
 ## Pending / gated work
 
 - O01c/d/e need `PVLAB_OAUTH_CLIENT_ID/SECRET/REFRESH_TOKEN` in
