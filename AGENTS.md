@@ -660,6 +660,35 @@ its experiment dir and planRun honours `--experiment` as a REAL filter -
 before 2026-08-18 it was a label only, and `--only I04` ran both twins.
 Always pass `--experiment <dir>` in probes.
 
+## experiments/compute-disk - key facts (validated 2026-08-19)
+
+Self-provisioning (no tofu), Pro/Team/Free orgs, modules D01-D09.
+Reference: COMPUTE-DISK.md at the repo root; see the experiment's
+RUNLOG.md for the per-module details and the probe script's
+result-id -> module-id mapping.
+
+- Autoscale config unreadable AND unmodifiable on the public v1 API - on
+  both Pro AND Team orgs, GET /config/disk/autoscale returns an empty
+  shape, mutation verbs all 404 (D04/D07).
+- Disk quota enforced as `429 Database disk can only be modified once per
+  four hours. Last modified at <UTC>` - contradicts the doc's "4 within
+  24h" text; enforcement nondeterministic across runs (D03).
+- Free org db starts with 2GB disk, not the documented 1GB; it did not
+  autoscale during a fill to 726MB (D05).
+- Free org read-only caught at ~726MB db size, not the documented 500MB
+  (D06). SELECT still answers 201 on the management query endpoint. TRUNCATE
+  rejected (D06b) - recovery needs DELETE + vacuum or the override GUC.
+- Disk IOPS/throughput bump accepted AND applied on Micro via POST
+  /config/disk - the dashboard's "LARGE required" text is a UI gate only,
+  no API enforcement (D08).
+- micro->small resize settled 107s; pg_limits per size (D01): micro 60/10/10,
+  small 90/10/10 (connections/wal_senders/rep_slots).
+- D09 measured upgrade AND downgrade windows with 250ms sampling: u
+  micro->small 105s (REST max contiguous outage 1.0s), u small->large 61s
+  (17.0s), d large->small 61s (0s), d small->micro 73s (0s); Auth never
+  had a contiguous outage. Adjacent resize PATCHes rate-limited: 429
+  `still processing addon changes, try again in 1-2 minutes`.
+
 ## experiments/rls-policy-cost - key facts (validated 2026-08-19)
 
 One project, no AWS. Planner/RLS-cost matrix over synthetic fixtures; see
