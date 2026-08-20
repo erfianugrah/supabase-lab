@@ -1,13 +1,14 @@
 /**
  * F04 - can you discover the set of creatable regions from the API?
  *
- * Region choice is where data-residency decisions get made, and platform
- * builders ask for programmatic per-customer region selection. Both rest on an
- * unstated assumption: that the valid region set is machine-readable. It is
- * not. `region` is accepted on project creation, but there is no catalogue
- * endpoint to enumerate what may be passed - the list exists only in
- * documentation, which is exactly the class of claim this experiment exists to
- * re-measure.
+ * UPDATE 2026-08-20 (residency-facts R01 falsified the original negative):
+ * the catalogue endpoint EXISTS at /projects/available-regions, but only with
+ * ?organization_slug= - a bare call answers 400, and the three paths this
+ * module originally probed (/regions, /platform/regions, /projects/regions)
+ * all 404. The original conclusion ("documentation-only") was drawn from
+ * name-guessed paths, the exact failure mode F05's enumeration method exists
+ * to avoid. The original probes are kept below as a record; F04c is the
+ * corrected measurement.
  *
  * A CONTROL is mandatory and is the whole reason this is a test rather than a
  * pair of 404s: 404 everywhere also describes a dead token, a wrong base URL,
@@ -72,9 +73,8 @@ async function catalogueAbsent(ctx: Ctx): Promise<TestResult> {
     title: "Region catalogue endpoint",
     status: "info",
     detail: anyPresent
-      ? "a region catalogue endpoint EXISTS - the documented-only claim has changed, update the docs"
-      : "no region catalogue endpoint; the creatable-region set is documentation-only, " +
-        "while the controls answered 200 in the same run",
+      ? "one of the name-guessed paths answers - re-check what it returns"
+      : "the name-guessed paths still 404 (historical record); the real catalogue is /projects/available-regions - see F04c",
     measurements,
   };
 }
@@ -119,13 +119,77 @@ async function observedRegions(ctx: Ctx): Promise<TestResult> {
   };
 }
 
+/**
+ * F04c - the corrected measurement: the catalogue lives at
+ * /projects/available-regions?organization_slug=<slug>. The slug comes from
+ * /organizations in the same run, so the module stays self-contained.
+ * Records the counts and whether the expected anchors (a Zurich region code,
+ * the three smart groups) are present; the full catalogue belongs to
+ * residency-facts R01, which asserts on content.
+ */
+async function cataloguePresent(ctx: Ctx): Promise<TestResult> {
+  const orgs = await mgmt(ctx, "GET", "/organizations");
+  if (orgs.status !== 200 || !Array.isArray(orgs.json) || orgs.json.length === 0) {
+    return {
+      id: "F04c",
+      title: "Region catalogue at /projects/available-regions",
+      status: "fail",
+      detail: `control /organizations -> HTTP ${orgs.status} or empty; cannot build the org-scoped catalogue call`,
+      measurements: { organizations_status: orgs.status },
+    };
+  }
+  const slug = String((orgs.json[0] as Record<string, unknown>).slug ?? (orgs.json[0] as Record<string, unknown>).id ?? "");
+
+  const bare = await mgmt(ctx, "GET", "/projects/available-regions");
+  const r = await mgmt(ctx, "GET", `/projects/available-regions?organization_slug=${slug}`);
+  if (r.throttled) {
+    return {
+      id: "F04c",
+      title: "Region catalogue at /projects/available-regions",
+      status: "skip",
+      detail: "throttled (HTML interstitial) - re-run",
+      measurements: { bare_status: bare.status, catalogue_status: "throttled" },
+    };
+  }
+
+  const measurements: Record<string, string | number> = {
+    bare_status: bare.status,
+    catalogue_status: r.status,
+  };
+  if (r.status !== 200) {
+    return {
+      id: "F04c",
+      title: "Region catalogue at /projects/available-regions",
+      status: "fail",
+      detail: `org-scoped catalogue -> HTTP ${r.status}; residency-facts R01's positive has regressed`,
+      measurements,
+      evidence: r.text.slice(0, 200),
+    };
+  }
+
+  const j = r.json as Record<string, unknown>;
+  const all = (j.all ?? {}) as Record<string, unknown>;
+  const specific = (all.specific ?? []) as Array<{ code?: string }>;
+  const groups = (all.smartGroup ?? []) as Array<{ code?: string }>;
+  measurements.specific_count = specific.length;
+  measurements.smart_group_count = groups.length;
+
+  return {
+    id: "F04c",
+    title: "Region catalogue at /projects/available-regions",
+    status: "pass",
+    detail: `catalogue is machine-readable: ${specific.length} specific + ${groups.length} smart groups (bare call -> HTTP ${bare.status}, org slug required)`,
+    measurements,
+  };
+}
+
 const mod: TestModule = {
   id: "F04",
   title: "Region discoverability",
   where: "local",
   requires: ["pat"],
   async run(ctx: Ctx) {
-    return [await catalogueAbsent(ctx), await observedRegions(ctx)];
+    return [await catalogueAbsent(ctx), await cataloguePresent(ctx), await observedRegions(ctx)];
   },
 };
 export default mod;

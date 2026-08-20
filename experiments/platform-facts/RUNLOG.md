@@ -64,6 +64,20 @@ project programmatically, you cannot discover where you are allowed to place it,
 and a region added or withdrawn upstream is invisible to a caller until a create
 fails.
 
+**CORRECTION 2026-08-20 - the conclusion above is WRONG, and the error is
+instructive.** residency-facts R01 found the real endpoint:
+`GET /v1/projects/available-regions?organization_slug=<slug>` answers 200 with
+`{ recommendations, all: { smartGroup[], specific[] } }` (17 specific regions +
+3 smart groups on a Team org; a bare call without the org slug answers 400).
+F04a's three probes were name-guessed paths, and all three 404 - the catalogue
+sat on a differently-named path the whole time. This is exactly the failure
+mode F05's read-the-whole-spec method exists to avoid, and F04 fell into it
+two days before F05 was written down. The three original probes are kept in
+the module as a historical record; F04c is the corrected measurement and
+passes. The `recommendations` block is a bonus finding: it is the platform's
+capacity pick per org (americas/us-west-2 observed from a Singapore vantage),
+i.e. smart-group behaviour made visible.
+
 **F04b - 2 distinct regions across 4 projects** on this account (aggregate only;
 refs deliberately not recorded).
 
