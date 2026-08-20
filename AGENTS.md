@@ -410,12 +410,16 @@ Ported from throwaway bash that produced the same findings; see RUNLOG.md.
   quote as bare numbers (compute prices, connection counts, plan entitlements,
   key shapes, default Postgres major). Built to be re-run and DIFFED - and
   since `pvlab --diff` exists, diffing it is one command rather than an eyeball.
-- There is NO region-catalogue endpoint (F04): `/regions`, `/platform/regions`
-  and `/projects/regions` all 404 while `/projects` and `/organizations` answer
-  200 in the same run. `region` is accepted at project creation and nothing
-  lets a caller enumerate what may legally be passed, so per-customer placement
-  can place but cannot discover, and an upstream region change is invisible
-  until a create fails.
+- The region catalogue IS machine-readable (F04c, correcting the original F04a
+  negative, which probed name-guessed paths and concluded absence):
+  `GET /v1/projects/available-regions?organization_slug=<slug>` returns
+  `{ recommendations, all: { smartGroup[], specific[] } }` - 17 specific + 3
+  smart groups on a Team org. A bare call without the org slug answers 400,
+  and `/regions`, `/platform/regions`, `/projects/regions` all still 404. The
+  `recommendations` block is the platform's capacity pick - smart-group
+  behaviour made visible. Lesson recorded in the F04 RUNLOG: F04a fell into
+  the name-guessing trap two days before F05's enumerate-the-whole-spec method
+  was written down.
 - Organization membership is READ-ONLY on the stable API (F05). Enumerated from
   the published OpenAPI document rather than probed: across 169 operations there
   is exactly one membership operation, `GET /v1/organizations/{slug}/members`,
@@ -757,6 +761,40 @@ experiments/rls-policy-cost/RUNLOG.md and sql/rls-cost.sql.
 - Differential harness: dart/ holds the repro; make repro / repro-local
   (REUSE_WINDOW_SEC default 12) prints VERDICT=defect-reproduced vs fixed;
   both hosted and local environments verified. Dart SDK at ~/sdk/dart-sdk.
+
+## experiments/residency-facts - key facts (validated 2026-08-20, Zurich project)
+
+- The region catalogue IS machine-readable:
+  `GET /v1/projects/available-regions?organization_slug=<slug>` ->
+  `{ recommendations, all: { smartGroup[3], specific[17] } }`; bare call 400.
+  `recommendations` is the platform's per-org capacity pick. A smart-group
+  code in the `region` field of POST /v1/projects is a 400
+  ("Need to use one of available regions"); `region_selection` is the only
+  place a group is accepted (I02's other half).
+- REST and Storage front Cloudflare from any vantage (PoP = caller-nearest,
+  SIN from Singapore against a eu-central-2 project). Edge Functions execute
+  user-nearest by default (x-sb-edge-region: ap-southeast-1 from Singapore);
+  `x-region` pins to the project region.
+- Storage CDN, measured (the fundamentals doc-reading did NOT survive):
+  signed URLs cache per token (repeat HITs, fresh token MISSes - but two
+  sign calls in the same second with the same expiresIn return the SAME url,
+  vary expiresIn). Private buckets do NOT give per-user misses: a second
+  user's first read HITs. And a cached private object is served to a user
+  the policy has since been tightened to deny (200/HIT; a never-authorized
+  user correctly gets 400/DYNAMIC) - on a hit, the CDN does not re-evaluate
+  the policy. The object carried `Cache-Control: no-cache` and was cached
+  anyway. Reproduced 3 consecutive runs.
+- realtime.messages is daily-partitioned but LAZILY: a fresh project has the
+  table with zero partitions, SQL realtime.send() warns "no partition of
+  relation messages found for row" and drops the message; one websocket
+  subscribe makes the Realtime service create 5 daily partitions (+/-2 days)
+  under supabase_realtime_messages_publication. 3-day retention not
+  observable on a fresh project.
+- Log drains have NO published-API surface: zero drain-config operations
+  across the whole published OpenAPI document (F05's enumeration method).
+  Dashboard-only on the stable contract.
+- Makefile note: the PAT is NOT in secrets.tfvars (placeholder by design);
+  it comes from SUPABASE_ACCESS_TOKEN in the operator's env.
 
 ## Commands
 
