@@ -723,6 +723,43 @@ experiments/rls-policy-cost/RUNLOG.md and sql/rls-cost.sql.
   (comment the placeholder out locally) fixes it; pdf-corpus-graph's Makefile
   comment documents the same trap.
 
+## experiments/rls-wire-claims - key facts (validated 2026-08-20)
+
+One project per module, self-provisioning (no tofu), Pro org; C03 also deploys
+a throwaway probe Worker + two Hyperdrive configs via wrangler (account from
+`wrangler whoami` or CLOUDFLARE_ACCOUNT_ID). Validates the lexicanum
+`reference/rls-without-supabase-auth` pattern. Probe:
+`.pi/probe-rls-wire-claims.sh C01[,C02,C03]`.
+
+- The pattern works: as a custom non-owner role, `set_config(
+  'request.jwt.claims', ..., true)` over the wire drives per-user RLS on the
+  session pooler (5432), the transaction pooler (6543), and through
+  Hyperdrive's tx and multi-statement forms.
+- **Managed Supabase silently no-ops `GRANT USAGE ON SCHEMA auth`** for a
+  custom role (has_schema_privilege stays false; `auth.uid()` errors
+  `permission denied for schema auth`). `GRANT EXECUTE ON FUNCTION auth.uid()`
+  alone is not enough. Working shape: a SECURITY DEFINER wrapper owned by
+  postgres (`public.claims_uid() -> auth.uid()`), granted EXECUTE to the
+  custom role, policy reads `owner = public.claims_uid()`.
+- GoTrue-issued JWT claims work over the wire with no PostgREST (C02);
+  tampered-sub control confirms the GUC is unprivileged - the database
+  enforces whatever the GUC says, so the connection credential is the
+  security boundary.
+- Session pooler (5432) RESETs GUCs on return (bare SET did not leak, 5
+  tries). **Transaction pooler (6543) DOES leak a bare SET across
+  invocations** - opposite of 5432; claims belong in a transaction, never a
+  bare SET.
+- Hyperdrive did NOT replay a claims-GUC query across users in this probe
+  (identical SQL + param, claims A warmed n=1, claims B got 0) - the doc's
+  cache-blindness worst case was not reproduced; the split-binding rule
+  stays as the documented control regardless.
+- Operational: Hyperdrive create races fresh-project Supavisor warmup
+  (ENOTFOUND tenant/user) - warm the pooler locally first and retry the
+  create. Probe worker needs `nodejs_compat` for postgres.js. The Management
+  query endpoint wraps multi-statement SQL in one transaction, so fixture
+  DDL that creates a function and a policy referencing it must run in
+  separate calls (function first).
+
 ## Pending / gated work
 
 - O01c/d/e need `PVLAB_OAUTH_CLIENT_ID/SECRET/REFRESH_TOKEN` in
