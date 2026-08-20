@@ -32,6 +32,11 @@ facts):
   seconds.
 - `platform-facts` - not a behaviour test; harvests per-project facts
   (pg_settings, extensions, versions) for reference.
+- `residency-facts` - the data-residency doc's claims as measured modules:
+  the region catalogue endpoint, smart-group rejection in `region`,
+  Cloudflare edge PoP, edge-function execution pinning, the storage CDN
+  cache matrix (including a cached-private-object policy-bypass finding),
+  realtime.messages partitioning, and the log-drain API surface.
 - `pooler-semantics` - Supavisor session-vs-transaction mode behaviour,
   error codes, and capacity signatures.
 - `pdf-corpus-graph` - PDF corpus ingestion + entity graph experiment.
