@@ -74,6 +74,21 @@ facts):
   upgrade/downgrade timing + sampled downtime (D09). Root reference:
   COMPUTE-DISK.md.
 
+## Ad-hoc platform probes (no experiment dir)
+
+Small Management API probes that never graduated to an experiment. Full
+write-ups publish to lexicanum (erfi.dev).
+
+- **Branching: clearing a persistent branch's git link** (2026-08-21) -
+  `PATCH /v1/branches/{id}` with `{"git_branch":""}` detaches a persistent
+  branch from its git branch without delete/recreate (empty string clears;
+  `null` is silently treated as field-absent). A/B: linked push -> `Supabase
+  Preview` check run `in_progress` + branch redeploys; unlinked push -> check
+  run `skipped`, branch untouched. Reversible by setting the name back; the
+  CLI path is `supabase branches update <name> --git-branch ""`. Adjacent:
+  `DELETE` on a persistent branch 400s - PATCH `persistent:false` first.
+  Guide: https://erfi.dev/guides/supabase-branch-detach-git-link/
+
 ## Setup (once)
 
 ```sh
