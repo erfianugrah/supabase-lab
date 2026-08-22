@@ -89,6 +89,25 @@ write-ups publish to lexicanum (erfi.dev).
   `DELETE` on a persistent branch 400s - PATCH `persistent:false` first.
   Guide: https://erfi.dev/guides/supabase-branch-detach-git-link/
 
+- **logs.all -> logs Management API migration dry-run** (2026-08-22;
+  `logs.all` removed 2026-09-23) - probed on a standing project. Old
+  `logs.all` still serves BigQuery dialect today (rejects ClickHouse
+  `count()`); new `logs` is ClickHouse-only and GET-only (POST 404s). The
+  official migration guide's example is WRONG: `WHERE source_name =
+  'edge_logs'` fails with `Field "source_name" does not exist` - the real
+  column is `source` (the OpenAPI description says `source`; the changelog
+  example says `source_name`). Working minimal migration:
+  `SELECT timestamp, event_message FROM logs WHERE source = 'edge_logs'
+  ORDER BY timestamp DESC LIMIT 3`. Also measured: `log_attributes['key']`
+  map access replaces BigQuery `unnest(metadata)` (which now errors);
+  `SELECT *` fails (explicit columns required); `timestamp` changes from
+  microsecond int to ISO string; dialect/parse failures return HTTP 200 in
+  the `{result,error}` envelope (`Backend error! Retry your query.`);
+  no deprecation/sunset header on `logs.all`; `x-ratelimit-limit: 10`.
+  Sources seen: edge_logs, postgres_logs, pgbouncer_logs, storage_logs,
+  realtime_logs. Our only live caller is the MFA-audit script
+  (auth logs); lab experiments use usage.api-counts/metrics - unaffected.
+
 ## Setup (once)
 
 ```sh
