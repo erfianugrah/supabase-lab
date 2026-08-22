@@ -107,6 +107,7 @@ write-ups publish to lexicanum (erfi.dev).
   Sources seen: edge_logs, postgres_logs, pgbouncer_logs, storage_logs,
   realtime_logs. Our only live caller is the MFA-audit script
   (auth logs); lab experiments use usage.api-counts/metrics - unaffected.
+  Full write-up: https://erfi.dev/guides/supabase-management-api-logs-endpoint/
 
 ## Setup (once)
 
