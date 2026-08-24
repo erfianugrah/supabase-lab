@@ -36,6 +36,8 @@ export interface CtxInput {
   peers?: Record<string, string>;
   orgSlugs?: string[];
   endpoints?: Record<string, string>;
+  mgmtBase?: string;
+  apiHostSuffix?: string;
   quiet?: boolean;
 }
 
@@ -125,6 +127,10 @@ export function deriveCapabilities(f: {
   return caps;
 }
 
+function apiHostSuffix(input: CtxInput): string {
+  return input.apiHostSuffix ?? process.env.SUPABASE_API_HOST_SUFFIX ?? "supabase.co";
+}
+
 export async function buildCtx(input: CtxInput): Promise<Ctx> {
   const env = input.where === "runner" ? await runnerEnv() : {};
   const ref = input.ref ?? env.REF ?? process.env.PVLAB_REF ?? "";
@@ -176,7 +182,7 @@ export async function buildCtx(input: CtxInput): Promise<Ctx> {
   return {
     ref,
     phzHost,
-    apiHost: ref ? `${ref}.supabase.co` : "",
+    apiHost: ref ? `${ref}.${apiHostSuffix(input)}` : "",
     dbPassword,
     anonKey,
     serviceKey,
@@ -187,6 +193,8 @@ export async function buildCtx(input: CtxInput): Promise<Ctx> {
     orgSlugs,
     endpoints,
     capabilities,
+    mgmtBase: input.mgmtBase ?? process.env.SUPABASE_MGMT_BASE_URL,
+    apiHostSuffix: apiHostSuffix(input),
     where: input.where,
     log: (m) => {
       if (!input.quiet) console.log(`  ${m}`);

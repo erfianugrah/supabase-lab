@@ -79,6 +79,8 @@ export interface Ctx {
    * output exports exactly that.
    */
   endpoints: Record<string, string>;
+  mgmtBase?: string;
+  apiHostSuffix?: string;
   capabilities: Set<Capability>;
   /** Where this process is running, so `where`-filtering works. */
   where: Where;
