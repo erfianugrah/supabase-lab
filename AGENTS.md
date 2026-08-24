@@ -610,6 +610,27 @@ cleanly. I04: free org - nano create 201, no compute addon catalogue at
 all, pause/restore lifecycle live (wake 162-204 s, data API answers
 `HTTP 540 Project paused` while parked).
 
+## experiments/sfp-platforms - key facts (validated 2026-08-24)
+
+Platform-plan entitlement delta, measured on a `platform`-plan organization
+against the same modules run on a normal Pro org. Nano IS the default create
+tier (224 MB shared_buffers, pausable), not a catalogue variant -- the earlier
+I01 "Nano absent" reading measured the upgrade/resize surfaces, not the
+create default, and is corrected here. The platform plan is an entitlements
+tier decoupled from the "contact us" gates: 18-variant compute catalogue
+(`ci_micro`..`ci_48xlarge_high_memory`) but a narrower 10-size self-service
+update path. Pausing is ENFORCED (unlike every paid plan). Migrations: NOT
+SfP-gated (200 on Pro too). Restore points 400, OAuth bridge 404,
+project_cloning declared-but-404. Read replicas 400 despite declared
+entitlement. Disk gp3 IOPS floor blocks a 2->4 GB grow. Read-only mode
+(status + 15 min temporary-disable). Backup schedule 402 structured
+`entitlement_required`. Branches: delete is the top-level
+`DELETE /v1/branches/{id}`, not by name. `secret_jwt_template` accepted +
+echoed; minted key is opaque (`sb_secret_...`). JIT database access works
+(invite -> `invite_id`, delete -> 200).
+
+Full table: `experiments/sfp-platforms/README.md`.
+
 ## experiments/byo-oauth - key facts (validated 2026-08-17/18)
 
 The Management API OAuth2 surface (BYO-backend / Path B). O01: bogus
