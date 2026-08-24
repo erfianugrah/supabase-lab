@@ -93,28 +93,36 @@ const mod: TestModule = {
             region: "ap-southeast-1",
             with_data: false,
           });
+          // The create response carries a UUID `id`, NOT the name; that id is
+          // the handle for the top-level branch endpoints.
+          const branchId = (branch.json as { id?: string } | undefined)?.id ?? "";
           results.push({
             id: "S13b",
             title: "S13b: create branch",
             status: "info",
-            detail: branch.status >= 200 && branch.status < 300 ? "BRANCH_CREATED" : "BRANCH_REJECTED",
+            detail:
+              branch.status >= 200 && branch.status < 300
+                ? `BRANCH_CREATED (id=${branchId})`
+                : "BRANCH_REJECTED",
             measurements: { branch_create_status: branch.status },
             evidence: branch.text.slice(0, 300),
           });
 
           // --- S13c: list + delete ---
-          if (branch.status >= 200 && branch.status < 300) {
+          // Deletion is the TOP-LEVEL endpoint by branch UUID, not
+          // /projects/{ref}/branches/{name} (which 404s).
+          if (branch.status >= 200 && branch.status < 300 && branchId) {
             const branches = await mgmt(ctx, "GET", `/projects/${ref}/branches`);
             const branchesList = Array.isArray(branches.json) ? (branches.json as any[]) : [];
-            const deleteRes = await mgmt(ctx, "DELETE", `/projects/${ref}/branches/${branchName}`);
+            const deleteRes = await mgmt(ctx, "DELETE", `/branches/${branchId}`);
             results.push({
               id: "S13c",
               title: "S13c: list + delete",
               status: "info",
               detail:
                 deleteRes.status >= 200 && deleteRes.status < 300
-                  ? `branch listing=${branchesList.length}, delete=OK`
-                  : `branch listing=${branchesList.length}, delete rejected (HTTP ${deleteRes.status})`,
+                  ? `branch listing=${branchesList.length}, delete-by-id OK`
+                  : `branch listing=${branchesList.length}, delete-by-id rejected (HTTP ${deleteRes.status})`,
               measurements: {
                 branch_count: branchesList.length,
                 branch_delete_status: deleteRes.status,

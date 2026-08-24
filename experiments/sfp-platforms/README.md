@@ -63,7 +63,7 @@ BYO-backend bridge. On this org:
 | members | full member objects (Owner), not a read-only stub |
 | backup schedule | `402` structured `entitlement_required` error with `error.feature=backup.schedule` |
 | migration version | create returns `[]`; version is `YYYYMMDDHHMMSS` in `supabase_migrations.schema_migrations`; GET/PATCH by that version `200` |
-| branches | create `201` (listing shows 2: parent + branch); delete-by-name `404` |
+| branches | create `201` (returns a UUID `id`); delete is the top-level `DELETE /v1/branches/{id}` (`200`), not `/projects/{ref}/branches/{name}` (`404`) |
 | secret_jwt_template | accepted + echoed (`201`); minted key is opaque (`sb_secret_...`, not a JWT) |
 | JIT database access | invite `200` (returns `invite_id`), delete `200` - time-boxed network-restricted role-scoped grants |
 
