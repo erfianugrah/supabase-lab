@@ -17,6 +17,10 @@ import type { Ctx } from "./types";
 
 export const MGMT_BASE = "https://api.supabase.com/v1";
 
+export function mgmtBase(ctx?: Ctx): string {
+  return ctx?.mgmtBase ?? process.env.SUPABASE_MGMT_BASE_URL ?? MGMT_BASE;
+}
+
 export interface MgmtResponse {
   status: number;
   text: string;
@@ -50,7 +54,7 @@ export async function mgmt(
   body?: unknown,
   timeoutMs = 30000,
 ): Promise<MgmtResponse> {
-  const res = await fetch(`${MGMT_BASE}${path}`, {
+  const res = await fetch(`${mgmtBase(ctx)}${path}`, {
     method,
     headers: {
       Authorization: `Bearer ${ctx.pat}`,
