@@ -47,14 +47,14 @@ BYO-backend bridge. On this org:
 | surface | result |
 |---|---|
 | plan | `platform` |
-| compute catalogue (purchasable addons) | 18 variants, floor `ci_micro`, ceiling `ci_48xlarge_high_memory`; `ci_nano` ABSENT |
-| compute update path (resize) | 10 sizes, `ci_micro`..`ci_16xlarge` |
+| compute catalogue (purchasable addons) | 18 variants, floor `ci_micro`, ceiling `ci_48xlarge_high_memory`; `ci_nano` not listed because nano is the default, not an upgrade |
+| compute update path (resize) | 10 sizes, `ci_micro`..`ci_16xlarge` (no nano - you cannot resize TO nano) |
 | project_pausing | ENFORCED (pause 200 -> INACTIVE; normal paid org = 400) |
 | project_cloning | DECLARED but no Management API endpoint (404) |
 | migrations endpoint | 200, transactional rollback verified, recorded in supabase_migrations |
 | restore points | 400 (not enabled on this org) |
 | OAuth project-claim / apps / transfer | 404 / 404 / 404 (BYO bridge not enabled) |
-| scale-to-zero / nano | absent (not in entitlements, not in catalogue) |
+| scale-to-zero / nano | **DEFAULT create tier**: SfP-path create (no `desired_instance_size`) provisions `infra_compute_size: nano` (224MB shared_buffers, vs 256MB on the paid micro default); pausable. Nano is NOT in any catalogue because it is the default, not a purchasable variant |
 | realtime ceiling / branching / functions | 10000 concurrent / unlimited / unlimited |
 | audit_logs_days / PITR / private_link / HA | 366 / off / off / off |
 | read replicas | setup 400 despite `instances.read_replicas:true` (entitlement is not the endpoint gate) |
