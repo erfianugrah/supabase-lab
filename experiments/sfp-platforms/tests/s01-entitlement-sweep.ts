@@ -36,8 +36,8 @@ interface ProjectStatusResponse {
   status?: string;
 }
 interface AddonsResponse {
-  available_addons?: Array<{ addon_type?: string; addon_variant?: string }>;
-  selected_addons?: Array<{ addon_type?: string; addon_variant?: string }>;
+  available_addons?: Array<{ type?: string; variants?: Array<{ id?: string }> }>;
+  selected_addons?: Array<{ addon_type?: string; addon_variant?: string; type?: string }>;
 }
 
 async function waitHealthy(ctx: Ctx, ref: string, maxIters = 90): Promise<string> {
@@ -53,14 +53,23 @@ async function waitHealthy(ctx: Ctx, ref: string, maxIters = 90): Promise<string
 function selectedCompute(json: unknown): string {
   const data = json as AddonsResponse | undefined;
   const selected = Array.isArray(data?.selected_addons) ? data.selected_addons : [];
-  return (
-    selected.find((a) => a?.addon_type === "compute_instance")?.addon_variant ?? "none"
-  );
+  // addon variants carry both `addon_type`/`addon_variant` and `type`/`id` shapes.
+  const hit = selected.find((a) => (a?.addon_type ?? a?.type) === "compute_instance");
+  return hit?.addon_variant ?? "none(default)";
 }
 
-/** Current compute as pg_settings reveals it (memory is the tier tell). */
+/** Compute variants this org's catalogue offers (the entitlement list). */
+function computeVariants(json: unknown): string[] {
+  const data = json as AddonsResponse | undefined;
+  const compute = (Array.isArray(data?.available_addons) ? data.available_addons : []).find(
+    (a) => a?.type === "compute_instance",
+  );
+  return (compute?.variants ?? []).map((v) => v?.id ?? "").filter(Boolean);
+}
+
+/** Current compute as pg_settings reveals it (memory/connections are the tier tell). */
 async function computeHint(ctx: Ctx, ref: string): Promise<string> {
-  const q = await mgmt(ctx, "POST", `/projects/${ref}/database/query`, {
+  const q = await mgmt(ctx, "POST", `/projects/${ref}/database/query/read-only`, {
     query: "select current_setting('shared_buffers') as sb, current_setting('max_connections') as mc",
   });
   if (q.status !== 200) return `unread:${q.status}`;
@@ -116,22 +125,23 @@ const mod: TestModule = {
           const addons = await mgmt(ctx, "GET", `/projects/${ref}/billing/addons`);
           const compute = addons.status === 200 ? selectedCompute(addons.json) : "unread";
           const hint = await computeHint(ctx, ref);
-          const avail = (addons.json as AddonsResponse | undefined)?.available_addons ?? [];
-          const nanoAvailable = avail.some(
-            (a) => a?.addon_type === "compute_instance" && a?.addon_variant === "ci_nano",
-          );
+          const variants = computeVariants(addons.json);
+          const nanoAvailable = variants.includes("ci_nano");
+          const microAvailable = variants.includes("ci_micro");
           results.push({
             id: "S01a",
             title: "S01a: SfP-path create (no desired_instance_size)",
             status: status === "ACTIVE_HEALTHY" ? "pass" : "fail",
             detail:
               status === "ACTIVE_HEALTHY"
-                ? `created under the SfP org; compute=${compute}; ${hint}`
+                ? `created under the org; selected=${compute}; catalogue floor=${variants[0] ?? "none"}; ${hint}`
                 : `created but not healthy after 15 min (status=${status})`,
             measurements: {
               provision_s: provisionS,
               compute,
               ci_nano_available: nanoAvailable ? 1 : 0,
+              ci_micro_available: microAvailable ? 1 : 0,
+              compute_variants: variants.length,
               region: ((create.json as { region?: string } | undefined)?.region ?? "unread"),
             },
           });
