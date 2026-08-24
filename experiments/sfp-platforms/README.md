@@ -21,6 +21,32 @@ rejects Nano; this experiment measures the entitled counterpart.
 | S01b | database migrations endpoint applies a schema change |
 | S01c | restore point is accepted |
 | S01d | undo-to-restore-point reverts a post-point schema change |
+| S03 | restore points + undo semantics (entitled path) |
+| S04 | migrations endpoint transactional semantics (rollback + bookkeeping) |
+| S05 | project claim/transfer surface (BYO-backend bridge) |
+| S06 | platform-plan entitlements snapshot + pausing enforcement |
+
+## Measured (org under test, live run)
+
+Every figure below comes from our own throwaway-project runs on the org under
+test.
+
+The `platform` plan is an entitlements tier, DECOUPLED from the "contact us"
+feature gates (migrations / restore-points / scale-to-zero) and from the OAuth
+BYO-backend bridge. On this org:
+
+| surface | result |
+|---|---|
+| plan | `platform` |
+| compute catalogue | 10 sizes, floor `ci_micro`, ceiling `ci_16xlarge`; `ci_nano` ABSENT |
+| project_pausing | ENFORCED (pause 200 -> INACTIVE; normal paid org = 400) |
+| project_cloning | DECLARED but no Management API endpoint (404) |
+| migrations endpoint | 200, transactional rollback verified, recorded in supabase_migrations |
+| restore points | 400 (not enabled on this org) |
+| OAuth project-claim / apps / transfer | 404 / 404 / 404 (BYO bridge not enabled) |
+| scale-to-zero / nano | absent (not in entitlements, not in catalogue) |
+| realtime ceiling / branching / functions | 10000 concurrent / unlimited / unlimited |
+| audit_logs_days / PITR / private_link / HA | 366 / off / off / off |
 
 ## Running
 
