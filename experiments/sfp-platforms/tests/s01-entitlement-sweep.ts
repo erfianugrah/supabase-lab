@@ -72,7 +72,7 @@ async function computeHint(ctx: Ctx, ref: string): Promise<string> {
   const q = await mgmt(ctx, "POST", `/projects/${ref}/database/query/read-only`, {
     query: "select current_setting('shared_buffers') as sb, current_setting('max_connections') as mc",
   });
-  if (q.status !== 200) return `unread:${q.status}`;
+  if (q.status < 200 || q.status >= 300) return `unread:${q.status}`;
   const rows = Array.isArray(q.json) ? (q.json as Array<{ sb?: string; mc?: string }>) : [];
   const r = rows[0];
   return r ? `shared_buffers=${r.sb},max_connections=${r.mc}` : "unread:empty";
