@@ -67,6 +67,24 @@ function computeVariants(json: unknown): string[] {
   return (compute?.variants ?? []).map((v) => v?.id ?? "").filter(Boolean);
 }
 
+/**
+ * The project's ACTUAL compute, from the org-scoped list (the project-detail
+ * GET returns infra_compute_size:null). This is the surface that shows the
+ * default tier (nano on a platform org, micro on a paid org) - the addon
+ * catalogue only lists the purchasable UPGRADES, which is a different thing.
+ */
+interface OrgProjectRow {
+  ref?: string;
+  databases?: Array<{ infra_compute_size?: string }>;
+}
+async function infraComputeSize(ctx: Ctx, org: string, ref: string): Promise<string> {
+  const list = await mgmt(ctx, "GET", `/organizations/${org}/projects`);
+  if (list.status < 200 || list.status >= 300) return "unread";
+  const body = list.json as { projects?: OrgProjectRow[] } | undefined;
+  const mine = (body?.projects ?? []).find((p) => p?.ref === ref);
+  return mine?.databases?.[0]?.infra_compute_size ?? "unknown";
+}
+
 /** Current compute as pg_settings reveals it (memory/connections are the tier tell). */
 async function computeHint(ctx: Ctx, ref: string): Promise<string> {
   const q = await mgmt(ctx, "POST", `/projects/${ref}/database/query/read-only`, {
@@ -128,17 +146,19 @@ const mod: TestModule = {
           const variants = computeVariants(addons.json);
           const nanoAvailable = variants.includes("ci_nano");
           const microAvailable = variants.includes("ci_micro");
+          const infra = await infraComputeSize(ctx, org, ref);
           results.push({
             id: "S01a",
             title: "S01a: SfP-path create (no desired_instance_size)",
             status: status === "ACTIVE_HEALTHY" ? "pass" : "fail",
             detail:
               status === "ACTIVE_HEALTHY"
-                ? `created under the org; selected=${compute}; catalogue floor=${variants[0] ?? "none"}; ${hint}`
+                ? `created under the org; infra_compute_size=${infra}; addon selected=${compute}; catalogue floor=${variants[0] ?? "none"}; ${hint}`
                 : `created but not healthy after 15 min (status=${status})`,
             measurements: {
               provision_s: provisionS,
               compute,
+              infra_compute_size: infra,
               ci_nano_available: nanoAvailable ? 1 : 0,
               ci_micro_available: microAvailable ? 1 : 0,
               compute_variants: variants.length,
