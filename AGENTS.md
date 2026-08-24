@@ -612,7 +612,7 @@ all, pause/restore lifecycle live (wake 162-204 s, data API answers
 
 ## experiments/sfp-platforms - key facts (validated 2026-08-24)
 
-Platform-plan entitlement delta, measured on a `platform`-plan organization
+Platform-plan entitlement delta, measured on a `platform`-plan org
 against the same modules run on a normal Pro org. Nano IS the default create
 tier (224 MB shared_buffers, pausable), not a catalogue variant -- the earlier
 I01 "Nano absent" reading measured the upgrade/resize surfaces, not the
