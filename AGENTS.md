@@ -286,24 +286,32 @@ per-customer projects merged INTO one shared multi-tenant project. See RUNLOG.md
 - The management query endpoint connects as `postgres`, so it sees every row
   while a tenant sees none. Verifying data landed says nothing about isolation.
 
-## experiments/key-rotation - key facts (ported 2026-08-04, findings from 2026-08-03/04)
+## experiments/key-rotation - key facts (ported 2026-08-04; FIRST LIVE RUN 2026-08-25)
 
 Hub and spoke: the hub's GoTrue is the spoke's third-party auth issuer, and the
-hub rotates its signing key. Ported from bash that produced the findings below;
-the port has NOT been run live yet, so treat it as a mechanism awaiting its first
-run rather than a source of measurements.
+hub rotates its signing key. The port ran live 2026-08-25 (full 20-minute
+window, artifacts in `out/2026-08-25/`) - two port bugs were fixed on the way
+(signing keys are managed on the MANAGEMENT API at
+`/v1/projects/{ref}/config/auth/signing-keys`, not the project GoTrue admin
+surface, which is a hard 404; and `adminCreate` had a doubled
+`/admin/admin/users` path), and the platform changed around the old findings:
 
-- The window belongs to the CONSUMER's cache, not the issuer's publication. The
-  hub published the new kid in its own JWKS in about 7 minutes; the spoke's
-  cached kid set held exactly one entry across 282 probes and 37 minutes and
-  never re-resolved. Re-creating the integration does not help - it re-caches
-  the same stale set.
-- A token signed by the old key keeps working through `previously_used` AND
-  through `revoked` - still 200 sixteen minutes after revocation, with the key's
-  status re-read immediately before each probe.
-- Standby-key creation is rate limited on a fresh project: `Please wait until
-  <ISO8601>`, measured at 144 s, 127 s and 131 s. Wait the deadline out; do not
-  retry past it.
+- STILL TRUE - the window belongs to the CONSUMER's cache, not the issuer's
+  publication. Live 2026-08-25: hub published the new kid in 241 s (~4 min,
+  was ~7 in 2026-08-04 bash); the spoke's cached kid set never changed across
+  116 probes / 20 min and new-key tokens were 401 throughout. STRONGER than
+  the old re-creation finding: a FRESH integration created while the issuer's
+  JWKS was demonstrably current still served the stale kid set.
+- CHANGED - standby-key creation is NOT time-rate-limited any more (was
+  `Please wait until <ISO8601>`, 127-144 s). The live constraint is
+  one-standby-at-a-time: a second create answers `422 "already has a signing
+  key in standby"`. Status vocabulary: standby | in_use | previously_used |
+  revoked; `kid == id`; create body needs `{algorithm}`.
+- NOT RE-CONFIRMED - "a revoked key keeps working" (the 2026-08-03/04
+  finding). The 2026-08-25 run's module ordering meant the spoke never cached
+  the revoked key, so its tokens 401'd for staleness reasons, not revocation
+  handling. Needs a dedicated run: create the trust BEFORE rotating, revoke
+  inside the cache window, no intervening promotion.
 - Every probe records four fields - PostgREST error code, the spoke's cached kid
   set, the hub's published JWKS, and the token key's status at that moment. A
   sensor fails if any goes missing, because capturing only HTTP status is what
@@ -610,7 +618,7 @@ cleanly. I04: free org - nano create 201, no compute addon catalogue at
 all, pause/restore lifecycle live (wake 162-204 s, data API answers
 `HTTP 540 Project paused` while parked).
 
-## experiments/sfp-platforms - key facts (validated 2026-08-24)
+## experiments/sfp-platforms - key facts (validated 2026-08-24, extended 2026-08-25)
 
 Platform-plan entitlement delta, measured on a `platform`-plan org
 against the same modules run on a normal Pro org. Nano IS the default create
@@ -621,15 +629,27 @@ tier decoupled from the "contact us" gates: 18-variant compute catalogue
 (`ci_micro`..`ci_48xlarge_high_memory`) but a narrower 10-size self-service
 update path. Pausing is ENFORCED (unlike every paid plan). Migrations: NOT
 SfP-gated (200 on Pro too). Restore points 400, OAuth bridge 404,
-project_cloning declared-but-404. Read replicas 400 despite declared
-entitlement. Disk gp3 IOPS floor blocks a 2->4 GB grow. Read-only mode
-(status + 15 min temporary-disable). Backup schedule 402 structured
-`entitlement_required`. Branches: delete is the top-level
-`DELETE /v1/branches/{id}`, not by name. `secret_jwt_template` accepted +
-echoed; minted key is opaque (`sb_secret_...`). JIT database access works
-(invite -> `invite_id`, delete -> 200).
+project_cloning declared-but-404.
 
-Full table: `experiments/sfp-platforms/README.md`.
+Extended 2026-08-25 (gate hunt + A/B, see RUNLOG):
+
+- Read replicas: the 400 names its gate (`"minimum size of small"`, same on
+  both org classes - the nano default sits below the floor), then a
+  completed-physical-backup wait; chain closed on Pro (after `pitr_7`, setup
+  204). PITR enable on the platform org is its own entitlement refusal.
+- `secret_jwt_template` claims REACH the exchanged token on both org classes
+  (`jwt_probe()` returning `auth.jwt()`; role + custom claim as templated).
+  The api-keys create response redacts `api_key` without `?reveal=true`;
+  PostgREST needs a schema-cache reload before a fresh RPC resolves.
+- JIT database access is a real platform differentiator: 200 on platform,
+  500 on Pro. Backup schedule 402 `entitlement_required` on BOTH org classes
+  (the OpenAPI 402 text says Enterprise plan).
+- Disk grow to 8 GB confirmed landed. Disk gp3 IOPS floor blocks a 2->4 GB
+  grow. Read-only mode (status + 15 min temporary-disable). Branches: delete
+  is the top-level `DELETE /v1/branches/{id}`, not by name.
+
+Full table: `experiments/sfp-platforms/README.md`; per-run record: RUNLOG.md;
+committed artifacts: `out/2026-08-25/`.
 
 ## experiments/byo-oauth - key facts (validated 2026-08-17/18)
 
