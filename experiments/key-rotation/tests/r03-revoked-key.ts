@@ -110,8 +110,8 @@ const mod: TestModule = {
 
     // ---- Identify the active signing key. This is the key whose token
     //      will be tested after revocation. ----
-    const initialKeys = await listSigningKeys(hubHost, hubKeys.service);
-    const activeKey = initialKeys.find((k) => k.status === "active");
+    const initialKeys = await listSigningKeys(ctx, hub);
+    const activeKey = initialKeys.find((k) => k.status === "in_use");
     if (!activeKey) {
       return [
         ...results,
@@ -165,11 +165,11 @@ const mod: TestModule = {
     });
 
     // ---- Create or find a standby key to rotate to. ----
-    const keysAfterMint = await listSigningKeys(hubHost, hubKeys.service);
+    const keysAfterMint = await listSigningKeys(ctx, hub);
     let standby = keysAfterMint.find((k) => k.status === "standby");
 
     if (!standby) {
-      const createAttempt = await createSigningKey(hubHost, hubKeys.service);
+      const createAttempt = await createSigningKey(ctx, hub);
       const msg =
         createAttempt.json && typeof createAttempt.json === "object" && !Array.isArray(createAttempt.json)
           ? String((createAttempt.json as Record<string, unknown>).message ?? "")
@@ -182,7 +182,7 @@ const mod: TestModule = {
         const t0 = performance.now();
         if (waitMs > 0) await new Promise((r) => setTimeout(r, waitMs));
         const waitedMs = Math.round(performance.now() - t0);
-        const retry = await createSigningKey(hubHost, hubKeys.service);
+        const retry = await createSigningKey(ctx, hub);
         results.push({
           id: "R03c",
           title: "Standby key created after rate-limit wait",
@@ -212,7 +212,7 @@ const mod: TestModule = {
     }
 
     // Re-read to find the standby (may have just been created).
-    const keysPrePromote = await listSigningKeys(hubHost, hubKeys.service);
+    const keysPrePromote = await listSigningKeys(ctx, hub);
     standby = keysPrePromote.find((k) => k.status === "standby");
     if (!standby) {
       return [
@@ -227,8 +227,8 @@ const mod: TestModule = {
     }
 
     // ---- Promote the standby to active, making the old key previously_used. ----
-    const promote = await patchSigningKey(hubHost, hubKeys.service, standby.id, {
-      status: "active",
+    const promote = await patchSigningKey(ctx, hub, standby.id, {
+      status: "in_use",
     });
     results.push({
       id: "R03d",
@@ -239,7 +239,7 @@ const mod: TestModule = {
     });
 
     // ---- Revoke the old key. ----
-    const revoke = await patchSigningKey(hubHost, hubKeys.service, activeKey.id, {
+    const revoke = await patchSigningKey(ctx, hub, activeKey.id, {
       status: "revoked",
     });
     results.push({
@@ -258,7 +258,7 @@ const mod: TestModule = {
     const probePoints: RevokedProbe[] = [];
 
     while (performance.now() - probeT0 < WINDOW_MS) {
-      const signingKeys = await listSigningKeys(hubHost, hubKeys.service);
+      const signingKeys = await listSigningKeys(ctx, hub);
       const tpas = await listTpa(ctx, spoke);
       const hubTpa = tpas.find(
         (t) => t.oidc_issuer_url === hubIssuer || t.jwks_url?.includes(hubHost),

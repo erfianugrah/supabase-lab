@@ -57,15 +57,15 @@ BYO-backend bridge. On this org:
 | scale-to-zero / nano | **DEFAULT create tier**: SfP-path create (no `desired_instance_size`) provisions `infra_compute_size: nano` (224MB shared_buffers, vs 256MB on the paid micro default); pausable. Nano is NOT in any catalogue because it is the default, not a purchasable variant |
 | realtime ceiling / branching / functions | 10000 concurrent / unlimited / unlimited |
 | audit_logs_days / PITR / private_link / HA | 366 / off / off / off |
-| read replicas | setup 400 despite `instances.read_replicas:true` (entitlement is not the endpoint gate) |
-| disk | gp3 2GB / 3000 IOPS / 125 MiB/s base; async grow (`201` empty, reflects ~15s); gp3 IOPS floor 3000 + max `min(500x size,16000)` makes a 2->4GB grow impossible |
+| read replicas | setup 400 despite `instances.read_replicas:true` - and the 400 names its gate: `"Read replicas require a minimum size of small"`, identical on both org classes (gate hunt 2026-08-25). The 2026-08-24 platform reading is thus explained: the nano-default create sits below the replica floor. After `ci_small` the refusal becomes a completed-physical-backup wait (Pro: `406 "Failed to check for latest completed physical backup"`; platform: `400 "...currently in progress"`). **Chain closed on Pro**: after enabling `pitr_7` the setup is ACCEPTED (`204`) - prerequisites are exactly compute floor + physical backups. On the platform org the PITR rung is its own entitlement boundary: `400 "Organization is not entitled to the selected PITR duration"` |
+| disk | gp3 2GB / 3000 IOPS / 125 MiB/s base; async grow (`201` empty, reflects ~15s) - grow to 8GB confirmed landed (size after poll = 8GB, 2026-08-25); gp3 IOPS floor 3000 + max `min(500x size,16000)` makes a 2->4GB grow impossible |
 | read-only mode | `enabled:false, override_enabled:false`; temporary-disable `201` |
 | members | full member objects (Owner), not a read-only stub |
-| backup schedule | `402` structured `entitlement_required` error with `error.feature=backup.schedule` |
+| backup schedule | `402` structured `entitlement_required` error with `error.feature=backup.schedule` - identical on Pro (A/B 2026-08-25); the OpenAPI spec's 402 description says the feature requires the Enterprise plan |
 | migration version | create returns `[]`; version is `YYYYMMDDHHMMSS` in `supabase_migrations.schema_migrations`; GET/PATCH by that version `200` |
 | branches | create `201` (returns a UUID `id`); delete is the top-level `DELETE /v1/branches/{id}` (`200`), not `/projects/{ref}/branches/{name}` (`404`) |
-| secret_jwt_template | accepted + echoed (`201`); minted key is opaque (`sb_secret_...`, not a JWT) |
-| JIT database access | invite `200` (returns `invite_id`), delete `200` - time-boxed network-restricted role-scoped grants |
+| secret_jwt_template | accepted + echoed (`201`); minted key is opaque (`sb_secret_...`, not a JWT). Exchanged at the data plane (2026-08-25, BOTH org classes): the claims DO reach the token - `jwt_probe()` returning `auth.jwt()` reports `role` and `tenant_id` as templated. Create response redacts the key without `?reveal=true` |
+| JIT database access | invite `200` (returns `invite_id`), delete `200` - time-boxed network-restricted role-scoped grants. A real platform differentiator: the same invite on a Pro org is REJECTED (`500`, A/B 2026-08-25) |
 
 ## Running
 
