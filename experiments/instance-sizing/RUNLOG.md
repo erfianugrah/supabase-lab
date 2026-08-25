@@ -67,3 +67,13 @@ creation lineage. A legacy paused project is a one-way door: once woken it
 cannot be re-paused and joins the always-on compute floor. For a platform
 carrying dormant tenants, "wake on demand" for a legacy/free-era project
 permanently changes its cost basis.
+
+## 2026-08-24/25 addendum - I01's "Nano absent" reading scoped by sfp-platforms
+
+I01 stands for Pro orgs, but its "Nano absent" generalization measured the
+addon/upgrade catalogue, not the create default. On a `platform`-plan org the
+SfP-prescribed create (no `desired_instance_size`) provisions
+`infra_compute_size: nano` (224 MB shared_buffers) and the project can pause -
+nano is the platform plan's create default, absent from every catalogue
+because it is not a purchasable or resize target on any plan. See
+`experiments/sfp-platforms/` (S01, RUNLOG 2026-08-24/25).

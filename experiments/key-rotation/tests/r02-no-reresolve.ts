@@ -145,7 +145,7 @@ const mod: TestModule = {
     const oldKid = String(jwtHeader(oldToken).kid ?? "?");
 
     // ---- Find the standby key (created by R01) and promote it. ----
-    const initialKeys = await listSigningKeys(hubHost, hubKeys.service);
+    const initialKeys = await listSigningKeys(ctx, hub);
     const standby = initialKeys.find((k) => k.status === "standby");
 
     if (!standby) {
@@ -162,7 +162,7 @@ const mod: TestModule = {
       ];
     }
 
-    const oldKeyBeforePromote = initialKeys.find((k) => k.status === "active");
+    const oldKeyBeforePromote = initialKeys.find((k) => k.status === "in_use");
     results.push({
       id: "R02b",
       title: "Pre-rotation key state",
@@ -176,8 +176,8 @@ const mod: TestModule = {
     });
 
     // ---- Promote the standby to active. ----
-    const promote = await patchSigningKey(hubHost, hubKeys.service, standby.id, {
-      status: "active",
+    const promote = await patchSigningKey(ctx, hub, standby.id, {
+      status: "in_use",
     });
     results.push({
       id: "R02c",
@@ -235,7 +235,7 @@ const mod: TestModule = {
     const probePoints: ProbePoint[] = [];
 
     while (performance.now() - probeT0 < WINDOW_MS) {
-      const signingKeys = await listSigningKeys(hubHost, hubKeys.service);
+      const signingKeys = await listSigningKeys(ctx, hub);
       const tpas = await listTpa(ctx, spoke);
       const hubTpa = tpas.find(
         (t) => t.oidc_issuer_url === hubIssuer || t.jwks_url?.includes(hubHost),
