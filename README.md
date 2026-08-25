@@ -51,6 +51,11 @@ facts):
 - `instance-sizing` - compute-size gating across org classes: Nano rejected
   three ways on paid orgs, accepted on free orgs; smart region selection;
   the legacy paused-project one-way door; the free-org pause lifecycle.
+- `sfp-platforms` - what a `platform`-plan (SfP) org actually unlocks vs Pro,
+  measured: nano is the create default (correcting instance-sizing I01's
+  "Nano absent" reading, which measured the upgrade catalogue), pausing is
+  enforced, migrations are not gated, restore points 400, the OAuth BYO
+  bridge 404. Self-provisioning modules, no OpenTofu state.
 - `byo-oauth` - the Management API OAuth2 surface: authorize behaviour,
   the full token lifecycle (24 h tokens, refresh rotation, org-scoped
   grants, instant revocation), the contract-gated claim flow, and the
