@@ -98,31 +98,50 @@ async function authAdmin(
   return { status: res.status, json, text };
 }
 
-export async function listSigningKeys(
-  host: string,
-  serviceKey: string,
-): Promise<SigningKey[]> {
-  const r = await authAdmin(host, serviceKey, "/signing-keys");
-  return Array.isArray(r.json) ? (r.json as SigningKey[]) : [];
+/**
+ * Signing keys live on the MANAGEMENT API, not the project's GoTrue admin
+ * surface - `/auth/v1/admin/signing-keys` is a hard 404 on live projects
+ * (measured 2026-08-25; the original offline port assumed it existed).
+ * Live contract, verified on a throwaway project:
+ *   GET   /v1/projects/{ref}/config/auth/signing-keys        -> {keys: [...]}
+ *   POST  ... {algorithm: "ES256"}                           -> 201, status "standby"
+ *   PATCH .../{id} {status: "in_use"}                        -> 200, promotes;
+ *         the old in_use key auto-demotes to "previously_used"
+ * Status vocabulary: standby | in_use | previously_used | revoked.
+ * kid == id for asymmetric keys (and public_jwk carries the kid).
+ */
+export async function listSigningKeys(ctx: Ctx, ref: string): Promise<SigningKey[]> {
+  const r = await mgmt(ctx, "GET", `/projects/${ref}/config/auth/signing-keys`);
+  const arr = (r.json as { keys?: unknown[] } | undefined)?.keys;
+  if (!Array.isArray(arr)) return [];
+  return arr.map((k) => {
+    const rec = k as Record<string, unknown>;
+    const jwk = rec.public_jwk as Record<string, unknown> | null | undefined;
+    return {
+      ...rec,
+      id: String(rec.id ?? ""),
+      kid: String(jwk?.kid ?? rec.id ?? ""),
+      status: String(rec.status ?? ""),
+    } as SigningKey;
+  });
 }
 
 export async function createSigningKey(
-  host: string,
-  serviceKey: string,
-): Promise<{ status: number; json: Record<string, unknown> | unknown[]; text: string }> {
-  return authAdmin(host, serviceKey, "/signing-keys", { method: "POST" });
+  ctx: Ctx,
+  ref: string,
+): Promise<{ status: number; json?: Record<string, unknown> | unknown[]; text: string }> {
+  return mgmt(ctx, "POST", `/projects/${ref}/config/auth/signing-keys`, {
+    algorithm: "ES256",
+  });
 }
 
 export async function patchSigningKey(
-  host: string,
-  serviceKey: string,
+  ctx: Ctx,
+  ref: string,
   id: string,
   body: Record<string, unknown>,
-): Promise<{ status: number; json: Record<string, unknown> | unknown[]; text: string }> {
-  return authAdmin(host, serviceKey, `/signing-keys/${id}`, {
-    method: "PATCH",
-    body: JSON.stringify(body),
-  });
+): Promise<{ status: number; json?: Record<string, unknown> | unknown[]; text: string }> {
+  return mgmt(ctx, "PATCH", `/projects/${ref}/config/auth/signing-keys/${id}`, body);
 }
 
 // ---- Auth users on the hub ----
@@ -133,13 +152,13 @@ export async function adminCreate(
   body: Record<string, unknown>,
 ): Promise<{ status: number; json: Record<string, unknown> | unknown[]; text: string }> {
   // First admin write on a fresh project can 500 even after health goes green.
-  let r = await authAdmin(host, serviceKey, "/admin/users", {
+  let r = await authAdmin(host, serviceKey, "/users", {
     method: "POST",
     body: JSON.stringify(body),
   });
   if (r.status >= 500) {
     await new Promise((x) => setTimeout(x, 12000));
-    r = await authAdmin(host, serviceKey, "/admin/users", {
+    r = await authAdmin(host, serviceKey, "/users", {
       method: "POST",
       body: JSON.stringify(body),
     });

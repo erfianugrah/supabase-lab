@@ -1,30 +1,13 @@
 # RUNLOG - key-rotation
 
-> **PARKED: this has never been run against real projects.** It is a port of
-> bash that produced the findings below on 2026-08-03 and 2026-08-04, and it
-> passes an offline gate - it compiles, registers, validates, and skips cleanly
-> without credentials. None of that proves it reproduces anything.
->
-> Until someone runs it, a failure here means nothing: you cannot tell a changed
-> platform from a broken harness. Treat the modules as unproven and the findings
-> as belonging to the bash they replaced.
->
-> **First live run, when you pick this up:**
->
-> 1. `make secrets-decrypt` at the repo root, with a valid PAT in it.
-> 2. `make apply` here - two projects, hub and spoke.
-> 3. `make probe`, and budget about an hour. R02's window is 20 minutes and
->    R03's is 15; shortening them for the FIRST run defeats the purpose, because
->    what happens across those windows is the entire question.
-> 4. Compare against the key-facts section for this experiment in the root
->    `AGENTS.md`. Exact numbers are not the test - the standby cooldown already
->    varied 127-144 s over three runs - the SHAPE is: the consumer never
->    re-resolves, and the old key keeps working through revoked.
-> 5. `make destroy`, then replace this banner with what the run found.
->
-> If the shape does NOT hold, that is interesting rather than a bug to paper
-> over: check the harness first, then consider that the platform may have
-> changed - which is the reason this port exists at all.
+> **RAN LIVE 2026-08-25** - full windows, two throwaway projects, destroyed
+> after. See "First live run (2026-08-25)" below. The headline: the consumer
+> cache SHAPE held (R02 reproduced end-to-end), but the platform changed
+> around it - signing keys moved to the Management API, the standby-create
+> rate limit is gone (one-standby-at-a-time `422` instead), and a fresh
+> integration serves a stale kid set even when the issuer's JWKS is current.
+> R03's exact revoked-key-honoured scenario still needs a dedicated run
+> (module ordering confounded it this time).
 
 
 Two Supabase projects, no AWS. Answers a question about platform
@@ -114,6 +97,47 @@ the full-duration run and a fast smoke test share the same code:
 - No account-specific identifiers anywhere in tracked files.
 - Secrets never enter a measurement, detail, or evidence string.
 - Kids and JWKS bodies are public; access tokens are not.
+
+## First live run (2026-08-25)
+
+The offline-gated port finally ran live (committed artifacts: `out/2026-08-25/`; raw evidence dirs stay local). Two port bugs
+surfaced first, then the run itself changed three findings:
+
+- **Port bug 1 - the surface moved.** The project GoTrue admin
+  `/auth/v1/admin/signing-keys` is a hard `404 page not found` on live
+  projects; signing keys are managed on the Management API at
+  `GET|POST|PATCH /v1/projects/{ref}/config/auth/signing-keys`. The lib now
+  routes there (PAT, not service key). Status vocabulary: `standby | in_use |
+  previously_used | revoked`; `kid == id`; create body needs `{algorithm}`.
+- **Port bug 2 - doubled path.** `adminCreate` passed `/admin/users` to a
+  helper that already prefixes `/auth/v1/admin`, so every user create hit
+  `/admin/admin/users`, silently 404'd (result unchecked), and the login
+  probes failed 400 on a nonexistent user.
+- **R01 premise refuted.** Standby creation is NOT time-rate-limited on the
+  new surface: first create `201` immediately. The constraint changed shape -
+  a second create answers `422 "already has a signing key in standby"` (one
+  standby at a time), not an ISO-deadline throttle.
+- **R02 reproduced end-to-end.** Hub published the new kid in its JWKS after
+  241 s (~4 min, vs ~7 min measured 2026-08-04). The spoke's cached kid set
+  never changed across 116 probes / 20 min and new-key tokens were refused
+  (HTTP 401, not a PGRST301 body) the entire window. The consumer cache is
+  still the maintenance window.
+- **R03 partially confounded, and a stronger cache finding fell out.** The
+  revoked key's tokens were refused throughout (87 probes, 401) - but
+  `cached_kids` shows the spoke never cached that key at all: R03's FRESH
+  third-party-auth integration, created while the new key was `in_use` and
+  while the hub JWKS demonstrably advertised it, still served the ORIGINAL
+  kid set. Integration re-creation does not repopulate the JWKS cache even
+  when the issuer's published JWKS is current - stronger than the 2026-08-04
+  G33 reading (which blamed the issuer's own JWKS lag). The original R03
+  scenario (spoke honours a revoked key it HAS cached) was therefore not
+  reproduced this run; it needs a run where the spoke's integration is
+  created before the rotation and the revocation happens inside the cache
+  window with no intervening promotion.
+
+This answers the second bullet below ("whether the spoke re-resolves if the
+integration is deleted and re-created"): it does not, at least within the
+observed window, even with a current issuer JWKS.
 
 ## What this does NOT answer
 

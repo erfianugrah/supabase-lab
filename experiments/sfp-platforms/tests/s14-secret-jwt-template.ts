@@ -9,9 +9,10 @@
  *         Record `key_create_status` (201 = created), and capture the returned
  *         `api_key` (DO NOT write the full key value into results - store only its
  *         `prefix` and `hash`). `info`.
- *   S14c  verify binding: decode the minted key's JWT (or query a table
- *         through the data plane with the key as `Authorization: Bearer`) and confirm
- *         the custom claims reach the token. Record `role_bound` (1|0) and
+ *   S14c  verify binding: the key is opaque, so exchange it at the data plane -
+ *         install a `jwt_probe()` RPC returning `auth.jwt()`, call it with the
+ *         minted key as `Authorization: Bearer`, and read the claims PostgREST
+ *         actually sees. Record `data_plane_status`, `role_bound` (1|0) and
  *         `tenant_claim_present` (1|0). If the key cannot be exercised, S14c is a
  *         `skip` with that reason.
  *
@@ -91,7 +92,11 @@ const mod: TestModule = {
           });
 
           // --- S14b: mint key ---
-          const keyRes = await mgmt(ctx, "POST", `/projects/${ref}/api-keys`, {
+          // The create response REDACTS the key value by default (masked with
+          // U+00B7 dots, which fetch() rejects as an invalid header value) -
+          // ask for the real value with ?reveal=true, and if it still is not
+          // clean ASCII, re-fetch the key by id with reveal.
+          const keyRes = await mgmt(ctx, "POST", `/projects/${ref}/api-keys?reveal=true`, {
             type: "secret",
             name: "role_probe",
             secret_jwt_template: {
@@ -100,13 +105,26 @@ const mod: TestModule = {
             },
           });
           const key_status = keyRes.status;
-          const api_key = (keyRes.json as any)?.api_key;
+          const cleanKey = (v: unknown): string | undefined =>
+            typeof v === "string" && /^[\x21-\x7e]+$/.test(v.trim()) ? v.trim() : undefined;
+          let api_key: string | undefined = cleanKey((keyRes.json as any)?.api_key);
+          const key_id = (keyRes.json as any)?.id;
+          if (!api_key && key_id) {
+            const rev = await mgmt(ctx, "GET", `/projects/${ref}/api-keys/${key_id}?reveal=true`);
+            api_key = cleanKey((rev.json as any)?.api_key);
+          }
           let key_prefix = "unknown";
           let key_hash = "unknown";
 
           if (api_key) {
             key_prefix = api_key.substring(0, 8);
-            key_hash = "hash_not_implemented";
+            const buf = await crypto.subtle.digest(
+              "SHA-256",
+              new TextEncoder().encode(api_key),
+            );
+            key_hash = [...new Uint8Array(buf)]
+              .map((b) => b.toString(16).padStart(2, "0"))
+              .join("");
           }
 
           results.push({
@@ -122,25 +140,96 @@ const mod: TestModule = {
             evidence: key_status >= 200 && key_status < 300 ? `key: ${key_prefix}...` : keyRes.text.slice(0, 300),
           });
 
-          // --- S14c: verify binding ---
-          // The minted key is OPAQUE (not a self-contained JWT), so the
-          // secret_jwt_template is applied server-side only when the key is
-          // exchanged for a token. Role-binding cannot be verified by decoding
-          // the key itself; record the opacity as the finding.
+          // --- S14c: verify binding via the data plane ---
+          // The minted key is OPAQUE (not a self-contained JWT); the template
+          // is applied server-side when the key is exchanged. So exchange it:
+          // expose auth.jwt() through an RPC and call it with the minted key
+          // as bearer. Whatever claims PostgREST reports ARE the exchanged
+          // token - role_bound/tenant_claim_present are measured, not assumed.
           const keyIsJwt = typeof api_key === "string" && api_key.split(".").length === 3;
-          results.push({
-            id: "S14c",
-            title: "S14c: verify binding",
-            status: "info",
-            detail: keyIsJwt
-              ? "key is a decodable JWT"
-              : "key is opaque (not a JWT) - role-binding is server-side, not inspectable from the key",
-            measurements: {
-              key_is_jwt: keyIsJwt ? 1 : 0,
-              role_bound: 0,
-              tenant_claim_present: 0,
-            },
-          });
+          if (!api_key) {
+            results.push({
+              id: "S14c",
+              title: "S14c: verify binding",
+              status: "skip",
+              detail: "no key minted - nothing to exchange",
+            });
+          } else {
+            const fn = await mgmt(ctx, "POST", `/projects/${ref}/database/query`, {
+              query:
+                "create or replace function public.jwt_probe() returns jsonb " +
+                "language sql stable as $$ select coalesce(auth.jwt(), '{}'::jsonb) $$; " +
+                "grant execute on function public.jwt_probe() to anon, authenticated; " +
+                // PostgREST serves from a schema cache; without the reload the
+                // fresh function 404s (PGRST202) for a while.
+                "notify pgrst, 'reload schema';",
+            });
+            // /database/query answers successful statements with 201, not 200.
+            if (fn.status < 200 || fn.status >= 300) {
+              results.push({
+                id: "S14c",
+                title: "S14c: verify binding",
+                status: "skip",
+                detail: `jwt_probe install failed: HTTP ${fn.status}: ${fn.text.slice(0, 200)}`,
+              });
+            } else {
+              const suffix = ctx.apiHostSuffix ?? "supabase.co";
+              try {
+                // retry PGRST202/404 while the schema-cache reload propagates
+                let dp: Response | undefined;
+                let dpText = "";
+                for (let attempt = 0; attempt < 6; attempt++) {
+                  dp = await fetch(`https://${ref}.${suffix}/rest/v1/rpc/jwt_probe`, {
+                    method: "POST",
+                    headers: {
+                      apikey: api_key,
+                      Authorization: `Bearer ${api_key}`,
+                      "Content-Type": "application/json",
+                    },
+                    body: "{}",
+                    signal: AbortSignal.timeout(30_000),
+                  });
+                  dpText = await dp.text();
+                  if (dp.status !== 404) break;
+                  await sleep(5_000);
+                }
+                if (!dp) throw new Error("no response");
+                let claims: Record<string, unknown> = {};
+                try {
+                  claims = JSON.parse(dpText) as Record<string, unknown>;
+                } catch {
+                  /* non-JSON is data - claims stay empty */
+                }
+                const role_bound = claims["role"] === "authenticated" ? 1 : 0;
+                const tenant_claim_present = claims["tenant_id"] === "probe-tenant" ? 1 : 0;
+                results.push({
+                  id: "S14c",
+                  title: "S14c: verify binding",
+                  status: "info",
+                  detail:
+                    dp.status >= 200 && dp.status < 300
+                      ? `exchanged token claims: role=${String(claims["role"])} tenant_id=${String(claims["tenant_id"])}`
+                      : `data-plane exchange refused: HTTP ${dp.status}`,
+                  measurements: {
+                    key_is_jwt: keyIsJwt ? 1 : 0,
+                    data_plane_status: dp.status,
+                    role_bound,
+                    tenant_claim_present,
+                  },
+                  evidence: dpText.slice(0, 300),
+                });
+              } catch (fe) {
+                // a thrown fetch (header validation, DNS, timeout) is a
+                // recorded outcome, not a module failure
+                results.push({
+                  id: "S14c",
+                  title: "S14c: verify binding",
+                  status: "skip",
+                  detail: `data-plane fetch threw: ${fe instanceof Error ? fe.message.slice(0, 200) : String(fe)}`,
+                });
+              }
+            }
+          }
         }
       }
 

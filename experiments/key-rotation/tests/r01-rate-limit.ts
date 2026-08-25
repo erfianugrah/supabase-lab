@@ -52,7 +52,7 @@ const mod: TestModule = {
     }
 
     // ---- Record initial signing key state. ----
-    const before = await listSigningKeys(host, hubKeys.service);
+    const before = await listSigningKeys(ctx, hub);
     results.push({
       id: "R01a",
       title: "Initial signing keys",
@@ -62,7 +62,7 @@ const mod: TestModule = {
     });
 
     // ---- Attempt to create a standby key. Expect rate limiting. ----
-    const attempt1 = await createSigningKey(host, hubKeys.service);
+    const attempt1 = await createSigningKey(ctx, hub);
 
     // Parse the rate-limit message. The body carries a message like
     // "Please wait until 2026-08-04T12:34:56Z" with a 4xx status.
@@ -90,7 +90,7 @@ const mod: TestModule = {
       // If not rate limited (unusual but possible if R01 is re-run on a
       // project that's past the window), the key might have been created
       // already. Check and report.
-      const after = await listSigningKeys(host, hubKeys.service);
+      const after = await listSigningKeys(ctx, hub);
       const standby = after.find((k) => k.status === "standby");
       results.push({
         id: "R01c",
@@ -114,8 +114,8 @@ const mod: TestModule = {
     const waitedMs = Math.round(performance.now() - t0);
 
     // ---- Second attempt after the deadline. ----
-    const attempt2 = await createSigningKey(host, hubKeys.service);
-    const after = await listSigningKeys(host, hubKeys.service);
+    const attempt2 = await createSigningKey(ctx, hub);
+    const after = await listSigningKeys(ctx, hub);
     const standby = after.find((k) => k.status === "standby");
 
     results.push({
@@ -134,7 +134,7 @@ const mod: TestModule = {
     });
 
     // Record that the old key is still active after creating a standby.
-    const active = after.find((k) => k.status === "active");
+    const active = after.find((k) => k.status === "in_use");
     results.push({
       id: "R01e",
       title: "Active key unchanged after creating standby",
@@ -142,7 +142,7 @@ const mod: TestModule = {
       detail: active
         ? `${active.kid} still active; standby=${standby?.kid ?? "none"}`
         : "no active key found",
-      measurements: { active_count: after.filter((k) => k.status === "active").length },
+      measurements: { active_count: after.filter((k) => k.status === "in_use").length },
     });
 
     return results;
