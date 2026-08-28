@@ -4,11 +4,12 @@ REF := $(shell tofu output -raw project_ref 2>/dev/null)
 TOK := $(shell grep -E '^supabase_access_token' $(ROOT)/secrets.tfvars 2>/dev/null | cut -d'"' -f2)
 PW := $(shell grep -E '^db_password' $(ROOT)/secrets.tfvars 2>/dev/null | cut -d'"' -f2)
 TS := $(shell date +%Y%m%d-%H%M%S)
-IDS ?= S01,S02,S03,S04,S05
+IDS ?= S01,S02,S03,S04,S05,S06,S07,S08,S09,S10,S11,S12
 PGRST_PORT ?= 3001
 RL_PORT ?= 8080
+RLW_PORT ?= 8788
 
-.PHONY: init fmt validate apply probe destroy postgrest-up postgrest-down ratelimit-up ratelimit-down
+.PHONY: init fmt validate apply probe destroy postgrest-up postgrest-down ratelimit-up ratelimit-down ratelimit-worker-up ratelimit-worker-down
 
 init:
 	tofu init
@@ -57,6 +58,16 @@ ratelimit-up:
 ratelimit-down:
 	-docker rm -f sec-ratelimit >/dev/null 2>&1 && echo "ratelimit down"
 
+# S12: the Cloudflare Worker rate-limiter variant. Runs locally via wrangler
+# dev (no deploy, no cost) in front of the same PostgREST container. Foreground
+# by design - leave it in its own terminal, then `make probe`. ORIGIN is
+# overridden with the actual PostgREST port.
+ratelimit-worker-up:
+	cd ratelimit-worker && wrangler dev --port $(RLW_PORT) --var ORIGIN:http://localhost:$(PGRST_PORT)
+
+ratelimit-worker-down:
+	-pkill -f 'wrangler dev --port $(RLW_PORT)' >/dev/null 2>&1 && echo "ratelimit-worker down"
+
 probe:
 	@test -n "$(REF)" || (echo "no project_ref output - run 'make apply' first"; exit 1)
 	@test -n "$(TOK)" || (echo "no PAT in $(ROOT)/secrets.tfvars"; exit 1)
@@ -72,6 +83,7 @@ probe:
 		PVLAB_DB_PASSWORD="$(PW)" \
 		PVLAB_ENDPOINT_SELFHOSTED_POSTGREST="http://localhost:$(PGRST_PORT)" \
 		PVLAB_ENDPOINT_RATELIMIT="http://localhost:$(RL_PORT)" \
+		PVLAB_ENDPOINT_RATELIMIT_WORKER="http://localhost:$(RLW_PORT)" \
 		$(ROOT)/harness/dist/pvlab --where local --experiment security-lockdown \
 		--only "$(IDS)" --destructive --out evidence/$(TS)
 	@echo "== evidence/$(TS)/run-<stamp>.md =="

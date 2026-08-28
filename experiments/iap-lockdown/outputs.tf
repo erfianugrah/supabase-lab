@@ -28,3 +28,14 @@ output "proxy_hostname" {
   value = var.enable_cloudflare ? local.proxy_hostname : ""
 }
 
+# Access service token for the M2M call to the proxy (L12). client_secret is
+# only returned by the API at create time; keep it out of anything committed.
+output "svc_token_client_id" {
+  value = var.enable_cloudflare ? cloudflare_zero_trust_access_service_token.l12[0].client_id : ""
+}
+
+output "svc_token_client_secret" {
+  value     = var.enable_cloudflare ? cloudflare_zero_trust_access_service_token.l12[0].client_secret : ""
+  sensitive = true
+}
+

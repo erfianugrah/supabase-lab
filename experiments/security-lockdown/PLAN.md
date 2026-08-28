@@ -56,7 +56,7 @@ is to run your own PostgREST and turn the managed Data API off:
 
 ### S05 - rate limiting in front of your PostgREST (design; light test)
 
-Rate limiting is the easy part and can live anywhere the traffic funnels
+Rate limiting can live anywhere the traffic funnels
 through: a Cloudflare Worker (rate-limit binding / DO / KV), CF WAF rate rules,
 nginx, Envoy, or Upstash (which Supabase's own docs recommend for edge
 functions). The only rule: it must sit in front of a CLOSED origin, or callers
