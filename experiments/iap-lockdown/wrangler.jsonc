@@ -8,5 +8,11 @@
   "main": "worker/index.ts",
   "compatibility_date": "2026-01-01",
   "workers_dev": false,
+  // The route is a public DNS name (not a secret), and this account's SaaS
+  // wildcard SSL entitlement requires an explicit zone per route - which the
+  // CLI --route flag cannot carry - so it lives here. The project host and
+  // service key (the secrets) are still supplied at deploy time by the Makefile.
+  // If your cf_subdomain / cf_zone_name differ, change these two values.
+  "routes": [{ "pattern": "iap-lab.erfi.dev/*", "zone_name": "erfi.dev" }],
   "observability": { "enabled": true }
 }
