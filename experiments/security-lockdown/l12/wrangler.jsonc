@@ -1,7 +1,8 @@
 {
-  // L12 test worker: serves the supabase-js page + transparently proxies to
-  // the project origin. Deployed to workers.dev (no zone). UPSTREAM + ANON are
-  // set at deploy time (--var), not committed.
+  // L12 browser-test worker: serves the supabase-js page + transparently
+  // proxies to the project origin. workers.dev (a zoneless test page); the
+  // measured L12 ran on the erfi.dev Access-gated proxy, not here. UPSTREAM +
+  // ANON are set at deploy time (--var), not committed.
   "$schema": "../../../../node_modules/wrangler/config-schema.json",
   "name": "l12-sbjs-proxy",
   "main": "worker.ts",
