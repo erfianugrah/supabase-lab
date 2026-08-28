@@ -1,0 +1,11 @@
+# Key material and run output never leave the machine.
+jwks/private.json
+evidence/
+.wrangler/
+secrets.tfvars
+.terraform/
+terraform.tfstate*
+tfplan*
+__pycache__/
+# wrangler.jsonc IS committed (codified). Real CF ids live in *.auto.tfvars,
+# which the root .gitignore already excludes via *.tfvars.
