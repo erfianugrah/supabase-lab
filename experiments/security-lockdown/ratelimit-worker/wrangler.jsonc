@@ -1,0 +1,13 @@
+{
+  "name": "sec-ratelimit-worker",
+  "main": "index.ts",
+  "compatibility_date": "2025-06-01",
+  // Native Rate Limiting binding. period must be 10 or 60; limit=2 over 10s
+  // mirrors the nginx demonstrator's rate=2r/s so a 15-request burst is mostly
+  // 429. namespace_id is any stable integer string for this account.
+  "ratelimits": [
+    { "name": "RL", "namespace_id": "1101", "simple": { "limit": 2, "period": 10 } }
+  ],
+  // Overridden at run time by the Makefile with the actual PostgREST port.
+  "vars": { "ORIGIN": "http://localhost:3000" }
+}

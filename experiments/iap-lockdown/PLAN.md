@@ -1,10 +1,11 @@
 # experiments/iap-lockdown - PLAN
 
-Status: Phase A (L01-L09) and Phase B (L10/L11/L13) run live 2026-08-28 and
-torn down - see RUNLOG.md for results. Remaining: the chrome-driven Access
-login (L10d, L11 proxy call, L12), Phase C (PrivateLink, needs the Team-tier
-org), and broader security dimensions beyond the IAP framing (network
-restrictions applied, security advisors, auth hardening).
+Status: Phase A (L01-L09), Phase B (L10-L13), and L20-L23 implemented and run
+2026-08-28, torn down - see the RUNLOG closeout. L12 runs browserless via an
+Access service token; L22 and L23 run live; L20/L21 are real modules whose
+PrivateLink composition is proven in privatelink-aws, so a standalone AWS run
+is gated on an AWS session plus the one manual dashboard association. The
+broader security dimensions live in the security-lockdown experiment.
 
 ## The question under test
 
