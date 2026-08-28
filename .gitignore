@@ -42,3 +42,6 @@ pubspec.lock
 
 # stray harness run artifacts
 harness/out/
+
+# run artifacts (like evidence/) - never commit
+**/out/
