@@ -1,6 +1,10 @@
 # experiments/iap-lockdown - PLAN
 
-Status: planned, not yet provisioned. Nothing in this directory has run.
+Status: Phase A (L01-L09) and Phase B (L10/L11/L13) run live 2026-08-28 and
+torn down - see RUNLOG.md for results. Remaining: the chrome-driven Access
+login (L10d, L11 proxy call, L12), Phase C (PrivateLink, needs the Team-tier
+org), and broader security dimensions beyond the IAP framing (network
+restrictions applied, security advisors, auth hardening).
 
 ## The question under test
 
@@ -56,6 +60,22 @@ Prior measured work this experiment builds on (do not re-measure, cite):
    answer, never measured here.
 6. The custom-domain misconception, measured: a custom CNAME gates nothing
    because the origin hostname keeps serving.
+7. The Enterprise axis, stated plainly. The customer asked "possible on
+   Enterprise?" For the managed multi-tenant tier the HTTP answer is
+   plan-independent: no network lockdown on any plan (Free..Enterprise).
+   BYOC (the whole stack in the customer's own VPC) and self-hosting are
+   the genuine "private HTTP tier" answers, and both are outside what this
+   lab can provision. The deliverable must still carry a BYOC row and a
+   self-host row or it is silent on the exact axis the customer named.
+8. The CORS surface, measured and de-mythologised. PostgREST honours an
+   `Origin` (its CORS config is undocumented); Auth implements no CORS at
+   all. Either way CORS is browser-only and gates nothing against a
+   non-browser client - the misconception twin of the CNAME - but the
+   PostgREST-yes / Auth-no asymmetry is a real fact worth recording.
+9. "Private by default" as literally asked: every lever here is opt-in
+   AFTER provisioning. A managed project is fully public from creation
+   until a lever is applied; nothing makes it private at birth. That is the
+   honest answer to "private by default" and it is a finding, not a lever.
 
 ## Phases and modules
 
@@ -96,16 +116,49 @@ Self-provisioning (W21/rls-wire-claims pattern), Pro org, no tofu.
   REVOKE` is what makes the lockdown survive new migrations. (c) The
   pen-test shape: a view over an RLS-enabled table returns every row to
   anon unless the view is created `WITH (security_invoker = true)` -
-  measured both ways. One statement per claim, all reversible.
-- L09 prerequest-hook-probe: whether any published Management API surface
-  configures a Postgres-side pre-request hook for PostgREST (headers or
-  otherwise), and whether `current_setting('request.headers')` is readable
-  in SQL on a managed project. Recorded as an inventory of what exists,
-  not an assertion about what a hook could do - whether the edge overwrites
-  or appends a spoofable forwarding header is platform internals and is
-  NOT lab-testable, so that question stays open by construction.
+  measured both ways. One statement per claim, all reversible. Two more
+  write-policy holes that make "we added RLS" still fail a pen test,
+  measured on the same project (L08f/L08g): an UPDATE-permitted role can
+  rewrite a column the policy never meant to expose - e.g. reassigning a
+  row's foreign-key owner / tenant id - unless a trigger, CHECK, or
+  column-level privilege constrains which columns change; and a PERMISSIVE
+  policy written for one role silently applies to others (PERMISSIVE
+  policies OR together), so a relaxed admin policy can bleed onto anon.
+  These are RLS-correctness edges, not network levers, but they are the
+  shape of the second customer's actual exposure.
+- L09 prerequest-ip-filter + spec enumeration. The DB-layer pre-request
+  filter is NOT absent - it is a documented PostgREST mechanism (Source:
+  /docs/supabase/guides/api/securing-your-api.md and
+  /docs/supabase/guides/database/debugging-performance.md): set
+  `pgrst.db_pre_request` to a function that reads
+  `current_setting('request.headers')` (which carries `x-forwarded-for`)
+  and RAISEs to reject. Measure it end to end on the actual PostgREST path,
+  not just via /database/query: (a) the function fires on a `/rest/v1/`
+  call; (b) it can read the forwarding header and reject a chosen value
+  with a chosen status/hint; (c) its cost - a pre-request function runs on
+  every request, and a filter that writes (rate-limit/IP-ban bookkeeping)
+  forces a write per request; measure whether it works at all against a
+  read replica (claimed not to). The one part that stays open by
+  construction: whether the edge overwrites vs appends a client-supplied
+  `x-forwarded-for` before PostgREST sees it. If it appends, the filter is
+  spoofable and is not an allowlist - platform-internal, not lab-testable.
+  Then the F05-method whole-spec enumeration of the /v1 OpenAPI for any
+  network/restriction/allowlist/ip/private operation, so "no built-in IP
+  allowlist for the Data API" is stated across the whole spec, not guessed.
 
 ### Phase B - IAP integration (Cloudflare: Worker + Access)
+
+IdP dependency: no self-hosted identity provider (Authentik etc.) is
+required or useful. L10 needs a PUBLICLY REACHABLE JWKS - Supabase's control
+plane fetches it to resolve the TPA integration, so a localhost IdP cannot
+work, and inline `custom_jwks` is a measured dead path (cross-project-auth
+X01: accepted, never resolves). Use the edge-resilience pattern: local
+ES256 keygen + a small Worker serving `/jwks.json` (or a
+`/.well-known/openid-configuration` for the `oidc_issuer_url` shape, which
+resolves fastest). L11 uses real Cloudflare Access as the IAP (already
+available; publishes a JWKS, injects `Cf-Access-Jwt-Assertion`). A
+self-hosted IAP would add no Supabase-side evidence and would still need to
+be tunnel-exposed.
 
 - L10 tpa-iap-issuer: lab ES256 issuer (reuse edge-resilience `lib/jwt.ts`
   + `scripts/keygen.ts`) standing in for the IAP's identity; register via
@@ -123,10 +176,15 @@ Self-provisioning (W21/rls-wire-claims pattern), Pro org, no tofu.
   rest/auth/storage/realtime. Records which subsystems survive path-prefix
   proxying (Realtime WS upgrade is the expected casualty) and which need
   per-client overrides.
-- L13 custom-domain: activate a custom domain; measure the origin hostname
-  still serving (the CNAME-as-gate misconception, settled with evidence).
-  Attempt CF proxying in front of the custom hostname and record cert /
-  verification behaviour.
+- L13 custom-domain + CORS: activate a custom domain; measure the origin
+  hostname still serving (the CNAME-as-gate misconception, settled with
+  evidence). Attempt CF proxying in front of the custom hostname and record
+  cert / verification behaviour. Same misconception family - the CORS
+  surface: measure that PostgREST honours an `Origin` header (its CORS
+  config is undocumented) while Auth implements no CORS at all, and that
+  both are browser-only, so a non-browser client (curl) ignores CORS
+  entirely and it gates nothing. Record the PostgREST-yes / Auth-no
+  asymmetry as a fact and "CORS locks my API" as the misconception.
 
 ### Phase C - network lockdown (AWS, reuse privatelink-aws tofu)
 
@@ -152,8 +210,17 @@ where possible; this experiment adds its own state dir.
 ### Phase D - synthesis
 
 - D1 surface x lever x plan-tier x evidence-id matrix (markdown, in-repo).
+  Must include a BYOC row and a self-host row (docs-backed, not lab-run) so
+  the plan-tier axis is complete and the Enterprise answer is explicit:
+  managed-tier rows carry lab evidence ids, the BYOC/self-host rows carry
+  doc citations. Without them the matrix is silent on "Enterprise?".
 - D2 lexicanum reference doc (generalised, no customer detail).
 - D3 short answer text for the sales thread, backed by evidence ids.
+- Scope boundary to name, not solve: RLS write-policy correctness (UPDATE
+  column scope, PERMISSIVE bleed, SELECT-logic reused across DELETE/UPDATE)
+  is a distinct problem from network/proxy lockdown - L08f/L08g touch its
+  surface but a real RLS-policy test harness belongs in its own experiment.
+  Flag it in D2 as future work so the reader knows the gap is known.
 
 ## Docs to re-check at execution time (platform moves)
 

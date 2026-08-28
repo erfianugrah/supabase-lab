@@ -147,7 +147,7 @@ grant select on public.${TABLE} to anon, authenticated;
     key: keys.serviceJwt,
     body: { id: BUCKET_PUBLIC, name: BUCKET_PUBLIC, public: true },
   });
-  if (bucket.status >= 300 && !/already exists|duplicate/i.test(bucket.code)) {
+  if (bucket.status >= 300 && !/already.?exists|duplicate/i.test(bucket.code)) {
     throw new Error(`create bucket: HTTP ${bucket.status} ${bucket.code}`);
   }
   const put = await fetch(`https://${ctx.apiHost}/storage/v1/object/${BUCKET_PUBLIC}/hello.txt`, {
@@ -173,7 +173,9 @@ grant select on public.${TABLE} to anon, authenticated;
     verify_jwt: false,
     body,
   });
-  if (fn.status >= 300) throw new Error(`deploy ${EF_OPEN}: HTTP ${fn.status} ${fn.text.slice(0, 200)}`);
+  if (fn.status >= 300 && !/duplicat|already exists/i.test(fn.text)) {
+    throw new Error(`deploy ${EF_OPEN}: HTTP ${fn.status} ${fn.text.slice(0, 200)}`);
+  }
 
   // Propagation: REST needs a schema-cache reload for a fresh table, and a
   // fresh EF needs its own settle window (W25 measured ~10.6s). Poll both.
