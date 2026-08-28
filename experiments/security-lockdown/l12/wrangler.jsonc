@@ -1,0 +1,10 @@
+{
+  // L12 test worker: serves the supabase-js page + transparently proxies to
+  // the project origin. Deployed to workers.dev (no zone). UPSTREAM + ANON are
+  // set at deploy time (--var), not committed.
+  "$schema": "../../../../node_modules/wrangler/config-schema.json",
+  "name": "l12-sbjs-proxy",
+  "main": "worker.ts",
+  "compatibility_date": "2026-01-01",
+  "workers_dev": true
+}

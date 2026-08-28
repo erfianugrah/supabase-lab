@@ -42,7 +42,10 @@ resource "cloudflare_zero_trust_access_application" "iap_issuer" {
   policies                  = [cloudflare_zero_trust_access_policy.allow[0].id]
   allowed_idps              = [var.cf_pin_idp_id]
   saas_app {
-    auth_type     = "oidc"
+    auth_type = "oidc"
+    # Cloudflare rejects client_credentials for SaaS OIDC apps (measured
+    # 2026-08-28) - the token for L10d must come from the interactive
+    # authorization-code login (the chrome/Gmail-PIN flow).
     redirect_uris = local.proxy_callback_uris
     grant_types   = ["authorization_code_with_pkce"]
     scopes        = ["openid", "email", "profile", "groups"]

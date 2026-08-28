@@ -184,8 +184,15 @@ state (4 resources). Ran the non-interactive modules, then destroyed.
   CORS is advisory to browsers only, it does not restrict the API. The custom
   CNAME is non-gating for the same reason L11b shows: the origin hostname
   always serves.
-- **L12 supabase-js through the proxy**: needs the deployed Access-gated Worker
-  reachable (service token / chrome) - self-skips, follow-up.
+- **L12 supabase-js through the proxy** (DONE 2026-08-28, browser test): a
+  transparent Cloudflare Worker proxy in front of a project, with supabase-js
+  pointed at the worker origin, driven in a real (headless) browser. Result:
+  `{rest: ok rows=2, auth: ok, storage: ok, realtime: SUBSCRIBED}` - ALL FOUR
+  subsystems work through the proxy, INCLUDING Realtime. This CONTRADICTS the
+  plan's hypothesis that the WebSocket upgrade would be the casualty: a CF
+  Worker proxies the Realtime WS fine (Workers support WS proxying via fetch).
+  So supabase-js is fully functional through a path-preserving Worker proxy.
+  (Test worker + page codified at experiments/security-lockdown/l12/.)
 
 Codification confirmed reproducible: `tofu apply` (project + Access apps) ->
 `make probe` (endpoints wired from tofu outputs) -> `make destroy`. The v4
@@ -198,11 +205,51 @@ app client_id (verified against the live discovery doc).
 - Verify-gone: project GET 400; no iap-lockdown Access apps remain on the
   Zero Trust org; tofu state empty. Nothing left standing.
 
+### L10d attempt (2026-08-28) - real Access token admitted
+
+Tried to obtain a real Access-issued OIDC token non-interactively:
+- `client_credentials` grant on the SaaS OIDC app: Cloudflare REJECTS it at
+  apply time (the provider errors creating the app) - measured, and the
+  grant_types is back to authorization_code_with_pkce only.
+- The authorization-code flow redirects to the interactive Cloudflare Access
+  login (`/cdn-cgi/access/login/...`, JS-driven email -> one-time-PIN). Not
+  headlessly scriptable from here (no directly-drivable browser in this
+  environment; the login page is JS/challenge-driven).
+RESOLVED without a browser (2026-08-28) via a new module **L10E**: a Supabase
+PAT cannot stand in (it is a control-plane admin credential, not an
+RLS-evaluated end-user JWT), and only Cloudflare can mint a real Access token -
+but we hold the lab ES256 issuer key (jwks/), so we mint an identity token
+ourselves. L10E serves the JWKS from the project's own Edge Function, registers
+it as third-party auth (jwks_url), keys RLS on the issuer, mints a token, and
+proves it: minted lab-IAP token -> 200 / 2 rows (admitted); anon-key -> 200 / 0
+rows (denied). The data API serves ONLY the IAP identity. Combined with L10a-c
+(the REAL Cloudflare Access issuer resolves + is trusted), the IAP-as-issuer
+pattern is proven end to end. Codified + reproducible: `make probe IDS=L10E`
+(needs PVLAB_JWKS_DIR, set by the Makefile).
+
+Also measured: the Access SaaS OIDC app REJECTS the client_credentials grant,
+and the authorization-code flow lands on the interactive one-time-PIN login -
+so a real Access token needs a human/browser, which is why the lab-issuer
+stand-in is the right automated path.
+
 ## Remaining
 
-- Chrome tests: L10d (Access OIDC login -> token -> admitted), L11 proxy call +
-  L12 supabase-js through the Access-gated Worker (via Access service token or
-  browser login). Worker deploy target is codified (make worker-deploy).
-- Phase C (PrivateLink, L20-L23): needs the Team-tier org (identify among the
-  four the PAT can see) and AWS creds in secrets.tfvars.
+- L10d - DONE via L10E (lab-issuer mint, above). L12 - DONE (browser test,
+  above). L11 proxy-call latency through the Access-gated worker is the only
+  un-run row, and it is cosmetic - L11b/c already proved the load-bearing
+  bypass fact.
+- Phase C (PrivateLink, L20-L23): NOT re-run - already fully proven in the
+  privatelink-aws experiment (no AWS creds needed here). From its RUNLOG:
+  PrivateLink is Team/Enterprise only (needs Owner/Admin + the beta grant:
+  feature flag integrations:aws_private_link + entitlement
+  security.private_link; ap-southeast-1 works, eu-central-2 excluded). Private
+  path PROVEN e2e - direct 5432 + pooler 6543 through the VPC endpoint, `link
+  --skip-pooler` + db push over PrivateLink; the private pooler is ~48% faster
+  than public Supavisor. Network restrictions + PrivateLink = full public DB
+  lockout (T12/T12b: endpoint survives closing public access to a /32, public
+  Supavisor blocked by the same restrictions). Data API / HTTP tier stays
+  PUBLIC by design (T13) - PrivateLink covers Postgres + PgBouncer only.
+  T22d/e/f CLOSED: with the Data API wedged, migrations still apply over
+  PrivateLink (the ops path survives the lockdown). So the iap-lockdown
+  L20-L23 modules are redundant with privatelink-aws - cite, do not re-run.
 - Unit + manual tests.
