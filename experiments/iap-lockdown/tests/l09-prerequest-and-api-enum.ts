@@ -60,7 +60,7 @@ notify pgrst, 'reload config';
 
       // Did the role GUC actually persist? This separates "the platform
       // rejected/overrode the SET" from "the SET landed but PostgREST did not
-      // honor it" - very different findings for the customer answer.
+      // honor it" - very different findings for the operator answer.
       const cfg = await query(ctx, `select rolconfig from pg_roles where rolname = 'authenticator';`);
       const rolconfig = JSON.stringify(cfg[0] ?? {});
       const gucPersisted = /db_pre_request/.test(rolconfig);

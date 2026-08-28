@@ -78,6 +78,29 @@ facts):
   lifecycle (D05/D06/D06b), the dashboard-only IOPS gate (D08), and
   upgrade/downgrade timing + sampled downtime (D09). Root reference:
   COMPUTE-DISK.md.
+- `rls-policy-cost` - the cost of an RLS policy: whether `(select auth.uid())`
+  hoists (InitPlan, access-control-neutral), what an index does to that win,
+  and how a joined table inside an EXISTS policy behaves. Synthetic fixtures
+  only, run through the session pooler.
+- `rls-wire-claims` - keeping per-user RLS while dropping PostgREST/GoTrue by
+  setting `request.jwt.claims` over the wire; validates the lexicanum
+  `rls-without-supabase-auth` reference.
+- `iap-lockdown` - how far a managed project's HTTP surfaces lock down, and
+  putting an Identity-Aware Proxy over the Data API. The per-surface x lever
+  inventory (L01-L09: realtime private_only, key revocation, storage + signed
+  URLs, EF verify_jwt, grant/RLS write-policy holes, the pre-request filter
+  that does NOT fire on hosted), then third-party auth AS the IAP with RLS
+  keyed on the issuer claim - a self-minted ES256 issuer (JWKS from an Edge
+  Function) for browserless testing, plus the Cloudflare Access / Worker proxy
+  path. Cloudflare pieces are OpenTofu (gated on `enable_cloudflare`).
+- `security-lockdown` - the broader security surface beyond the IAP: the
+  Management API security advisor (catches every seeded exposure), network
+  restrictions gating only the DB/pooler socket (REST keeps answering), the
+  auth-hardening levers, and the honest Data API answer - the managed PostgREST
+  off and your own PostgREST (v16.2) serving the same Postgres through the
+  session pooler, fronted by a `db-pre-request` IP filter and an nginx
+  `limit_req` rate limiter. Also the PostgREST connection-role separation,
+  Vault, pg_net egress, pgaudit/PITR, and the socket lock.
 
 ## Ad-hoc platform probes (no experiment dir)
 

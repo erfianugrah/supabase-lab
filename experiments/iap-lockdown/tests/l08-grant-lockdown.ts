@@ -1,6 +1,6 @@
 /**
  * L08 - grant-based lockdown + RLS write-policy holes: the no-full-RLS-
- * migration path for a customer whose pen test found exposed data.
+ * migration path for a operator whose pen test found exposed data.
  *
  *   L08a - REVOKE SELECT FROM anon, authenticated: anon Data-API read goes
  *          42501-shaped; service_role keeps reading (bypasses RLS + holds
@@ -95,7 +95,7 @@ insert into public.${T2} (note) values ('x'),('y');
       });
 
       // L08c - ALTER DEFAULT PRIVILEGES for the postgres grantor (what a
-      // customer's migrations run as) closes new tables on arrival.
+      // operator's migrations run as) closes new tables on arrival.
       await sql(ctx, `
 alter default privileges for role postgres in schema public revoke select on tables from anon, authenticated;
 drop table if exists public.l08_after2;
@@ -113,7 +113,7 @@ insert into public.l08_after2 default values;
       });
 
       // L08c2 - the supabase_admin grantor keeps its OWN default ACL, and a
-      // customer (postgres) cannot alter it - measured, not assumed.
+      // operator (postgres) cannot alter it - measured, not assumed.
       let adminAlterErr = "";
       try {
         await sql(ctx, `alter default privileges for role supabase_admin in schema public revoke select on tables from anon, authenticated;`);
@@ -122,10 +122,10 @@ insert into public.l08_after2 default values;
       }
       results.push({
         id: "L08c2",
-        title: "customer cannot close the supabase_admin default-privilege grantor",
+        title: "operator cannot close the supabase_admin default-privilege grantor",
         status: "info",
         detail: adminAlterErr
-          ? `ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin as postgres is refused: ${adminAlterErr} - objects created by the platform admin grantor keep default anon grants the customer cannot revoke this way`
+          ? `ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin as postgres is refused: ${adminAlterErr} - objects created by the platform admin grantor keep default anon grants the operator cannot revoke this way`
           : "supabase_admin default privileges were alterable as postgres (unexpected - record verbatim)",
         measurements: { admin_alter_refused: String(Boolean(adminAlterErr)) },
       });
