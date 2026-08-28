@@ -53,7 +53,7 @@ its endpoint always answers a key-holder, and db-pre-request does not fire).
 The path that works: Supabase = managed Postgres; run your own PostgREST
 against it (Data API off), behind your edge (IAP + IP allowlist + WAF + rate
 limit + db-pre-request). S04 proves the PostgREST + IP-filter half end to end;
-rate limiting (S05) is the easy part and lives in the same fronting layer
+rate limiting (S05) lives in the same fronting layer
 (Cloudflare Worker / WAF / nginx / Upstash) - only effective in front of the
 now-closed origin.
 
@@ -91,12 +91,30 @@ Follow-ups on the review gaps. One Micro, run live, destroyed.
   unaffected) + S10 (socket refused) together prove restrictions gate the
   database socket only, without borrowing privatelink-aws for the second half.
 
-Still open from the review: auth-hardening efficacy (settable, not proven to
-close), and the doc-link + BYOC-verification items, deferred.
+## Run 3 - 2026-08-28 - efficacy + the Worker rate-limiter (S11, S12)
+
+One Micro (org ErfiCorp), destroyed after. Closes the two gaps the review left.
+
+- **S11 auth-hardening EFFICACY** (S03 proved settable, not that it rejects):
+  set `password_min_length=12` and `password_hibp_enabled=true`, then drove the
+  password-UPDATE path (admin-create a user, sign in, `PUT /auth/v1/user`) so
+  the verdict is not confounded by the signup email rate limit (2/hour on the
+  shared SMTP). min_length rejects a 4-char password (422). A compliant long
+  unique password is accepted (200). FINDING: leaked-password (HIBP) does NOT
+  fire on the password-UPDATE path - a breached password ("passwordpassword")
+  was accepted (200) even with HIBP on. HIBP is enforced on signup, not on a
+  password change via `PUT /auth/v1/user`; settable is not enforced everywhere.
+- **S12 Worker rate-limiter** (the S05 nginx variant, edge-agnostic): a Worker
+  using the native Rate Limiting binding (`simple: limit=2, period=10`) run
+  locally with `wrangler dev` in front of the same self-hosted PostgREST. A
+  15-request burst returned 2x200 + 13x429 - the same result as nginx (S05).
+  The binding throttles without black-holing, and only works fronting a closed
+  origin. Note: the readiness poll spends the per-window budget, so the module
+  waits one window before the burst.
 
 ## Remaining
 
-- Chrome/manual tests still pending from iap-lockdown (Access OIDC login).
-- Phase C PrivateLink (iap-lockdown L20-L23) - needs the Team-tier org.
-- S05's Cloudflare-Worker variant (vs the nginx demonstrator) - the pattern is
-  identical; reuses the iap-lockdown worker + wrangler codification.
+- Phase C PrivateLink (iap-lockdown L20-L23) - needs a Team-tier org, an AWS
+  session, and the one manual dashboard association; the composition is proven
+  in privatelink-aws (see iap-lockdown RUNLOG closeout).
+- The doc-link + BYOC-verification items, deferred.
