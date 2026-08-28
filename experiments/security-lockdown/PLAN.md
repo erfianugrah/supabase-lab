@@ -45,10 +45,10 @@ is to run your own PostgREST and turn the managed Data API off:
   S04c - db-pre-request IP filter ON the self-hosted PostgREST: a function
          reading current_setting('request.headers')->>'x-forwarded-for' and
          RAISEing on a disallowed value. Confirm it REJECTS a spoofed IP.
-         This is the exact db-pre-request x-forwarded-for filter that iap-lockdown L09
-         measured does NOT fire on hosted Supabase - it works here because we
-         own the PostgREST config. The customer's IP-restrict-the-Data-API ask
-         is answerable, just not on the managed tier.
+         This is the exact db-pre-request x-forwarded-for filter that
+         iap-lockdown L09 measured does NOT fire on hosted Supabase - it works
+         here because we own the PostgREST config. The IP-restrict-the-Data-API
+         ask is answerable, just not on the managed tier.
 
   Ops: `make postgrest-up` runs the container (pinned image, session pooler
   connection from the db_password); the module installs the anon role grants +

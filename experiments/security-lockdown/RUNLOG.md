@@ -31,8 +31,8 @@ adds a local PostgREST container. All green, then destroyed.
   Postgres via the session pooler and served the data the managed endpoint no
   longer would (200). Its db-pre-request IP filter REJECTED a spoofed
   x-forwarded-for (403 PT403) while an allowed request served (200) - the exact
-  db-pre-request x-forwarded-for filter, which iap-lockdown L09 measured does NOT fire on
-  hosted. It works here because we own the PostgREST config.
+  db-pre-request x-forwarded-for filter that iap-lockdown L09 measured does NOT
+  fire on hosted. It works here because we own the PostgREST config.
 
 - **S05 rate limiting in front of your own PostgREST**: nginx limit_req (rate
   2r/s, burst 2) in front of the self-hosted PostgREST. A 15-request burst
@@ -47,7 +47,7 @@ adds a local PostgREST container. All green, then destroyed.
 
 ### The architecture, evidenced
 
-For the customer who wants IP restrictions / rate limiting / a private REST
+For the operator who wants IP restrictions / rate limiting / a private REST
 layer: you cannot get it from the managed Data API (proxying it is bypassable,
 its endpoint always answers a key-holder, and db-pre-request does not fire).
 The path that works: Supabase = managed Postgres; run your own PostgREST

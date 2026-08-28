@@ -8,7 +8,7 @@
  * never touched:
  *
  *   L02c - db_schema "public" (dropping graphql_public): GraphQL can be
- *          killed independently of REST. For a customer whose pen test
+ *          killed independently of REST. For a operator whose pen test
  *          flagged the GraphQL surface, this is the one-statement fix.
  *   L02d - max_rows 1: caps rows per response without touching authz. An
  *          exfil brake, not a gate - recorded as what it is.

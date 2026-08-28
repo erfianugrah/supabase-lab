@@ -4,7 +4,7 @@
  *   L11b - with a proxy fronting the project, the ORIGIN hostname keeps
  *          answering anyone holding a key. Direct <ref>.supabase.co with the
  *          anon key still serves - the proxy gates nothing on its own. This
- *          is the fact the customer answer turns on; measured, not asserted.
+ *          is the fact the operator answer turns on; measured, not asserted.
  *   L11c - close the bypass: disable the legacy keys (L05 lever), then the
  *          direct origin refuses the anon key. Only combined with key
  *          revocation (and RLS, L10) does the proxy become the only path.

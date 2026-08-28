@@ -77,18 +77,18 @@ idempotency for bucket + EF re-seed). Findings:
   (201) - "revoked" is a posture the PAT always reopens.
 - **L06 Storage**: public bucket -> private refuses the anon public URL (400
   NoSuchBucket) in ~6s; a service-key signed URL still serves (200) - the read
-  path a locked-down customer keeps.
+  path a locked-down operator keeps.
 - **L07 EF verify_jwt**: an EF is public-by-default (anon no-key 200).
   verify_jwt=true refuses the no-auth caller (401) BUT the anon PROJECT KEY
   passes (200) - verify_jwt is a KEY-POSSESSION check, not an authorization
   control. An IAP-as-proxy must revoke keys, not lean on verify_jwt.
-- **L08 grant lockdown + RLS write holes** (customer #2):
+- **L08 grant lockdown + RLS write holes** (the "added RLS, pen test still found data" scenario):
   - REVOKE SELECT closes the table via the Data API (42501); service_role
     keeps reading. New table reopens anon read via default privileges (rot).
   - ALTER DEFAULT PRIVILEGES for `postgres` closes new tables on arrival (404
     PGRST205) - the durable fix. But `supabase_admin`'s default ACL is NOT
     alterable by postgres (42501) - platform-admin-created objects keep default
-    anon grants the customer cannot revoke this way. (Finding.)
+    anon grants the operator cannot revoke this way. (Finding.)
   - A plain VIEW over an RLS table leaks all rows to anon; the same view WITH
     (security_invoker=true) returns 0 - the "we have RLS, why is it exposed"
     hole.
@@ -108,7 +108,7 @@ idempotency for bucket + EF re-seed). Findings:
 **Managed-tier headline**: no lever makes the HTTP surface network-private;
 each is a per-service tighten. The only surfaces reachable with NO key are
 public storage objects and public Edge Functions. The DB-layer IP filter the
-pen-test thread hoped for does not activate on hosted.
+pen-test scenario hoped for does not activate on hosted.
 
 Evidence: experiments/iap-lockdown/evidence/20260828-085*/ (gitignored).
 
@@ -125,10 +125,10 @@ Foundation laid (2026-08-28):
 - ES256 issuer keypair generated in jwks/ (kid 7f130f59...); private.json is
   mode 600 and gitignored via a new per-experiment .gitignore (mirrors
   edge-resilience). public.json is committable and is what the Worker serves.
-- wrangler authed against the Cloudflare account (CLOUDFLARE_ACCOUNT_ID set).
-- Target zone: erfi.dev, on that account - both erfi.dev and
-  erfianugrah.com live on that account, matching CLOUDFLARE_ACCOUNT_ID. Plan to route
-  the Worker at iap-lab.erfi.dev.
+- wrangler authed against the Cloudflare account (CLOUDFLARE_ACCOUNT_ID set;
+  real ids live in gitignored cloudflare.auto.tfvars).
+- Target zone: erfi.dev, on that account, matching CLOUDFLARE_ACCOUNT_ID. Plan
+  to route the Worker at iap-lab.erfi.dev.
 - Reuse: edge-resilience worker (serves /.well-known/jwks.json from JWKS_JSON)
   + lib/jwt.ts (mintEs256) + TPA registration via
   POST /projects/{ref}/config/auth/third-party-auth { jwks_url } (X01 measured
