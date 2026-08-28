@@ -8,7 +8,10 @@
  * REST/Auth/Storage survive path-prefix proxying; Realtime's WebSocket upgrade
  * is the casualty.
  *
- * Deployed to workers.dev (no zone). Config at deploy: UPSTREAM, ANON.
+ * This is the browser variant, on workers.dev (a zoneless test page). The
+ * measured L12 - browserless, via an Access service token - ran against the
+ * Access-gated proxy on the erfi.dev zone (iap-lockdown), not here. Config at
+ * deploy: UPSTREAM, ANON.
  */
 export interface Env {
   UPSTREAM: string;
