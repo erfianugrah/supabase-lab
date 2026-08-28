@@ -95,7 +95,7 @@ notify pgrst, 'reload schema';
         id: "S04c",
         title: "db-pre-request IP filter rejects a disallowed IP (the control managed cannot give)",
         status: spoofed.status === 403 && allowed.status === 200 ? "pass" : "fail",
-        detail: `spoofed x-forwarded-for=203.0.113.9 -> ${spoofed.status} ${spoofed.code}; allowed -> ${allowed.status}. This is the db-pre-request x-forwarded-for filter, working because we own the PostgREST config (it does NOT fire on hosted - see iap-lockdown L09).`,
+        detail: `spoofed x-forwarded-for=203.0.113.9 -> ${spoofed.status} ${spoofed.code}; allowed -> ${allowed.status}. The db-pre-request x-forwarded-for filter, working because we own the PostgREST config (it does NOT fire on hosted - see iap-lockdown L09).`,
         measurements: { spoofed_status: spoofed.status, allowed_status: allowed.status },
       });
     } catch (e) {
