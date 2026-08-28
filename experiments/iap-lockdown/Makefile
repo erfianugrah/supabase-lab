@@ -38,6 +38,8 @@ probe:
 		SUPABASE_ANON_KEY="$$anon" SUPABASE_SERVICE_ROLE_KEY="$$svc" \
 		PVLAB_ENDPOINT_OIDC_ISSUER="$$(tofu output -raw oidc_issuer_url 2>/dev/null)" \
 		PVLAB_ENDPOINT_WORKER="https://$$(tofu output -raw proxy_hostname 2>/dev/null)" \
+		CF_ACCESS_CLIENT_ID="$$(tofu output -raw svc_token_client_id 2>/dev/null)" \
+		CF_ACCESS_CLIENT_SECRET="$$(tofu output -raw svc_token_client_secret 2>/dev/null)" \
 		PVLAB_JWKS_DIR="$(abspath jwks)" \
 		$(ROOT)/harness/dist/pvlab --where local --experiment iap-lockdown \
 		--only "$(IDS)" --destructive --out evidence/$(TS)
@@ -59,7 +61,7 @@ worker-deploy:
 		| jq -r '.[]|select(.name=="service_role")|.api_key'); \
 	test -n "$$svc" || (echo "could not fetch service_role key"; exit 1); \
 	printf '%s' "$$svc" | wrangler secret put SERVICE_KEY --name iap-lockdown-proxy; \
-	wrangler deploy --var "UPSTREAM:https://$(REF).supabase.co" --route "$$host/*"
+	wrangler deploy --var "UPSTREAM:https://$(REF).supabase.co"
 
 worker-delete:
 	-wrangler delete --name iap-lockdown-proxy --force

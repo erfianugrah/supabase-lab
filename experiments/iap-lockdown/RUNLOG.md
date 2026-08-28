@@ -232,24 +232,54 @@ and the authorization-code flow lands on the interactive one-time-PIN login -
 so a real Access token needs a human/browser, which is why the lab-issuer
 stand-in is the right automated path.
 
-## Remaining
+## Closeout (2026-08-28)
 
-- L10d - DONE via L10E (lab-issuer mint, above). L12 - DONE (browser test,
-  above). L11 proxy-call latency through the Access-gated worker is the only
-  un-run row, and it is cosmetic - L11b/c already proved the load-bearing
-  bypass fact.
-- Phase C (PrivateLink, L20-L23): NOT re-run - already fully proven in the
-  privatelink-aws experiment (no AWS creds needed here). From its RUNLOG:
-  PrivateLink is Team/Enterprise only (needs Owner/Admin + the beta grant:
-  feature flag integrations:aws_private_link + entitlement
-  security.private_link; ap-southeast-1 works, eu-central-2 excluded). Private
-  path PROVEN e2e - direct 5432 + pooler 6543 through the VPC endpoint, `link
-  --skip-pooler` + db push over PrivateLink; the private pooler is ~48% faster
-  than public Supavisor. Network restrictions + PrivateLink = full public DB
-  lockout (T12/T12b: endpoint survives closing public access to a /32, public
-  Supavisor blocked by the same restrictions). Data API / HTTP tier stays
-  PUBLIC by design (T13) - PrivateLink covers Postgres + PgBouncer only.
-  T22d/e/f CLOSED: with the Data API wedged, migrations still apply over
-  PrivateLink (the ops path survives the lockdown). So the iap-lockdown
-  L20-L23 modules are redundant with privatelink-aws - cite, do not re-run.
-- Unit + manual tests.
+Every open module is implemented and run except the two AWS PrivateLink runner
+modules, whose composition privatelink-aws already proves end to end.
+
+- L12 (supabase-js through the Access-gated proxy): run browserless via an
+  Access service token. Added a `cloudflare_zero_trust_access_service_token` and
+  a `non_identity` policy on the proxy app, a proxied AAAA for the route, and
+  wired `CF_ACCESS_CLIENT_ID`/`CF_ACCESS_CLIENT_SECRET` into the probe. REST
+  through the proxy returns rows (the Worker injects the service key
+  server-side and the token cleared the edge, no browser). Storage and Auth are
+  not on a `/rest`+`/graphql` proxy's surface; the Realtime WebSocket upgrade
+  does not survive a path-prefix proxy.
+- L22 (Edge Functions under restrict-all): the support answer holds, measured.
+  With no restrictions the EF's direct `pg` connect over `SUPABASE_DB_URL`
+  works. Under restrict-all the direct connect fails
+  (`CONNECT_TIMEOUT db.<ref>.supabase.co:5432`) - the EF loses its socket -
+  while the same EF's `/rest` fallback with the service key still serves. So
+  the restriction pushes EF data onto the public HTTP tier it was meant to
+  close.
+- L23 (control plane stays public): under a locked project the Management API
+  still reads the project (200) and mutates config (`max_rows` 1000 -> 999 ->
+  1000, read back each step). api.supabase.com is a separate, always-public
+  surface that PrivateLink and network restrictions never touch.
+- L10d (interactive Access login): the M2M service token (L12) and the
+  lab-issuer mint (L10E) cover the automated paths, so the browser login adds
+  no Supabase-side evidence.
+- L20/L21 (PrivateLink runner + Lambda): now real modules (no longer stubs),
+  self-skipping without the `endpoint`/`lambda` capability. The composition
+  they measure - the private DB path alive while the HTTP tier is locked - is
+  proven end to end in privatelink-aws (T01-T09 connectivity, T12/T12b
+  restrict-all plus the endpoint, T13 the Data API stays public, T22d/e/f
+  migrations over PrivateLink). A standalone run needs an AWS session
+  (`aws sso login`) and the one manual dashboard PrivateLink association (the
+  `/platform` routes reject PATs), and would re-measure privatelink-aws, so it
+  is gated rather than required. Runbook below.
+- x-forwarded-for overwrite-vs-append at the hosted edge (the L09 open
+  question): not lab-answerable. Whether the platform edge overwrites or
+  appends a client-supplied `x-forwarded-for` before PostgREST sees it decides
+  whether a header-based pre-request check could ever be an allowlist, and it
+  needs platform-internal access. Stated as a known gap in the docs, not
+  guessed.
+
+### Phase C runbook (when an AWS session and the association are available)
+
+1. `aws sso login` (or export credentials).
+2. `cd ../privatelink-aws && make phase1` - its own project, VPC, and runner.
+3. Create the PrivateLink association in the dashboard (3 clicks, ~2 min; the
+   `/platform` routes reject PATs), then `make arns && make phase2`.
+4. Run the L2x modules against that project with `--experiment iap-lockdown`
+   (L20 runner-vantage over the endpoint; L22/L23 local), then `make destroy`.
