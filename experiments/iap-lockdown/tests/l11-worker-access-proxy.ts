@@ -1,41 +1,83 @@
 /**
- * L11 - IAP-as-proxy: Cloudflare Worker behind Access, holding the service
- * key server-side.
+ * L11 - IAP-as-proxy: the bypass is the load-bearing fact.
  *
- *   L11a - deploy worker/ (Access JWT validation against the team certs
- *          endpoint, service key injected from a Worker secret, proxies
- *          /rest/v1/* to the origin). gocurl the added latency p50/p95 vs
- *          direct origin.
- *   L11b - THE load-bearing row: with the proxy up, direct-origin access
- *          with the anon key still answers. The proxy gates nothing on its
- *          own; the origin hostname keeps serving anyone holding a key.
- *          Measured, not asserted - this is the fact the customer answer
- *          turns on.
- *   L11c - close the bypass: revoke browser-usable keys (L05) and/or deny
- *          by default at RLS/grants (L08), then re-measure: direct origin
- *          refuses, proxy still serves. Only NOW is the IAP the only path.
+ *   L11b - with a proxy fronting the project, the ORIGIN hostname keeps
+ *          answering anyone holding a key. Direct <ref>.supabase.co with the
+ *          anon key still serves - the proxy gates nothing on its own. This
+ *          is the fact the customer answer turns on; measured, not asserted.
+ *   L11c - close the bypass: disable the legacy keys (L05 lever), then the
+ *          direct origin refuses the anon key. Only combined with key
+ *          revocation (and RLS, L10) does the proxy become the only path.
  *
- * Ops notes: render-wrangler pattern from edge-resilience/scripts/render-
- * wrangler.ts for wrangler.toml; worker needs no nodejs_compat (JWT verify
- * via WebCrypto, edge-resilience/lib/jwt.ts has the ES256 verify half).
- * Requires CLOUDFLARE_ACCOUNT_ID + CLOUDFLARE_API_TOKEN in env and an Access
- * application on the lab zone; self-skip with reason otherwise.
+ * The Access-gated Worker call itself (latency p50/p95, and proxy-still-serves
+ * after the bypass closes) needs an Access service token or the chrome login
+ * to pass the edge; that half is the chrome/service-token follow-up. This
+ * module measures the origin side, which needs no token.
+ *
+ * DESTRUCTIVE: toggles legacy keys; restores + verifies in finally.
  */
 import type { Ctx, TestModule, TestResult } from "../../../harness/src/types.js";
+import { mgmt } from "../../../harness/src/mgmt.js";
+import { fetchKeys, http, waitFor, TABLE } from "../lib/inventory.js";
+
+async function anonRead(ctx: Ctx, anonJwt: string) {
+  return http(`https://${ctx.apiHost}/rest/v1/${TABLE}?select=id&limit=1`, { key: anonJwt });
+}
 
 const mod: TestModule = {
   id: "L11",
-  title: "IAP-as-proxy: Access-gated worker, service key server-side, bypass measured",
+  title: "IAP-as-proxy: the direct-origin bypass, and closing it",
   where: "local",
   requires: ["pat", "anon-key"],
   destructive: true,
-  async run(_ctx: Ctx): Promise<TestResult> {
-    return {
-      id: "L11",
-      title: this.title,
-      status: "skip",
-      detail: "STUB - see file header. Needs worker/ deployed + an Access application; gates on CF env vars.",
-    };
+  async run(ctx: Ctx): Promise<TestResult[]> {
+    const keys = await fetchKeys(ctx);
+    const results: TestResult[] = [];
+
+    const proxy = ctx.endpoints["worker"];
+    const before = await anonRead(ctx, keys.anonJwt);
+    results.push({
+      id: "L11b",
+      title: "direct origin serves the anon key regardless of any proxy",
+      status: before.status === 200 ? "pass" : "fail",
+      detail: `direct ${ctx.apiHost} with the anon key -> ${before.status}. A proxy at ${proxy ?? "<hostname>"} cannot gate this: the origin keeps answering anyone holding a key - the bypass.`,
+      measurements: { direct_anon_status: before.status },
+    });
+
+    let disabled = false;
+    try {
+      const off = await mgmt(ctx, "PUT", `/projects/${ctx.ref}/api-keys/legacy?enabled=false`);
+      disabled = off.status < 300;
+      if (disabled) {
+        const closed = await waitFor(async () => (await anonRead(ctx, keys.anonJwt)).status >= 400, 60_000);
+        const after = await anonRead(ctx, keys.anonJwt);
+        results.push({
+          id: "L11c",
+          title: "closing the bypass: revoke keys and the direct origin refuses",
+          status: after.status >= 400 ? "pass" : "fail",
+          detail: `after disabling legacy keys, direct origin with the anon key -> ${after.status} ${after.code} (in ${closed.elapsedS}s). Now the only paths are key-holding server-side (the proxy) or an IAP identity (L10).`,
+          measurements: { direct_anon_after: after.status },
+        });
+      } else {
+        results.push({ id: "L11c", title: "closing the bypass", status: "fail", detail: `could not disable legacy keys: HTTP ${off.status}` });
+      }
+    } finally {
+      if (disabled) {
+        let ok = false;
+        for (let i = 0; i < 5 && !ok; i++) {
+          const on = await mgmt(ctx, "PUT", `/projects/${ctx.ref}/api-keys/legacy?enabled=true`);
+          if (on.status < 300) ok = (await waitFor(async () => (await anonRead(ctx, keys.anonJwt)).status === 200, 60_000)).ok;
+          if (!ok) await new Promise((r) => setTimeout(r, 5000));
+        }
+        results.push({
+          id: "L11z",
+          title: "restore legacy keys",
+          status: ok ? "pass" : "fail",
+          detail: ok ? "legacy keys re-enabled, anon read confirmed" : "RESTORE FAILED - project destroyed at end of run anyway",
+        });
+      }
+    }
+    return results;
   },
 };
 export default mod;
