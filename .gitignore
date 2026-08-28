@@ -45,3 +45,6 @@ harness/out/
 
 # run artifacts (like evidence/) - never commit
 **/out/
+
+# wrangler dev local state (miniflare cache, sqlite, trace store) - regenerable
+**/.wrangler/
