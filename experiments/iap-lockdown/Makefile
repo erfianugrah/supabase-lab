@@ -38,6 +38,7 @@ probe:
 		SUPABASE_ANON_KEY="$$anon" SUPABASE_SERVICE_ROLE_KEY="$$svc" \
 		PVLAB_ENDPOINT_OIDC_ISSUER="$$(tofu output -raw oidc_issuer_url 2>/dev/null)" \
 		PVLAB_ENDPOINT_WORKER="https://$$(tofu output -raw proxy_hostname 2>/dev/null)" \
+		PVLAB_JWKS_DIR="$(abspath jwks)" \
 		$(ROOT)/harness/dist/pvlab --where local --experiment iap-lockdown \
 		--only "$(IDS)" --destructive --out evidence/$(TS)
 	@echo "== evidence/$(TS)/run-<stamp>.md =="

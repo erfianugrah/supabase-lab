@@ -39,3 +39,6 @@ node_modules/
 .dart_tool/
 .pub/
 pubspec.lock
+
+# stray harness run artifacts
+harness/out/

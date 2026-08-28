@@ -1,0 +1,7 @@
+# Key material and run output never leave the machine.
+evidence/
+secrets.tfvars
+.terraform/
+terraform.tfstate*
+tfplan*
+__pycache__/
