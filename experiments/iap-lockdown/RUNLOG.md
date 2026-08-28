@@ -108,7 +108,7 @@ idempotency for bucket + EF re-seed). Findings:
 **Managed-tier headline**: no lever makes the HTTP surface network-private;
 each is a per-service tighten. The only surfaces reachable with NO key are
 public storage objects and public Edge Functions. The DB-layer IP filter the
-pen-test thread hoped for does not activate on hosted.
+pen-test scenario hoped for does not activate on hosted.
 
 Evidence: experiments/iap-lockdown/evidence/20260828-085*/ (gitignored).
 
@@ -128,7 +128,7 @@ Foundation laid (2026-08-28):
 - wrangler authed against the Cloudflare account (CLOUDFLARE_ACCOUNT_ID set;
   real ids live in gitignored cloudflare.auto.tfvars).
 - Target zone: erfi.dev, on that account, matching CLOUDFLARE_ACCOUNT_ID. Plan
-  the Worker at iap-lab.erfi.dev.
+  to route the Worker at iap-lab.erfi.dev.
 - Reuse: edge-resilience worker (serves /.well-known/jwks.json from JWKS_JSON)
   + lib/jwt.ts (mintEs256) + TPA registration via
   POST /projects/{ref}/config/auth/third-party-auth { jwks_url } (X01 measured

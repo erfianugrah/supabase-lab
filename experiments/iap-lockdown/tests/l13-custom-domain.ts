@@ -2,8 +2,8 @@
  * L13 - the CNAME + CORS misconceptions, measured.
  *
  * The custom-domain CNAME is often read as an access-control lever, and CORS
- * the second thread hoped CORS could restrict the API. Both are measured here
- * as the misconceptions they are:
+ * is often hoped to restrict the API. Both are measured here as the
+ * misconceptions they are:
  *
  *   L13-cors-a - PostgREST honours an Origin (returns an
  *                Access-Control-Allow-Origin header), but that is a

@@ -10,7 +10,7 @@ restrictions applied, security advisors, auth hardening).
 
 The question: can an Identity-Aware Proxy sit in front of
 Supabase projects so nothing is publicly reachable except through the proxy,
-through the proxy, and does the answer change on Enterprise?
+and does the answer change on Enterprise?
 
 The question splits into two surfaces with different answers:
 
@@ -61,12 +61,11 @@ Prior measured work this experiment builds on (do not re-measure, cite):
 6. The custom-domain misconception, measured: a custom CNAME gates nothing
    because the origin hostname keeps serving.
 7. The Enterprise axis: does the answer change on Enterprise? For the
-   Enterprise?" For the managed multi-tenant tier the HTTP answer is
-   plan-independent: no network lockdown on any plan (Free..Enterprise).
+   managed multi-tenant tier the HTTP answer is plan-independent: no network
+   lockdown on any plan (Free..Enterprise). BYOC (the whole stack in your own
    VPC) and self-hosting are the genuine "private HTTP tier" answers, and both
-   the genuine "private HTTP tier" answers, and both are outside what this
-   lab can provision. The deliverable must still carry a BYOC row and a
-
+   are outside what this lab can provision. The deliverable must still carry a
+   BYOC row and a self-host row or it is silent on that axis.
 8. The CORS surface, measured and de-mythologised. PostgREST honours an
    `Origin` (its CORS config is undocumented); Auth implements no CORS at
    all. Either way CORS is browser-only and gates nothing against a
@@ -215,7 +214,7 @@ where possible; this experiment adds its own state dir.
   managed-tier rows carry lab evidence ids, the BYOC/self-host rows carry
   doc citations. Without them the matrix is silent on "Enterprise?".
 - D2 lexicanum reference doc.
-- D3 short answer text for the sales thread, backed by evidence ids.
+- D3 short answer text, backed by evidence ids.
 - Scope boundary to name, not solve: RLS write-policy correctness (UPDATE
   column scope, PERMISSIVE bleed, SELECT-logic reused across DELETE/UPDATE)
   is a distinct problem from network/proxy lockdown - L08f/L08g touch its
