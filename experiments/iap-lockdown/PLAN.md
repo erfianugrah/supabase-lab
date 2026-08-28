@@ -8,9 +8,9 @@ restrictions applied, security advisors, auth hardening).
 
 ## The question under test
 
-A customer asked (paraphrased, generalised): can an Identity-Aware Proxy sit
-in front of their Supabase projects so nothing is publicly reachable except
-through the proxy, and does the answer change on Enterprise?
+The question (generalised): can an Identity-Aware Proxy sit in front of
+Supabase projects so nothing is publicly reachable except through the proxy,
+and does the answer change on Enterprise?
 
 The question splits into two surfaces with different answers:
 
@@ -60,13 +60,12 @@ Prior measured work this experiment builds on (do not re-measure, cite):
    answer, never measured here.
 6. The custom-domain misconception, measured: a custom CNAME gates nothing
    because the origin hostname keeps serving.
-7. The Enterprise axis, stated plainly. The customer asked "possible on
-   Enterprise?" For the managed multi-tenant tier the HTTP answer is
-   plan-independent: no network lockdown on any plan (Free..Enterprise).
-   BYOC (the whole stack in the customer's own VPC) and self-hosting are
-   the genuine "private HTTP tier" answers, and both are outside what this
-   lab can provision. The deliverable must still carry a BYOC row and a
-   self-host row or it is silent on the exact axis the customer named.
+7. The Enterprise axis, stated plainly ("possible on Enterprise?"). For the
+   managed multi-tenant tier the HTTP answer is plan-independent: no network
+   lockdown on any plan (Free..Enterprise). BYOC (the whole stack in your own
+   VPC) and self-hosting are the genuine "private HTTP tier" answers, and both
+   are outside what this lab can provision. The deliverable must still carry a
+   BYOC row and a self-host row or it is silent on that axis.
 8. The CORS surface, measured and de-mythologised. PostgREST honours an
    `Origin` (its CORS config is undocumented); Auth implements no CORS at
    all. Either way CORS is browser-only and gates nothing against a
@@ -125,7 +124,7 @@ Self-provisioning (W21/rls-wire-claims pattern), Pro org, no tofu.
   policy written for one role silently applies to others (PERMISSIVE
   policies OR together), so a relaxed admin policy can bleed onto anon.
   These are RLS-correctness edges, not network levers, but they are the
-  shape of the second customer's actual exposure.
+  shape of a real "we added RLS but a pen test still found data" exposure.
 - L09 prerequest-ip-filter + spec enumeration. The DB-layer pre-request
   filter is NOT absent - it is a documented PostgREST mechanism (Source:
   /docs/supabase/guides/api/securing-your-api.md and
@@ -215,7 +214,7 @@ where possible; this experiment adds its own state dir.
   managed-tier rows carry lab evidence ids, the BYOC/self-host rows carry
   doc citations. Without them the matrix is silent on "Enterprise?".
 - D2 lexicanum reference doc (generalised, no customer detail).
-- D3 short answer text for the sales thread, backed by evidence ids.
+- D3 short answer text, backed by evidence ids.
 - Scope boundary to name, not solve: RLS write-policy correctness (UPDATE
   column scope, PERMISSIVE bleed, SELECT-logic reused across DELETE/UPDATE)
   is a distinct problem from network/proxy lockdown - L08f/L08g touch its

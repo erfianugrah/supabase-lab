@@ -874,6 +874,69 @@ a throwaway probe Worker + two Hyperdrive configs via wrangler (account from
 - Makefile note: the PAT is NOT in secrets.tfvars (placeholder by design);
   it comes from SUPABASE_ACCESS_TOKEN in the operator's env.
 
+## experiments/iap-lockdown - key facts (validated 2026-08-28, Phase A + partial B)
+
+- No managed HTTP-tier lever makes any surface network-private; each is a
+  per-service tighten. The only surfaces reachable with NO key are a public
+  storage object and a `verify_jwt=false` Edge Function.
+- L02: `db_schema:""` wedges PostgREST to 503 PGRST002 in ~4s;
+  Auth/Storage/Realtime/EF are UNAFFECTED - "Data API off" is PostgREST-only.
+  Dropping `graphql_public` -> GraphQL 406 PGRST106 while REST stays 200.
+  `max_rows` caps a read (exfil brake, not a gate).
+- L03: `private_only` is enforced at CHANNEL JOIN, not the WS upgrade - the
+  anon handshake still succeeds (101). L07: `verify_jwt` is a KEY-POSSESSION
+  check (the anon project key passes) - an IAP-as-proxy must revoke keys.
+- L05: disabling legacy keys 401s the anon JWT in ~45s, but new publishable-key
+  generation is INDEPENDENT and the control plane re-mints at will - "revoked"
+  is a posture the PAT reopens.
+- L08 grant/RLS write holes: `REVOKE SELECT` is undone by the next
+  `CREATE TABLE` (pg_default_acl rot); `ALTER DEFAULT PRIVILEGES FOR ROLE
+  postgres` is the durable fix, but `supabase_admin`'s default ACL is NOT
+  alterable by postgres (42501). A plain VIEW over an RLS table leaks all rows
+  unless `security_invoker=true`. UPDATE policy gates ROWS not COLUMNS;
+  PERMISSIVE policies OR together (a second permissive policy bleeds onto anon).
+- L09: the documented `db_pre_request` mechanism did NOT fire on the hosted
+  PostgREST path within 121s (role-GUC + NOTIFY reload did not activate the
+  hook) - the self-hosted IP filter is not activatable via SQL on hosted.
+  Whole-spec enum: 7 network/security ops, none a Data-API IP allowlist.
+- L10/L10E: third-party auth AS the IAP - `jwks_url` and `oidc_issuer_url`
+  resolve, inline `custom_jwks` never does; RLS keyed on the issuer `iss` claim
+  admits a token minted by a self-hosted ES256 issuer (JWKS served from an Edge
+  Function) and denies anon and GoTrue tokens.
+- Cloudflare pieces are OpenTofu (provider v4, gated on `enable_cloudflare`);
+  real CF ids live in gitignored `cloudflare.auto.tfvars`.
+
+## experiments/security-lockdown - key facts (validated 2026-08-28)
+
+- S01: the Management API security advisor catches every seeded exposure
+  (rls_disabled_in_public, rls_enabled_no_policy, security_definer_view,
+  security_definer_function, function_search_path_mutable) - run it first for
+  any "are we locked down?" question.
+- S02 + S10: network restrictions gate the DB/pooler socket ONLY. A restrictive
+  CIDR leaves the REST HTTP tier answering unchanged (401 -> 401) while the
+  pooler refuses the excluded IP (Supavisor `FATAL EADDRNOTALLOWED`). Proves
+  restrictions do NOT cover REST/Auth/Storage, without borrowing privatelink-aws
+  for the socket half.
+- S03: auth hardening is settable via the API (password_min_length, HIBP
+  leaked-password [OFF by default], MFA verify).
+- S04/S05: the honest Data API answer. Managed Data API off (503 PGRST002); a
+  self-hosted PostgREST (v16.2) on the SAME Postgres via the session pooler
+  serves the data; its db-pre-request x-forwarded-for filter rejects a spoofed
+  IP (403 PT403) - the exact mechanism L09 measured does NOT fire on hosted,
+  working here because you own the config. nginx `limit_req` (rate 2r/s) turns a
+  15-request burst into 2x200 + 13x429; only works fronting a CLOSED origin.
+  Gotchas: the pre-request function must persist for the container's life; nginx
+  `limit_req` returns 503 unless `limit_req_status 429` is set.
+- S06: run PostgREST as an authenticator-style role (NOSUPERUSER, NOBYPASSRLS,
+  member of anon/authenticated), NOT `postgres` (a superuser bypasses RLS and
+  every grant, silently defeating an RLS lockdown).
+- S07/S08/S09: `supabase_vault` stores ciphertext, not a plaintext column;
+  `pg_net` (`net.http_get`) is an outbound-HTTP egress/SSRF surface most
+  lockdown plans omit - restrict EXECUTE on the net schema or leave pg_net
+  disabled; pgaudit is available; `GET /database/backups` on a fresh project
+  shows `pitr_enabled=false`, `walg_enabled=true` (PITR is a paid add-on, off by
+  default).
+
 ## Commands
 
 Root: `make secrets-decrypt`, `make secrets-encrypt`, `make experiments`.

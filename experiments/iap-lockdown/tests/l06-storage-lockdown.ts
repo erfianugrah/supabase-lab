@@ -87,7 +87,7 @@ const mod: TestModule = {
         id: "L06d",
         title: "signed URL still serves the object in a private bucket",
         status: signedStatus === 200 ? "pass" : "fail",
-        detail: `signed-URL GET = ${signedStatus} (the read path a locked-down customer keeps)`,
+        detail: `signed-URL GET = ${signedStatus} (the read path a locked-down operator keeps)`,
         measurements: { signed_url_status: signedStatus },
       });
     } finally {
