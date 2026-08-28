@@ -1,0 +1,12 @@
+{
+  // L11 IAP-as-proxy Worker. Codified and committed; the per-run values
+  // (UPSTREAM project host, SERVICE_KEY secret, and the route hostname) are
+  // supplied at deploy time by the Makefile `worker-deploy` target, not baked
+  // in here - the repo is built to be public.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "iap-lockdown-proxy",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-01-01",
+  "workers_dev": false,
+  "observability": { "enabled": true }
+}
