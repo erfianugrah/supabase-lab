@@ -62,6 +62,38 @@ now-closed origin.
 make postgrest-down + make destroy: container gone, project GET 400, tofu
 state empty. Nothing left standing.
 
+## Run 2 - 2026-08-28 - gap-plugging (S06-S10)
+
+Follow-ups on the review gaps. One Micro, run live, destroyed.
+
+- **S06 self-hosted PostgREST connection role**: S04 connected as the postgres
+  superuser, which bypasses RLS and every grant - the wrong role to run
+  PostgREST as. The managed `authenticator` role is NOSUPERUSER + NOBYPASSRLS;
+  a dedicated login role granted anon/authenticated (NOSUPERUSER, NOBYPASSRLS,
+  member of both) is the safe connection role. The own-PostgREST guide should
+  connect as an authenticator-style role, not postgres.
+- **S07 Vault**: `supabase_vault` stores a secret as ciphertext in
+  vault.secrets and returns it through vault.decrypted_secrets - a home for the
+  service key / issuer secrets that is not a plaintext column.
+- **S08 pg_net egress**: `net.http_get('https://example.com')` returned 200 -
+  the database can make outbound HTTP. A SQL-capable attacker can exfiltrate or
+  SSRF from inside Postgres; restrict EXECUTE on the net schema, or leave
+  pg_net disabled if unused. An egress surface most lockdown plans omit.
+- **S09 audit + backups**: pgaudit is available (statement auditing to the
+  Postgres log, read via the Management API logs, not a table). GET
+  /database/backups on a fresh project: pitr_enabled=false, walg_enabled=true,
+  one scheduled backup - PITR is a paid add-on and off by default, so recovery
+  is daily backups until enabled.
+- **S10 socket lock (closes the S02 half)**: with psql on PATH, a real
+  connection through the pooler succeeds at 0.0.0.0/0, then is refused the
+  moment a restrictive CIDR excluding this machine is applied - Supavisor
+  returns `FATAL (EADDRNOTALLOWED) address not in tenant`. So S02 (HTTP tier
+  unaffected) + S10 (socket refused) together prove restrictions gate the
+  database socket only, without borrowing privatelink-aws for the second half.
+
+Still open from the review: auth-hardening efficacy (settable, not proven to
+close), and the doc-link + BYOC-verification items, deferred.
+
 ## Remaining
 
 - Chrome/manual tests still pending from iap-lockdown (Access OIDC login).
