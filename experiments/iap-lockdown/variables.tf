@@ -87,6 +87,13 @@ variable "cf_erfi_corp_group_id" {
   default = ""
 }
 
+# The email the L10d OIDC login authenticates as (must be an inbox the lab can
+# read the one-time PIN from).
+variable "cf_login_email" {
+  type    = string
+  default = ""
+}
+
 # Toggle so Phase A (Supabase only) can apply without the Cloudflare resources.
 variable "enable_cloudflare" {
   type    = bool
