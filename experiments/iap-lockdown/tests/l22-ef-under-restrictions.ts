@@ -19,7 +19,7 @@
  *          /rest/v1 via supabase-js with the service key. Confirm it works
  *          under restrict-all - and record that the data now transits the
  *          public HTTP tier, i.e. the restriction pushed EF traffic onto
- *          the surface the customer wants closed.
+ *          the surface the operator wants closed.
  *
  * DESTRUCTIVE: applies network restrictions; removes them in finally.
  */

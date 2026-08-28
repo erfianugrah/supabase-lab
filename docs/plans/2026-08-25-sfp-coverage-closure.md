@@ -807,7 +807,7 @@ Not token-solvable: both need account-level enablement (restore-points entitleme
 
 ### Task 17: upstream doc reports (U1-U6)
 
-Not fixable in these repos - file each internally (channel of choice: docs repo issue or the platform-docs Slack). One message per item, each citing the measured evidence:
+Not fixable in these repos - file each upstream. One note per item, each citing the measured evidence:
 
 - [ ] U1: Nano vs Pico naming - integration doc vs 2025-12-05 launch blog. Evidence: the two published pages themselves.
 - [ ] U2: "paid projects cannot be paused" needs scoping to automatic pausing + dashboard; platform orgs pause on demand via `POST /v1/projects/{ref}/pause`. Evidence: S06 (enforced, measured 2026-08-24).
