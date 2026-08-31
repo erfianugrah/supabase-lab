@@ -64,6 +64,38 @@ bypass it by hitting the origin directly (same bypass as S04a / L11). Tested
 lightly here as a Worker in front of the self-hosted PostgREST; the full CF
 integration reuses the iap-lockdown worker + wrangler pattern.
 
+### S13-S15 - review gap-plugging (column grants, the Auth switch-on levers, Storage/Realtime reach)
+
+Three gaps a review of the data-surface-lockdown reference raised, each the
+missing half of a claim the page already makes.
+
+  S13 - column-level grants. Move 1 says "an UPDATE policy gates which rows
+        change but not which columns" and stops. The fix is a column privilege,
+        not a policy: with a permissive UPDATE policy and a table-level UPDATE
+        grant, anon writes a sensitive column (the trap); after `REVOKE UPDATE`
+        + `GRANT UPDATE (<safe columns>)` the same write returns 42501 through
+        the Data API while the row policy is unchanged, and the granted column
+        still writes. RLS decides the rows, the grant decides the columns.
+
+  S14 - the Auth levers a customer switches ON. S03/S11 probed Auth for what
+        leaks; the lever table never covers what a customer can turn on to
+        harden the Auth service: a before-user-created hook, CAPTCHA
+        (hCaptcha/Turnstile), and the configurable auth rate limits. Inventory
+        which switch-on fields the Management API exposes, prove one settable
+        end to end (a rate limit lowered and read back), restore. Enforcement of
+        the hook/CAPTCHA needs a live endpoint + provider secret, so those are
+        inventoried, not driven.
+
+  S15 - Storage and Realtime do not route through PostgREST. The db-pre-request
+        IP filter and any owner-list read from request headers are PostgREST
+        controls; Storage (storage-api) and Realtime run their own services
+        against Postgres and never traverse PostgREST. Evidenced structurally:
+        with the managed Data API OFF (REST 503), Storage (/storage/v1) and
+        Realtime (/realtime/v1) keep answering. Plus: the storage schema is
+        owned by supabase_storage_admin, so the Move 1 public-schema REVOKE does
+        not govern it. Conclusion: an IP/owner gate for Storage/Realtime belongs
+        in each service's own authz or an edge you own, never a db-pre-request.
+
 ## The architecture this evidences
 
 Supabase = managed Postgres. Data plane = your own PostgREST behind your edge
