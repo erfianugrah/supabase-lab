@@ -100,7 +100,13 @@ facts):
   off and your own PostgREST (v16.2) serving the same Postgres through the
   session pooler, fronted by a `db-pre-request` IP filter and an nginx
   `limit_req` rate limiter. Also the PostgREST connection-role separation,
-  Vault, pg_net egress, pgaudit/PITR, and the socket lock.
+  Vault, pg_net egress, pgaudit/PITR, and the socket lock. Review gap-plugging
+  (S13-S15, 2026-08-31): column-level grants close the column a row UPDATE
+  policy leaves open (write to a withheld column -> 401/42501); the Auth
+  switch-on levers a customer can turn on (before-user-created hook, CAPTCHA,
+  configurable rate limits) are present and settable; and Storage/Realtime
+  answer with the Data API off, so a db-pre-request (a PostgREST control) never
+  reaches them.
 
 ## Ad-hoc platform probes (no experiment dir)
 

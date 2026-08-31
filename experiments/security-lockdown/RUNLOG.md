@@ -112,6 +112,43 @@ One Micro (org ErfiCorp), destroyed after. Closes the two gaps the review left.
   origin. Note: the readiness poll spends the per-window budget, so the module
   waits one window before the burst.
 
+## Run 4 - 2026-08-31 - review gap-plugging modules (S13-S15), run live
+
+One Micro (org from secrets, ap-southeast-1), provisioned -> probed -> destroyed
+in one session. `make apply` then `make probe IDS=S13,S14,S15` then `make
+destroy`. Second pass green: 8 pass, 0 fail, 0 skip (the first pass caught two
+of my own too-strict probe assertions, fixed below). S13/S14/S15 need only the
+project + anon key + PAT; no self-hosted PostgREST.
+
+- **S13 column-level grants** (the write-column trap Move 1 raises and stops
+  at): confirmed the pair. Permissive UPDATE policy + table-level grant lets
+  anon overwrite `balance` (`204` - the trap; the policy filtered rows, not
+  columns). After `REVOKE UPDATE ON t` + `GRANT UPDATE (note)`, the same write
+  returns `401` carrying SQLSTATE `42501` (permission denied for column), and
+  `note` still writes (`204`). FINDING on the status code: PostgREST maps the
+  42501 column denial to `401` for the unauthenticated anon role (not `403`) -
+  the load-bearing signal is the 42501, and the first-pass assertion that
+  demanded 403 was wrong. The column privilege, not another policy, is the fix.
+- **S14 Auth switch-on levers**: all three switch-on groups present on micro.
+  `hook_before_user_created_enabled=false` (present, off by default),
+  `security_captcha_enabled=false` with `security_captcha_provider=hcaptcha`
+  (present, off), and the seven `rate_limit_*` fields
+  (anonymous_users=30, email_sent=2, sms_sent=30, otp=30, verify=30,
+  token_refresh=150, web3=30). Drove `rate_limit_anonymous_users` 30 -> 5 (200,
+  read back 5), restored. Hook and CAPTCHA enforcement not driven (need a live
+  hook endpoint and a real provider secret) - this proves the levers exist and
+  are settable, the half the doc's "what stays open" table omitted.
+- **S15 Storage/Realtime reach**: with the Data API wedged off, a table path
+  returns `503 PGRST002` (REST dark) while `/storage/v1/bucket` still answers
+  (`200` service and anon) and `/realtime/v1/websocket` still answers (`500` to
+  a bare GET - its own service error, i.e. up, not a gateway 503). Both are
+  their own services and never traverse PostgREST, so a db-pre-request cannot
+  gate them. Read-only fact: the storage schema is owned by **supabase_admin**
+  (not supabase_storage_admin as first guessed - the doc was corrected to the
+  measured value). FINDING on the probe: "REST off" reads as `503` only on a
+  TABLE path; the `/rest/v1/` root answers `401 Invalid API key` at the gateway
+  with no schema route, so S15a creates a throwaway table to read the wedge.
+
 ## Remaining
 
 - Phase C PrivateLink (iap-lockdown L20-L23) - needs a Team-tier org, an AWS
