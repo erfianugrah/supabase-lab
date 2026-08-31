@@ -906,7 +906,7 @@ a throwaway probe Worker + two Hyperdrive configs via wrangler (account from
 - Cloudflare pieces are OpenTofu (provider v4, gated on `enable_cloudflare`);
   real CF ids live in gitignored `cloudflare.auto.tfvars`.
 
-## experiments/security-lockdown - key facts (validated 2026-08-28)
+## experiments/security-lockdown - key facts (validated 2026-08-28; S13-S15 2026-08-31)
 
 - S01: the Management API security advisor catches every seeded exposure
   (rls_disabled_in_public, rls_enabled_no_policy, security_definer_view,
@@ -936,6 +936,27 @@ a throwaway probe Worker + two Hyperdrive configs via wrangler (account from
   disabled; pgaudit is available; `GET /database/backups` on a fresh project
   shows `pitr_enabled=false`, `walg_enabled=true` (PITR is a paid add-on, off by
   default).
+- S13: column-level grants close the column a row UPDATE policy leaves open. A
+  permissive UPDATE policy + a table-level UPDATE grant lets anon overwrite a
+  sensitive column (`204`); after `REVOKE UPDATE ON t` + `GRANT UPDATE (safe
+  cols)` the same write returns `401` carrying SQLSTATE `42501` (PostgREST maps
+  the column denial to 401 for anon, not 403), and the granted column still
+  writes. RLS gates rows, the grant gates columns - a `WITH CHECK` never
+  constrains which columns move.
+- S14: the Auth levers a customer switches ON, the half S03/S11 (what leaks)
+  omitted. All present on micro and off by default: `hook_before_user_created_*`
+  (before-user-created hook), `security_captcha_*` (provider defaults hcaptcha),
+  and the seven `rate_limit_*` fields. A rate limit PATCHes down and back
+  (settable). Hook/CAPTCHA enforcement not driven (needs a live endpoint + real
+  provider secret).
+- S15: Storage and Realtime never traverse PostgREST, so a db-pre-request cannot
+  gate them. With the Data API wedged off (`503 PGRST002` on a table path),
+  `/storage/v1` still answers (`200`) and `/realtime/v1` still answers - both are
+  their own services against the same Postgres. The storage schema is owned by
+  `supabase_admin` (not the project owner), so the Move 1 public-schema REVOKE
+  does not govern it; Storage authz is RLS on `storage.objects`. Probe note:
+  "REST off" reads as `503` on a TABLE path only; `/rest/v1/` root answers `401`
+  at the gateway with no schema route.
 
 ## Commands
 
