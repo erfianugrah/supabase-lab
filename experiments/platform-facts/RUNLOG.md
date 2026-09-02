@@ -183,9 +183,10 @@ unlimited | enabled | unit | set } } ] }`), and the plan label is on
 `GET /v1/organizations/{slug}` (`plan`), not in the entitlements body. F01
 had been digging dotted paths into a nested object and rendering every row
 "absent"; the edge-function-limits experiment noticed while reading
-`function.max_count`. F01 now looks rows up by feature key, adds
-`function_size_limit_mb`, and fails on an empty list instead of recording
-eleven absences as facts.
+`function.max_count`. F01 now looks rows up by feature key, adds a
+`function_size_limit_mb` fact (reading the `function.size_limit_mb` feature
+key), and fails on an empty list instead of recording eleven absences as
+facts.
 
 Re-run the same day against a Free, a Pro and a Team org: 64 features listed
 on each; `function.max_count` 100 / 1000 / 2000 functions;
