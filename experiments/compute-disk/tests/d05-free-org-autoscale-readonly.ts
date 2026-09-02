@@ -135,7 +135,7 @@ const mod: TestModule = {
           initial_disk_gb: diskBefore ?? "?",
           final_disk_gb: diskAfter ?? "?",
           util_endpoint: utilAvail,
-          util_endpoints_seen: utilEndpointStatus.join,
+          util_endpoints_seen: utilEndpointStatus.join(","),
           db_size_at_seed_mb: sizeAtSeed,
         },
       });

@@ -185,7 +185,9 @@ const mod: TestModule = {
       async function sign(expiresIn: number): Promise<string> {
         const r = await fetch(`${base}/storage/v1/object/sign/${PRIV}/${OBJ}`, {
           method: "POST",
-          headers: { apikey: keys.anon, Authorization: `Bearer ${u1.token}`, "content-type": "application/json" },
+          // keys.anon is checked non-empty at the top of run(); TypeScript does
+          // not carry that narrowing into a nested function, hence the fallback.
+          headers: { apikey: keys.anon ?? "", Authorization: `Bearer ${u1.token}`, "content-type": "application/json" },
           body: JSON.stringify({ expiresIn }),
         });
         const j = (await r.json()) as { signedURL?: string };

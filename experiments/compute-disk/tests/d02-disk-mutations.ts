@@ -133,7 +133,7 @@ const mod: TestModule = {
           : "all 12 increases accepted in one burst - the 4-mod/24h doc claim fails at API level",
         measurements: {
           accepted_increases: attempts.filter((a) => a.status < 300).length.toFixed(0),
-          reject_status: quotaHit ? attempts[attempts.length - 1].status : "none",
+          reject_status: quotaHit ? (attempts.at(-1)?.status ?? "none") : "none",
           final_size_gb: size,
         },
         evidence: quotaHit ? rejectedText : undefined,
