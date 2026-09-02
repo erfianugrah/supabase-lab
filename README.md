@@ -104,7 +104,12 @@ facts):
   output), 409 as the same-slug race signature, the runtime
   restrictions (HTML->text/plain on GET only, port 25 hangs while 587 was
   reachable, static files via API deploy 201 with the asset missing), and
-  546 WORKER_RESOURCE_LIMIT for both CPU and memory. Pure triage classifier
+  546 WORKER_RESOURCE_LIMIT for both CPU and memory. Second wave the same
+  day: both log limits bite exactly (10,000 chars + a truncation marker; first
+  100 of 150 events), an active stream is cut at 395 s (docs 400 s), the
+  recursive cap did not bite at ~110k nested calls/min (27 x 429
+  RATE_LIMIT_EXCEEDED in ~119k), and ten delete-during-deploy rounds plus
+  five 4-wide same-slug rounds showed no corruption. Pure triage classifier
   under `lib/`, unit tested on the verbatim strings. Write-up:
   https://erfi.dev/reference/supabase-edge-function-limits/
 - `self-hosted-auth` - a GoTrue you run yourself against a managed project's
@@ -116,7 +121,9 @@ facts):
   managed PostgREST rejects an HS256 token that carries any kid (`401
   PGRST301`) while the managed GoTrue accepts the same token; revoking the
   legacy HS256 signing key kills the self-hosted tokens in 3-6 s and the
-  legacy anon/service_role API keys with them. Write-up:
+  legacy anon/service_role API keys with them; with its own ES256 key
+  published from an Edge Function and registered as third-party auth, the
+  self-hosted GoTrue's tokens survive that revoke. Write-up:
   https://erfi.dev/reference/supabase-auth-end-to-end/
 - `security-lockdown` - the broader security surface beyond the IAP: the
   Management API security advisor (catches every seeded exposure), network
