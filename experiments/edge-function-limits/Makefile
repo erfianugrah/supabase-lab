@@ -8,7 +8,7 @@ TS := $(shell date +%Y%m%d-%H%M%S)
 # EF02 reads organization entitlements. Everything else deploys into the lab
 # project and is destructive by construction.
 READONLY := EF01,EF02
-DESTRUCTIVE := EF03,EF04,EF05,EF06,EF07
+DESTRUCTIVE := EF03,EF04,EF05,EF06,EF07,EF08,EF09,EF10,EF11
 
 .PHONY: init fmt validate apply probe probe-destructive unit destroy
 
@@ -44,20 +44,24 @@ probe:
 		--only $(READONLY) --out evidence/$(TS)
 	@echo "== evidence/$(TS) =="
 
-# EF03-EF07 deploy functions and secrets into the lab project and delete them
-# afterwards. ONLY=EF04 narrows the run.
+# EF03-EF11 deploy functions and secrets into the lab project and delete them
+# afterwards. ONLY=EF04 narrows the run. BUILD=0 RUNNER="bun $(ROOT)/harness/
+# src/run.ts" runs from source without recompiling dist/pvlab (Linux refuses
+# to overwrite a running executable while another battery uses it).
 ONLY ?= $(DESTRUCTIVE)
+RUNNER ?= $(ROOT)/harness/dist/pvlab
+BUILD ?= 1
 probe-destructive:
 	@test -n "$(REF)" || (echo "no project_ref output - run 'make apply' first"; exit 1)
 	@test -n "$(TOK)" || (echo "no PAT in $(ROOT)/secrets.tfvars"; exit 1)
-	@cd $(ROOT)/harness && bun run build >/dev/null
+	@if [ "$(BUILD)" = "1" ]; then cd $(ROOT)/harness && bun run build >/dev/null; else cd $(ROOT)/harness && bun run gen >/dev/null; fi
 	@mkdir -p evidence/$(TS)
 	@keys=$$(curl -s -H "Authorization: Bearer $(TOK)" \
 		"https://api.supabase.com/v1/projects/$(REF)/api-keys"); \
 	anon=$$(echo "$$keys" | jq -r '.[] | select(.name=="anon") | .api_key' | head -1); \
 	PVLAB_REF="$(REF)" SUPABASE_ACCESS_TOKEN="$(TOK)" SUPABASE_ANON_KEY="$$anon" \
 		PVLAB_ORG_SLUGS="$(ORGS)" \
-		$(ROOT)/harness/dist/pvlab --where local --experiment edge-function-limits \
+		$(RUNNER) --where local --experiment edge-function-limits \
 		--destructive --only $(ONLY) --out evidence/$(TS)
 	@echo "== evidence/$(TS) =="
 
