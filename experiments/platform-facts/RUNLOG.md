@@ -25,7 +25,7 @@ and F02/F03 still run.
 
 | id | question | doc claim it dates |
 |---|---|---|
-| F01 | what does each plan grant | the Pro-vs-Team entitlements table |
+| F01 | what does each plan grant | the Pro-vs-Team entitlements table (flat-list payload since at least 2026-09-02; rewritten that day - see below) |
 | F02a | compute prices, RAM, connection counts | the per-hour compute rates and connection counts |
 | F02b | does a new project carry both key shapes | the PGRST301 provisioning trap |
 | F02c | signing key algorithms and statuses | "new projects sign with ES256, HS256 demoted" |
@@ -174,3 +174,21 @@ One Micro project, minutes. `make destroy`. Re-provisioning per run is
 deliberate: a long-lived project would accumulate state and stop answering
 "what does a NEW project look like", which is what F02b, F02c and F02e are
 actually asking.
+
+## 2026-09-02 - F01 rewritten for the flat entitlements payload
+
+The entitlements body is a flat list keyed by feature
+(`{ entitlements: [ { feature: { key, type }, hasAccess, config: { value |
+unlimited | enabled | unit | set } } ] }`), and the plan label is on
+`GET /v1/organizations/{slug}` (`plan`), not in the entitlements body. F01
+had been digging dotted paths into a nested object and rendering every row
+"absent"; the edge-function-limits experiment noticed while reading
+`function.max_count`. F01 now looks rows up by feature key, adds
+`function_size_limit_mb`, and fails on an empty list instead of recording
+eleven absences as facts.
+
+Re-run the same day against a Free, a Pro and a Team org: 64 features listed
+on each; `function.max_count` 100 / 1000 / 2000 functions;
+`function.size_limit_mb` 20 MB on all three; `security.member_roles` gains
+Read-only on Team; `auth.platform.sso` yes on Team only;
+`security.audit_logs_days` 0 / 0 / 62.
