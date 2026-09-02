@@ -13,7 +13,8 @@
  *
  * The function reports the inner status it received so a refusal at depth is
  * visible from the outside. DESTRUCTIVE: deploys one function under
- * pvlab-ef10-, deletes in finally. Costs a few thousand invocations.
+ * pvlab-ef10-, deletes in finally. Costs on the order of 180,000 invocations
+ * at concurrency 100 (59,562 chains x 3 on 2026-09-02).
  */
 import type { Ctx, TestModule, TestResult } from "../../../harness/src/types";
 import { RUNTIME } from "../lib/docs";

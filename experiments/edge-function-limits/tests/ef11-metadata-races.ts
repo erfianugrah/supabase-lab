@@ -3,11 +3,12 @@
  *
  * EF05 ran one delete-during-deploy trial and three rounds of two concurrent
  * same-slug deploys, and both came out clean. One clean trial against a path
- * reported to corrupt function metadata proves nothing, so this module
+ * this battery exists to look at proves nothing, so this module
  * repeats each shape enough times to say whether corruption appears at this
  * scale, and records the signature if it does: a function GET says present
  * while the invocation 404s, a version that moves backwards, or a deploy that
- * reports 201 and leaves nothing behind.
+ * reports 201 and leaves nothing behind with no delete in flight (a 201 that
+ * a racing delete then removes is the delete winning, not corruption).
  *
  *   EF11a  delete during deploy, 10 rounds, delete fired 0-400 ms into the
  *          deploy; after each: GET, invoke, then a fresh deploy of the same

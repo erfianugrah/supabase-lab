@@ -23,7 +23,7 @@ Full write-up: https://erfi.dev/reference/supabase-edge-function-limits/
 | EF05 | destructive | 24 API deploys 8-wide, 8 concurrent CLI processes, a same-slug race, a delete during a deploy: reported success vs landed, 409 vs 413 vs 429 kept apart, version regressions. |
 | EF06 | destructive | Restrictions: HTML rewritten to text/plain, ports 25/587 blocked (443 control), Worker and node:vm unavailable, static files via API vs via CLI, `npm:sharp`. |
 | EF07 | destructive | Runtime ceilings: CPU 500 ms vs 3 s, memory 64 MB vs 400 MB. Idle timeout referenced to edge-resilience W13, not re-run. |
-| EF08 | destructive | The two log limits that reject nothing: a 12,000-character log line and a 150-event burst, read back through the Management API logs endpoint (`source = 'function_logs'`, with the time window the endpoint requires). |
+| EF08 | destructive | The two log limits that reject nothing: a log line of 12,000 payload characters (12,019 sent with its marker) and a 150-event burst, read back through the Management API logs endpoint (`source = 'function_logs'`, with the time window the endpoint requires). |
 | EF09 | destructive | Wall clock on an ACTIVE request: a stream that ticks every 5 s asks for 450 s; where the platform cuts it. |
 | EF10 | destructive | The recursive-call cap (~5000 per minute in the docs): one minute of self-calling chains at concurrency 100, depth 2. |
 | EF11 | destructive | The metadata races repeated: delete during deploy x10 with a redeploy after each; same slug 4 concurrent x5. |
@@ -155,8 +155,9 @@ below are findings, not harness errors, unless marked as a correction.
 
 ## Second wave, 2026-09-02 afternoon (fresh project, evidence/20260902-172915 and evidence/20260902-174302)
 
-Everything the first wave had left as "not run" or "one trial", on a second
-throwaway project created and destroyed the same afternoon.
+Everything the first wave had left as "not run" or "one trial", except the
+two items under "Still not run" below, on a second throwaway project created
+and destroyed the same afternoon.
 
 ### Log limits (EF08) - both bite at exactly the documented figure
 
@@ -164,10 +165,11 @@ throwaway project created and destroyed the same afternoon.
   characters followed by ` ....[truncated]`**; the invocation answered 200.
 - 150 `console.log` calls inside one invocation: **the first 100 were stored
   (indices 000 to 099), the last 50 dropped**; the invocation answered 200.
-- Reading them back: the Management API logs endpoint answers `Backend
-  error! Retry your query.` to ANY query without `iso_timestamp_start` and
-  `iso_timestamp_end`, including the example the logs guide itself publishes;
-  with a three-hour window the same SQL returns rows. Edge Function
+- Reading them back: the Management API logs endpoint answered `Backend
+  error! Retry your query.` to all four queries tried with neither
+  `iso_timestamp_start` nor `iso_timestamp_end` (a query carrying only one of
+  the two was not tried), the erfi.dev logs-endpoint guide's own SQL example
+  among them; with a three-hour window the same SQL returned rows. Edge Function
   `console.log` lines live under `source = 'function_logs'`. The first EF08
   run (172915) failed on exactly this and its measurements were recovered by
   hand from the lines that had landed; the module now sends the window and
@@ -177,11 +179,12 @@ throwaway project created and destroyed the same afternoon.
 
 - Control: a 30 s stream completed cleanly (6 ticks).
 - A stream asking for 450 s, ticking every 5 s so the request was never idle,
-  was **cut after 395 s (79 ticks)**; the client saw a truncated compressed
-  body (Bun reported it as a zlib error on the response stream) rather than
-  an HTTP error, because the headers had long since been sent. That is
-  within 15 s of the documented 400 s paid figure. W13's 504 IDLE_TIMEOUT at
-  150 s is the idle rule; this is the active one.
+  delivered its **last tick at 395 s (79 ticks)** and was cut before the next
+  one; the client saw a truncated compressed body (Bun reported it as a zlib
+  error on the response stream) rather than an HTTP error, because the headers
+  had long since been sent. So the cut fell within one 5 s tick of the
+  documented 400 s paid figure (the module's pass band is 15 s). W13's 504
+  IDLE_TIMEOUT at 150 s is the idle rule; this is the active one.
 
 ### The recursive-call cap (EF10) - did not bite at 22x the documented figure
 
@@ -190,25 +193,29 @@ throwaway project created and destroyed the same afternoon.
 - One minute at concurrency 100, depth 2: **59,562 chains in 65 s, about
   110,600 nested calls per minute** against a documented cap of ~5000. Outer
   statuses 200:59549 | 429:13; inner 200:59535 | 429:14 | unparsed:13. The
-  only refusal seen, 27 times in about 119,000 nested calls, was
+  only refusal seen, 27 times (13 outer, 14 inner) across 59,562 chains,
+  about 119,000 nested calls and about 178,700 invocations in all, was
   `429 {"code":"RATE_LIMIT_EXCEEDED","message":"Too many requests. Re-try the
   request in 1 seconds."}`. Whatever the ~5000/min figure describes, it is
   not a ceiling a self-calling function meets at this rate on a Micro
-  project; the operative limiter is a per-second one that answers 429 with a
-  1 s retry hint.
+  project; the only limiter that answered carries a 1 s retry hint, which
+  reads as a per-second limiter.
 
 ### The metadata races, repeated (EF11) - still no corruption signature
 
 - Delete during deploy, 10 rounds, delete fired 0-400 ms into the deploy:
   deploy 201 x10, delete 200 x10; afterwards 8 present-and-healthy, 2 absent
-  (the delete won); every redeploy of the same slug afterwards 201 and
-  invoke 200. 0 outcomes where GET said present and the invocation 404d, 0
-  version regressions.
-- Same slug, 4 concurrent deploys, 5 rounds: statuses 201:9 | 409:11, versions
-  1 -> 2 -> 3 -> 4 -> 5 -> 6 (one bump per round), invoke 200 after every
-  round. Two or three of every four concurrent deploys of one slug answer 409.
-- Ten and five rounds is a repeat, not a proof; the row stays "no corruption
-  signature at this scale".
+  (deploy 201 then absent, attributed to the delete that was in flight, so not
+  counted as the 201-then-nothing signature); every redeploy of the slug
+  afterwards 201 and invoke 200. 0 outcomes where GET said present and the
+  invocation 404d, 0 version regressions.
+- Same slug, 4 concurrent deploys, 5 rounds: statuses 201:9 | 409:11; the
+  version is read once per round after all four settle, and it went
+  1 -> 2 -> 3 -> 4 -> 5 -> 6, one bump per round even where two of the four
+  answered 201; invoke 200 after every round. Two or three of every four
+  concurrent deploys of one slug answer 409.
+- Ten and five rounds repeat the first wave's result; they do not prove
+  absence. The row stays "no corruption signature at this scale".
 
 ### Still not run
 
