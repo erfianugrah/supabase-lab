@@ -1,0 +1,185 @@
+{
+  "startedAt": "2026-09-02T09:29:16.401Z",
+  "finishedAt": "2026-09-02T09:42:47.442Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "edge-function-limits",
+  "labCommit": "67f9251",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "OpenSSL 3.6.4 25 Aug 2026 (Library: OpenSSL 3.6.4 25 Aug 2026)"
+  },
+  "results": [
+    {
+      "id": "EF08a",
+      "title": "log message length: stored vs sent",
+      "status": "fail",
+      "detail": "long line not found in 0 rows after 8 queries (last error: \"Backend error! Retry your query. Please contact support if this continues.\")",
+      "measurements": {
+        "sent_chars": 12019,
+        "stored_chars": 0,
+        "docs_max_chars": 10000,
+        "source": "none",
+        "queries": 8,
+        "wait_s": 205
+      },
+      "durationMs": 211637
+    },
+    {
+      "id": "EF08b",
+      "title": "log event threshold: events stored from one 150-event burst",
+      "status": "fail",
+      "detail": "no burst events found in 0 rows after 8 queries",
+      "measurements": {
+        "sent_events": 150,
+        "stored_distinct": 0,
+        "stored_rows": 0,
+        "docs_threshold": "100 per 10 s",
+        "sources_seen": "none"
+      },
+      "durationMs": 211637
+    },
+    {
+      "id": "EF08z",
+      "title": "cleanup: delete pvlab-ef08-* functions",
+      "status": "pass",
+      "detail": "deleted 1",
+      "measurements": {
+        "deleted": 1,
+        "left": 0
+      },
+      "durationMs": 211637
+    },
+    {
+      "id": "EF09a",
+      "title": "30 s stream completes",
+      "status": "pass",
+      "detail": "6 ticks, last at 30 s, ended clean",
+      "measurements": {
+        "ticks": 6,
+        "last_tick_s": 30,
+        "elapsed_s": 30,
+        "ended": "clean"
+      },
+      "durationMs": 438454
+    },
+    {
+      "id": "EF09b",
+      "title": "450 s stream: where the request is cut",
+      "status": "pass",
+      "detail": "cut after 395 s (79 ticks), body ended by error \"ZlibError fetching \"https://<ref>.supabase.co/functions/v1/pvlab-ef09-stream?s=450\". For more information, pass `verbose: true` in the second argument to fetch()\" - within 15 s of the documented paid figure",
+      "measurements": {
+        "docs_wall_clock_paid_s": 400,
+        "docs_wall_clock_free_s": 150,
+        "ticks": 79,
+        "last_tick_s": 395,
+        "elapsed_s": 400,
+        "ended": "error",
+        "error": "ZlibError fetching \"https://<ref>.supabase.co/functions/v1/pvlab-ef09-stream?s=450\". For more information, pass `verbose: true` in the second argument to fetch()",
+        "near_paid_figure": 1
+      },
+      "durationMs": 438454
+    },
+    {
+      "id": "EF09z",
+      "title": "cleanup: delete pvlab-ef09-* functions",
+      "status": "pass",
+      "detail": "deleted 1",
+      "measurements": {
+        "deleted": 1,
+        "left": 0
+      },
+      "durationMs": 438454
+    },
+    {
+      "id": "EF10a",
+      "title": "control: one chain at depth 2",
+      "status": "pass",
+      "detail": "outer 200, inner 200, 2794 ms",
+      "measurements": {
+        "outer_status": 200,
+        "inner_status": "200",
+        "ms": 2794
+      },
+      "durationMs": 69832
+    },
+    {
+      "id": "EF10b",
+      "title": "one minute at concurrency 100, depth 2",
+      "status": "info",
+      "detail": "59562 chains in 65 s = 110607 nested calls/min (docs cap ~5000); outer 200:59549|429:13; inner ?:13|200:59535|429:14; first refusal: outer 429: {\"code\":\"RATE_LIMIT_EXCEEDED\",\"message\":\"Too many requests. Re-try the request in 1 seconds.\"}",
+      "measurements": {
+        "concurrency": 100,
+        "depth": 2,
+        "chains": 59562,
+        "nested_calls": 119124,
+        "nested_per_minute": 110607,
+        "docs_cap_per_minute": 5000,
+        "outer_histogram": "200:59549|429:13",
+        "inner_histogram": "?:13|200:59535|429:14",
+        "refused_chains": 27,
+        "first_refusal": "outer 429: {\"code\":\"RATE_LIMIT_EXCEEDED\",\"message\":\"Too many requests. Re-try the request in 1 seconds.\"}"
+      },
+      "durationMs": 69832
+    },
+    {
+      "id": "EF10z",
+      "title": "cleanup: delete pvlab-ef10-* functions",
+      "status": "pass",
+      "detail": "deleted 1",
+      "measurements": {
+        "deleted": 1,
+        "left": 0
+      },
+      "durationMs": 69832
+    },
+    {
+      "id": "EF11a",
+      "title": "delete during deploy, 10 rounds",
+      "status": "pass",
+      "detail": "0 corrupted outcome(s) in 10 rounds; deploy 201:10, delete 200:10; outcomes absent-delete-won:2|present-healthy:8; redeploy afterwards 200:10 - no corruption signature at this scale (still not proof of absence)",
+      "measurements": {
+        "rounds": 10,
+        "corrupted": 0,
+        "deploy_histogram": "201:10",
+        "delete_histogram": "200:10",
+        "outcome_histogram": "absent-delete-won:2|present-healthy:8",
+        "redeploy_invoke_histogram": "200:10"
+      },
+      "evidence": "present-healthy@316ms->redeploy 200\npresent-healthy@286ms->redeploy 200\nabsent-delete-won@389ms->redeploy 200\nabsent-delete-won@256ms->redeploy 200\npresent-healthy@249ms->redeploy 200\npresent-healthy@272ms->redeploy 200\npresent-healthy@225ms->redeploy 200\npresent-healthy@137ms->redeploy 200\npresent-healthy@144ms->redeploy 200\npresent-healthy@187ms->redeploy 200",
+      "durationMs": 91152
+    },
+    {
+      "id": "EF11b",
+      "title": "same slug, 4 concurrent deploys, 5 rounds",
+      "status": "pass",
+      "detail": "versions 1 -> 2 -> 3 -> 4 -> 5 -> 6; 0 regression(s); statuses 201:9|409:11; invoke after each round 200:5",
+      "measurements": {
+        "rounds": 5,
+        "width": 4,
+        "versions": "1>2>3>4>5>6",
+        "version_regressions": 0,
+        "status_histogram": "201:9|409:11",
+        "n_201": 9,
+        "n_409": 11,
+        "n_429": 0,
+        "invoke_histogram": "200:5"
+      },
+      "durationMs": 91152
+    },
+    {
+      "id": "EF11z",
+      "title": "cleanup: delete pvlab-ef11-* functions",
+      "status": "pass",
+      "detail": "deleted 11",
+      "measurements": {
+        "deleted": 11,
+        "left": 0
+      },
+      "durationMs": 91152
+    }
+  ]
+}

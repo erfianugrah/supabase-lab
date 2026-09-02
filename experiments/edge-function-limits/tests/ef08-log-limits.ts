@@ -22,7 +22,7 @@
  *
  * DESTRUCTIVE: deploys one function under pvlab-ef08-, deletes in finally.
  */
-import { mgmt } from "../../../harness/src/mgmt";
+import { type LogRow as PlatformLogRow, logsQuery } from "../../../harness/src/platform";
 import type { Ctx, TestModule, TestResult } from "../../../harness/src/types";
 import { cleanupPrefix, deployViaApi, invokeWhenLive } from "../lib/ef";
 
@@ -44,31 +44,11 @@ Deno.serve((req) => {
 });
 `;
 
-interface LogRow {
-  event_message?: string;
-  source?: string;
-  timestamp?: string;
-}
-
-/**
- * One logs query; the endpoint is GET-only with the SQL in the query string.
- * It also needs an explicit time window: without `iso_timestamp_start` and
- * `iso_timestamp_end` every query, including the guide's own example,
- * answered `Backend error! Retry your query.` (measured 2026-09-02); with a
- * window the same SQL returned rows. The window here is the last three hours.
- */
-async function logs(ctx: Ctx, sql: string): Promise<{ status: number; rows: LogRow[]; error: string }> {
-  const end = new Date();
-  const start = new Date(end.getTime() - 3 * 3600_000);
-  const qs = `sql=${encodeURIComponent(sql)}&iso_timestamp_start=${encodeURIComponent(start.toISOString())}&iso_timestamp_end=${encodeURIComponent(end.toISOString())}`;
-  const r = await mgmt(ctx, "GET", `/projects/${ctx.ref}/analytics/endpoints/logs?${qs}`, undefined, 60_000);
-  const j = (r.json ?? {}) as { result?: LogRow[]; error?: unknown };
-  return {
-    status: r.status,
-    rows: Array.isArray(j.result) ? j.result : [],
-    error: j.error ? JSON.stringify(j.error).slice(0, 200) : r.status >= 300 ? r.text.slice(0, 200) : "",
-  };
-}
+// The logs endpoint needs BOTH time-window parameters or answers its generic
+// backend error (this module's first run failed on exactly that); the shared
+// helper sends a three-hour window by default.
+const logs = (ctx: Ctx, sqlText: string) => logsQuery(ctx, sqlText, 3);
+type LogRow = PlatformLogRow;
 
 const mod: TestModule = {
   id: "EF08",

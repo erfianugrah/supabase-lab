@@ -1,0 +1,105 @@
+{
+  "startedAt": "2026-09-02T09:30:41.437Z",
+  "finishedAt": "2026-09-02T09:31:03.162Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "self-hosted-auth",
+  "labCommit": "67f9251",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "OpenSSL 3.6.4 25 Aug 2026 (Library: OpenSSL 3.6.4 25 Aug 2026)"
+  },
+  "results": [
+    {
+      "id": "SH06a",
+      "title": "JWKS served from an Edge Function on the project",
+      "status": "pass",
+      "detail": "deploy 201; GET 200 kid 182b1b00",
+      "measurements": {
+        "deploy_status": 201,
+        "get_status": 200,
+        "kid_matches": 1,
+        "jwks_url": "https://<ref>.supabase.co/functions/v1/pvlab-sh06-jwks"
+      },
+      "durationMs": 21728
+    },
+    {
+      "id": "SH06b",
+      "title": "third-party auth registration (jwks_url)",
+      "status": "pass",
+      "detail": "HTTP 201; type custom; resolved_at 2026-09-02T09:30:45.045+00:00",
+      "measurements": {
+        "status": 201,
+        "resolved_on_create": 1,
+        "type": "custom"
+      },
+      "durationMs": 21728
+    },
+    {
+      "id": "SH06c",
+      "title": "self-hosted password grant with the own key",
+      "status": "pass",
+      "detail": "alg ES256 kid 182b1b00 (own kid 182b1b00), iss https://<ref>.supabase.co/auth/v1",
+      "measurements": {
+        "status": 200,
+        "alg": "ES256",
+        "kid_is_own": 1,
+        "iss": "https://<ref>.supabase.co/auth/v1"
+      },
+      "durationMs": 21728
+    },
+    {
+      "id": "SH06d",
+      "title": "own-key token against managed PostgREST and managed Auth",
+      "status": "pass",
+      "detail": "PostgREST 200 rows=1, accepted 4 s after the registration; managed /auth/v1/user 403 bad_jwt",
+      "measurements": {
+        "rest_status": 200,
+        "rest_rows": 1,
+        "rest_code": "none",
+        "accepted_after_s": 4,
+        "managed_user_status": 403,
+        "managed_user_code": "bad_jwt"
+      },
+      "durationMs": 21728
+    },
+    {
+      "id": "SH06e",
+      "title": "Storage with the own-key (third-party) token vs a managed token",
+      "status": "info",
+      "detail": "GET /storage/v1/bucket: anon 200; own-key bearer 200; managed bearer 200",
+      "measurements": {
+        "anon_status": 200,
+        "ownkey_status": 200,
+        "ownkey_body": "ok",
+        "managed_status": 200
+      },
+      "durationMs": 21728
+    },
+    {
+      "id": "SH06f",
+      "title": "after revoking the legacy HS256 key: the own-key token",
+      "status": "pass",
+      "detail": "revoke 200; own-key token + legacy anon apikey -> 200; own-key token + sb_publishable apikey -> 200 rows=1; fresh self-hosted grant 200",
+      "measurements": {
+        "revoke_status": 200,
+        "legacy_anon_apikey_status": 200,
+        "legacy_anon_apikey_code": "none",
+        "publishable_apikey_status": 200,
+        "publishable_apikey_rows": 1,
+        "fresh_self_grant_status": 200
+      },
+      "durationMs": 21728
+    },
+    {
+      "id": "SH06z",
+      "title": "cleanup",
+      "status": "pass",
+      "detail": "tpa delete 200; user delete via sql 201 (admin api 403); functions deleted 1",
+      "durationMs": 21728
+    }
+  ]
+}
