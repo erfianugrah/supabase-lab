@@ -99,13 +99,25 @@ facts):
   by bundling path (API 8 MB refused with `413 request entity too large`,
   local CLI bundling lands 8 MB and refuses 24 MB with the same 413), the
   four secrets limits at their exact boundaries, silent loss under parallel
-  deploys (24x 201 with 10 landed; 8 CLI processes exit 0 with 9/24 landed,
-  no 429 anywhere), 409 as the same-slug race signature, the runtime
+  deploys (24x 201 with 10 landed; 8 CLI processes x 3 functions exit 0 with
+  9/24 functions landed; no 429 on any deploy response or in any process
+  output), 409 as the same-slug race signature, the runtime
   restrictions (HTML->text/plain on GET only, port 25 hangs while 587 was
   reachable, static files via API deploy 201 with the asset missing), and
   546 WORKER_RESOURCE_LIMIT for both CPU and memory. Pure triage classifier
   under `lib/`, unit tested on the verbatim strings. Write-up:
   https://erfi.dev/reference/supabase-edge-function-limits/
+- `self-hosted-auth` - a GoTrue you run yourself against a managed project's
+  Postgres (session pooler, `postgres` role, `search_path=auth`): it shares
+  the auth schema, its HS256 tokens (legacy `jwt_secret`) are accepted by
+  managed Auth and PostgREST, refresh tokens redeem across both sides, and
+  with the platform's ES256 public key supplied as a verify-only JWK the trust
+  is mutual. Measured 2026-09-02: `supabase_auth_admin` is reserved; the
+  managed PostgREST rejects an HS256 token that carries any kid (`401
+  PGRST301`) while the managed GoTrue accepts the same token; revoking the
+  legacy HS256 signing key kills the self-hosted tokens in 3-6 s and the
+  legacy anon/service_role API keys with them. Write-up:
+  https://erfi.dev/reference/supabase-auth-end-to-end/
 - `security-lockdown` - the broader security surface beyond the IAP: the
   Management API security advisor (catches every seeded exposure), network
   restrictions gating only the DB/pooler socket (REST keeps answering), the
