@@ -14,9 +14,9 @@
  * plan, that is one half of the argument that function size is a
  * bundling-path property and not a plan lever (EF04 is the other half).
  *
- * Note the entitlements payload is `{ entitlements: [{ feature: { key },
- * type, hasAccess, config: { value | unlimited | enabled } }] }` - a flat list
- * keyed by feature, not the nested object an older module assumed.
+ * Note the entitlements payload is `{ entitlements: [ { feature: { key, type },
+ * hasAccess, config: { value | unlimited | enabled | unit | set } } ] }` - a
+ * flat list keyed by feature, not the nested object an older module assumed.
  *
  * Read-only. Supply PVLAB_ORG_SLUGS=free-slug,pro-slug,team-slug for one row
  * per plan; the interesting rows are the ones that differ.

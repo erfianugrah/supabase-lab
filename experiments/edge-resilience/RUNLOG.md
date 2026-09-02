@@ -194,7 +194,12 @@ The answer is nuanced and measured:
   subscriptions can vanish/reappear under platform management.
 - Backfill limitation recorded: password_hash is not portable via the
   admin API - a backfill must copy hashes via direct SQL, or users
-  re-authenticate.
+  re-authenticate. CORRECTION 2026-09-02: this was an assumption, not a
+  measurement - W09 posted its backfill users without a password_hash.
+  tenant-consolidation C03 (2026-08-04) posted a bcrypt password_hash to
+  POST /auth/v1/admin/users and the user logged in with the original
+  password, so the admin API IS a backfill path for bcrypt hashes. The
+  reference and runbook were corrected the same day.
 - INTERIM POSTURE (written to the reference): TPA portability keeps
   existing sessions reading; fresh logins post-cutover need either SQL
   hash backfill or forced re-login. auth.* streaming replication on micro
