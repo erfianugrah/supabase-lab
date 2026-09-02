@@ -27,7 +27,7 @@ answers under each lockdown lever).
   14-char placeholder and returns 401 "JWT could not be decoded" - the
   encrypted secret intentionally holds no live token. The working PAT is in
   the environment (`SUPABASE_ACCESS_TOKEN`, verified 200 against
-  /v1/organizations) and belongs to org `<org-pro>`. Wired that
+  /v1/organizations) and belongs to org `<pro-org-slug>`. Wired that
   PAT + org into the (gitignored) secrets.tfvars for this run. Target org is
   therefore that org, region ap-southeast-1, Micro.
 - Cost confirmed via the Supabase get_cost API this session (returned
@@ -54,7 +54,7 @@ status by credential (surface=HTTP status):
 Baseline gate passed (anon can read the probe table and log in), so the
 levers below are measurable.
 
-### Phase A results (live, org ErfiCorp <org-pro>, project dnza..., 2026-08-28)
+### Phase A results (live, org ErfiCorp <pro-org-slug>, project dnza..., 2026-08-28)
 
 All nine modules green after two fix passes (204-vs-200 on the realtime PATCH;
 supabase_admin default-priv permission wall; key-name charset; fixture

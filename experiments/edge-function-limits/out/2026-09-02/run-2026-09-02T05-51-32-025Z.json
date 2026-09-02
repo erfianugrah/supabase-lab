@@ -1,0 +1,460 @@
+{
+  "startedAt": "2026-09-02T05:51:32.025Z",
+  "finishedAt": "2026-09-02T05:54:25.613Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "edge-function-limits",
+  "labCommit": "5bfea0e",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "OpenSSL 3.6.4 25 Aug 2026 (Library: OpenSSL 3.6.4 25 Aug 2026)"
+  },
+  "results": [
+    {
+      "id": "EF03a",
+      "title": "reserved prefix SUPABASE_ is refused",
+      "status": "pass",
+      "detail": "HTTP 400: \"0.name: Secret name must not start with the SUPABASE_ prefix.\"",
+      "measurements": {
+        "status": 400,
+        "error": "0.name: Secret name must not start with the SUPABASE_ prefix.",
+        "stored": 0,
+        "triage_bucket": "reserved-prefix"
+      },
+      "durationMs": 4950
+    },
+    {
+      "id": "EF03b",
+      "title": "name length boundary",
+      "status": "pass",
+      "detail": "accepted at 256, refused at 257: \"0.name: Too big: expected string to have <=256 characters\"",
+      "measurements": {
+        "docs_figure": 256,
+        "at_limit_status": 201,
+        "over_limit_status": 400,
+        "over_limit_error": "0.name: Too big: expected string to have <=256 characters",
+        "triage_bucket": "name-length"
+      },
+      "durationMs": 4950
+    },
+    {
+      "id": "EF03c",
+      "title": "value size boundary (one-byte characters)",
+      "status": "pass",
+      "detail": "accepted at 24576, refused at 24577: \"0.value: Too big: expected string to have <=24576 characters\"",
+      "measurements": {
+        "docs_figure": 24576,
+        "at_limit_status": 201,
+        "over_limit_status": 400,
+        "over_limit_error": "0.value: Too big: expected string to have <=24576 characters",
+        "triage_bucket": "value-size"
+      },
+      "durationMs": 4950
+    },
+    {
+      "id": "EF03c2",
+      "title": "value ceiling: characters or bytes?",
+      "status": "info",
+      "detail": "24576 two-byte characters (49152 bytes, over 49152) ACCEPTED - the ceiling is 24576 characters, and \"48 KiB\" is that figure at two bytes per character",
+      "measurements": {
+        "chars": 24576,
+        "bytes": 49152,
+        "docs_bytes": 49152,
+        "status": 201,
+        "error": "none"
+      },
+      "durationMs": 4950
+    },
+    {
+      "id": "EF03d",
+      "title": "count boundary: 100 per project",
+      "status": "pass",
+      "detail": "100 stored, the 101st refused HTTP 400: \"You can only store 100 secrets per project at maximum.\"",
+      "measurements": {
+        "docs_figure": 100,
+        "preexisting": 0,
+        "stored_at_ceiling": 100,
+        "over_status": 400,
+        "over_error": "You can only store 100 secrets per project at maximum.",
+        "stored_after_over": 100,
+        "triage_bucket": "count",
+        "docs_read_at": "2026-09-02"
+      },
+      "durationMs": 4950
+    },
+    {
+      "id": "EF03z",
+      "title": "cleanup: remove PVLAB_EF03_ secrets",
+      "status": "pass",
+      "detail": "removed 100",
+      "measurements": {
+        "removed": 100,
+        "left": 0
+      },
+      "durationMs": 4950
+    },
+    {
+      "id": "EF04a",
+      "title": "API deploy, 2 MB (control)",
+      "status": "pass",
+      "detail": "HTTP 201, landed, invoke 200 reports 2097004 bytes",
+      "measurements": {
+        "path": "api",
+        "size_mb": 2,
+        "docs_ceiling_mb": 5,
+        "deploy_status": 201,
+        "deploy_ms": 4627,
+        "error": "none",
+        "present_after": 1,
+        "invoke_status": 200,
+        "bytes_reported": 2097004,
+        "triage_bucket": "unknown"
+      },
+      "durationMs": 59806
+    },
+    {
+      "id": "EF04b",
+      "title": "API deploy, 8 MB (over the server-side ceiling)",
+      "status": "pass",
+      "detail": "refused HTTP 413: \"request entity too large\" [size-limit]",
+      "measurements": {
+        "path": "api",
+        "size_mb": 8,
+        "docs_ceiling_mb": 5,
+        "deploy_status": 413,
+        "deploy_ms": 292,
+        "error": "request entity too large",
+        "present_after": 0,
+        "invoke_status": 0,
+        "bytes_reported": "n/a",
+        "triage_bucket": "size-limit"
+      },
+      "evidence": "{\"message\":\"request entity too large\"}",
+      "durationMs": 59806
+    },
+    {
+      "id": "EF04c",
+      "title": "CLI --use-api, 8 MB",
+      "status": "pass",
+      "detail": "refused exit 1: \"unexpected deploy status 413: {\"message\":\"request entity too large\"}\" [size-limit]",
+      "measurements": {
+        "path": "cli-use-api",
+        "size_mb": 8,
+        "docs_ceiling_mb": 5,
+        "exit_code": 1,
+        "deploy_ms": 652,
+        "error": "unexpected deploy status 413: {\"message\":\"request entity too large\"}",
+        "present_after": 0,
+        "invoke_status": 0,
+        "bytes_reported": "n/a",
+        "stderr_mentions_docker": 0,
+        "triage_bucket": "size-limit"
+      },
+      "evidence": "supabase functions deploy pvlab-ef04-cli-api-8mb --project-ref <ref> --workdir <workdir> --no-verify-jwt --output-format json --use-api\n--- stdout\n{\"_tag\":\"Error\",\"error\":{\"code\":\"FunctionsApiStatusError\",\"message\":\"unexpected deploy status 413: {\\\"message\\\":\\\"request entity too large\\\"}\"}}\n\n--- stderr\nUploading asset (pvlab-ef04-cli-api-8mb): supabase/functions/pvlab-ef04-cli-api-8mb/index.ts\n",
+      "durationMs": 59806
+    },
+    {
+      "id": "EF04d",
+      "title": "CLI default bundling, 8 MB",
+      "status": "pass",
+      "detail": "exit 0, landed, invoke 200 reports 8388460 bytes in 32s",
+      "measurements": {
+        "path": "cli-default",
+        "size_mb": 8,
+        "docs_ceiling_mb": 20,
+        "exit_code": 0,
+        "deploy_ms": 31838,
+        "error": "none",
+        "present_after": 1,
+        "invoke_status": 200,
+        "bytes_reported": 8388460,
+        "stderr_mentions_docker": 0,
+        "triage_bucket": "unknown"
+      },
+      "evidence": "supabase functions deploy pvlab-ef04-cli-def-8mb --project-ref <ref> --workdir <workdir> --no-verify-jwt --output-format json\n--- stdout\n{\"project_ref\":\"<ref>\",\"functions\":[\"pvlab-ef04-cli-def-8mb\"],\"dashboard_url\":\"https://supabase.com/dashboard/project/<ref>/functions\",\"message\":\"Deployed Functions.\"}\n\n--- stderr\nv1.74.3: Pulling from supabase/edge-runtime\nba9e24d39072: Pulling fs layer\n60414ed24b30: Pulling fs layer\nc39190ba742d: Pulling fs layer\n662b1f44f1ee: Pulling fs layer\n0d29c829782d: Pulling fs layer\n60414ed24b30: Download complete\nba9e24d39072: Download complete\nc39190ba742d: Download complete\n077d97247b89: Download complete\nc39190ba742d: Pull complete\n60414ed24b30: Pull complete\n0d29c829782d: Download complete\n0d29c829782d: Pull complete\n662b1f44f1ee: Download complete\n662b1f44f1ee: Pull complete\nba9e24d39072: Pull complete\nDigest: sha256:c52405002a890ca9fcf77978671c57f3a988e03174afb277f84ac65bc917013c\nStatus: Downloaded newer image for public.ecr.aws/supabase/edge-runtime:v1.74.3\npublic.ecr.aws/supabase/edge-runtime:v1.74.3\nDeploying Function: pvlab-ef04-cli-def-8mb (script size: 12 MB)\n",
+      "durationMs": 59806
+    },
+    {
+      "id": "EF04e",
+      "title": "CLI default bundling, 24 MB (over the local ceiling)",
+      "status": "pass",
+      "detail": "refused exit 1: \"unexpected create function status 413: {\"message\":\"request entity too large\"}\" [size-limit]",
+      "measurements": {
+        "path": "cli-default",
+        "size_mb": 24,
+        "docs_ceiling_mb": 20,
+        "exit_code": 1,
+        "deploy_ms": 11952,
+        "error": "unexpected create function status 413: {\"message\":\"request entity too large\"}",
+        "present_after": 0,
+        "invoke_status": 0,
+        "bytes_reported": "n/a",
+        "stderr_mentions_docker": 0,
+        "triage_bucket": "size-limit"
+      },
+      "evidence": "supabase functions deploy pvlab-ef04-cli-def-24mb --project-ref <ref> --workdir <workdir> --no-verify-jwt --output-format json\n--- stdout\n{\"_tag\":\"Error\",\"error\":{\"code\":\"FunctionsApiStatusError\",\"message\":\"unexpected create function status 413: {\\\"message\\\":\\\"request entity too large\\\"}\"}}\n\n--- stderr\nBundling Function: pvlab-ef04-cli-def-24mb\nDeploying Function: pvlab-ef04-cli-def-24mb (script size: 37 MB)\n",
+      "durationMs": 59806
+    },
+    {
+      "id": "EF04z",
+      "title": "cleanup: delete pvlab-ef04-* functions",
+      "status": "pass",
+      "detail": "deleted 2",
+      "measurements": {
+        "deleted": 2,
+        "left": 0,
+        "cli_version": "2.116.0",
+        "docker": 1,
+        "docs_read_at": "2026-09-02"
+      },
+      "durationMs": 59806
+    },
+    {
+      "id": "EF05a",
+      "title": "24 API deploys, 8 in flight: reported vs landed",
+      "status": "fail",
+      "detail": "24/24 reported 2xx, 10/24 present afterwards, 14 silent loss; no failures",
+      "measurements": {
+        "n": 24,
+        "parallel": 8,
+        "reported_2xx": 24,
+        "landed": 10,
+        "silent_loss": 14,
+        "failed_but_present": 0,
+        "status_histogram": "201:24",
+        "triage_histogram": "none",
+        "n_429": 0,
+        "n_409": 0,
+        "n_413": 0,
+        "html_interstitials": 0,
+        "p50_deploy_ms": 1007
+      },
+      "durationMs": 60691
+    },
+    {
+      "id": "EF05b",
+      "title": "8 concurrent CLI processes x 3 functions: exit codes vs landed",
+      "status": "fail",
+      "detail": "8/8 processes exited 0, 9/24 functions present, 15 exit-0-but-missing; no 429 surfaced",
+      "measurements": {
+        "cli_version": "2.116.0",
+        "bundling_flag": "--use-api",
+        "processes": 8,
+        "functions_per_process": 3,
+        "exit0_processes": 8,
+        "landed": 9,
+        "exit0_but_missing": 15,
+        "exit_histogram": "0:8",
+        "processes_with_429_text": 0,
+        "max_process_ms": 5442
+      },
+      "evidence": "[proc 0] exit 0 5s\n-0): supabase/functions/pvlab-ef05-cli-0-0/index.ts\nDeploying Function: pvlab-ef05-cli-0-1\nUploading asset (pvlab-ef05-cli-0-1): supabase/functions/pvlab-ef05-cli-0-1/index.ts\nDeploying Function: pvlab-ef05-cli-0-2\nUploading asset (pvlab-ef05-cli-0-2): supabase/functions/pvlab-ef05-cli-0-2/index.ts\n\n[proc 1] exit 0 4s\n-0): supabase/functions/pvlab-ef05-cli-1-0/index.ts\nDeploying Function: pvlab-ef05-cli-1-1\nUploading asset (pvlab-ef05-cli-1-1): supabase/functions/pvlab-ef05-cli-1-1/index.ts\nDeploying Function: pvlab-ef05-cli-1-2\nUploading asset (pvlab-ef05-cli-1-2): supabase/functions/pvlab-ef05-cli-1-2/index.ts\n\n[proc 2] exit 0 4s\n-0): supabase/functions/pvlab-ef05-cli-2-0/index.ts\nDeploying Function: pvlab-ef05-cli-2-1\nUploading asset (pvlab-ef05-cli-2-1): supabase/functions/pvlab-ef05-cli-2-1/index.ts\nDeploying Function: pvlab-ef05-cli-2-2\nUploading asset (pvlab-ef05-cli-2-2): supabase/functions/pvlab-ef05-cli-2-2/index.ts\n\n[proc 3] exit 0 3s\n-0): supabase/functions/pvlab-ef05-cli-3-0/index.ts\nDeploying Function: pvlab-ef05-cli-3-1\nUploading asset (pvlab-ef05-cli-3-1): supabase/functions/pvlab-ef05-cli-3-1/index.ts\nDeploying Function: pvlab-ef05-cli-3-2\nUploading asset (pvlab-ef05-cli-3-2): supabase/functions/pvlab-ef05-cli-3-2/index.ts\n\n[proc 4] exit 0 4s\n-0): supabase/functions/pvlab-ef05-cli-4-0/index.ts\nDeploying Function: pvlab-ef05-cli-4-1\nUploading asset (pvlab-ef05-cli-4-1): supabase/functions/pvlab-ef05-cli-4-1/index.ts\nDeploying Function: pvlab-ef05-cli-4-2\nUploading asset (pvlab-ef05-cli-4-2): supabase/functions/pvlab-ef05-cli-4-2/index.ts\n\n[proc 5] exit 0 5s\n-0): supabase/functions/pvlab-ef05-cli-5-0/index.ts\nDeploying Function: pvlab-ef05-cli-5-1\nUploading asset (pvlab-ef05-cli-5-1): supabase/functions/pvlab-ef05-cli-5-1/index.ts\nDeploying Function: pvlab-ef05-cli-5-2\nUploading asset (pvlab-ef05-cli-5-2): supabase/functions/pvlab-ef05-cli-5-2/index.ts\n\n[proc 6] exit 0 4s\n-0): supabase/functions/pvlab-ef05-cli-6-0/index.ts\nDeploying Function: pvlab-ef05-cli-6-1\nUploading asset (pvlab-ef05-cli-6-1): supabase/functions/pvlab-ef05-cli-6-1/index.ts\nDeploying Function: pvlab-ef05-cli-6-2\nUploading asset (pvlab-ef05-cli-6-2): supabase/functions/pvlab-ef05-cli-6-2/index.ts\n\n[proc 7] exit 0 3s\n-0): supabase/functions/pvlab-ef05-cli-7-0/index.ts\nDeploying Function: pvlab-ef05-cli-7-1\nUploading asset (pvlab-ef05-cli-7-1): supabase/functions/pvlab-ef05-cli-7-1/index.ts\nDeploying Function: pvlab-ef05-cli-7-2\nUploading asset (pvlab-ef05-cli-7-2): supabase/functions/pvlab-ef05-cli-7-2/index.ts\n",
+      "durationMs": 60691
+    },
+    {
+      "id": "EF05c",
+      "title": "same-slug race: 3 rounds of 2 concurrent deploys",
+      "status": "pass",
+      "detail": "versions 1 -> 2 -> 3 -> 4; 0 regression(s); statuses 201:3|409:3; invoke afterwards 200",
+      "measurements": {
+        "first_deploy_status": 201,
+        "versions": "1>2>3>4",
+        "version_regressions": 0,
+        "race_status_histogram": "201:3|409:3",
+        "n_409": 3,
+        "n_429": 0,
+        "invoke_after": 200
+      },
+      "durationMs": 60691
+    },
+    {
+      "id": "EF05d",
+      "title": "delete while a deploy of the same slug is in flight",
+      "status": "info",
+      "detail": "deploy 201, delete 200; afterwards GET 200, status=ACTIVE, invoke 200",
+      "measurements": {
+        "deploy_status": 201,
+        "delete_status": 200,
+        "present_after": 1,
+        "fn_status_after": "ACTIVE",
+        "invoke_after": 200
+      },
+      "durationMs": 60691
+    },
+    {
+      "id": "EF05z",
+      "title": "cleanup: delete pvlab-ef05-* functions",
+      "status": "pass",
+      "detail": "deleted 21",
+      "measurements": {
+        "deleted": 21,
+        "left": 0
+      },
+      "durationMs": 60691
+    },
+    {
+      "id": "EF06a",
+      "title": "GET returning text/html is rewritten to text/plain on the project hostname",
+      "status": "pass",
+      "detail": "GET -> 200 text/plain; POST -> 200 text/html; charset=utf-8",
+      "measurements": {
+        "deploy_status": 201,
+        "get_status": 200,
+        "get_content_type": "text/plain",
+        "post_status": 200,
+        "post_content_type": "text/html; charset=utf-8",
+        "rewritten_to_plain": 1
+      },
+      "durationMs": 39351
+    },
+    {
+      "id": "EF06b",
+      "title": "outbound ports 25 and 587 blocked, 443 open",
+      "status": "fail",
+      "detail": "443 ok; 25 blocked \"Error: pvlab-timeout-8000ms\"; 587 OPEN; 465 (undocumented) open",
+      "measurements": {
+        "deploy_status": 201,
+        "port_443_ok": 1,
+        "port_25_ok": 0,
+        "port_25_error": "Error: pvlab-timeout-8000ms",
+        "port_25_ms": 8003,
+        "port_587_ok": 1,
+        "port_587_error": "none",
+        "port_587_ms": 4,
+        "port_465_ok": 1,
+        "port_465_error": "none"
+      },
+      "durationMs": 39351
+    },
+    {
+      "id": "EF06c",
+      "title": "Web Worker and node:vm unavailable",
+      "status": "pass",
+      "detail": "typeof Worker=undefined, construct=ReferenceError: Worker is not defined; vm import=NotCapable: Requires run access, run again with the --allow-run flag",
+      "measurements": {
+        "deploy_status": 201,
+        "invoke_status": 200,
+        "worker_typeof": "undefined",
+        "worker_construct": "ReferenceError: Worker is not defined",
+        "vm_import": "NotCapable: Requires run access, run again with the --allow-run flag",
+        "vm_run": "n/a",
+        "worker_unavailable": 1,
+        "vm_unavailable": 1
+      },
+      "durationMs": 39351
+    },
+    {
+      "id": "EF06d",
+      "title": "static file deployed through the API path (docs: cannot)",
+      "status": "pass",
+      "detail": "deploy 201 but the read fails at runtime: 500 \"NotFound: path not found: /var/tmp/sb-compile-edge-runtime/source/static/hello.txt: readfile '/var/tmp/sb-compile-edge-runtime/source/static/hello.txt': path not found: /var/tmp/sb-compile-edge-runtime/source/static/hello.txt: readfile '/var/tmp/sb-compile-edge-runtime/source/static/hello.txt': path\" - the deploy reports success and the asset is missing",
+      "measurements": {
+        "deploy_status": 201,
+        "deploy_error": "none",
+        "invoke_status": 500,
+        "file_readable": 0,
+        "runtime_error": "NotFound: path not found: /var/tmp/sb-compile-edge-runtime/source/static/hello.txt: readfile '/var/tmp/sb-compile-edge-runtime/source/static/hello.txt': path no"
+      },
+      "durationMs": 39351
+    },
+    {
+      "id": "EF06d2",
+      "title": "static file via CLI local bundling (the documented working path)",
+      "status": "fail",
+      "detail": "exit 0 but runtime read 500: \"NotFound: path not found: /var/tmp/sb-compile-edge-runtime/pvlab-ef06-static-cli/static/hello.txt: readfile '/var/tmp/sb-compile-edge-runtime/pvlab-ef06-static-cli/static/hello.txt': path not found: /var/tmp/sb-compile-edge-runtime/pvlab-ef06-static-cli/static/hello.txt: readfile '/var/tmp/sb-compil\"",
+      "measurements": {
+        "cli_version": "2.116.0",
+        "exit_code": 0,
+        "invoke_status": 500,
+        "file_readable": 0,
+        "error": "NotFound: path not found: /var/tmp/sb-compile-edge-runtime/pvlab-ef06-static-cli/static/hello.txt: readfile '/var/tmp/sb-compile-edge-runtime/pvlab-ef06-static-"
+      },
+      "evidence": "supabase functions deploy pvlab-ef06-static-cli --project-ref <ref> --workdir <workdir> --no-verify-jwt --output-format json\nBundling Function: pvlab-ef06-static-cli\nDeploying Function: pvlab-ef06-static-cli (script size: 654 B)\n",
+      "durationMs": 39351
+    },
+    {
+      "id": "EF06e",
+      "title": "npm:sharp (requires multithreading; docs: not supported)",
+      "status": "pass",
+      "detail": "deploy 201, invoke 500: \"\" - fails at run time",
+      "measurements": {
+        "deploy_status": 201,
+        "deploy_ms": 6255,
+        "deploy_error": "none",
+        "invoke_status": 500,
+        "works": 0,
+        "runtime_error": "none"
+      },
+      "durationMs": 39351
+    },
+    {
+      "id": "EF06z",
+      "title": "cleanup: delete pvlab-ef06-* functions",
+      "status": "pass",
+      "detail": "deleted 6",
+      "measurements": {
+        "deleted": 6,
+        "left": 0
+      },
+      "durationMs": 39351
+    },
+    {
+      "id": "EF07a",
+      "title": "CPU time: 2000 ms per request",
+      "status": "pass",
+      "detail": "500 ms -> 200; 3000 ms -> 546 {\"code\":\"WORKER_RESOURCE_LIMIT\",\"message\":\"Function failed due to not having enough compute resources (please check logs)\"}",
+      "measurements": {
+        "docs_cpu_ms": 2000,
+        "control_status": 200,
+        "control_ms": 1484,
+        "over_status": 546,
+        "over_ms": 3960,
+        "over_body": "{\"code\":\"WORKER_RESOURCE_LIMIT\",\"message\":\"Function failed due to not having enough compute resources (please check logs"
+      },
+      "durationMs": 8798
+    },
+    {
+      "id": "EF07b",
+      "title": "memory: 256 MB",
+      "status": "pass",
+      "detail": "64 MB -> 200; 400 MB -> 546 {\"code\":\"WORKER_RESOURCE_LIMIT\",\"message\":\"Function failed due to not having enough compute resources (please check logs)\"}",
+      "measurements": {
+        "docs_memory_mb": 256,
+        "control_status": 200,
+        "control_ms": 90,
+        "over_status": 546,
+        "over_ms": 144,
+        "over_body": "{\"code\":\"WORKER_RESOURCE_LIMIT\",\"message\":\"Function failed due to not having enough compute resources (please check logs"
+      },
+      "durationMs": 8798
+    },
+    {
+      "id": "EF07c",
+      "title": "wall clock and idle timeout",
+      "status": "info",
+      "detail": "not re-measured here - edge-resilience W13 measured the 150 s idle timeout (504 IDLE_TIMEOUT); docs: wall clock 150 s free / 400 s paid, recursive calls ~5000/min",
+      "measurements": {
+        "docs_idle_timeout_s": 150,
+        "docs_wall_clock_free_s": 150,
+        "docs_wall_clock_paid_s": 400,
+        "docs_recursive_per_minute": 5000,
+        "measured_in": "edge-resilience/W13"
+      },
+      "durationMs": 8798
+    },
+    {
+      "id": "EF07z",
+      "title": "cleanup: delete pvlab-ef07-* functions",
+      "status": "pass",
+      "detail": "deleted 1",
+      "measurements": {
+        "deleted": 1,
+        "left": 0
+      },
+      "durationMs": 8798
+    }
+  ]
+}

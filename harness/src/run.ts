@@ -6,6 +6,7 @@
  *   pvlab --tests ./tests --where runner --out ./out
  *   pvlab --tests ./tests --where local --only T20 --destructive
  *   pvlab --diff evidence/a/run-1.json,evidence/b/run-2.json --out evidence/diff
+ *   pvlab --facts evidence/a/run-1.json --only EF08,EF09   # measurements as markdown
  */
 import { $ } from "bun";
 import { readdir } from "node:fs/promises";
@@ -13,6 +14,7 @@ import { resolve } from "node:path";
 import { buildCtx, toolVersions } from "./ctx";
 import { planRun } from "./plan";
 import { diffArtifacts, renderDiffMarkdown } from "./diff";
+import { renderFacts } from "./facts";
 import { renderMarkdown } from "./report";
 import type { RunArtifact, TestModule, TestResult, Where } from "./types";
 
@@ -111,6 +113,15 @@ const main = async () => {
   const diffArg = arg("diff");
   if (diffArg) {
     await diffMode(diffArg.split(",").map((t) => t.trim()).filter(Boolean), arg("out", "./out")!);
+    return;
+  }
+  // `--facts run.json [--only ids]` - measurements as markdown, to paste into
+  // a RUNLOG or a reference doc instead of retyping. Offline, like --diff.
+  const factsArg = arg("facts");
+  if (factsArg) {
+    const run = JSON.parse(await Bun.file(factsArg).text()) as RunArtifact;
+    const only = arg("only")?.split(",").map((s) => s.trim()).filter(Boolean);
+    console.log(renderFacts(run, { only }));
     return;
   }
   const where = (arg("where", "runner") as Where) ?? "runner";
