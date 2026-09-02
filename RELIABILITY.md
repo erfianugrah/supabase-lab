@@ -209,9 +209,13 @@ ap-southeast-2 -> ap-southeast-1).**
   instances, auth/storage stream nothing (received_lsn null) and initial
   sync hangs at BgworkerStartup. Instance size does not matter
   (max_worker_processes is platform-fixed at 6 across micro and small;
-  connections/buffers do scale). Password hashes are not portable via the
-  admin API. Posture: TPA for existing sessions + SQL hash backfill or
-  forced re-login; storage objects via sync (W10), never replication.
+  connections/buffers do scale). Password hashes ARE portable via the admin
+  API (`POST /auth/v1/admin/users` with `password_hash`; tested with bcrypt
+  hashes only, tenant-consolidation C03, 2026-08-04 - this line used to say
+  the opposite, based on W09's standby run, which never posted a hash).
+  Posture: TPA to keep existing sessions valid, plus a hash backfill (admin
+  API or SQL) for logins; if neither backfill is possible, forced re-login.
+  Storage objects via sync (W10), never replication.
 - Edge functions have a 150s idle-timeout wall (W13): 120s sleep returns
   200, 400s returns 504 IDLE_TIMEOUT. Long jobs need queue+cron or an
   external runner. CPU past 2s and memory past 256MB both answer 546

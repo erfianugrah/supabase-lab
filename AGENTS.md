@@ -248,9 +248,9 @@ tenant keeps its token across a move? See RUNLOG.md.
   synchronous with the API call; both land well inside two seconds.
 - Load-bearing for any "the tenant is now independent" claim: refresh still
   goes to the ISSUING project's `/token` endpoint. The spoke can verify, not
-  mint. Measured outside this repo since - a refresh presented to the trusting
-  project answers `400 refresh_token_not_found` - but there is still no test
-  module for it here, so treat it as reported, not reproducible. Worth a X0n.
+  mint. A refresh presented to the trusting project answers
+  `400 refresh_token_not_found` - measured here by X03 (green 2026-08-17, see
+  the RUNLOG), so it is reproducible, not reported.
 
 ## experiments/tenant-consolidation - key facts (validated 2026-08-04)
 
@@ -455,16 +455,19 @@ Ported from throwaway bash that produced the same findings; see RUNLOG.md.
 - Most results are `info` on purpose. There is no correct value for a price,
   so asserting one manufactures a failure every time the platform legitimately
   changes. Only the three shape claims assert.
-- The entitlements payload is a FLAT LIST keyed by feature
-  (`{entitlements:[{feature:{key,type},hasAccess,config:{value|set|enabled|
-  unlimited}}]}`), and the plan label lives on `GET /organizations/{slug}`
-  (`plan`), not in the entitlements body. F01 originally dug dotted paths into
-  a nested object and had been rendering every row "absent" for an unknown
-  period until edge-function-limits noticed on 2026-09-02; it now looks rows up
-  by feature key and FAILS on an empty list rather than recording eleven
-  absences as facts. A row that reads "absent" means the feature is genuinely
-  not in the list. 64 features were listed on each of a Free, Pro and Team
-  org that day.
+- The entitlements payload is a FLAT LIST keyed by feature -
+  `{ entitlements: [ { feature: { key, type }, hasAccess, config: { value |
+  unlimited | enabled | unit | set } } ] }` (the canonical spelling; the
+  platform-facts RUNLOG 2026-09-02 entry carries the same) - and the plan
+  label lives on `GET /organizations/{slug}` (`plan`), not in the entitlements
+  body. F01 originally dug dotted paths into a nested object and had been
+  rendering every row "absent" for an unknown period until
+  edge-function-limits noticed on 2026-09-02; it now looks up the eleven
+  features it reports by feature key and FAILS on an empty list rather than
+  recording eleven absences as facts. In F01 evidence dated 2026-09-02 or
+  later, a row that reads "absent" means the feature is genuinely not in the
+  list; in earlier evidence every row reads "absent" and means nothing. 64
+  features were listed on each of a Free, Pro and Team org that day.
 - F03's live-token control is not optional. 404 on every scope candidate also
   describes a dead token or an outage; without the control returning 200 in the
   same run, the negative result is a `skip`, not a `pass`.
@@ -989,11 +992,14 @@ RUNLOG has the module table and per-row evidence.
   at maximum.`). The value ceiling counts CHARACTERS (24,576 three-byte chars
   = 73,728 bytes accepted). `GET /secrets` lists seven platform `SUPABASE_*`
   entries once any function exists; they do not count toward the 100.
-- **Silent loss reproduces on a fresh project with NO visible throttle**: 24
-  API deploys 8-wide -> 24x 201, 10 present; 8 concurrent CLI processes -> 8x
-  exit 0, 9/24 present. Not a read-lag artifact (cleanup listing minutes later
-  agreed). Same-slug concurrent deploys answer **409** (3 of 6), versions stay
-  monotonic - 409 is the same-slug signature, distinct from 429.
+- **Silent loss reproduces on a fresh project with no 429 on any deploy
+  response**: 24 API deploys 8-wide -> 24x 201, 10 present; 8 concurrent CLI
+  processes x 3 functions each -> 8x exit 0, 9/24 functions present, no 429
+  text in any process output. Whether the follow-up GET/DELETE calls were
+  throttled is not recorded (the helpers retry through 429 silently). Not a
+  read-lag artifact (cleanup listing minutes later agreed). Same-slug
+  concurrent deploys answer **409** (3 of 6), versions stay monotonic - 409 is
+  the same-slug signature, distinct from 429.
 - **Restrictions**: HTML->text/plain is GET-only (POST keeps text/html). Port
   25 hangs (timeout), **587 was reachable** on two runs (TCP connect), 465
   open. Worker undefined; node:vm import `NotCapable`. Static files via the
@@ -1001,20 +1007,73 @@ RUNLOG has the module table and per-row evidence.
   function 500s); via CLI local bundling with `static_files` they work - paths
   are relative to `supabase/` (`./functions/<name>/...`), and a wrong glob
   ships a 654 B bundle silently. `npm:sharp` bundles (201) and 500s at run time.
-- **Runtime ceilings**: CPU >2 s and memory >256 MB both answer `546
-  WORKER_RESOURCE_LIMIT` with identical bodies - indistinguishable from the
-  response. Wall clock/idle: edge-resilience W13.
+- **Runtime ceilings**: a 3 s CPU loop and a 400 MB allocation both answer
+  `546 WORKER_RESOURCE_LIMIT` with identical bodies (500 ms and 64 MB pass;
+  the docs place the limits at 2 s and 256 MB, not measured to the edge) -
+  indistinguishable from the response. Wall clock/idle: edge-resilience W13.
 - Harness rules here: a deploy is never "done" on status/exit code -
   `lib/ef.ts` `landed()` reads GET afterwards and size acceptances are proven by
   invoking. Big sources are random base64 (a repeated character measures the
   compressor). `lib/triage.ts` is the triage order (error string, parallelism,
   landing) as a pure function, unit tested on the verbatim strings above.
-  Entitlements are a FLAT list `{entitlements:[{feature:{key},config}]}`;
-  platform-facts F01 was rewritten to it the same day.
-- CLI 2.116.0 accepts hidden `--use-docker` alongside `--use-api`, deploys
-  without a `config.toml` given `--project-ref` + `--workdir`, and bundles
-  locally by default when Docker is present.
+  Entitlements are a FLAT list keyed by feature (canonical shape in the
+  platform-facts section above); platform-facts F01 was rewritten to it the
+  same day.
+- CLI 2.116.0 has a hidden `--use-docker` flag in addition to `--use-api`
+  (they select opposite bundling paths; pass one), deploys without a
+  `config.toml` given `--project-ref` + `--workdir`, and bundles locally by
+  default when Docker is present.
 - Run the destructive battery detached; a killed run leaves functions deployed.
+
+## experiments/self-hosted-auth - key facts (validated 2026-09-02, micro, Pro org, GoTrue v2.196.0)
+
+One project plus one local container: a GoTrue you run yourself
+(`supabase/gotrue:v2.196.0`, matching the managed version) pointed at the
+managed project's Postgres through the session pooler. Can it stand in for
+managed Auth? Yes, with two dependencies the platform controls: the legacy
+HS256 signing key must stay `previously_used` (revoking it kills every
+self-hosted token), and the oct JWK must carry no kid or the managed PostgREST
+refuses the tokens. RUNLOG has the per-row record and the three-project
+history.
+
+- **Role**: `supabase_auth_admin` is reserved on the platform (`42501 ... is a
+  reserved role, only superusers can modify it` / `role memberships are
+  reserved`), so the self-hosted GoTrue connects as `postgres`: USAGE on auth,
+  INSERT on users/refresh_tokens/sessions, no CREATE on the schema, no INSERT
+  on `auth.schema_migrations`. The connection URL MUST carry
+  `?search_path=auth` - `postgres` defaults to `"$user", public, extensions`,
+  the migrator then creates an empty `public.schema_migrations`, decides
+  nothing is applied, and dies on `00_init_auth_schema` with `permission
+  denied for schema auth`. With the search_path it reports `migrations applied
+  successfully count=0` (77 platform rows cover all 70 image files).
+- **Trust is real and mutual**: a self-hosted admin-created user shows in the
+  managed admin list; a self-hosted HS256 token (signed with the project's
+  legacy `jwt_secret`, iss mirrored) is accepted by managed `/auth/v1/user`
+  (200) and PostgREST (200, authenticated-only row) because the HS256 key is
+  `previously_used`. Refresh tokens redeem across sides both ways (one
+  `auth.refresh_tokens`). The managed ES256 token is refused by the
+  self-hosted side (`403 bad_jwt`) until `GOTRUE_JWT_KEYS` carries the
+  platform's ES256 public JWK as verify-only - then 200 (`make gotrue-up
+  JWKS=1`).
+- **The kid rule**: in JWKS mode the self-hosted GoTrue stamps its signing
+  key's kid into the header, and the managed PostgREST answers `401 PGRST301`
+  to a self-hosted HS256 token carrying ANY kid - arbitrary or the platform's
+  own HS256 key id - while the managed GoTrue verifies the same token. The oct
+  JWK must carry no kid. Two managed verifiers, two rules.
+- **What the platform can take away**: `PATCH signing-keys/{id} {status:
+  revoked}` on the HS256 signing key -> the self-hosted token is refused by
+  managed `/user` (`403 bad_jwt`) and PostgREST (`401 PGRST301`) within 3 to
+  6 s across three projects (4 s on project 3, the uncontaminated run), AND
+  the legacy `anon` (PostgREST 401) and `service_role` (admin 403) API keys
+  die with it while `sb_publishable_` / `sb_secret_` keep working. The
+  self-hosted signer lives exactly as long as that signing key stays
+  `previously_used`. SH05's cleanup falls back to SQL for that reason.
+- Not settled: TPA registration of the self-hosted issuer (needs a reachable
+  JWKS), pooler behaviour under load, an image ahead of the platform's
+  migration set, making the managed Auth endpoint unreachable (no lever).
+- Ops: three throwaway projects in one afternoon; run SH05 last (irreversible
+  on the project) and destroy after. `make gotrue-up` / `gotrue-up JWKS=1` /
+  `gotrue-down` / `probe IDS=...` / `destroy`.
 
 ## Commands
 
