@@ -1017,17 +1017,21 @@ RUNLOG has the module table and per-row evidence.
 - **Log limits bite exactly (EF08)**: a 12,019-char line stored as 10,000
   chars + ` ....[truncated]`; 150 events in one invocation -> the first 100
   kept. Neither fails the invocation. Read back via the logs endpoint with
-  `source = 'function_logs'` - and that endpoint answers `Backend error! Retry
-  your query.` to ANY query lacking `iso_timestamp_start`/`iso_timestamp_end`
-  (2026-09-02), including the logs guide's own example.
+  `source = 'function_logs'` - and that endpoint answered `Backend error!
+  Retry your query.` to all four queries tried with neither
+  `iso_timestamp_start` nor `iso_timestamp_end` (2026-09-02), the erfi.dev
+  logs-endpoint guide's own SQL example among them.
 - **The recursive cap did not bite (EF10)**: ~110,600 nested calls/min for a
-  minute at concurrency 100 (docs ~5000/min); 27 of ~119,000 answered
+  minute at concurrency 100 (docs ~5000/min); 27 refusals (13 outer, 14
+  inner) across 59,562 chains / ~119,000 nested calls answered
   `429 RATE_LIMIT_EXCEEDED "Too many requests. Re-try the request in 1
   seconds."`, nothing else refused.
-- **Races repeated (EF11)**: delete-during-deploy x10 -> 8 healthy, 2 absent
-  (delete won), every redeploy 201/200, 0 corrupted; same-slug 4-wide x5 ->
-  201:9 | 409:11, versions monotonic, healthy. Still "no signature at this
-  scale", not proof.
+- **Races repeated (EF11)**: delete-during-deploy x10 -> 8 healthy, 2 absent,
+  every redeploy 201/200, 0 corrupted (the 2 absent slugs each had a delete in
+  flight, so 201-then-absent is not counted as the third signature); same-slug
+  4-wide x5 -> 201:9 | 409:11, version read once per round and monotonic (one
+  bump per round even where two of four answered 201), healthy. Still "no
+  signature at this scale"; absence is not proven.
 - Harness rules here: a deploy is never "done" on status/exit code -
   `lib/ef.ts` `landed()` reads GET afterwards and size acceptances are proven by
   invoking. Big sources are random base64 (a repeated character measures the
@@ -1086,14 +1090,17 @@ history.
   self-hosted signer lives exactly as long as that signing key stays
   `previously_used`. SH05's cleanup falls back to SQL for that reason.
 - **Own key removes the dependency (SH06)**: `make gotrue-up OWNKEY=1` signs
-  with a generated ES256 key; the public half published from an Edge Function
-  on the project and registered as third-party auth (`jwks_url`) was accepted
-  by PostgREST 4 s after registration, and the token STILL read 200 after the
-  legacy HS256 key was revoked (with the legacy anon apikey and with
-  `sb_publishable_`). Managed `/auth/v1/user` refuses third-party tokens
-  (`403 bad_jwt`). The gateway matches the `apikey` header by value; PostgREST
-  verifies only the bearer - which is why a revoked anon JWT still works as
-  apikey but not as bearer.
+  with a generated ES256 key; the public half is published from an Edge
+  Function on the project and registered as third-party auth (`jwks_url`); a
+  token signed with that key was accepted by PostgREST 4 s after registration
+  and STILL read 200 from PostgREST after the legacy HS256 key was revoked
+  (with the legacy anon apikey and with `sb_publishable_`). Managed
+  `/auth/v1/user` refuses third-party tokens (`403 bad_jwt`). The anon JWT
+  under the revoked key still passed as apikey in SH06 (probed 10 s after the
+  revoke) but not as bearer in SH05 (within 4 s): either the gateway matches
+  the apikey by value and PostgREST verifies only the bearer, or a gateway
+  cache had not expired yet (L05 measured ~45 s for the legacy-key disable);
+  not separated.
 - Not settled: whether Storage/Realtime verify a third-party token (bucket
   list answers anon too), pooler behaviour under load, an image ahead of the
   platform (no public tag newer than v2.196.0 on 2026-09-02), making the

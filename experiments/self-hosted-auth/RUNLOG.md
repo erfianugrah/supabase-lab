@@ -19,7 +19,7 @@ Nothing about it is a tofu resource; it lives for one probe run.
 | SH03 | destructive | Refresh takeover: each side redeems the other's refresh tokens; reuse detection across sides. |
 | SH04 | destructive | JWKS mode: the self-hosted GoTrue given the platform's ES256 public key as a verify-only JWK verifies managed tokens, while its own tokens stay accepted by both managed verifiers. |
 | SH05 | destructive | Revoke the project's legacy HS256 key: time to rejection of a self-hosted token on managed Auth and PostgREST, and the collateral on the legacy API keys. Irreversible on the project. |
-| SH06 | destructive | The self-hosted GoTrue signing with its OWN ES256 key (`make gotrue-up OWNKEY=1`): public half published from an Edge Function, registered as third-party auth, accepted by PostgREST; then the legacy HS256 key is revoked and the own-key token is re-tested. Irreversible; run alone on a fresh project. |
+| SH06 | destructive | The self-hosted GoTrue signing with its OWN ES256 key (`make gotrue-up OWNKEY=1`): public half published from an Edge Function, registered as third-party auth, the resulting token accepted by PostgREST; then the legacy HS256 key is revoked and the own-key token is re-tested. Irreversible; run alone on a fresh project. |
 
 `make unit` covers the token-shape and error-code helpers.
 
@@ -155,14 +155,16 @@ The dependency SH05 exposed is removable. `make gotrue-up OWNKEY=1` generates
 an ES256 pair (`lib/keygen.ts`, into gitignored `evidence/ownkey/`) and starts
 GoTrue with `GOTRUE_JWT_KEYS` = [own private key, sign+verify; the managed
 ES256 public key, verify; the legacy HS256 secret as an `oct` verify-only key
-so the legacy `service_role` bearer still works for admin calls]. The
+so the legacy `service_role` bearer still works for admin calls to the
+self-hosted GoTrue]. The
 container is local, so the public half is published from an Edge Function ON
 THE PROJECT (`pvlab-sh06-jwks`, verify_jwt false) and that URL is registered
 as third-party auth with the `jwks_url` shape.
 
 - Registration -> 201, `type custom`, `resolved_at` set on the create
   response.
-- Self-hosted password grant -> ES256 with the own kid, iss mirrored.
+- Self-hosted password grant -> ES256 with the own kid, iss set to the managed
+  issuer URL.
 - That token -> managed PostgREST **200, 1 row, 4 s after the registration**
   (a first-time issuer kid; edge-resilience W01/W05 had measured ~30 s cold
   for a lab issuer - this one resolved faster, n=1). Managed `/auth/v1/user`
@@ -172,16 +174,19 @@ as third-party auth with the `jwks_url` shape.
   bearer 200. The bucket list answers anon, so this probe does not
   discriminate; whether Storage VERIFIES a third-party token is still open
   (a private-object read with RLS keyed on the claim would decide it).
-- **Revoke the legacy HS256 key -> the own-key token still reads 200**, both
-  with the legacy anon key in the `apikey` header and with the
-  `sb_publishable_` key. The legacy anon JWT in the apikey header passed 10 s
-  after the revoke: the gateway matches the apikey by value and PostgREST
-  verifies only the bearer, which is why SH05's anon probe (anon as BEARER)
-  failed and this one did not. A fresh self-hosted grant still mints.
-- Cleanup: the legacy `service_role` admin call was 403 after the revoke
-  (as in SH05); the user was deleted via SQL.
+- **Revoke the legacy HS256 key -> the own-key token still reads 200 from
+  PostgREST**, both with the legacy anon key in the `apikey` header and with
+  the `sb_publishable_` key. The legacy anon JWT was still accepted in the
+  apikey header when probed 10 s after the revoke, while as a BEARER it had
+  failed within 4 s in SH05. One reading: the API gateway in front of
+  PostgREST matches the apikey by value and PostgREST verifies only the
+  bearer. The other: a gateway cache that had not yet expired (the legacy-key
+  disable took ~45 s to propagate in iap-lockdown L05). A later probe was not
+  run, so the two are not separated. A fresh self-hosted grant still mints.
+- Cleanup: the legacy `service_role` call to the MANAGED admin API was 403
+  after the revoke (as in SH05); the user was deleted via SQL.
 
-So a self-hosted GoTrue can be an issuer the platform trusts on a key you
+So a self-hosted GoTrue can be an issuer the Data API trusts on a key you
 own, independent of the legacy secret, as long as its JWKS is reachable from
 the platform. The Edge Function is a convenient place to publish it because it
 lives on the project's own hostname.
