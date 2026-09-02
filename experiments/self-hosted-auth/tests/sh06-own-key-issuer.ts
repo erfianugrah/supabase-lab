@@ -15,7 +15,7 @@
  *          kid took ~30 s in edge-resilience W01/W05) and managed /auth/v1/user
  *   SH06e  the same token against Storage (`GET /storage/v1/bucket`) - whether
  *          a third-party token is honoured outside the Data API was an open
- *          question in the corpus
+ *          question in the erfi.dev auth reference
  *   SH06f  revoke the legacy HS256 signing key; the own-key token against
  *          PostgREST with the legacy anon apikey and with the sb_publishable
  *          key - independence from the legacy secret, or not
