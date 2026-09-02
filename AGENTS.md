@@ -38,7 +38,9 @@ platform behaviour or writing it into docs
   two-project experiment did it, but it puts the run's shape outside the
   context object whose whole job is to describe it, and the second and third
   experiments would each have invented their own variable name. Same for
-  `ctx.orgSlugs` (`PVLAB_ORG_SLUGS`). Both gate capabilities (`peer`, `org`),
+  `ctx.orgSlugs` (`PVLAB_ORG_SLUGS`) and, since 2026-09-02, `ctx.orgs` keyed by
+  role from `PVLAB_ORG_<ROLE>` (`pro`, `team`, `free`) for modules that need a
+  specific plan's org rather than "every org supplied". Both gate capabilities (`peer`, `org`),
   so a missing ref is a skip with a reason rather than a probe against an
   empty string. An env var set to empty counts as absent - a Makefile
   interpolating a missing tofu output exports exactly that.
@@ -1125,9 +1127,11 @@ assumes prose quotes by paste.
   redacts refs, project and pooler hostnames and emails and writes the artifact
   plus its facts.md to `out/<date>/`, which IS committed (`.gitignore` carves
   dated `experiments/*/out/20*/` directories out of `**/out/`; raw artifacts
-  at an `out/` root stay ignored - edge-resilience has 28 such files with refs
-  and an email in them, untouched). RUNLOGs and the docs site cite `out/`;
-  `evidence/` stays private.
+  at an `out/` root stay ignored). edge-resilience's 14 raw runs from
+  2026-08-16/17 were published this way on 2026-09-02 (redacted JSON, facts
+  and report per run under `out/2026-08-16/` and `out/2026-08-17/`; the raw
+  originals moved to the ignored `evidence/raw-out/`). RUNLOGs and the docs
+  site cite `out/`; `evidence/` stays private.
 - `bun harness/scripts/check-doc-numbers.ts <doc> <run.json> ...` lists every
   number on a measured line of a doc that appears in none of the artifacts -
   the reviewer's hand check as a command. Judge each hit: a documented figure
@@ -1137,9 +1141,12 @@ assumes prose quotes by paste.
   for emails, so a ref nobody listed still fails `bun test harness`. Its first
   run (2026-09-02) found two project refs and the Pro org slug in three tracked
   files from August (two RUNLOGs, one plan doc), all redacted the same day; the
-  hand-run sweeps had missed them for a month. Org slugs hardcoded in test
-  SOURCE (compute-disk, instance-sizing, byo-oauth, edge-resilience W21) are
-  not scanned; moving them to `PVLAB_ORG_SLUGS` is open.
+  hand-run sweeps had missed them for a month. The eighteen modules that
+  carried org slugs as constants in test SOURCE (compute-disk, instance-sizing,
+  byo-oauth, usage-metering, residency-facts R02, edge-resilience W21) now read
+  `ctx.orgs.pro|team|free`, populated from `PVLAB_ORG_PRO|TEAM|FREE`, and skip
+  with a reason when the role is absent; the local `.pi/probe-*.sh` scripts
+  export the three roles.
 - `harness/src/platform.ts` holds the helpers every experiment rewrote: `sql`
   (the query endpoint answers 201), `fetchKeys` (both key generations),
   `logsQuery` (the logs endpoint needs both time-window parameters),

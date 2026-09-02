@@ -71,6 +71,21 @@ export function readEndpoints(env: Record<string, string | undefined>): Record<s
 }
 
 /**
+ * `PVLAB_ORG_PRO=slug` -> `{ pro: "slug" }`. Roles are experiment-defined
+ * (`pro`, `team`, `free` today). `PVLAB_ORG_SLUGS` is the older comma list and
+ * is excluded here; it stays for modules that iterate every supplied org.
+ */
+export function readOrgs(env: Record<string, string | undefined>): Record<string, string> {
+  const orgs: Record<string, string> = {};
+  for (const [k, v] of Object.entries(env)) {
+    if (k === "PVLAB_ORG_SLUGS") continue;
+    const m = k.match(/^PVLAB_ORG_([A-Z0-9_]+)$/);
+    if (m?.[1] && v) orgs[m[1].toLowerCase()] = v;
+  }
+  return orgs;
+}
+
+/**
  * On the runner, /etc/pvlab/env carries the facts written at provisioning time.
  * Locally they come from flags/env. Either way the shape is identical.
  */
@@ -163,6 +178,7 @@ export async function buildCtx(input: CtxInput): Promise<Ctx> {
     (process.env.PVLAB_ORG_SLUGS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
 
   const endpoints = input.endpoints ?? readEndpoints(process.env);
+  const orgs = readOrgs(process.env);
 
   const capabilities = deriveCapabilities({
     dbPassword,
@@ -191,6 +207,7 @@ export async function buildCtx(input: CtxInput): Promise<Ctx> {
     endpointIps,
     peers,
     orgSlugs,
+    orgs,
     endpoints,
     capabilities,
     mgmtBase: input.mgmtBase ?? process.env.SUPABASE_MGMT_BASE_URL,

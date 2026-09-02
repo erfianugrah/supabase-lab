@@ -71,6 +71,15 @@ export interface Ctx {
   /** Organization slugs under test, from `PVLAB_ORG_SLUGS` (comma-separated). */
   orgSlugs: string[];
   /**
+   * Organizations by ROLE - `pro`, `team`, `free` - from `PVLAB_ORG_<ROLE>`.
+   * Self-provisioning modules that need "a Pro org" or "the Free org" read
+   * `ctx.orgs.pro` and skip with a reason when it is absent. Until 2026-09-02
+   * eighteen modules carried the slugs as constants in source; a public repo
+   * is the wrong place for an account identifier, and the identifiers test
+   * scans prose for exactly that shape.
+   */
+  orgs: Record<string, string>;
+  /**
    * Probe targets for this run, by role - `pooler`, `custom_domain`, `replica`.
    * Populated from `PVLAB_ENDPOINT_<NAME>`, lowercased. Same reasoning as
    * `peers`: a test that reads process.env directly puts the run's shape
