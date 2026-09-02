@@ -1,0 +1,217 @@
+{
+  "startedAt": "2026-08-25T09:28:47.193Z",
+  "finishedAt": "2026-08-25T10:08:03.384Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "key-rotation",
+  "labCommit": "3b5a109",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "OpenSSL 3.6.3 9 Jun 2026 (Library: OpenSSL 3.6.3 9 Jun 2026)"
+  },
+  "results": [
+    {
+      "id": "R01a",
+      "title": "Initial signing keys",
+      "status": "pass",
+      "detail": "3 key(s): 29da225d-74b8-4caa-ba64-b336e318a604(previously_used), 22885864-ca30-491c-8df2-3810d787773f(in_use), e7a42030-0a96-41e1-b6ec-4d0400610000(standby)",
+      "measurements": {
+        "initial_count": 3
+      },
+      "durationMs": 1031
+    },
+    {
+      "id": "R01b",
+      "title": "First create attempt - rate limited",
+      "status": "fail",
+      "detail": "unexpected: HTTP 422 \"The project \"<ref>\" already has a signing key in standby \"e7a42030-0a96-41e1-b6ec-4d0400610000\". Please change its status to in_use or previously_used to create a new signing key in standby status.\"",
+      "measurements": {
+        "http_status": 422,
+        "has_deadline": "false"
+      },
+      "evidence": "{\"message\":\"The project \\\"<ref>\\\" already has a signing key in standby \\\"e7a42030-0a96-41e1-b6ec-4d0400610000\\\". Please change its status to in_use or previously_used to create a new signing key in standby status.\"}",
+      "durationMs": 1032
+    },
+    {
+      "id": "R01c",
+      "title": "Standby key after first attempt",
+      "status": "info",
+      "detail": "key e7a42030-0a96-41e1-b6ec-4d0400610000 created without rate limiting",
+      "measurements": {
+        "standby_exists": "true",
+        "key_count": 3
+      },
+      "durationMs": 1032
+    },
+    {
+      "id": "R02a",
+      "title": "Spoke trusts the hub issuer",
+      "status": "pass",
+      "detail": "create HTTP 201, id=ff08611f-b00",
+      "measurements": {
+        "status": 201
+      },
+      "evidence": "{\"id\":\"ff08611f-b008-4f8d-81e4-d9ba4358088f\",\"type\":\"custom\",\"oidc_issuer_url\":\"https://<ref>.supabase.co/auth/v1\",\"jwks_url\":null,\"custom_jwks\":null,\"resolved_jwks\":{\"keys\":[{\"x\":\"dqUmNB6fVclGoVDIB3IB_nXPeD6QqkT7Urm5k1qCqfQ\",\"y\":\"0ZXEbaKr4KdIcJfDjQHq7tQ8KfICGTL0JMZBg_qTjGs\",\"alg\":\"ES",
+      "durationMs": 1448312
+    },
+    {
+      "id": "R02b",
+      "title": "Pre-rotation key state",
+      "status": "info",
+      "detail": "active=22885864-ca30-491c-8df2-3810d787773f, standby=e7a42030-0a96-41e1-b6ec-4d0400610000",
+      "measurements": {
+        "old_kid": "22885864-ca30-491c-8df2-3810d787773f",
+        "standby_kid": "e7a42030-0a96-41e1-b6ec-4d0400610000",
+        "active_matches_old": "true"
+      },
+      "durationMs": 1448312
+    },
+    {
+      "id": "R02c",
+      "title": "Standby key promoted to active",
+      "status": "pass",
+      "detail": "promote HTTP 200: standby=e7a42030-0a96-41e1-b6ec-4d0400610000",
+      "measurements": {
+        "status": 200
+      },
+      "durationMs": 1448312
+    },
+    {
+      "id": "R02d",
+      "title": "Hub JWKS includes the new kid after rotation",
+      "status": "pass",
+      "detail": "new kid e7a42030-0a96-41e1-b6ec-4d0400610000 in JWKS after 241182ms; kids=[22885864-ca30-491c-8df2-3810d787773f, e7a42030-0a96-41e1-b6ec-4d0400610000]",
+      "measurements": {
+        "propagation_ms": 241182,
+        "jwks_kid_count": 2,
+        "new_kid_published": "true"
+      },
+      "durationMs": 1448312
+    },
+    {
+      "id": "R02e",
+      "title": "Token signatures after rotation",
+      "status": "pass",
+      "detail": "old token kid=22885864-ca30-491c-8df2-3810d787773f, new token kid=e7a42030-0a96-41e1-b6ec-4d0400610000, standby kid=e7a42030-0a96-41e1-b6ec-4d0400610000",
+      "measurements": {
+        "new_token_signed_by_standby": "true",
+        "old_token_signed_by_active": "true"
+      },
+      "durationMs": 1448312
+    },
+    {
+      "id": "R02f",
+      "title": "Spoke never re-resolves: cached kid set constant throughout the window",
+      "status": "pass",
+      "detail": "116 probes over 20min, cached kids stayed [22885864-ca30-491c-8df2-3810d787773f]",
+      "measurements": {
+        "probe_count": 116,
+        "cached_kids_constant": "true",
+        "initial_cached_count": 1,
+        "initial_cached_first": "22885864-ca30-491c-8df2-3810d787773f"
+      },
+      "durationMs": 1448312
+    },
+    {
+      "id": "R02g",
+      "title": "Old token (signed by previously_used key) still accepted by the spoke",
+      "status": "fail",
+      "detail": "refused at some point: codes [HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401]",
+      "measurements": {
+        "probe_count": 116,
+        "old_token_accepted": "false",
+        "old_key_status_final": "previously_used"
+      },
+      "durationMs": 1448312
+    },
+    {
+      "id": "R02h",
+      "title": "New token (signed by new key) refused by the spoke with PGRST301",
+      "status": "fail",
+      "detail": "not PGRST301 at some point: codes [HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401, HTTP_401]",
+      "measurements": {
+        "probe_count": 116,
+        "new_token_refused": "false",
+        "new_key_status_final": "in_use"
+      },
+      "durationMs": 1448312
+    },
+    {
+      "id": "R02i",
+      "title": "Hub JWKS includes the new kid throughout the probe window",
+      "status": "pass",
+      "detail": "kid e7a42030-0a96-41e1-b6ec-4d0400610000 in hub JWKS at all 116 probe points",
+      "measurements": {
+        "hub_has_standby_kid": "true"
+      },
+      "durationMs": 1448312
+    },
+    {
+      "id": "R03a",
+      "title": "Initial key state",
+      "status": "info",
+      "detail": "29da225d-74b(previously_used), 22885864-ca3(previously_used), e7a42030-0a9(in_use)",
+      "measurements": {
+        "total_keys": 3
+      },
+      "durationMs": 906938
+    },
+    {
+      "id": "R03b",
+      "title": "Token minted with the to-be-revoked key",
+      "status": "pass",
+      "detail": "token kid=e7a42030-0a96-41e1-b6ec-4d0400610000, active kid=e7a42030-0a96-41e1-b6ec-4d0400610000",
+      "measurements": {
+        "token_matches_active": "true"
+      },
+      "durationMs": 906938
+    },
+    {
+      "id": "R03c",
+      "title": "Standby key created immediately",
+      "status": "pass",
+      "detail": "create HTTP 201",
+      "measurements": {
+        "status": 201
+      },
+      "durationMs": 906938
+    },
+    {
+      "id": "R03d",
+      "title": "Standby promoted to active",
+      "status": "pass",
+      "detail": "promote HTTP 200: standby=fbc65dae-f43",
+      "measurements": {
+        "status": 200
+      },
+      "durationMs": 906938
+    },
+    {
+      "id": "R03e",
+      "title": "Old key revoked",
+      "status": "pass",
+      "detail": "revoke HTTP 200: kid=e7a42030-0a9",
+      "measurements": {
+        "status": 200
+      },
+      "durationMs": 906938
+    },
+    {
+      "id": "R03f",
+      "title": "Key confirmed revoked at every probe, yet the token keeps working",
+      "status": "fail",
+      "detail": "87 probes: key_status=revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked,revoked, http_status=401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401,401, cached_kids always [22885864-ca30-491c-8df2-3810d787773f]",
+      "measurements": {
+        "probe_count": 87,
+        "revoked_at_every_probe": "true",
+        "token_accepted": "false",
+        "final_key_status": "revoked"
+      },
+      "evidence": "{\"pgrst_code\":\"\",\"http_status\":401,\"cached_kids\":[\"22885864-ca30-491c-8df2-3810d787773f\"],\"hub_jwks_kids\":[\"22885864-ca30-491c-8df2-3810d787773f\",\"e7a42030-0a96-41e1-b6ec-4d0400610000\"],\"old_key_status\":\"revoked\"}",
+      "durationMs": 906938
+    }
+  ]
+}

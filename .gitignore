@@ -45,6 +45,16 @@ harness/out/
 
 # run artifacts (like evidence/) - never commit
 **/out/
+# ...except the REDACTED, published copies an experiment writes with
+# `bun harness/scripts/publish-evidence.ts` into a DATED subdirectory - refs,
+# hostnames and emails replaced; these are what RUNLOGs and the docs site
+# cite. Raw artifacts dropped at out/ root stay ignored. Git cannot re-include
+# a path under an excluded directory, so the out/ directory itself is
+# re-included first, its direct children ignored again, then the dated
+# subdirectories re-included.
+!experiments/*/out/
+experiments/*/out/*
+!experiments/*/out/20*/
 
 # wrangler dev local state (miniflare cache, sqlite, trace store) - regenerable
 **/.wrangler/
