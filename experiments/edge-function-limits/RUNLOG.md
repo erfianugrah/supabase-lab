@@ -184,14 +184,22 @@ and destroyed the same afternoon.
   error on the response stream) rather than an HTTP error, because the headers
   had long since been sent. So the cut fell within one 5 s tick of the
   documented 400 s paid figure (the module's pass band is 15 s). W13's 504
-  IDLE_TIMEOUT at 150 s is the idle rule; this is the active one.
+  IDLE_TIMEOUT at 150 s is the idle rule; this is the active one. The docs
+  define the figure as how long a WORKER stays active, and this was one
+  request on a fresh worker; a warm worker serving several requests shares the
+  400 s, so a request that starts late in that life is cut sooner into itself.
+  That shared case was not run.
 
 ### The recursive-call cap (EF10) - did not bite at 22x the documented figure
 
 - Control: one depth-2 chain (three invocations, two nested) answered 200 in
   2,794 ms.
-- One minute at concurrency 100, depth 2: **59,562 chains in 65 s, about
-  110,600 nested calls per minute** against a documented cap of ~5000. Outer
+- One minute at concurrency 100, depth 2: **59,562 chains in 64.6 s (65 in
+  the rounded summary), 110,607 nested calls per minute as recorded** against
+  a documented cap of ~5000. The 27 refusals below are 0.02 per cent of the
+  119,124 nested calls; a cap of 5,000 per minute would have refused most of
+  the run. Whether such a cap would count per chain or per project this run
+  cannot separate. Outer
   statuses 200:59549 | 429:13; inner 200:59535 | 429:14 | unparsed:13. The
   only refusal seen, 27 times (13 outer, 14 inner) across 59,562 chains,
   about 119,000 nested calls and about 178,700 invocations in all, was
