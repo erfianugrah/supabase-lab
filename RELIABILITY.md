@@ -214,7 +214,10 @@ ap-southeast-2 -> ap-southeast-1).**
   forced re-login; storage objects via sync (W10), never replication.
 - Edge functions have a 150s idle-timeout wall (W13): 120s sleep returns
   200, 400s returns 504 IDLE_TIMEOUT. Long jobs need queue+cron or an
-  external runner.
+  external runner. CPU past 2s and memory past 256MB both answer 546
+  WORKER_RESOURCE_LIMIT with identical bodies (edge-function-limits EF07,
+  2026-09-02). The deploy-time ceilings and the deploys that report success
+  without landing are in experiments/edge-function-limits/RUNLOG.md.
 - Realtime delivery wedges when a subscribed table is dropped and
   recreated (W12): the new OID never delivers under the old name. Stable
   tables under subscription; also retry joins under load.
