@@ -11,7 +11,7 @@
 import type { Ctx, TestModule, TestResult } from "../../../harness/src/types.js";
 import { mgmt } from "../../../harness/src/mgmt.js";
 
-const PRO_ORG = "gfqyoavfwjduavsvhbni";
+let PRO_ORG = ""; // from PVLAB_ORG_PRO via ctx.orgs.pro; set in run()
 const REGION = "ap-southeast-1";
 const WATCHED = ["max_connections", "max_wal_senders", "max_replication_slots", "shared_buffers"];
 
@@ -64,6 +64,8 @@ const mod: TestModule = {
   requires: ["pat"],
   destructive: true, // provisions its own project and resizes it
   async run(ctx: Ctx): Promise<TestResult[]> {
+    PRO_ORG = ctx.orgs.pro ?? "";
+    if (!PRO_ORG) return [{ id: "D01", title: this.title, status: "skip", detail: "PVLAB_ORG_PRO not set" }];
     let ref = "";
     const results: TestResult[] = [];
     try {

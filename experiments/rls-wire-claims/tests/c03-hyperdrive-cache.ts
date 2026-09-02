@@ -31,7 +31,7 @@ import { mgmt } from "../../../harness/src/mgmt.js";
 
 const run = promisify(execFile);
 
-const ORG = "gfqyoavfwjduavsvhbni";
+let ORG = ""; // from PVLAB_ORG_PRO via ctx.orgs.pro; set in run()
 const REGION = "ap-southeast-1";
 const USER_A = "11111111-1111-1111-1111-111111111111";
 const USER_B = "22222222-2222-2222-2222-222222222222";
@@ -132,6 +132,8 @@ const mod: TestModule = {
   requires: ["pat"],
   destructive: true,
   async run(ctx: Ctx): Promise<TestResult[]> {
+    ORG = ctx.orgs.pro ?? "";
+    if (!ORG) return [{ id: "C03", title: this.title, status: "skip", detail: "PVLAB_ORG_PRO not set" }];
     // wrangler is authenticated via its own stored Global API Key (see
     // `wrangler whoami`); we only need the account id. CLOUDFLARE_ACCOUNT_ID
     // from env wins; otherwise take the first account wrangler reports.

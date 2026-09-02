@@ -24,7 +24,7 @@
 import type { TestModule, TestResult } from "../../../harness/src/types.js";
 import { mgmt } from "../../../harness/src/mgmt.js";
 
-const PRO_ORG = "gfqyoavfwjduavsvhbni"; // ErfiCorp (Pro plan - spend cap is Pro-only)
+let PRO_ORG = ""; // from PVLAB_ORG_PRO via ctx.orgs.pro; set in run() (Pro plan - spend cap is Pro-only)
 const REGION = "ap-southeast-2";
 const IMAGES = 105; // 100 included origin-image transforms + 5 past the boundary
 const PNG_B64 =
@@ -72,6 +72,8 @@ const mod: TestModule = {
   requires: ["pat"],
   destructive: true,
   async run(ctx): Promise<TestResult> {
+    PRO_ORG = ctx.orgs.pro ?? "";
+    if (!PRO_ORG) return { id: "W21", title: this.title, status: "skip", detail: "PVLAB_ORG_PRO not set" };
     const evidence: string[] = [];
     const measurements: Record<string, number | string> = {};
     let ref = "";

@@ -22,7 +22,7 @@
 import type { Ctx, TestModule, TestResult } from "../../../harness/src/types.js";
 import { mgmt } from "../../../harness/src/mgmt.js";
 
-const FREE_ORG = "vkievkbeejnmbzburjkc"; // the free-plan org
+let FREE_ORG = ""; // from PVLAB_ORG_FREE via ctx.orgs.free; set in run()
 const REGION = "ap-southeast-1";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -65,6 +65,8 @@ const mod: TestModule = {
   requires: ["pat"],
   destructive: true, // provisions/pauses/restores/deletes its own project on a free org
   async run(ctx: Ctx): Promise<TestResult[]> {
+    FREE_ORG = ctx.orgs.free ?? "";
+    if (!FREE_ORG) return [{ id: "I04", title: this.title, status: "skip", detail: "PVLAB_ORG_FREE not set" }];
     const results: TestResult[] = [];
     let ref = "";
     try {

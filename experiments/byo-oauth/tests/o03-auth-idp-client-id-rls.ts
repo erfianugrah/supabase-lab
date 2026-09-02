@@ -28,7 +28,7 @@ import { Buffer } from "node:buffer";
 import type { Ctx, TestModule, TestResult } from "../../../harness/src/types.js";
 import { mgmt } from "../../../harness/src/mgmt.js";
 
-const PRO_ORG = "gfqyoavfwjduavsvhbni"; // same Pro org const as w21/i01/m01
+let PRO_ORG = ""; // from PVLAB_ORG_PRO via ctx.orgs.pro; set in run()
 const REGION = "ap-southeast-1";
 const REDIRECT = "http://localhost:54321/callback";
 
@@ -204,6 +204,8 @@ const mod: TestModule = {
   requires: ["pat"],
   destructive: true, // provisions and deletes its own project
   async run(ctx: Ctx): Promise<TestResult[]> {
+    PRO_ORG = ctx.orgs.pro ?? "";
+    if (!PRO_ORG) return [{ id: "O03", title: this.title, status: "skip", detail: "PVLAB_ORG_PRO not set" }];
     const results: TestResult[] = [];
     let ref = "";
     try {

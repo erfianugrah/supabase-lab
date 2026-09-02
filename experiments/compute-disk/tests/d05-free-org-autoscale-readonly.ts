@@ -11,7 +11,7 @@
 import type { Ctx, TestModule, TestResult } from "../../../harness/src/types.js";
 import { mgmt } from "../../../harness/src/mgmt.js";
 
-const FREE_ORG = "vkievkbeejnmbzburjkc";
+let FREE_ORG = ""; // from PVLAB_ORG_FREE via ctx.orgs.free; set in run()
 const REGION = "ap-southeast-1";
 const BATCH = "insert into public.dfill(line) select md5(random()::text) from generate_series(1, 1000000);";
 const MAX_BATCHES = 200;
@@ -50,6 +50,8 @@ const mod: TestModule = {
   requires: ["pat"],
   destructive: true,
   async run(ctx: Ctx): Promise<TestResult[]> {
+    FREE_ORG = ctx.orgs.free ?? "";
+    if (!FREE_ORG) return [{ id: "D05", title: this.title, status: "skip", detail: "PVLAB_ORG_FREE not set" }];
     let ref = "";
     const results: TestResult[] = [];
     try {

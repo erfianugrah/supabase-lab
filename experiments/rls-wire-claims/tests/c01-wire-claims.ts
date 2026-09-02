@@ -25,7 +25,7 @@ import { mgmt } from "../../../harness/src/mgmt.js";
 
 const run = promisify(execFile);
 
-const ORG = "gfqyoavfwjduavsvhbni";
+let ORG = ""; // from PVLAB_ORG_PRO via ctx.orgs.pro; set in run()
 const REGION = "ap-southeast-1";
 const USER_A = "11111111-1111-1111-1111-111111111111";
 const USER_B = "22222222-2222-2222-2222-222222222222";
@@ -72,6 +72,8 @@ const mod: TestModule = {
   requires: ["pat"],
   destructive: true, // provisions and deletes its own project
   async run(ctx: Ctx): Promise<TestResult[]> {
+    ORG = ctx.orgs.pro ?? "";
+    if (!ORG) return [{ id: "C01", title: this.title, status: "skip", detail: "PVLAB_ORG_PRO not set" }];
     let ref = "";
     try {
       const dbPass = `${crypto.randomUUID()}Aa1!`;

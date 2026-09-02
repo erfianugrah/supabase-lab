@@ -1,0 +1,30 @@
+{
+  "startedAt": "2026-08-17T08:13:34.645Z",
+  "finishedAt": "2026-08-17T08:13:37.386Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "edge-resilience",
+  "labCommit": "f25fdf7",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "OpenSSL 3.6.3 9 Jun 2026 (Library: OpenSSL 3.6.3 9 Jun 2026)"
+  },
+  "results": [
+    {
+      "id": "W17",
+      "title": "auth config parity inventory",
+      "status": "pass",
+      "detail": "auth config parity inventory completed",
+      "measurements": {
+        "baseline_diff": "{\"uri_allow_list\":\"\\\"https://w17.example.com/cb\\\" != \\\"\\\"\",\"jwt_exp\":\"42222 != 3600\",\"rate_limit_otp\":\"77 != 30\",\"custom_oauth_max_providers\":\"32767 != 3\"}",
+        "patch_readback_ms": 232,
+        "post_patch_diff": "{\"uri_allow_list\":\"\\\"https://w17.example.com/cb\\\" != \\\"\\\"\",\"jwt_exp\":\"42222 != 3600\",\"rate_limit_otp\":\"77 != 30\",\"custom_oauth_max_providers\":\"32767 != 3\"}",
+        "restore_success": "true"
+      },
+      "durationMs": 2741
+    }
+  ]
+}

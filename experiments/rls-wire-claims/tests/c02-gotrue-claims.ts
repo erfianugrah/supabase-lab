@@ -22,7 +22,7 @@ import { mgmt } from "../../../harness/src/mgmt.js";
 
 const run = promisify(execFile);
 
-const ORG = "gfqyoavfwjduavsvhbni";
+let ORG = ""; // from PVLAB_ORG_PRO via ctx.orgs.pro; set in run()
 const REGION = "ap-southeast-1";
 const OTHER_UUID = "33333333-3333-3333-3333-333333333333";
 
@@ -53,6 +53,8 @@ const mod: TestModule = {
   requires: ["pat"],
   destructive: true,
   async run(ctx: Ctx): Promise<TestResult[]> {
+    ORG = ctx.orgs.pro ?? "";
+    if (!ORG) return [{ id: "C02", title: this.title, status: "skip", detail: "PVLAB_ORG_PRO not set" }];
     let ref = "";
     try {
       const dbPass = `${crypto.randomUUID()}Aa1!`;

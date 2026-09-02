@@ -11,8 +11,8 @@
 import type { Ctx, TestModule, TestResult } from "../../../harness/src/types.js";
 import { mgmt } from "../../../harness/src/mgmt.js";
 
-const PRO_ORG = "gfqyoavfwjduavsvhbni";
-const TEAM_ORG = "kqiknhvnmyxpyhudlyxh";
+let PRO_ORG = ""; // from PVLAB_ORG_PRO via ctx.orgs.pro; set in run()
+let TEAM_ORG = ""; // from PVLAB_ORG_TEAM via ctx.orgs.team; set in run()
 const REGION = "ap-southeast-1";
 const PROBE_VERBS = ["PUT", "POST", "PATCH"] as const;
 const PROBE_BODY = { growth_percent: 20, min_increment_gb: 2, max_size_gb: 24 };
@@ -37,6 +37,9 @@ const mod: TestModule = {
   requires: ["pat"],
   destructive: true, // provisions projects; any mutation verb that lands is contained
   async run(ctx: Ctx): Promise<TestResult[]> {
+    PRO_ORG = ctx.orgs.pro ?? "";
+    TEAM_ORG = ctx.orgs.team ?? "";
+    if (!PRO_ORG || !TEAM_ORG) return [{ id: "D04", title: this.title, status: "skip", detail: "PVLAB_ORG_PRO and PVLAB_ORG_TEAM not set" }];
     const outcomes: TestResult[] = [];
     for (const [id, org] of [
       ["D04", PRO_ORG],

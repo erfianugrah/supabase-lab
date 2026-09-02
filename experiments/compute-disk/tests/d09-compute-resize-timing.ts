@@ -10,7 +10,7 @@
 import type { Ctx, TestModule, TestResult } from "../../../harness/src/types.js";
 import { mgmt } from "../../../harness/src/mgmt.js";
 
-const PRO_ORG = "gfqyoavfwjduavsvhbni";
+let PRO_ORG = ""; // from PVLAB_ORG_PRO via ctx.orgs.pro; set in run()
 const REGION = "ap-southeast-1";
 const SAMPLE_INTERVAL_MS = 250;
 const MAX_OP_MS = 15 * 60_000;
@@ -115,6 +115,8 @@ const mod: TestModule = {
   requires: ["pat"],
   destructive: true,
   async run(ctx: Ctx): Promise<TestResult[]> {
+    PRO_ORG = ctx.orgs.pro ?? "";
+    if (!PRO_ORG) return [{ id: "D09", title: this.title, status: "skip", detail: "PVLAB_ORG_PRO not set" }];
     let ref = "";
     const results: TestResult[] = [];
     const phases: PhaseStats[] = [];

@@ -14,7 +14,7 @@
 import type { Ctx, TestModule, TestResult } from "../../../harness/src/types";
 import { mgmt } from "../../../harness/src/mgmt";
 
-const TEAM_ORG = "kqiknhvnmyxpyhudlyxh"; // same Team org as d04/secrets.tfvars
+let TEAM_ORG = ""; // from PVLAB_ORG_TEAM via ctx.orgs.team; set in run()
 
 const mod: TestModule = {
   id: "R02",
@@ -23,6 +23,8 @@ const mod: TestModule = {
   requires: ["pat"],
   destructive: true,
   async run(ctx: Ctx): Promise<TestResult> {
+    TEAM_ORG = ctx.orgs.team ?? "";
+    if (!TEAM_ORG) return { id: "R02", title: this.title, status: "skip", detail: "PVLAB_ORG_TEAM not set" };
     const create = await mgmt(ctx, "POST", "/projects", {
       organization_slug: TEAM_ORG,
       name: `r02-smart-reject-${Date.now()}`,

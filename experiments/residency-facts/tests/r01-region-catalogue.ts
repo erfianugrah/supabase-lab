@@ -46,7 +46,9 @@ const mod: TestModule = {
     // The endpoint requires ?organization_slug - a bare call answers 400
     // "organization_slug: Invalid input". The catalogue can differ per org
     // (plan gating), so the org is part of the measurement.
-    const org = ctx.orgSlugs[0] ?? "kqiknhvnmyxpyhudlyxh"; // Team org, same as secrets.tfvars
+    // First supplied slug, else the Team role; never a literal in source.
+    const org = ctx.orgSlugs[0] ?? ctx.orgs.team ?? "";
+    if (!org) return { id: "R01", title: this.title, status: "skip", detail: "PVLAB_ORG_SLUGS or PVLAB_ORG_TEAM not set" };
     const r = await mgmt(ctx, "GET", `/projects/available-regions?organization_slug=${org}`);
     measurements.catalogue_status = r.status;
     measurements.org = org;
