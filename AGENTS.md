@@ -662,7 +662,9 @@ Extended 2026-08-25 (gate hunt + A/B, see RUNLOG):
   is the top-level `DELETE /v1/branches/{id}`, not by name.
 
 Full table: `experiments/sfp-platforms/README.md`; per-run record: RUNLOG.md;
-committed artifacts: `out/2026-08-25/`.
+artifacts: `out/2026-08-25/` (redacted and made trackable on 2026-09-02;
+before that they sat untracked under the global `**/out/` ignore while this
+line called them committed).
 
 ## experiments/byo-oauth - key facts (validated 2026-08-17/18)
 
@@ -1110,6 +1112,47 @@ history.
   after. `make gotrue-up` / `gotrue-up JWKS=1` / `gotrue-up OWNKEY=1` /
   `gotrue-down` / `probe IDS=...` (`BUILD=0 RUNNER="bun .../run.ts"` to run
   from source while another battery holds the binary) / `destroy`.
+
+## Write-up workflow (added 2026-09-02 after three review passes)
+
+The numbers that went wrong in that day's write-ups were all retyped from
+memory of a run; the artifact had the right value every time. The tooling now
+assumes prose quotes by paste.
+
+- `pvlab --facts run.json [--only EF08,EF09]` renders a run's measurements as
+  markdown tables (offline, no credential). Quote from it.
+- `make publish-evidence RUN=evidence/<ts>/run-<stamp>.json` (per experiment)
+  redacts refs, project and pooler hostnames and emails and writes the artifact
+  plus its facts.md to `out/<date>/`, which IS committed (`.gitignore` carves
+  dated `experiments/*/out/20*/` directories out of `**/out/`; raw artifacts
+  at an `out/` root stay ignored - edge-resilience has 28 such files with refs
+  and an email in them, untouched). RUNLOGs and the docs site cite `out/`;
+  `evidence/` stays private.
+- `bun harness/scripts/check-doc-numbers.ts <doc> <run.json> ...` lists every
+  number on a measured line of a doc that appears in none of the artifacts -
+  the reviewer's hand check as a command. Judge each hit: a documented figure
+  is fine, a retyped measurement is the bug.
+- `harness/src/identifiers.test.ts` scans every tracked markdown file and
+  every `out/` artifact for the project-ref SHAPE (20 lowercase letters) and
+  for emails, so a ref nobody listed still fails `bun test harness`. Its first
+  run (2026-09-02) found two project refs and the Pro org slug in three tracked
+  files from August (two RUNLOGs, one plan doc), all redacted the same day; the
+  hand-run sweeps had missed them for a month. Org slugs hardcoded in test
+  SOURCE (compute-disk, instance-sizing, byo-oauth, edge-resilience W21) are
+  not scanned; moving them to `PVLAB_ORG_SLUGS` is open.
+- `harness/src/platform.ts` holds the helpers every experiment rewrote: `sql`
+  (the query endpoint answers 201), `fetchKeys` (both key generations),
+  `logsQuery` (the logs endpoint needs both time-window parameters),
+  `functionPresent` (a deploy is not done on its exit code). Import from here.
+- `bun harness/scripts/new-module.ts <experiment> <ID> <slug> "<question>"`
+  scaffolds a module with the doc-comment skeleton: side/key/project named per
+  row, per-row ids, DESTRUCTIVE and cleanup notes, "not settled by this module".
+- `make probe-bg` runs a battery detached with a log (a killed run leaves
+  functions deployed); `BUILD=0 RUNNER="bun $(ROOT)/harness/src/run.ts"` runs
+  from source while another battery holds the compiled binary (Linux refuses
+  to overwrite a running executable).
+- The `lab-writeup` skill carries the ambiguity checklist and the reviewer
+  brief; run the brief as a subagent on the diff before every commit of prose.
 
 ## Commands
 

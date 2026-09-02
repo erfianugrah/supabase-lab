@@ -2,7 +2,7 @@
 
 > **STATUS 2026-08-11: DESTROYED.** All tracks done and committed
 > (`327301c`, `883de45`), then the throwaway project was torn down
-> (`make destroy`, `supabase_project.probe` ref `mliyxhgwobcurlssgfdu`, medium,
+> (`make destroy`, `supabase_project.probe` ref `<ref>`, medium,
 > ap-southeast-1) - plan: 0 add, 0 change, 1 destroy; apply complete; ref now
 > unreachable; tofu state gone. Rebuild is `make up` (~446s) whenever the demo
 > is wanted back. The Cloudflare Worker for `pggraph.erfi.dev` was NOT touched

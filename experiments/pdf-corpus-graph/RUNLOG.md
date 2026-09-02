@@ -522,7 +522,7 @@ Lesson recorded in the sbperf heuristics (585f613).
 
 ## Teardown (2026-08-11)
 
-`make destroy` - supabase_project.probe (mliyxhgwobcurlssgfdu, medium,
+`make destroy` - supabase_project.probe (<ref>, medium,
 ap-southeast-1): plan 0 add / 0 change / 1 destroy, applied; ref unreachable,
 tofu state gone. The Cloudflare Worker serving pggraph.erfi.dev was left up as
 a separate wrangler step, with the demo redeployed to explain the dead backend

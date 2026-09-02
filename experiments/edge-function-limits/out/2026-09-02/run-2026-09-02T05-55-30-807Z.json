@@ -1,0 +1,206 @@
+{
+  "startedAt": "2026-09-02T05:55:30.807Z",
+  "finishedAt": "2026-09-02T05:56:18.227Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "edge-function-limits",
+  "labCommit": "5bfea0e",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "OpenSSL 3.6.4 25 Aug 2026 (Library: OpenSSL 3.6.4 25 Aug 2026)"
+  },
+  "results": [
+    {
+      "id": "EF03a",
+      "title": "reserved prefix SUPABASE_ is refused",
+      "status": "pass",
+      "detail": "HTTP 400: \"0.name: Secret name must not start with the SUPABASE_ prefix.\"",
+      "measurements": {
+        "status": 400,
+        "error": "0.name: Secret name must not start with the SUPABASE_ prefix.",
+        "stored": 0,
+        "triage_bucket": "reserved-prefix"
+      },
+      "durationMs": 6162
+    },
+    {
+      "id": "EF03b",
+      "title": "name length boundary",
+      "status": "pass",
+      "detail": "accepted at 256, refused at 257: \"0.name: Too big: expected string to have <=256 characters\"",
+      "measurements": {
+        "docs_figure": 256,
+        "at_limit_status": 201,
+        "over_limit_status": 400,
+        "over_limit_error": "0.name: Too big: expected string to have <=256 characters",
+        "triage_bucket": "name-length"
+      },
+      "durationMs": 6162
+    },
+    {
+      "id": "EF03c",
+      "title": "value size boundary (one-byte characters)",
+      "status": "pass",
+      "detail": "accepted at 24576, refused at 24577: \"0.value: Too big: expected string to have <=24576 characters\"",
+      "measurements": {
+        "docs_figure": 24576,
+        "at_limit_status": 201,
+        "over_limit_status": 400,
+        "over_limit_error": "0.value: Too big: expected string to have <=24576 characters",
+        "triage_bucket": "value-size"
+      },
+      "durationMs": 6162
+    },
+    {
+      "id": "EF03c2",
+      "title": "value ceiling: characters or bytes?",
+      "status": "info",
+      "detail": "24576 three-byte characters (73728 bytes, over the 49152-byte figure) ACCEPTED - the ceiling counts characters; \"48 KiB\" is 24576 at two bytes each",
+      "measurements": {
+        "chars": 24576,
+        "bytes": 73728,
+        "docs_bytes": 49152,
+        "status": 201,
+        "error": "none"
+      },
+      "durationMs": 6162
+    },
+    {
+      "id": "EF03d",
+      "title": "count boundary: 100 per project",
+      "status": "fail",
+      "detail": "filled to 100 (fill worst HTTP 201); 101st -> HTTP 201; 101 stored afterwards",
+      "measurements": {
+        "docs_figure": 100,
+        "preexisting": 7,
+        "stored_at_ceiling": 100,
+        "over_status": 201,
+        "over_error": "none",
+        "stored_after_over": 101,
+        "triage_bucket": "unclassified",
+        "docs_read_at": "2026-09-02"
+      },
+      "durationMs": 6162
+    },
+    {
+      "id": "EF03z",
+      "title": "cleanup: remove PVLAB_EF03_ secrets",
+      "status": "pass",
+      "detail": "removed 94",
+      "measurements": {
+        "removed": 94,
+        "left": 0
+      },
+      "durationMs": 6162
+    },
+    {
+      "id": "EF06a",
+      "title": "GET returning text/html is rewritten to text/plain on the project hostname",
+      "status": "pass",
+      "detail": "GET -> 200 text/plain; POST -> 200 text/html; charset=utf-8",
+      "measurements": {
+        "deploy_status": 201,
+        "get_status": 200,
+        "get_content_type": "text/plain",
+        "post_status": 200,
+        "post_content_type": "text/html; charset=utf-8",
+        "rewritten_to_plain": 1
+      },
+      "durationMs": 41260
+    },
+    {
+      "id": "EF06b",
+      "title": "outbound ports 25 and 587 blocked, 443 open",
+      "status": "fail",
+      "detail": "443 ok; 25 blocked \"Error: pvlab-timeout-8000ms\"; 587 OPEN; 465 (undocumented) open",
+      "measurements": {
+        "deploy_status": 201,
+        "port_443_ok": 1,
+        "port_25_ok": 0,
+        "port_25_error": "Error: pvlab-timeout-8000ms",
+        "port_25_ms": 8001,
+        "port_587_ok": 1,
+        "port_587_error": "none",
+        "port_587_ms": 3,
+        "port_465_ok": 1,
+        "port_465_error": "none"
+      },
+      "durationMs": 41260
+    },
+    {
+      "id": "EF06c",
+      "title": "Web Worker and node:vm unavailable",
+      "status": "pass",
+      "detail": "typeof Worker=undefined, construct=ReferenceError: Worker is not defined; vm import=NotCapable: Requires run access, run again with the --allow-run flag",
+      "measurements": {
+        "deploy_status": 201,
+        "invoke_status": 200,
+        "worker_typeof": "undefined",
+        "worker_construct": "ReferenceError: Worker is not defined",
+        "vm_import": "NotCapable: Requires run access, run again with the --allow-run flag",
+        "vm_run": "n/a",
+        "worker_unavailable": 1,
+        "vm_unavailable": 1
+      },
+      "durationMs": 41260
+    },
+    {
+      "id": "EF06d",
+      "title": "static file deployed through the API path (docs: cannot)",
+      "status": "pass",
+      "detail": "deploy 201 but the read fails at runtime: 500 \"NotFound: path not found: /var/tmp/sb-compile-edge-runtime/source/static/hello.txt: readfile '/var/tmp/sb-compile-edge-runtime/source/static/hello.txt': path not found: /var/tmp/sb-compile-edge-runtime/source/static/hello.txt: readfile '/var/tmp/sb-compile-edge-runtime/source/static/hello.txt': path\" - the deploy reports success and the asset is missing",
+      "measurements": {
+        "deploy_status": 201,
+        "deploy_error": "none",
+        "invoke_status": 500,
+        "file_readable": 0,
+        "runtime_error": "NotFound: path not found: /var/tmp/sb-compile-edge-runtime/source/static/hello.txt: readfile '/var/tmp/sb-compile-edge-runtime/source/static/hello.txt': path no"
+      },
+      "durationMs": 41260
+    },
+    {
+      "id": "EF06d2",
+      "title": "static file via CLI local bundling (the documented working path)",
+      "status": "pass",
+      "detail": "exit 0, file readable at runtime (\"hello-from-static\")",
+      "measurements": {
+        "cli_version": "2.116.0",
+        "exit_code": 0,
+        "invoke_status": 200,
+        "file_readable": 1,
+        "error": "none"
+      },
+      "evidence": "supabase functions deploy pvlab-ef06-static-cli --project-ref <ref> --workdir <workdir> --no-verify-jwt --output-format json\nBundling Function: pvlab-ef06-static-cli\nDeploying Function: pvlab-ef06-static-cli (script size: 679 B)\n",
+      "durationMs": 41260
+    },
+    {
+      "id": "EF06e",
+      "title": "npm:sharp (requires multithreading; docs: not supported)",
+      "status": "pass",
+      "detail": "deploy 201, invoke 500: \"\" - fails at run time",
+      "measurements": {
+        "deploy_status": 201,
+        "deploy_ms": 6119,
+        "deploy_error": "none",
+        "invoke_status": 500,
+        "works": 0,
+        "runtime_error": "none"
+      },
+      "durationMs": 41260
+    },
+    {
+      "id": "EF06z",
+      "title": "cleanup: delete pvlab-ef06-* functions",
+      "status": "pass",
+      "detail": "deleted 6",
+      "measurements": {
+        "deleted": 6,
+        "left": 0
+      },
+      "durationMs": 41260
+    }
+  ]
+}
