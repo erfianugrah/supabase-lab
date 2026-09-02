@@ -1,5 +1,14 @@
 import { describe, expect, test } from "bun:test";
-import { deriveCapabilities, readEndpoints, readPeers } from "./ctx";
+import { deriveCapabilities, readEndpoints, readOrgs, readPeers } from "./ctx";
+
+describe("readOrgs", () => {
+  test("PVLAB_ORG_<ROLE> becomes a lowercase role key", () => {
+    expect(readOrgs({ PVLAB_ORG_PRO: "a", PVLAB_ORG_TEAM: "b", PVLAB_ORG_FREE: "c" })).toEqual({ pro: "a", team: "b", free: "c" });
+  });
+  test("the older comma list is not a role, and an empty value counts as absent", () => {
+    expect(readOrgs({ PVLAB_ORG_SLUGS: "a,b", PVLAB_ORG_PRO: "" })).toEqual({});
+  });
+});
 
 describe("deriveCapabilities", () => {
   test("db needs BOTH a password and a host", () => {

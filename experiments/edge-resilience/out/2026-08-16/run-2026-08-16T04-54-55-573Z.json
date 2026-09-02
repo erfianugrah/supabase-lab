@@ -1,0 +1,25 @@
+{
+  "startedAt": "2026-08-16T04:54:55.573Z",
+  "finishedAt": "2026-08-16T04:54:55.573Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "edge-resilience",
+  "labCommit": "db4fbb0",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "OpenSSL 3.6.3 9 Jun 2026 (Library: OpenSSL 3.6.3 9 Jun 2026)"
+  },
+  "results": [
+    {
+      "id": "W20",
+      "title": "statement timeout and lock-wait signature",
+      "status": "skip",
+      "detail": "pooler endpoint missing in ctx.endpoints",
+      "measurements": {},
+      "durationMs": 0
+    }
+  ]
+}
