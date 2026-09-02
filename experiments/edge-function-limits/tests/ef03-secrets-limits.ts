@@ -8,17 +8,20 @@
  *   EF03a  reserved prefix: a name starting SUPABASE_ is refused
  *   EF03b  name length: 256 accepted, 257 refused
  *   EF03c  value size: 24,576 chars accepted, 24,577 refused
- *   EF03c2 the same 24,576 in two-byte characters (49,152 bytes, over the
- *          48 KiB figure) - tells whether the ceiling is characters or bytes,
- *          since the docs quote both as if they were the same number
+ *   EF03c2 the same 24,576 in three-byte characters (73,728 bytes, above the
+ *          48 KiB = 49,152-byte figure that 24,576 two-byte characters would
+ *          give) - tells whether the ceiling is characters or bytes, since the
+ *          docs quote both as if they were the same number
  *   EF03d  count: filled to 100, the 101st is refused
  *
  * Each result carries the platform's error verbatim and the triage bucket
  * `secretLimitOf` puts it in, so the classifier is exercised on real text.
  *
  * DESTRUCTIVE: creates up to 100 secrets under PVLAB_EF03_ and deletes them
- * in finally. Any secret that was on the project before the run is left
- * alone and counted toward the ceiling.
+ * in finally. Any user secret that was on the project before the run is left
+ * alone and counted toward the 100. The platform-managed SUPABASE_* entries
+ * that GET /secrets lists are NOT counted - they do not count on the platform
+ * side either (see the RUNLOG's EF03 correction).
  */
 import { mgmt } from "../../../harness/src/mgmt";
 import type { Ctx, TestModule, TestResult } from "../../../harness/src/types";
