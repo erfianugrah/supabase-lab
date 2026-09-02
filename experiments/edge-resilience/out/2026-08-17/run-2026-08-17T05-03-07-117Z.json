@@ -1,0 +1,31 @@
+{
+  "startedAt": "2026-08-17T05:03:07.117Z",
+  "finishedAt": "2026-08-17T05:07:33.010Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "edge-resilience",
+  "labCommit": "1ccb9ef",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "OpenSSL 3.6.3 9 Jun 2026 (Library: OpenSSL 3.6.3 9 Jun 2026)"
+  },
+  "results": [
+    {
+      "id": "W21",
+      "title": "spend cap trip behavior (transform quota boundary)",
+      "status": "pass",
+      "detail": "no synchronous enforcement at quota+5: all renders 200; disallow (if any) is not immediate",
+      "measurements": {
+        "provision_s": 154,
+        "renders_ok": 105,
+        "boundary_index": "none",
+        "existing_render_post_cap": 200
+      },
+      "evidence": "uploaded 105 distinct images to public bucket w21\nall 105 renders returned 200 - no synchronous disallow at quota+5\nre-render of already-transformed img-1: HTTP 200",
+      "durationMs": 265906
+    }
+  ]
+}
