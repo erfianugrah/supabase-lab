@@ -65,6 +65,21 @@ probe-destructive:
 		--destructive --only $(ONLY) --out evidence/$(TS)
 	@echo "== evidence/$(TS) =="
 
+# Detached run of probe-destructive with a log, for batteries longer than a
+# shell timeout: a killed run leaves functions deployed. Tail the log or wire a
+# monitor on it; the last line is "=== make exit <code>".
+probe-bg:
+	@mkdir -p evidence
+	@log=evidence/probe-$(TS).log; \
+	setsid nohup sh -c '$(MAKE) probe-destructive ONLY="$(ONLY)"; echo "=== make exit $$? $$(date +%T)"' > $$log 2>&1 < /dev/null & \
+	echo "running detached; log: $$log"
+
+# Redact and publish a run artifact to out/<date>/ (committed) with its facts
+# rendering. RUN=evidence/<ts>/run-<stamp>.json; ONLY narrows the ids.
+publish-evidence:
+	@test -n "$(RUN)" || (echo "RUN=evidence/<ts>/run-<stamp>.json required"; exit 1)
+	@cd $(ROOT)/harness && bun scripts/publish-evidence.ts $(abspath $(RUN)) $(abspath .) $(if $(ONLY),--only $(ONLY),)
+
 destroy:
 	tofu plan -destroy $(VARS) -out=tfplan-destroy
 	tofu apply tfplan-destroy

@@ -145,6 +145,18 @@ probe:
 		--destructive --only $(IDS) --out evidence/$(TS)
 	@echo "== evidence/$(TS) =="
 
+# Detached run with a log (see edge-function-limits/Makefile for why).
+probe-bg:
+	@mkdir -p evidence
+	@log=evidence/probe-$(TS).log; \
+	setsid nohup sh -c '$(MAKE) probe IDS="$(IDS)" BUILD="$(BUILD)"; echo "=== make exit $$? $$(date +%T)"' > $$log 2>&1 < /dev/null & \
+	echo "running detached; log: $$log"
+
+# Redact and publish a run artifact to out/<date>/ (committed).
+publish-evidence:
+	@test -n "$(RUN)" || (echo "RUN=evidence/<ts>/run-<stamp>.json required"; exit 1)
+	@cd $(ROOT)/harness && bun scripts/publish-evidence.ts $(abspath $(RUN)) $(abspath .) $(if $(IDS_ONLY),--only $(IDS_ONLY),)
+
 destroy:
 	tofu plan -destroy $(VARS) -out=tfplan-destroy
 	tofu apply tfplan-destroy

@@ -7,7 +7,6 @@
  * the session pooler with search_path=auth). Every helper takes the base URL
  * so the same probe runs against either side, and the report reads as pairs.
  */
-import { mgmt } from "../../../harness/src/mgmt";
 import type { Ctx } from "../../../harness/src/types";
 
 export interface Probe {
@@ -52,28 +51,12 @@ export function codeOf(p: Probe): string {
   return String(j.error_code ?? j.code ?? j.msg ?? j.message ?? j.error ?? "").slice(0, 120);
 }
 
-export interface Keys {
-  anon: string;
-  service: string;
-}
-
-export async function fetchKeys(ctx: Ctx): Promise<Keys> {
-  const r = await mgmt(ctx, "GET", `/projects/${ctx.ref}/api-keys?reveal=true`);
-  const rows = Array.isArray(r.json) ? (r.json as { name?: string; api_key?: string }[]) : [];
-  const by = (n: string) => rows.find((k) => k.name === n)?.api_key ?? "";
-  const anon = by("anon");
-  const service = by("service_role");
-  if (!anon || !service) throw new Error(`legacy anon/service_role keys absent (api-keys HTTP ${r.status})`);
-  return { anon, service };
-}
-
-/** Management query endpoint - SQL as `postgres` without a DB socket. */
-export async function sql(ctx: Ctx, query: string): Promise<{ status: number; rows: Record<string, unknown>[]; error: string }> {
-  const r = await mgmt(ctx, "POST", `/projects/${ctx.ref}/database/query`, { query });
-  const rows = Array.isArray(r.json) ? (r.json as Record<string, unknown>[]) : [];
-  const error = r.status >= 300 ? String((r.json as Record<string, unknown> | undefined)?.message ?? r.text).slice(0, 300) : "";
-  return { status: r.status, rows, error };
-}
+// Keys and the query endpoint come from the shared platform helpers, which
+// carry the lessons this experiment learned the hard way (the endpoint's 201,
+// both key generations). `Keys` is kept as the local name.
+import { fetchKeys, type ProjectKeys as Keys, sql } from "../../../harness/src/platform";
+export { fetchKeys, sql };
+export type { Keys };
 
 // ---------------------------------------------------------------------------
 // JWT inspection (no verification - the platform does that; we read shape)

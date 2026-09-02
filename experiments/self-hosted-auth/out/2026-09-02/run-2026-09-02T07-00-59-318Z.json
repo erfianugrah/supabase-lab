@@ -1,0 +1,81 @@
+{
+  "startedAt": "2026-09-02T07:00:59.318Z",
+  "finishedAt": "2026-09-02T07:01:09.034Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "self-hosted-auth",
+  "labCommit": "f5d06cb",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "OpenSSL 3.6.4 25 Aug 2026 (Library: OpenSSL 3.6.4 25 Aug 2026)"
+  },
+  "results": [
+    {
+      "id": "SH05a",
+      "title": "before the revoke: self-hosted token trusted",
+      "status": "pass",
+      "detail": "managed /user 200; PostgREST 200 rows=1",
+      "measurements": {
+        "user_status": 200,
+        "rest_status": 200,
+        "rest_rows": 1
+      },
+      "durationMs": 9716
+    },
+    {
+      "id": "SH05b",
+      "title": "PATCH the HS256 key to revoked",
+      "status": "pass",
+      "detail": "HTTP 200",
+      "measurements": {
+        "status": 200,
+        "key_status_after": "revoked"
+      },
+      "durationMs": 9716
+    },
+    {
+      "id": "SH05c",
+      "title": "after the revoke: the same self-hosted token",
+      "status": "pass",
+      "detail": "managed /user 403 bad_jwt after 4s; PostgREST 401 PGRST301 after 4s",
+      "measurements": {
+        "user_status": 403,
+        "user_code": "bad_jwt",
+        "user_flip_s": 4,
+        "rest_status": 401,
+        "rest_code": "PGRST301",
+        "rest_flip_s": 4
+      },
+      "durationMs": 9716
+    },
+    {
+      "id": "SH05d",
+      "title": "collateral: legacy API keys vs the new key generation, and fresh self-hosted grants",
+      "status": "info",
+      "detail": "legacy anon key: PostgREST 401, auth health 200; legacy service_role key: admin list 403; sb_publishable: PostgREST 200; sb_secret: admin list 200; fresh self-hosted password grant 200 (mints, but nothing managed will accept it now)",
+      "measurements": {
+        "legacy_anon_rest_status": 401,
+        "legacy_anon_auth_health_status": 200,
+        "legacy_service_admin_status": 403,
+        "publishable_rest_status": 200,
+        "secret_admin_status": 200,
+        "fresh_self_grant_status": 200
+      },
+      "durationMs": 9716
+    },
+    {
+      "id": "SH05z",
+      "title": "cleanup: delete the probe user",
+      "status": "pass",
+      "detail": "sql fallback (admin api HTTP 403)",
+      "measurements": {
+        "admin_delete_status": 403,
+        "cleaned": 1
+      },
+      "durationMs": 9716
+    }
+  ]
+}
