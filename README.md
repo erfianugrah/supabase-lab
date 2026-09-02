@@ -93,6 +93,19 @@ facts):
   keyed on the issuer claim - a self-minted ES256 issuer (JWKS from an Edge
   Function) for browserless testing, plus the Cloudflare Access / Worker proxy
   path. Cloudflare pieces are OpenTofu (gated on `enable_cloudflare`).
+- `edge-function-limits` - the ceilings that get reported as one "Edge
+  Functions limit", measured one at a time (2026-09-02): functions per
+  project as an entitlement (free 100 / pro 1000 / team 2000), function size
+  by bundling path (API 8 MB refused with `413 request entity too large`,
+  local CLI bundling lands 8 MB and refuses 24 MB with the same 413), the
+  four secrets limits at their exact boundaries, silent loss under parallel
+  deploys (24x 201 with 10 landed; 8 CLI processes exit 0 with 9/24 landed,
+  no 429 anywhere), 409 as the same-slug race signature, the runtime
+  restrictions (HTML->text/plain on GET only, port 25 hangs while 587 was
+  reachable, static files via API deploy 201 with the asset missing), and
+  546 WORKER_RESOURCE_LIMIT for both CPU and memory. Pure triage classifier
+  under `lib/`, unit tested on the verbatim strings. Write-up:
+  https://erfi.dev/reference/supabase-edge-function-limits/
 - `security-lockdown` - the broader security surface beyond the IAP: the
   Management API security advisor (catches every seeded exposure), network
   restrictions gating only the DB/pooler socket (REST keeps answering), the
