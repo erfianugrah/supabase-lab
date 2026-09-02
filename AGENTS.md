@@ -455,6 +455,16 @@ Ported from throwaway bash that produced the same findings; see RUNLOG.md.
 - Most results are `info` on purpose. There is no correct value for a price,
   so asserting one manufactures a failure every time the platform legitimately
   changes. Only the three shape claims assert.
+- The entitlements payload is a FLAT LIST keyed by feature
+  (`{entitlements:[{feature:{key,type},hasAccess,config:{value|set|enabled|
+  unlimited}}]}`), and the plan label lives on `GET /organizations/{slug}`
+  (`plan`), not in the entitlements body. F01 originally dug dotted paths into
+  a nested object and had been rendering every row "absent" for an unknown
+  period until edge-function-limits noticed on 2026-09-02; it now looks rows up
+  by feature key and FAILS on an empty list rather than recording eleven
+  absences as facts. A row that reads "absent" means the feature is genuinely
+  not in the list. 64 features were listed on each of a Free, Pro and Team
+  org that day.
 - F03's live-token control is not optional. 404 on every scope candidate also
   describes a dead token or an outage; without the control returning 200 in the
   same run, the negative result is a `skip`, not a `pass`.
@@ -957,6 +967,54 @@ a throwaway probe Worker + two Hyperdrive configs via wrangler (account from
   does not govern it; Storage authz is RLS on `storage.objects`. Probe note:
   "REST off" reads as `503` on a TABLE path only; `/rest/v1/` root answers `401`
   at the gateway with no schema route.
+
+## experiments/edge-function-limits - key facts (validated 2026-09-02, micro, Pro org)
+
+One project, no AWS. Separates the ceilings that get reported as one "Edge
+Functions limit". Docs figures pinned in `lib/docs.ts` with the read date; the
+RUNLOG has the module table and per-row evidence.
+
+- **Functions per project is an entitlement** (`function.max_count`): free
+  100 / pro 1000 / team 2000 on the lab orgs, matching the docs. A cap of
+  exactly 1000 identifies Pro. `function.size_limit_mb` is 20 on EVERY plan -
+  size is not a plan lever.
+- **Function size is set by where bundling happens**, and the genuine
+  rejection is `413 request entity too large` on BOTH paths: API/`--use-api`
+  refuse 8 MB, CLI local (Docker) bundling lands 8 MB in ~32 s and refuses
+  24 MB with the same 413 body on the "create function" call. A 413 alone does
+  not say which ceiling; reproduce serially before ruling the flaky parallel
+  413 in or out.
+- **Secrets: four limits, all bite at the documented boundary** (400 with a
+  zod-style message; the 101st says `You can only store 100 secrets per project
+  at maximum.`). The value ceiling counts CHARACTERS (24,576 three-byte chars
+  = 73,728 bytes accepted). `GET /secrets` lists seven platform `SUPABASE_*`
+  entries once any function exists; they do not count toward the 100.
+- **Silent loss reproduces on a fresh project with NO visible throttle**: 24
+  API deploys 8-wide -> 24x 201, 10 present; 8 concurrent CLI processes -> 8x
+  exit 0, 9/24 present. Not a read-lag artifact (cleanup listing minutes later
+  agreed). Same-slug concurrent deploys answer **409** (3 of 6), versions stay
+  monotonic - 409 is the same-slug signature, distinct from 429.
+- **Restrictions**: HTML->text/plain is GET-only (POST keeps text/html). Port
+  25 hangs (timeout), **587 was reachable** on two runs (TCP connect), 465
+  open. Worker undefined; node:vm import `NotCapable`. Static files via the
+  API deploy: **201 and the asset is missing at runtime** (deploy says success,
+  function 500s); via CLI local bundling with `static_files` they work - paths
+  are relative to `supabase/` (`./functions/<name>/...`), and a wrong glob
+  ships a 654 B bundle silently. `npm:sharp` bundles (201) and 500s at run time.
+- **Runtime ceilings**: CPU >2 s and memory >256 MB both answer `546
+  WORKER_RESOURCE_LIMIT` with identical bodies - indistinguishable from the
+  response. Wall clock/idle: edge-resilience W13.
+- Harness rules here: a deploy is never "done" on status/exit code -
+  `lib/ef.ts` `landed()` reads GET afterwards and size acceptances are proven by
+  invoking. Big sources are random base64 (a repeated character measures the
+  compressor). `lib/triage.ts` is the triage order (error string, parallelism,
+  landing) as a pure function, unit tested on the verbatim strings above.
+  Entitlements are a FLAT list `{entitlements:[{feature:{key},config}]}`;
+  platform-facts F01 was rewritten to it the same day.
+- CLI 2.116.0 accepts hidden `--use-docker` alongside `--use-api`, deploys
+  without a `config.toml` given `--project-ref` + `--workdir`, and bundles
+  locally by default when Docker is present.
+- Run the destructive battery detached; a killed run leaves functions deployed.
 
 ## Commands
 
