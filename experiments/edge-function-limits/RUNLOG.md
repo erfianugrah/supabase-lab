@@ -22,7 +22,11 @@ Full write-up: https://erfi.dev/reference/supabase-edge-function-limits/
 | EF04 | destructive | Function size by deploy path: API 2 MB / 8 MB, CLI `--use-api` 8 MB, CLI default 8 MB / 24 MB, then `--use-docker` at 8 MB only if the 8 MB default did not land. Every acceptance proven by GET + invoke. |
 | EF05 | destructive | 24 API deploys 8-wide, 8 concurrent CLI processes, a same-slug race, a delete during a deploy: reported success vs landed, 409 vs 413 vs 429 kept apart, version regressions. |
 | EF06 | destructive | Restrictions: HTML rewritten to text/plain, ports 25/587 blocked (443 control), Worker and node:vm unavailable, static files via API vs via CLI, `npm:sharp`. |
-| EF07 | destructive | Runtime ceilings: CPU 500 ms vs 3 s, memory 64 MB vs 400 MB. Wall clock / idle timeout referenced to edge-resilience W13, not re-run. |
+| EF07 | destructive | Runtime ceilings: CPU 500 ms vs 3 s, memory 64 MB vs 400 MB. Idle timeout referenced to edge-resilience W13, not re-run. |
+| EF08 | destructive | The two log limits that reject nothing: a 12,000-character log line and a 150-event burst, read back through the Management API logs endpoint (`source = 'function_logs'`, with the time window the endpoint requires). |
+| EF09 | destructive | Wall clock on an ACTIVE request: a stream that ticks every 5 s asks for 450 s; where the platform cuts it. |
+| EF10 | destructive | The recursive-call cap (~5000 per minute in the docs): one minute of self-calling chains at concurrency 100, depth 2. |
+| EF11 | destructive | The metadata races repeated: delete during deploy x10 with a redeploy after each; same slug 4 concurrent x5. |
 
 Pure logic (docs table, spec readers, the triage classifier) is unit tested:
 `make unit` (or `bun test experiments/edge-function-limits` at the root). The
@@ -148,6 +152,72 @@ below are findings, not harness errors, unless marked as a correction.
 - Memory: 64 MB -> HTTP 200; 400 MB -> the same 546 WORKER_RESOURCE_LIMIT.
   CPU and memory exhaustion are indistinguishable from the response.
 - Wall clock / idle timeout: edge-resilience W13 (504 IDLE_TIMEOUT at 150 s).
+
+## Second wave, 2026-09-02 afternoon (fresh project, evidence/20260902-172915 and evidence/20260902-174302)
+
+Everything the first wave had left as "not run" or "one trial", on a second
+throwaway project created and destroyed the same afternoon.
+
+### Log limits (EF08) - both bite at exactly the documented figure
+
+- A `console.log` of 12,019 characters was stored as its first **10,000
+  characters followed by ` ....[truncated]`**; the invocation answered 200.
+- 150 `console.log` calls inside one invocation: **the first 100 were stored
+  (indices 000 to 099), the last 50 dropped**; the invocation answered 200.
+- Reading them back: the Management API logs endpoint answers `Backend
+  error! Retry your query.` to ANY query without `iso_timestamp_start` and
+  `iso_timestamp_end`, including the example the logs guide itself publishes;
+  with a three-hour window the same SQL returns rows. Edge Function
+  `console.log` lines live under `source = 'function_logs'`. The first EF08
+  run (172915) failed on exactly this and its measurements were recovered by
+  hand from the lines that had landed; the module now sends the window and
+  the clean run is 174302.
+
+### Wall clock on an active request (EF09)
+
+- Control: a 30 s stream completed cleanly (6 ticks).
+- A stream asking for 450 s, ticking every 5 s so the request was never idle,
+  was **cut after 395 s (79 ticks)**; the client saw a truncated compressed
+  body (Bun reported it as a zlib error on the response stream) rather than
+  an HTTP error, because the headers had long since been sent. That is
+  within 15 s of the documented 400 s paid figure. W13's 504 IDLE_TIMEOUT at
+  150 s is the idle rule; this is the active one.
+
+### The recursive-call cap (EF10) - did not bite at 22x the documented figure
+
+- Control: one depth-2 chain (three invocations, two nested) answered 200 in
+  2,794 ms.
+- One minute at concurrency 100, depth 2: **59,562 chains in 65 s, about
+  110,600 nested calls per minute** against a documented cap of ~5000. Outer
+  statuses 200:59549 | 429:13; inner 200:59535 | 429:14 | unparsed:13. The
+  only refusal seen, 27 times in about 119,000 nested calls, was
+  `429 {"code":"RATE_LIMIT_EXCEEDED","message":"Too many requests. Re-try the
+  request in 1 seconds."}`. Whatever the ~5000/min figure describes, it is
+  not a ceiling a self-calling function meets at this rate on a Micro
+  project; the operative limiter is a per-second one that answers 429 with a
+  1 s retry hint.
+
+### The metadata races, repeated (EF11) - still no corruption signature
+
+- Delete during deploy, 10 rounds, delete fired 0-400 ms into the deploy:
+  deploy 201 x10, delete 200 x10; afterwards 8 present-and-healthy, 2 absent
+  (the delete won); every redeploy of the same slug afterwards 201 and
+  invoke 200. 0 outcomes where GET said present and the invocation 404d, 0
+  version regressions.
+- Same slug, 4 concurrent deploys, 5 rounds: statuses 201:9 | 409:11, versions
+  1 -> 2 -> 3 -> 4 -> 5 -> 6 (one bump per round), invoke 200 after every
+  round. Two or three of every four concurrent deploys of one slug answer 409.
+- Ten and five rounds is a repeat, not a proof; the row stays "no corruption
+  signature at this scale".
+
+### Still not run
+
+- The override's below-plan direction: no public API writes an entitlement
+  row, and none of the lab orgs carries one, so "an override can hold an
+  organisation below its plan figure" stays a statement about what an
+  override is rather than a measurement.
+- The wall clock on a FREE project (documented 150 s active): only a paid
+  project was used.
 
 ## Operational notes
 

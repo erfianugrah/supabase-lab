@@ -6,6 +6,11 @@ TOK := $(shell grep -E '^supabase_access_token' $(ROOT)/secrets.tfvars 2>/dev/nu
 PW := $(shell grep -E '^db_password' $(ROOT)/secrets.tfvars 2>/dev/null | cut -d'"' -f2)
 TS := $(shell date +%Y%m%d-%H%M%S)
 IDS ?= SH01,SH02,SH03,SH04,SH05
+# OWNKEY=1 (gotrue-up) generates an ES256 key pair into evidence/ownkey/ and
+# starts GoTrue signing with it, with the managed ES256 public key and the
+# legacy HS256 secret as verify-only keys; SH06 publishes the public half from
+# an Edge Function, registers it as third-party auth, and revokes the legacy
+# key. Run SH06 alone on a fresh project (IDS=SH06).
 # The managed project answered /auth/v1/health with v2.196.0 on 2026-09-02 and
 # the public image exists at the same tag; matching it keeps the embedded
 # migration set aligned with the auth schema the platform already applied
@@ -69,7 +74,14 @@ gotrue-up:
 	test -n "$$jwt" -a "$$jwt" != null || (echo "could not read the project's jwt_secret"; exit 1); \
 	pooler="aws-0-$(REGION).pooler.supabase.com"; \
 	keysenv=""; mode=plain; \
-	if [ "$(JWKS)" = "1" ]; then \
+	if [ "$(OWNKEY)" = "1" ]; then \
+	  bun lib/keygen.ts evidence/ownkey >/dev/null; \
+	  priv=$$(cat evidence/ownkey/own-es256.private.json); \
+	  anon=$$(curl -s -H "Authorization: Bearer $(TOK)" "https://api.supabase.com/v1/projects/$(REF)/api-keys" | jq -r '.[] | select(.name=="anon") | .api_key'); \
+	  pub=$$(curl -s -H "apikey: $$anon" "https://$(REF).supabase.co/auth/v1/.well-known/jwks.json" | jq -c '[.keys[] | . + {key_ops:["verify"]}]'); \
+	  octv=$$(printf '%s' "$$jwt" | basenc --base64url -w0 | tr -d '=' | jq -Rc '{kty:"oct",k:.,alg:"HS256",key_ops:["verify"]}'); \
+	  keysenv=$$(jq -cn --argjson o "$$priv" --argjson p "$$pub" --argjson h "$$octv" '[$$o] + $$p + [$$h]'); mode=ownkey; \
+	elif [ "$(JWKS)" = "1" ]; then \
 	  anon=$$(curl -s -H "Authorization: Bearer $(TOK)" "https://api.supabase.com/v1/projects/$(REF)/api-keys" | jq -r '.[] | select(.name=="anon") | .api_key'); \
 	  pub=$$(curl -s -H "apikey: $$anon" "https://$(REF).supabase.co/auth/v1/.well-known/jwks.json" | jq -c '[.keys[] | . + {key_ops:["verify"]}]'); \
 	  if [ "$(OCT_KID)" = "platform" ]; then \
@@ -107,22 +119,29 @@ gotrue-down:
 
 # Modules self-skip without PVLAB_ENDPOINT_SELFHOSTED_GOTRUE; run gotrue-up
 # first. IDS=SH02 narrows the run. SH05 revokes a signing key and is last.
+# BUILD=0 RUNNER="bun $(ROOT)/harness/src/run.ts" runs from source without
+# recompiling dist/pvlab - needed when another experiment's battery is running
+# from that binary (Linux refuses to overwrite a running executable).
+RUNNER ?= $(ROOT)/harness/dist/pvlab
+BUILD ?= 1
 probe:
 	@test -n "$(REF)" || (echo "no project_ref - run 'make apply' first"; exit 1)
 	@test -n "$(TOK)" || (echo "no PAT in $(ROOT)/secrets.tfvars"; exit 1)
-	@cd $(ROOT)/harness && bun run build >/dev/null
+	@if [ "$(BUILD)" = "1" ]; then cd $(ROOT)/harness && bun run build >/dev/null; else cd $(ROOT)/harness && bun run gen >/dev/null; fi
 	@mkdir -p evidence/$(TS)
 	@keys=$$(curl -s -H "Authorization: Bearer $(TOK)" "https://api.supabase.com/v1/projects/$(REF)/api-keys?reveal=true"); \
 	anon=$$(echo "$$keys" | jq -r '.[] | select(.name=="anon") | .api_key' | head -1); \
 	svc=$$(echo "$$keys" | jq -r '.[] | select(.name=="service_role") | .api_key' | head -1); \
 	gotrue=""; docker inspect $(GOTRUE_NAME) >/dev/null 2>&1 && gotrue="http://localhost:$(GOTRUE_PORT)"; \
 	mode=$$(cat evidence/.gotrue-mode 2>/dev/null || echo plain); \
+	ownpub=""; test -f evidence/ownkey/own-es256.public.json && ownpub=$$(base64 -w0 < evidence/ownkey/own-es256.public.json); \
 	PVLAB_REF="$(REF)" SUPABASE_ACCESS_TOKEN="$(TOK)" DB_PASSWORD="$(PW)" \
 		SUPABASE_ANON_KEY="$$anon" SUPABASE_SERVICE_ROLE_KEY="$$svc" \
 		PVLAB_ENDPOINT_SELFHOSTED_GOTRUE="$$gotrue" \
 		PVLAB_ENDPOINT_SELFHOSTED_GOTRUE_MODE="$$mode" \
+		PVLAB_ENDPOINT_OWNKEY_PUBLIC_JWK="$$ownpub" \
 		PVLAB_ENDPOINT_POOLER="aws-0-$(REGION).pooler.supabase.com" \
-		$(ROOT)/harness/dist/pvlab --where local --experiment self-hosted-auth \
+		$(RUNNER) --where local --experiment self-hosted-auth \
 		--destructive --only $(IDS) --out evidence/$(TS)
 	@echo "== evidence/$(TS) =="
 
