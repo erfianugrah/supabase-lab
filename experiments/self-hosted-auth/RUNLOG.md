@@ -19,17 +19,19 @@ Nothing about it is a tofu resource; it lives for one probe run.
 | SH03 | destructive | Refresh takeover: each side redeems the other's refresh tokens; reuse detection across sides. |
 | SH04 | destructive | JWKS mode: the self-hosted GoTrue given the platform's ES256 public key as a verify-only JWK verifies managed tokens, while its own tokens stay accepted by both managed verifiers. |
 | SH05 | destructive | Revoke the project's legacy HS256 key: time to rejection of a self-hosted token on managed Auth and PostgREST, and the collateral on the legacy API keys. Irreversible on the project. |
+| SH06 | destructive | The self-hosted GoTrue signing with its OWN ES256 key (`make gotrue-up OWNKEY=1`): public half published from an Edge Function, registered as third-party auth, accepted by PostgREST; then the legacy HS256 key is revoked and the own-key token is re-tested. Irreversible; run alone on a fresh project. |
 
 `make unit` covers the token-shape and error-code helpers.
 
 ## Validated 2026-09-02 (micro, ap-southeast-1, Pro org; managed GoTrue v2.196.0, image supabase/gotrue:v2.196.0, CLI n/a)
 
-Three throwaway projects in one afternoon (each destroyed). Project 1: the
+Four throwaway projects in one day (each destroyed). Project 1: the
 plain-mode battery (HS256 secret only) and SH05, then a JWKS run with an
 arbitrary kid that exposed the kid rule. Project 2: JWKS with the platform's
 HS256 key id as kid, SH01-SH05. Project 3: JWKS with a kid-less oct key
 (SH02, SH04) and then SH05, the run in which every "before" row passed and
-the revoke timing is therefore uncontaminated.
+the revoke timing is therefore uncontaminated. Project 4: own-key mode, SH06
+alone (20260902-173041).
 Evidence dirs 20260902-145333 (plain, SH01-SH04), 20260902-145442 (JWKS,
 arbitrary kid), 20260902-145503 (SH05 on the first project),
 20260902-145822 (JWKS, platform kid, SH01-SH05), 20260902-150030 (JWKS,
@@ -147,20 +149,57 @@ no kid, SH02+SH04) and 20260902-150058 (SH05 clean).
   managed accepts the result. A self-hosted signer built on the legacy secret
   lives exactly as long as that key stays `previously_used`.
 
+### The self-hosted GoTrue on its own key (SH06) - all pass, project 4 (20260902-173041)
+
+The dependency SH05 exposed is removable. `make gotrue-up OWNKEY=1` generates
+an ES256 pair (`lib/keygen.ts`, into gitignored `evidence/ownkey/`) and starts
+GoTrue with `GOTRUE_JWT_KEYS` = [own private key, sign+verify; the managed
+ES256 public key, verify; the legacy HS256 secret as an `oct` verify-only key
+so the legacy `service_role` bearer still works for admin calls]. The
+container is local, so the public half is published from an Edge Function ON
+THE PROJECT (`pvlab-sh06-jwks`, verify_jwt false) and that URL is registered
+as third-party auth with the `jwks_url` shape.
+
+- Registration -> 201, `type custom`, `resolved_at` set on the create
+  response.
+- Self-hosted password grant -> ES256 with the own kid, iss mirrored.
+- That token -> managed PostgREST **200, 1 row, 4 s after the registration**
+  (a first-time issuer kid; edge-resilience W01/W05 had measured ~30 s cold
+  for a lab issuer - this one resolved faster, n=1). Managed `/auth/v1/user`
+  -> **403 bad_jwt**: the managed GoTrue does not honour third-party keys,
+  only PostgREST does.
+- Storage `GET /storage/v1/bucket`: anon 200, own-key bearer 200, managed
+  bearer 200. The bucket list answers anon, so this probe does not
+  discriminate; whether Storage VERIFIES a third-party token is still open
+  (a private-object read with RLS keyed on the claim would decide it).
+- **Revoke the legacy HS256 key -> the own-key token still reads 200**, both
+  with the legacy anon key in the `apikey` header and with the
+  `sb_publishable_` key. The legacy anon JWT in the apikey header passed 10 s
+  after the revoke: the gateway matches the apikey by value and PostgREST
+  verifies only the bearer, which is why SH05's anon probe (anon as BEARER)
+  failed and this one did not. A fresh self-hosted grant still mints.
+- Cleanup: the legacy `service_role` admin call was 403 after the revoke
+  (as in SH05); the user was deleted via SQL.
+
+So a self-hosted GoTrue can be an issuer the platform trusts on a key you
+own, independent of the legacy secret, as long as its JWKS is reachable from
+the platform. The Edge Function is a convenient place to publish it because it
+lives on the project's own hostname.
+
 ### What this does not settle
 
-- Registering the self-hosted GoTrue as a third-party auth issuer (so the
-  managed side would trust a self-hosted ES256 key of its own rather than the
-  shared HS256 secret) needs the self-hosted JWKS reachable from the
-  platform; the container here is local. cross-project-auth and iap-lockdown
-  show the mechanism works for reachable issuers.
+- Whether Storage or Realtime verify a third-party token: the bucket-list
+  probe answers anon too. Realtime was not probed.
 - Everything ran as `postgres` through the session pooler. Whether GoTrue's
   connection pool behaves under load through Supavisor session mode, and
   what happens on the transaction pooler, was not measured.
-- One managed GoTrue version (v2.196.0) and the matching image. An image
-  ahead of the platform's migration set would try to apply migrations as
-  `postgres`, which cannot INSERT into `auth.schema_migrations`.
+- An image AHEAD of the platform's migration set could not be tested on
+  2026-09-02: no public `supabase/gotrue` tag newer than v2.196.0 existed
+  (v2.197.0 to v2.200.0 all absent). Such an image would try to apply its
+  extra migrations as `postgres`, which cannot INSERT into
+  `auth.schema_migrations`.
 - The managed Auth endpoint cannot be turned off (http-tier-lockdown,
   iap-lockdown L04), so both GoTrues serve the same users for as long as the
   project exists; this experiment did not try to make the managed one
   unreachable.
+- SMTP, hooks and OAuth providers on the self-hosted side were not run.
