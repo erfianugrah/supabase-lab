@@ -14,7 +14,9 @@
  *          stored (docs: 100 per 10 s)
  *
  * The logs endpoint is ClickHouse-only, GET-only, rate limited to 10 requests
- * per minute, and ingestion lags by tens of seconds; the module polls slowly
+ * per window (`x-ratelimit-limit: 10`; the window length is not documented and
+ * is treated as a minute here), and ingestion lags by tens of seconds; the
+ * module polls slowly
  * and records the source name it found the lines under, because the function
  * log source is not documented on the page it cites.
  *
