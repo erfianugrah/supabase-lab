@@ -108,3 +108,52 @@ Storage, Realtime either stay public or move to your stack too.
 One Micro per run; a local Docker container for S04. Ephemeral: provision ->
 probe -> destroy (project) + postgrest-down (container) in one run. Nothing
 left standing.
+
+### S16-S21 - pen-test-customer gaps (2026-09-03)
+
+A customer with a failed pen test, no RLS (authorisation in app code, service_role
+from the backend), asked four things: disable or IP-restrict the Data API and put
+WAF rules in front; FORCE ROW LEVEL SECURITY for the roles the backend uses; a
+full access-audit trail (Log Drains to Honeycomb) and a way to block a bad
+actor; managed protection for signup abuse beyond CAPTCHA and the
+before-user-created hook. The existing modules answer the first thoroughly and
+the other three thinly or not at all. Six modules close that, on one micro.
+
+  S16 - pre-request on hosted, with a RESTART. L09's "does not fire" rests on
+        one 120s window after NOTIFY. Set the role GUC, NOTIFY, poll; then
+        `POST /projects/{ref}/restart`, wait for health, poll again. Plus an
+        RPC that returns `request.headers` so the x-forwarded-for shape the
+        hosted edge hands PostgREST (client value passed, appended, or
+        replaced) is measured, not "not lab-answerable".
+  S17 - FORCE ROW LEVEL SECURITY. Role attributes (rolsuper, rolbypassrls) for
+        the platform roles; FORCE binds the table owner (owner read 2 -> 0);
+        service_role still reads everything (BYPASSRLS); whether the project
+        owner can strip BYPASSRLS from service_role; and the shape that works -
+        a NOBYPASSRLS backend role reached through the Data API with a minted
+        HS256 JWT, RLS applied.
+  S18 - audit trail + blocking. Log Drains in the /v1 spec (none: Dashboard
+        only); a marked REST and Storage request found in `edge_logs` with a
+        client IP field, and the ingestion lag; a failed login in `auth_logs`
+        and a successful login in `/auth/v1/admin/audit`; network bans -
+        retrieve, provoke with repeated failed psql auth through the pooler,
+        retrieve, remove - and that every ban endpoint is DB-scoped.
+  S19 - Auth enforcement, not settability. HIBP at SIGNUP (autoconfirm on, so
+        no email send); an anonymous-sign-in rate limit driven to its 429; the
+        CAPTCHA gate with Turnstile's documented always-fail and always-pass
+        test secrets (no provider account needed); a before-user-created hook
+        as a Postgres function rejecting a disposable-email domain.
+  S20 - the x-forwarded-for trust boundary on your own PostgREST. S04 proved the
+        filter fires on a client-supplied header. Here an nginx edge overwrites
+        X-Forwarded-For with $remote_addr: the spoof is visible direct to
+        PostgREST and invisible through the edge. The filter is an allowlist
+        only when PostgREST is reachable solely from the edge.
+  S21 - the no-RLS, service_role-from-the-backend shape. Anon reads a plain
+        table (the exposure); REVOKE on schema/tables/functions + ALTER DEFAULT
+        PRIVILEGES closes anon and authenticated while service_role keeps
+        reading, including a table created afterwards; and the exposed-schema
+        move is project-wide - service_role loses `public` too until it sends
+        `Accept-Profile`.
+
+  Ops: S20 needs `make postgrest-up` + `make edge-up`. S16 restarts the project
+  and runs LAST in its own invocation; S18 bans this machine's IP from the DB
+  socket mid-module and removes it, so it runs alone after S17/S19/S21.

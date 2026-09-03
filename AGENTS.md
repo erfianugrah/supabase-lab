@@ -937,7 +937,7 @@ a throwaway probe Worker + two Hyperdrive configs via wrangler (account from
 - Cloudflare pieces are OpenTofu (provider v4, gated on `enable_cloudflare`);
   real CF ids live in gitignored `cloudflare.auto.tfvars`.
 
-## experiments/security-lockdown - key facts (validated 2026-08-28; S13-S15 2026-08-31)
+## experiments/security-lockdown - key facts (validated 2026-08-28; S13-S15 2026-08-31; S16-S21 2026-09-03)
 
 - S01: the Management API security advisor catches every seeded exposure
   (rls_disabled_in_public, rls_enabled_no_policy, security_definer_view,
@@ -988,6 +988,73 @@ a throwaway probe Worker + two Hyperdrive configs via wrangler (account from
   does not govern it; Storage authz is RLS on `storage.objects`. Probe note:
   "REST off" reads as `503` on a TABLE path only; `/rest/v1/` root answers `401`
   at the gateway with no schema route.
+
+- S16: on the MANAGED PostgREST `request.headers` reaches SQL with
+  `cf-connecting-ip`, `cf-ew-via`, `cf-ipcountry`, `x-forwarded-for`,
+  `x-forwarded-proto`; the hosted edge APPENDS its address after a
+  client-supplied x-forwarded-for (client value first), so a check must read
+  `cf-connecting-ip`, never the first XFF element. `pgrst.db_pre_request` on
+  the authenticator role persists but fires neither after `NOTIFY pgrst,
+  'reload config'` (61s) nor after `POST /projects/{ref}/restart` (182s after
+  REST returned; the restart took REST down for 303s and the health endpoint
+  said ACTIVE_HEALTHY throughout). L09 stands, now with the restart path
+  measured too.
+- S18: the audit trail a customer credential reaches is the logs endpoint.
+  `edge_logs` carries every REST/Storage request with
+  `metadata.request.headers.cf_connecting_ip` (15-18s lag); `auth_logs`
+  carries a failed login as a request line (path, status, `error_code`,
+  `remote_addr`, no email) and a successful one as an `auth_event` with
+  `actor_username`. `GET /auth/v1/admin/audit` returned 0 entries throughout.
+  No Log Drains path exists in the /v1 spec (Dashboard-only). Blocking: 10
+  failed psql auths through the pooler banned this machine at the DB socket;
+  `POST network-bans/retrieve` (201) lists it, `DELETE network-bans` (200)
+  lifts it, and it is the only ban lever - nothing bans an IP at the HTTP tier.
+- S17: FORCE ROW LEVEL SECURITY binds an owner only if the owner cannot bypass
+  RLS. On the platform `postgres` (the query endpoint's role and default table
+  owner), `service_role` and `supabase_admin` are BYPASSRLS; a postgres-owned
+  table with RLS on and no policy reads every row before AND after FORCE, a
+  table owned by a NOBYPASSRLS lab role reads 0 after. `ALTER ROLE service_role
+  NOBYPASSRLS` -> `42501: "service_role" is a reserved role, only superusers can
+  modify it`. The backend gets RLS by ROLE CHOICE: a NOBYPASSRLS role granted to
+  `authenticator`, reached through the Data API with an HS256 JWT (`role` claim)
+  minted under the secret `GET /projects/{ref}/postgrest` returns - 0 rows with
+  no policy, the policy's rows with one.
+- S19 (enforcement, not settability): HIBP fires at SIGNUP (`422
+  weak_password`; S11: not on `PUT /auth/v1/user`). `rate_limit_anonymous_users
+  = 3` -> exactly 3 x 200 then 429 `over_request_rate_limit`, no burst above the
+  value. CAPTCHA gates signup AND password login (`400 captcha_failed`) and can
+  be proven with Turnstile's documented test secrets (always-fail
+  `2x0000000000000000000000000000000AA`, always-pass `1x...AA`, dummy token
+  `XXXX.DUMMY.TOKEN.XXXX`) - no provider account needed. A before-user-created
+  hook as a Postgres function (`pg-functions://postgres/<schema>/<fn>`) rejects
+  with its own message (`400`, `error_code` is `unknown`); GoTrue answers a
+  generic 400 for a few seconds after the PATCH while it reloads, so a probe
+  must wait for the hook's text, not any 400. `mailer_autoconfirm=true` lets a
+  signup probe run without spending the 2/hour shared-SMTP budget.
+- S20: on your own PostgREST the db-pre-request filter judges whatever
+  x-forwarded-for reaches it. Direct to the container the client's header is
+  what SQL sees (client-controlled); through an nginx edge that sets
+  `X-Forwarded-For $remote_addr` SQL sees the edge's peer address and the
+  client value is gone. The filter is an allowlist only when PostgREST is
+  reachable from nowhere but the edge - a deployment property.
+- S21 (no-RLS, service_role-from-the-backend shape): `REVOKE ... FROM anon,
+  authenticated` on tables/sequences/functions/schema closes tables (`401`/`403`
+  with `42501`) but leaves every RPC callable - functions carry EXECUTE for
+  PUBLIC (`proacl {=X/postgres,...}`) and schema public keeps USAGE for PUBLIC.
+  `REVOKE EXECUTE ... FROM public` closes them. A per-schema `ALTER DEFAULT
+  PRIVILEGES ... IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM public` does
+  NOT stop a new function reopening (per-schema entries add to the global
+  default); only the GLOBAL form (no IN SCHEMA) does. Exposed schema PATCHed to
+  `api` only: service_role loses `public` too (`404 PGRST205`) - project-wide;
+  the first exposed schema is the default profile.
+- Logs endpoints: `/analytics/endpoints/logs` (the shared `logsQuery` helper)
+  answered `Backend error! Retry your query.` to every edge_logs/auth_logs LIKE
+  query on 2026-09-03 while `/analytics/endpoints/logs.all` answered the
+  identical SQL (1-hour window). S18 queries logs.all first.
+- The `pvlab` binary cannot be rebuilt while a probe runs, and a probe killed
+  by a caller timeout skips its `finally` (S18 left a user and would have left
+  a ban). Run long modules with `make probe-bg` or a background shell, never
+  under a 10-minute foreground timeout.
 
 ## experiments/edge-function-limits - key facts (validated 2026-09-02, micro, Pro org)
 
