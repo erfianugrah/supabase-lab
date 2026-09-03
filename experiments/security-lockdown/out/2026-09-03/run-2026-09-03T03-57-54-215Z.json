@@ -1,0 +1,104 @@
+{
+  "startedAt": "2026-09-03T03:57:54.215Z",
+  "finishedAt": "2026-09-03T03:58:13.066Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "security-lockdown",
+  "labCommit": "0998c69",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "OpenSSL 3.6.4 25 Aug 2026 (Library: OpenSSL 3.6.4 25 Aug 2026)"
+  },
+  "results": [
+    {
+      "id": "S21a",
+      "title": "the exposure: a plain table (no RLS) reads for anon and authenticated",
+      "status": "pass",
+      "detail": "anon GET sec21_pii -> 200, 2 rows; authenticated -> 200, 2 rows. Default grants make every public table readable by any key holder.",
+      "measurements": {
+        "anon_status_before": 200,
+        "anon_rows_before": 2,
+        "authed_status_before": 200
+      },
+      "durationMs": 14426
+    },
+    {
+      "id": "S21b",
+      "title": "REVOKE from anon, authenticated (+ USAGE, + default privileges): tables closed, RPC still open via PUBLIC",
+      "status": "pass",
+      "detail": "closed after 0s. anon table -> 401 42501: permission denied for table sec21_pii; authenticated table -> 403 42501: permission denied for table sec21_pii; service_role table -> 200, 2 rows. anon RPC -> 200 STILL CALLABLE - functions carry EXECUTE for PUBLIC (proacl {=X/postgres,postgres=X/postgres,service_role=X/postgres}) and schema public keeps USAGE for PUBLIC (nspacl {pg_database_owner=UC/pg_database_owner,=U/pg_database_owner,postgres=U/pg_database_owner,service_role=U/pg_database_owner,sec17_backend=U/pg_database_owner,supabase_auth_admin=U/pg_database_owner,sec17_owner=UC/pg_database_owner}).",
+      "measurements": {
+        "anon_status": 401,
+        "anon_code": "42501: permission denied for table sec21",
+        "authed_status": 403,
+        "anon_rpc_status": 200,
+        "service_status": 200,
+        "service_rows": 2,
+        "closed_after_s": 0,
+        "fn_acl": "{=X/postgres,postgres=X/postgres,service_role=X/postgres}",
+        "schema_acl": "{pg_database_owner=UC/pg_database_owner,=U/pg_database_owner,postgres=U/pg_database_owner,service_role=U/pg_database_owner,sec17_backend=U/pg_database_owner,supabase_auth_admin=U/pg_database_owner,sec17_owner=UC/pg_database_owner}"
+      },
+      "durationMs": 14426
+    },
+    {
+      "id": "S21b2",
+      "title": "REVOKE EXECUTE from PUBLIC (+ default privileges): anon RPC closed, service_role RPC open",
+      "status": "pass",
+      "detail": "after revoking EXECUTE from PUBLIC (closed after 0s): anon RPC -> 401 42501: permission denied for function sec21_fn; service_role RPC -> 200. The grantee that matters for functions is PUBLIC, not anon.",
+      "measurements": {
+        "anon_rpc_status_after_public_revoke": 401,
+        "service_rpc_status": 200,
+        "closed_after_s": 0
+      },
+      "durationMs": 14426
+    },
+    {
+      "id": "S21c",
+      "title": "created afterwards: the table stays closed; the function reopens (per-schema default-privilege revoke cannot remove PUBLIC's EXECUTE)",
+      "status": "pass",
+      "detail": "new table: anon -> 401 42501: permission denied for table sec21_new, service_role -> 200, 1 rows. New RPC: anon -> 200 - CALLABLE AGAIN: the IN SCHEMA public default-privilege revoke adds to the global default and cannot take away the built-in EXECUTE for PUBLIC.",
+      "measurements": {
+        "new_table_anon_status": 401,
+        "new_rpc_anon_status_schema_revoke": 200,
+        "new_table_service_status": 200
+      },
+      "durationMs": 14426
+    },
+    {
+      "id": "S21c2",
+      "title": "global ALTER DEFAULT PRIVILEGES ... REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC: a new function is closed to anon",
+      "status": "pass",
+      "detail": "after the global (no IN SCHEMA) revoke, a third new RPC: anon -> 401 42501: permission denied for function sec21_fn3; service_role -> 200. Default EXECUTE for PUBLIC is removed by the global entry only.",
+      "measurements": {
+        "new_rpc_anon_status_global_revoke": 401,
+        "new_rpc_service_status": 200
+      },
+      "durationMs": 14426
+    },
+    {
+      "id": "S21d",
+      "title": "exposed schema = api only: service_role loses public until it sends Accept-Profile",
+      "status": "pass",
+      "detail": "PATCH db_schema=api -> 200, effective after 3s. service_role GET public.sec21_pii -> 404 PGRST205: Could not find the table 'api.sec21_pii' in the schema cache; GET api.pii with Accept-Profile: api -> 200, 2 rows; GET pii with no profile header -> 200. The setting is project-wide: the backend's own calls move with it.",
+      "measurements": {
+        "patch_status": 200,
+        "service_public_status": 404,
+        "service_public_code": "PGRST205: Could not find the table 'api.",
+        "service_api_status": 200,
+        "service_bare_status": 200,
+        "effective_after_s": 3
+      },
+      "durationMs": 14426
+    },
+    {
+      "id": "S21z",
+      "title": "cleanup",
+      "status": "pass",
+      "detail": "db_schema restored; grants and default privileges regranted to anon/authenticated and PUBLIC; fixtures and user removed",
+      "durationMs": 14426
+    }
+  ]
+}
