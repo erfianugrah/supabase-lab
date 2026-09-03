@@ -88,6 +88,10 @@ platform behaviour or writing it into docs
 - Nothing account- or engagement-specific in this repo; it is built to be public.
   Evidence gets generalised: no org names, no account IDs, no project
   refs, no internal ticket IDs, no named individuals.
+- A module that runs gets its RUNLOG line the same day. T27 ran on 2026-08-07
+  and the RUNLOG said "NOT YET RUN" until 2026-09-03, while two published
+  pages cited it. Anything a page cites from gitignored `evidence/` needs a
+  redacted RUNLOG line, or `make publish-evidence` into `out/<date>/`.
 - Committed ciphertext is permanent: this repo is public, so anything in
   `secrets.enc.tfvars` stays downloadable at that commit forever. If a
   secret is exposed, **revoke the secret** - rotating the age key does not
@@ -219,6 +223,10 @@ Affects every experiment here, since they all create projects.
   `POST /auth/v1/admin/users` call nonetheless failed with
   `500 "Database error checking email"`, succeeding about ten seconds later.
   Retry the first write with backoff; do not treat its failure as a finding.
+  The lexicanum pages also carry a "5 of 5 fresh projects, `500
+  unexpected_failure`, 2026-08-04" row from a bash run that was never ported
+  here; it is the corpus's own record, not a lab artifact, and the two do not
+  contradict each other.
 - New projects carry BOTH key pairs: legacy `anon` / `service_role` JWTs and the
   newer `sb_publishable_` / `sb_secret_` keys. Select by `name` OR `type` when
   reading `/api-keys?reveal=true`, or a script that assumes one shape sends a
@@ -376,6 +384,12 @@ Ported from throwaway bash that produced the same findings; see RUNLOG.md.
   whose read path is PostgREST may not notice a restart; one signing users in
   during the same window fails for over a minute. This refines T14, which
   measured one path at 5 s resolution and reported a single number.
+- **The Auth probe is `GET /auth/v1/health` with an anon key** (`lib/setup.ts`
+  `AUTH_PATH`, `lib/probes.ts`), not an authenticated operation. D01's 75 s and
+  D03's 131 s are that endpoint; compute-disk D09 sampled the same endpoint on
+  2026-08-19 and saw 0 s across four resizes, so the two runs disagree on one
+  surface and no run has probed an authenticated Auth call across a resize.
+  Write-ups must not call these figures an "authenticated Auth path".
 - **A resize costs about twice a restart** - Auth 131 s resizing up against
   75 s restarting, pooler 207 s against 158 s. Budget a maintenance window off
   the restart number and you will under-budget.

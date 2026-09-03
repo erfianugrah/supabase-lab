@@ -83,7 +83,7 @@ proves it (module). Status: [green] lab-validated, [doc] doc/design only,
 
 | # | Failure point | Signature | Detection | Workaround | Test |
 |---|---------------|-----------|-----------|------------|------|
-| 9.1 | Compute lifecycle (restart/resize/upgrade) | per-service gaps: REST ~10s, Storage ~26s, Auth ~75s | per-service authed probes | schedule windows; read replicas keep GETs alive | [green D-series] |
+| 9.1 | Compute lifecycle (restart/resize/upgrade) | per-service gaps on restart: REST 0 failed samples, Auth 75 s, Storage 78 s, pooler 158 s (platform-downtime D01, 2026-08-04, n=1) | per-service authed probes | schedule windows; read replicas keep GETs alive | [green D-series] |
 | 9.2 | Connection ceiling | tooManyConnections | connect probe | pooler, PITR-drain-first (F-series) | [green] |
 | 9.3 | Disk full / IO stall | writes fail, reads degrade | disk metrics (Prometheus endpoint) | storage resize ahead of curve | [doc] |
 | 9.4 | No managed failover on standard tiers | DB down = everything down | - | standby (W05) / PITR (class 9) | [green W05] |
