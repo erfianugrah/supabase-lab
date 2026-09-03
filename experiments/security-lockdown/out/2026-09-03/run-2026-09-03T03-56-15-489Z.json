@@ -1,0 +1,82 @@
+{
+  "startedAt": "2026-09-03T03:56:15.489Z",
+  "finishedAt": "2026-09-03T03:57:10.385Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "security-lockdown",
+  "labCommit": "0998c69",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "OpenSSL 3.6.4 25 Aug 2026 (Library: OpenSSL 3.6.4 25 Aug 2026)"
+  },
+  "results": [
+    {
+      "id": "S19a",
+      "title": "HIBP at signup: a breached password is refused, a strong one accepted",
+      "status": "pass",
+      "detail": "PATCH hibp+autoconfirm -> 200; signup with a breached password -> 422 weak_password: Password is known to be weak and easy to guess, please choose a different one. (enforced after 6s); strong password -> 200. HIBP is enforced at signup (S11: not on PUT /auth/v1/user).",
+      "measurements": {
+        "breached_status": 422,
+        "breached_code": "weak_password: Password is known to be w",
+        "strong_status": 200,
+        "enforced_after_s": 6
+      },
+      "durationMs": 43179
+    },
+    {
+      "id": "S19b",
+      "title": "anonymous sign-in rate limit (set to 3/hour) reaches a 429",
+      "status": "pass",
+      "detail": "PATCH -> 200; 15 anonymous sign-ins: 3 x 200, 12 x 429, first 429 at request #4; 429 body: over_request_rate_limit: Request rate limit reached. Statuses: 200,200,200,429,429,429,429,429,429,429,429,429,429,429,429.",
+      "measurements": {
+        "limit_set": 3,
+        "ok_count": 3,
+        "first_429_at": 4,
+        "code_429": "over_request_rate_limit: Request rate limit reached"
+      },
+      "durationMs": 43179
+    },
+    {
+      "id": "S19c",
+      "title": "CAPTCHA gates signup and password login at the door (Turnstile test secrets)",
+      "status": "pass",
+      "detail": "PATCH turnstile always-fail -> 200; gated after 5s. No token: signup -> 400 captcha_failed: captcha protection: request disallowed (no captcha_token found); password login -> 400 captcha_failed: captcha protection: request disallowed (no captcha_token found). Dummy token under always-fail -> 400. Always-pass secret + dummy token -> 200.",
+      "measurements": {
+        "signup_no_token": 400,
+        "login_no_token": 400,
+        "signup_token_failsecret": 400,
+        "signup_token_passsecret": 200,
+        "captcha_code": "captcha_failed: captcha protection: request disallowed (no c"
+      },
+      "durationMs": 43179
+    },
+    {
+      "id": "S19d",
+      "title": "before-user-created hook (Postgres function) rejects a disposable domain",
+      "status": "pass",
+      "detail": "PATCH hook pg-functions://postgres/public/sec19_hook -> 200; active after 5s. Blocked domain -> 400 \"unknown: disposable email domains are not allowed\"; allowed domain -> 200. The hook is where a domain allowlist lives, before the row exists.",
+      "measurements": {
+        "hook_patch_status": 200,
+        "blocked_status": 400,
+        "blocked_message": "unknown: disposable email domains are not allowed",
+        "allowed_status": 200,
+        "active_after_s": 5
+      },
+      "durationMs": 43179
+    },
+    {
+      "id": "S19z",
+      "title": "restore auth config, drop hook, delete users",
+      "status": "pass",
+      "detail": "restore PATCH -> 200; 8/8 users deleted",
+      "measurements": {
+        "users_created": 8,
+        "users_deleted": 8
+      },
+      "durationMs": 43179
+    }
+  ]
+}

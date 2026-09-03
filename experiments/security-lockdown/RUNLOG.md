@@ -149,9 +149,143 @@ project + anon key + PAT; no self-hosted PostgREST.
   TABLE path; the `/rest/v1/` root answers `401 Invalid API key` at the gateway
   with no schema route, so S15a creates a throwaway table to read the wedge.
 
+## Run 5 - 2026-09-03 - the pen-test-customer gaps (S16-S21), run live
+
+One Micro (org from secrets, ap-southeast-1), `make apply` -> probes in four
+invocations (S20 with the containers up; S17,S19,S21; S18 alone; S16 last) ->
+`make destroy`. Each module's final artifact is published redacted under
+`out/2026-09-03/` with its facts.md; earlier artifacts in the same `evidence/`
+tree are the probe-fix iterations (a banned test address reused as the
+visibility probe, a numeric GoTrue `code` hiding `error_code`, a lab role
+without schema CREATE, a leftover role from a killed run) and are not cited.
+
+- **S20 x-forwarded-for trust boundary on your own PostgREST**
+  (`run-2026-09-03T03-48-10-095Z`): an RPC returning
+  `request.headers->>'x-forwarded-for'` called DIRECT on the container with
+  `x-forwarded-for: 198.51.100.7` returned that value (200, 1 address,
+  client value present); the same call through an nginx edge that sets
+  `X-Forwarded-For $remote_addr` returned one RFC 1918 address and no client
+  value. The S04 filter (bans 203.0.113.9): direct spoof `403 PT403`, via the
+  edge `200`. The filter is an allowlist only when PostgREST is reachable from
+  nowhere but the edge - a deployment property of the container, not of the
+  function.
+- **S16 pre-request on hosted: NOTIFY vs restart, and the x-forwarded-for
+  shape** (`run-2026-09-03T04-24-07-384Z`, run LAST). An RPC returning
+  `request.headers` on the MANAGED PostgREST: with no client header
+  x-forwarded-for carries 1 address; with a client-supplied
+  `x-forwarded-for: 203.0.113.9` it carries 2, client value FIRST, then the
+  edge's address - the hosted edge APPENDS. The address-bearing header keys
+  that reach SQL are `cf-connecting-ip`, `cf-ew-via`, `cf-ipcountry`,
+  `x-forwarded-for`, `x-forwarded-proto`: a header-keyed check on hosted has a
+  trustworthy client address in `cf-connecting-ip` and must not read the first
+  x-forwarded-for element. This closes the L09 "not lab-answerable" gap. Then
+  the pre-request itself: `ALTER ROLE authenticator SET pgrst.db_pre_request`
+  persisted (rolconfig), `NOTIFY pgrst, 'reload config'` produced no fire in
+  61s (L09 replay); `POST /projects/{ref}/restart` -> 200, REST refused at
+  once, the health endpoint reported db+rest ACTIVE_HEALTHY immediately (not
+  readiness - see the provisioning note), REST answered again 302s later (303s
+  total from the restart call); no fire in 182s after that, GUC still on the
+  role. The role-GUC path does not activate on hosted by reload OR by restart:
+  the managed PostgREST is not started with db-config on, or reads it from
+  somewhere the customer cannot reach. The hosted IP filter stays a no.
+- **S18 audit trail and blocking** (`run-2026-09-03T04-34-40-378Z`, run
+  alone): the /v1 spec has 115 paths, 0 mention drain (Log Drains are
+  Dashboard-only, no API lever) and 3 mention ban (`network-bans/retrieve`,
+  `retrieve/enriched`, `DELETE network-bans`). A marked anon REST request
+  (`GET /rest/v1/sec18_<nonce>` -> 404) was found in `edge_logs` 18s later by
+  `metadata.request.path`, with `cf_connecting_ip` and `x_real_ip` populated;
+  a marked Storage request (`/storage/v1/bucket?sec18=<nonce>` -> 200) 15s
+  later by `metadata.request.url`. A failed password login (`400
+  invalid_credentials`) appears in `auth_logs` as a request line with method,
+  path, status, `error_code` and `remote_addr` - not the email - found 2s
+  after the query started; a successful login appears as an `auth_event` line
+  (`action: login`, `actor_username` = the email) 3s later. `GET
+  /auth/v1/admin/audit` with the service key returned 200 with 0 entries
+  throughout: the audit trail on this project is the auth_logs auth_event,
+  not the admin audit endpoint. Network bans: 0 banned; 10 failed psql
+  auths through the session pooler (`FATAL: password authentication failed`)
+  produced 1 ban (this machine); `DELETE /network-bans` with that address ->
+  200, 0 banned after, and a correct-password psql through the pooler
+  succeeded afterwards. The ban is DB-socket scoped (the only ban lever in
+  the spec); nothing bans an IP at the HTTP tier. The first S18 run polled
+  `/analytics/endpoints/logs` (the shared helper) and got `Backend error!
+  Retry your query.` on every query while `logs.all` answered the same SQL;
+  it also keyed the failed-login lookup on the nonce, which that line does not
+  carry. Both fixed before the cited run.
+- **S17 FORCE ROW LEVEL SECURITY** (`run-2026-09-03T04-10-27-851Z`): the query
+  endpoint runs as `postgres`, which on this platform has `rolbypassrls=true`
+  (so do `service_role` and `supabase_admin`; `authenticator`, `anon`,
+  `authenticated`, `supabase_auth_admin` do not). A postgres-owned table with
+  RLS on and no policy read 2 rows before AND after FORCE - FORCE changes
+  nothing for a backend connecting as postgres. A table owned by a lab role
+  without BYPASSRLS read 2 before FORCE and 0 after. `service_role` via REST
+  under FORCE: 200, 2 rows. `ALTER ROLE service_role NOBYPASSRLS` as the
+  project owner: `42501: "service_role" is a reserved role, only superusers can
+  modify it`. The shape that works: a `NOBYPASSRLS` role granted to
+  `authenticator`, reached through the Data API with an HS256 JWT minted under
+  the secret `GET /projects/{ref}/postgrest` returns (`role` claim): 200 with 0
+  rows under no policy, 200 with 1 row once a `tenant = 'a'` policy exists.
+  RLS reaches the backend by role choice, not by FORCE.
+- **S19 Auth enforcement** (`run-2026-09-03T03-56-15-489Z`, S19 rows): with
+  `mailer_autoconfirm` on (no email sent), HIBP at SIGNUP refused
+  `passwordpassword` with `422 weak_password: Password is known to be weak and
+  easy to guess, please choose a different one.` 6s after the PATCH, and
+  accepted a strong one (200) - the half S11 could not drive.
+  `rate_limit_anonymous_users` lowered to 3: 15 anonymous sign-ins gave
+  3 x 200 then 12 x 429 (`over_request_rate_limit: Request rate limit
+  reached`), the first 429 at request #4 - the limit is exact, no burst above
+  the configured value in this window. CAPTCHA with Turnstile's documented
+  always-fail test secret: signup and password login without a token both
+  `400 captcha_failed: captcha protection: request disallowed (no
+  captcha_token found)`; the dummy token under the always-fail secret 400;
+  the always-pass secret plus the dummy token 200 - the gate covers login,
+  not just signup, and needs no provider account to prove. A
+  before-user-created hook as a Postgres function
+  (`pg-functions://postgres/public/sec19_hook`) rejecting `@mailinator.com`:
+  blocked domain `400 unknown: disposable email domains are not allowed`
+  (the hook's own message; `error_code` is `unknown`), allowed domain 200,
+  active 5s after the PATCH. GoTrue answers a generic 400 for a few seconds
+  while it reloads the hook config; the probe waits for the hook's own text.
+  8 users created, 8 deleted.
+- **S21 the no-RLS, service_role-from-the-backend shape**
+  (`run-2026-09-03T03-57-54-215Z`, S21 rows): a plain table read 200 for anon
+  and for an authenticated user token (the exposure). After `REVOKE ALL ON ALL
+  TABLES/SEQUENCES/FUNCTIONS IN SCHEMA public FROM anon, authenticated`,
+  `REVOKE USAGE ON SCHEMA public` and the matching `ALTER DEFAULT PRIVILEGES
+  FOR ROLE postgres IN SCHEMA public`: anon table `401 42501: permission
+  denied for table`, authenticated `403 42501`, service_role 200 with 2 rows -
+  and the anon RPC STILL 200. FINDING: functions carry EXECUTE for PUBLIC
+  (`proacl {=X/postgres,...}`) and schema public keeps USAGE for PUBLIC
+  (`nspacl {...,=U/pg_database_owner,...}`), so a revoke aimed at anon and
+  authenticated leaves every function callable. `REVOKE EXECUTE ON ALL
+  FUNCTIONS IN SCHEMA public FROM public` closed it (`401 42501: permission
+  denied for function`), service_role RPC still 200. A table created
+  afterwards stayed closed (default privileges), but a function created
+  afterwards was callable AGAIN: the `IN SCHEMA public` default-privilege
+  revoke adds to the global default and cannot remove the built-in EXECUTE
+  for PUBLIC. The GLOBAL form, `ALTER DEFAULT PRIVILEGES FOR ROLE postgres
+  REVOKE EXECUTE ON FUNCTIONS FROM public` (no IN SCHEMA), closed a third new
+  function (`401 42501`). Exposed schema PATCHed to `api` only: effective in
+  3s; service_role on the public table `404 PGRST205: Could not find the
+  table 'api.sec21_pii' in the schema cache`; `api.pii` 200 with
+  `Accept-Profile: api` and also 200 with no header (the first exposed schema
+  is the default). The setting is project-wide; the backend's own calls move
+  with it.
+
+### Teardown (run 5)
+
+`make postgrest-down edge-down` after S20; `make destroy` after S16: project
+GET 400, tofu state empty, no `sec-*` containers. Nothing left standing.
+
 ## Remaining
 
 - Phase C PrivateLink (iap-lockdown L20-L23) - needs a Team-tier org, an AWS
   session, and the one manual dashboard association; the composition is proven
   in privatelink-aws (see iap-lockdown RUNLOG closeout).
 - The doc-link + BYOC-verification items, deferred.
+- Log Drains delivery to an OTLP destination (Dashboard-only, Team plan) and
+  the HTTP-endpoint variant of the before-user-created hook - S18/S19 measured
+  the Postgres-function hook and the logs endpoints only.
+- pg_cron jobs and database webhooks under restrict-all (L22 measured one
+  Edge Function).
+- A ban provoked over direct 5432 (IPv6) rather than the pooler.
