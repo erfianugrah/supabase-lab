@@ -112,3 +112,45 @@ Deltas the diff surfaced:
   is micro (126 s provision), no nano anywhere in its catalogue.
 
 <!-- Append new runs below: date, org class, module ids, artifact path. -->
+
+## 2026-09-03 - Pro AND Team orgs, restore surface: S03 + S11 per org, plus a curl replay
+
+Prompted by a customer report of three refusals on the backups routes. S03 and
+S11 ran through `.pi/probe-sfp-platforms.sh` on the Pro org and again on the
+Team org (four artifacts under `evidence/20260903-restore-gate/{pro,team}/`,
+all four PROBE PASS; S03b `restore_point_status=400`, S11b
+`schedule_status=402` on both). The wider route matrix below is a curl replay
+against an existing Pro-org project and a fresh Pro-org project created and
+deleted for the run. Same PAT (owner role) throughout.
+
+- All four restore-family routes answer the SAME `400 {"message":"This endpoint
+  is unavailable at the moment"}` once the body passes schema validation:
+  `POST backups/restore` (`{id}`), `POST backups/restore-point` (`{name}`),
+  `GET backups/restore-point`, `POST backups/undo` (`{name}`). Identical on the
+  existing project and the fresh one. With S03 on Pro and Team today and on the
+  platform-plan org on 2026-08-24, that is three org classes with the same 400.
+- The gate fires AFTER validation and BEFORE any lookup: an empty body gets
+  `400 "Invalid input: expected object, received undefined"`, a wrong field gets
+  `400 "id: Invalid input: expected number"`, a 21-char name gets `400 "name: Too
+  big"`, and a bogus `{id:999999}` on a project whose only backup has a different
+  id still gets "unavailable" rather than a not-found. A customer who sees
+  "unavailable" therefore sent a well-formed request.
+- The message is specific to this gate. An unknown path answers
+  `404 "Cannot GET ..."`, and `POST backups/restore-pitr` with a valid body on a
+  non-PITR project answers `400 "PITR is not enabled for this project."`.
+- All eight backups operations are in the published OpenAPI document,
+  `POST backups/restore` (`v1-restore-physical-backup`, body `{id: integer}`)
+  and `GET backups/restore-point` (`v1-get-restore-point`, returns
+  `{name, status: AVAILABLE|PENDING|REMOVED|FAILED, completed_on}`) included.
+  Neither documents a 400 or a 402; only the two `schedule` operations
+  document 402.
+- The entitlements list (`GET /organizations/{slug}/entitlements`) carries NO
+  restore-point key on the Pro, Team or Free lab orgs (64 features; the
+  backup-family keys are `backup.retention_days`, `backup.restore_to_new_project`,
+  `backup.schedule`, `pitr.available_variants`, `project_restore_after_expiry`).
+  Restore-point access is not readable from that endpoint; the 400 above is
+  the only signal. `backup.schedule` is `hasAccess: false` on Pro AND Team, and
+  `GET`/`PATCH backups/schedule` both 402 with `feature: backup.schedule`,
+  consistent with S11.
+- A fresh project reported `ACTIVE_HEALTHY` on the first poll (10 s) and already
+  listed one COMPLETED physical backup.
