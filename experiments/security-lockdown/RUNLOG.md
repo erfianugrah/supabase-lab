@@ -193,7 +193,9 @@ without schema CREATE, a leftover role from a killed run) and are not cited.
   Dashboard-only, no API lever) and 3 mention ban (`network-bans/retrieve`,
   `retrieve/enriched`, `DELETE network-bans`). A marked anon REST request
   (`GET /rest/v1/sec18_<nonce>` -> 404) was found in `edge_logs` 18s later by
-  `metadata.request.path`, with `cf_connecting_ip` and `x_real_ip` populated;
+  `metadata.request.path`, with a client-address header field populated (the
+  probe accepts `cf_connecting_ip` or `x_real_ip`; the row read back by hand
+  carried both);
   a marked Storage request (`/storage/v1/bucket?sec18=<nonce>` -> 200) 15s
   later by `metadata.request.url`. A failed password login (`400
   invalid_credentials`) appears in `auth_logs` as a request line with method,
