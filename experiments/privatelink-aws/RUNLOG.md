@@ -398,6 +398,15 @@ Results:
   run missed this because deleting the project bypasses the guard. T19 should
   be rewritten as an ordering-constraint test: attempt with an attachment
   present, expect refusal; detach; expect success.
+- **T07 ceiling - fifth isolated sample: 288.** Evidence
+  `evidence/20260807-124740` (gitignored). Isolated probe on the quiet
+  system, 300 requested, first refusal at client 288, against 174 / 213 (run
+  8), 213 (run 6) and 287 (run 7). Ramp steps on the same pass: 150 accepted
+  and queued, 200 refused at client 24, 250 refused at client 243 - the ramp
+  steps run back to back with held connections, so only the isolated figure
+  is quotable. A second suite pass 16 minutes later
+  (`evidence/20260807-130351`) reported 140 on its isolated probe; recorded
+  here, not used in the published docs.
 
 New gotchas:
 
@@ -473,6 +482,29 @@ All three toggles default false and are not switched on in
 (missing capability), which was the gate this work was validated against
 instead of a live spin.
 
+## 2026-08-07 - T27 RUN (transit gateway; the second VPC reaches the endpoint)
+
+Separate spin the same day, after run 9's teardown, with
+`enable_second_vpc=true enable_transit_gateway=true`; vantage local, lab
+`9398dfe`, started 09:19Z. Artifact
+`evidence/t27/run-2026-08-07T09-19-13-386Z.{md,json}` (gitignored). T28 and
+T29 were not run on this spin.
+
+- T27 status `info`: reachable from the second VPC over the transit gateway
+  on 5432 and 6543. Measurements: `transport = transit-gateway`,
+  `peering_state = None`, `tgw_attachment_state = available`,
+  `phz_resolves = true`, `port_5432_ok = true`, `port_6543_ok = true`; probe
+  Lambda `supabase-lab-probe-second-vpc`.
+- Per port: 5432 connect 581ms, query 36ms, prepared statements ok; 6543
+  connect 218ms, query 21ms, prepared statements ok.
+- The transport attribution held: no peering connection present, gateway
+  attachment available, so the test's both-up / neither-up skip did not fire
+  and the gateway is what carried the traffic.
+- Certificate verification was off in the probe, so `verify-full` from the
+  second VPC is still not measured.
+
+Closes the T27 half of the "Run T27/T28/T29" follow-up below.
+
 ## Open follow-ups
 
 - [x] T22a/b/c/g/h + all of T23 - closed on a bare project, see
@@ -498,7 +530,9 @@ instead of a live spin.
       Declined on run 9. T20c confirms it is the only blocker: "no public A
       record for the database host - without the IPv4 add-on there is no
       public-direct path to measure".
-- [ ] Run T27/T28/T29 on the next spin: `enable_second_vpc=true
+- [x] T27 - run 2026-08-07 on a separate spin, see the T27 RUN entry above:
+      reachable over the transit gateway on both ports.
+- [ ] Run T28/T29 on the next spin: `enable_second_vpc=true
       enable_transit_gateway=true enable_read_replica=true enable_soak=true`,
       apply, let the soak accumulate for a while, then `--destructive`
-      (T28 needs it; T27/T29 do not).
+      (T28 needs it; T29 does not).
