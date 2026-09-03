@@ -1,0 +1,79 @@
+{
+  "startedAt": "2026-09-03T04:24:07.384Z",
+  "finishedAt": "2026-09-03T04:33:26.177Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "security-lockdown",
+  "labCommit": "0998c69",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "OpenSSL 3.6.4 25 Aug 2026 (Library: OpenSSL 3.6.4 25 Aug 2026)"
+  },
+  "results": [
+    {
+      "id": "S16a",
+      "title": "x-forwarded-for as the hosted PostgREST hands it to SQL (client header spoofed)",
+      "status": "pass",
+      "detail": "RPC ready in 3s (HTTP 200/200). Without a client header x-forwarded-for carries 1 address(es); with x-forwarded-for=203.0.113.9 it carries 2: APPENDED - client value first, then the edge's address. Address-bearing header keys present: cf-connecting-ip,cf-ew-via,cf-ipcountry,x-forwarded-for,x-forwarded-proto.",
+      "measurements": {
+        "rpc_status": 200,
+        "xff_addrs_plain": 1,
+        "xff_addrs_spoofed": 2,
+        "spoof_visible": "true",
+        "spoof_first": "true",
+        "header_keys": "cf-connecting-ip,cf-ew-via,cf-ipcountry,x-forwarded-for,x-forwarded-proto"
+      },
+      "durationMs": 558771
+    },
+    {
+      "id": "S16b",
+      "title": "GUC + NOTIFY reload config: pre-request fires? (L09 replay)",
+      "status": "info",
+      "detail": "GUC persisted on authenticator: true; no pre-request row within 61s of NOTIFY pgrst 'reload config' (matches L09).",
+      "measurements": {
+        "guc_persisted": "true",
+        "fired_after_notify": "false",
+        "notify_window_s": 61
+      },
+      "durationMs": 558813
+    },
+    {
+      "id": "S16c",
+      "title": "POST /restart: downtime as seen from REST",
+      "status": "pass",
+      "detail": "POST /projects/{ref}/restart -> HTTP 200. REST observed down: true (at +0s); db+rest ACTIVE_HEALTHY at +0s after that; REST answering again +302s after health. Total 303s.",
+      "measurements": {
+        "restart_status": 200,
+        "rest_down_observed": "true",
+        "down_at_s": 0,
+        "healthy_after_s": 0,
+        "rest_back_after_s": 302,
+        "total_s": 303
+      },
+      "durationMs": 558813
+    },
+    {
+      "id": "S16d",
+      "title": "after a full project restart: pre-request fires?",
+      "status": "info",
+      "detail": "no pre-request row within 182s after the restart; GUC still on the role: true. The role-GUC path does not activate on hosted by reload OR by restart.",
+      "measurements": {
+        "fired_after_restart": "false",
+        "restart_window_s": 182,
+        "guc_after_restart": "true",
+        "xff_in_row": "absent"
+      },
+      "durationMs": 558813
+    },
+    {
+      "id": "S16z",
+      "title": "cleanup",
+      "status": "pass",
+      "detail": "GUC reset, NOTIFY, table + functions dropped (project is destroyed after this run regardless)",
+      "durationMs": 558813
+    }
+  ]
+}

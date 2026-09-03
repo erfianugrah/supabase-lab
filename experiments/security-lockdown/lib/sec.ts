@@ -64,3 +64,43 @@ export async function waitFor(fn: () => Promise<boolean>, timeoutMs: number, pol
   }
   return { ok: false, elapsedS: Math.round((Date.now() - t0) / 1000) };
 }
+
+/** Like http() but keeps the body, for row counts and error messages. */
+export async function httpBody(
+  url: string,
+  opts: { method?: string; key?: string; body?: unknown; headers?: Record<string, string>; timeoutMs?: number } = {},
+): Promise<{ status: number; text: string; json: unknown; ms: number }> {
+  const t0 = performance.now();
+  try {
+    const res = await fetch(url, {
+      method: opts.method ?? "GET",
+      headers: {
+        ...(opts.key ? { apikey: opts.key, Authorization: `Bearer ${opts.key}` } : {}),
+        ...(opts.body !== undefined ? { "Content-Type": "application/json" } : {}),
+        ...(opts.headers ?? {}),
+      },
+      body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+      signal: AbortSignal.timeout(opts.timeoutMs ?? 15_000),
+    });
+    const text = await res.text();
+    let json: unknown = undefined;
+    try { json = JSON.parse(text); } catch { /* not json */ }
+    return { status: res.status, text, json, ms: Math.round(performance.now() - t0) };
+  } catch (e) {
+    return { status: 0, text: `ERR:${e instanceof Error ? e.message : String(e)}`, json: undefined, ms: Math.round(performance.now() - t0) };
+  }
+}
+
+/** Short error code/message from a PostgREST/GoTrue JSON body. */
+export function errCode(json: unknown, text: string): string {
+  if (json && typeof json === "object") {
+    const j = json as Record<string, unknown>;
+    // GoTrue puts a NUMERIC http code in `code` and the name in `error_code`;
+    // PostgREST puts the SQLSTATE-ish string in `code`. Prefer the named field.
+    const code = typeof j.code === "string" ? j.code : undefined;
+    const name = j.error_code ?? code;
+    const msg = j.msg ?? j.message ?? j.error ?? j.hint;
+    return [name, msg].filter((x) => x !== undefined && x !== "").map(String).join(": ").slice(0, 160);
+  }
+  return text.trim().slice(0, 80);
+}

@@ -4,12 +4,13 @@ REF := $(shell tofu output -raw project_ref 2>/dev/null)
 TOK := $(shell grep -E '^supabase_access_token' $(ROOT)/secrets.tfvars 2>/dev/null | cut -d'"' -f2)
 PW := $(shell grep -E '^db_password' $(ROOT)/secrets.tfvars 2>/dev/null | cut -d'"' -f2)
 TS := $(shell date +%Y%m%d-%H%M%S)
-IDS ?= S01,S02,S03,S04,S05,S06,S07,S08,S09,S10,S11,S12,S13,S14,S15
+IDS ?= S01,S02,S03,S04,S05,S06,S07,S08,S09,S10,S11,S12,S13,S14,S15,S16,S17,S18,S19,S20,S21
 PGRST_PORT ?= 3001
 RL_PORT ?= 8080
 RLW_PORT ?= 8788
+EDGE_PORT ?= 8081
 
-.PHONY: init fmt validate apply probe destroy postgrest-up postgrest-down ratelimit-up ratelimit-down ratelimit-worker-up ratelimit-worker-down
+.PHONY: init fmt validate apply probe publish-evidence destroy postgrest-up postgrest-down ratelimit-up ratelimit-down ratelimit-worker-up ratelimit-worker-down edge-up edge-down
 
 init:
 	tofu init
@@ -68,6 +69,18 @@ ratelimit-worker-up:
 ratelimit-worker-down:
 	-pkill -f 'wrangler dev --port $(RLW_PORT)' >/dev/null 2>&1 && echo "ratelimit-worker down"
 
+# S20: an nginx edge that OVERWRITES X-Forwarded-For in front of the self-hosted
+# PostgREST - the trust boundary S04's spoof test leaves open. Same pinned image
+# as the rate limiter.
+edge-up:
+	docker rm -f sec-edge >/dev/null 2>&1 || true
+	docker run -d --name sec-edge --add-host=host.docker.internal:host-gateway \
+		-p $(EDGE_PORT):8081 -v $(abspath edge.nginx.conf):/etc/nginx/nginx.conf:ro \
+		nginx:1.31.4-trixie >/dev/null && echo "edge up on :$(EDGE_PORT)"
+
+edge-down:
+	-docker rm -f sec-edge >/dev/null 2>&1 && echo "edge down"
+
 probe:
 	@test -n "$(REF)" || (echo "no project_ref output - run 'make apply' first"; exit 1)
 	@test -n "$(TOK)" || (echo "no PAT in $(ROOT)/secrets.tfvars"; exit 1)
@@ -84,9 +97,15 @@ probe:
 		PVLAB_ENDPOINT_SELFHOSTED_POSTGREST="http://localhost:$(PGRST_PORT)" \
 		PVLAB_ENDPOINT_RATELIMIT="http://localhost:$(RL_PORT)" \
 		PVLAB_ENDPOINT_RATELIMIT_WORKER="http://localhost:$(RLW_PORT)" \
+		PVLAB_ENDPOINT_EDGE="http://localhost:$(EDGE_PORT)" \
 		$(ROOT)/harness/dist/pvlab --where local --experiment security-lockdown \
 		--only "$(IDS)" --destructive --out evidence/$(TS)
 	@echo "== evidence/$(TS)/run-<stamp>.md =="
+
+# Redact a run artifact and publish it (plus facts.md) to the committed out/<date>/.
+publish-evidence:
+	@test -n "$(RUN)" || (echo "RUN=evidence/<ts>/run-<stamp>.json required"; exit 1)
+	@cd $(ROOT)/harness && bun scripts/publish-evidence.ts $(abspath $(RUN)) $(abspath .) $(if $(ONLY),--only $(ONLY),)
 
 destroy:
 	tofu plan -destroy $(VARS) -out=tfplan-destroy
