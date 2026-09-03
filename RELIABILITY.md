@@ -58,9 +58,12 @@ Recurring class, not a one-off.
 
 ## Class 2: Compute lifecycle downtime (restart / resize / upgrade / pause)
 
-**Lab-validated (platform-downtime, 2026-08-06..08).**
-- Restart gaps: REST ~10s, Storage ~26s, Auth ~75s (N=3, p50). Auth stays
-  down ~7.5x longer than REST on the same event.
+**Lab-validated (platform-downtime D01, 2026-08-04, n=1, 500 ms sampling).**
+- Restart gaps: REST and Realtime 0 failed samples, Auth 75 s (`HTTP 521` on
+  `GET /auth/v1/health`), Storage 78 s (`HTTP 500`), pooler 158 s. An earlier
+  revision of this file carried REST ~10s / Storage ~26s / Auth ~75s (N=3,
+  2026-08-06..08); no artifact or RUNLOG holds those figures and the RUNLOG is
+  the record.
 - Anonymous `pg_isready`-style probes see NOTHING - network accept is not
   readiness. Authenticated probes only, against a real table.
 - Postgres itself continues serving through kong/auth deaths
