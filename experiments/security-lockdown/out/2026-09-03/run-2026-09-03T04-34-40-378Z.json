@@ -1,0 +1,99 @@
+{
+  "startedAt": "2026-09-03T04:34:40.378Z",
+  "finishedAt": "2026-09-03T04:36:43.683Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "security-lockdown",
+  "labCommit": "0998c69",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "OpenSSL 3.6.4 25 Aug 2026 (Library: OpenSSL 3.6.4 25 Aug 2026)"
+  },
+  "results": [
+    {
+      "id": "S18a",
+      "title": "Log Drains and ban levers in the /v1 spec",
+      "status": "info",
+      "detail": "115 paths; 0 mention drain (none - Log Drains are Dashboard-only); 3 mention ban: /v1/projects/{ref}/network-bans/retrieve, /v1/projects/{ref}/network-bans/retrieve/enriched, /v1/projects/{ref}/network-bans.",
+      "measurements": {
+        "spec_paths": 115,
+        "drain_paths": 0,
+        "ban_paths": 3
+      },
+      "evidence": "/v1/projects/{ref}/network-bans/retrieve\n/v1/projects/{ref}/network-bans/retrieve/enriched\n/v1/projects/{ref}/network-bans",
+      "durationMs": 123309
+    },
+    {
+      "id": "S18b",
+      "title": "a REST request is findable in edge_logs by path, with a client IP",
+      "status": "pass",
+      "detail": "anon GET /rest/v1/sec18_<nonce> -> 404; found in edge_logs 18s later via the rich query (method=GET); client IP field present: true.",
+      "measurements": {
+        "rest_status": 404,
+        "found": "true",
+        "lag_s": 18,
+        "client_ip_present": "true",
+        "query": "rich"
+      },
+      "durationMs": 123309
+    },
+    {
+      "id": "S18c",
+      "title": "a Storage request is findable in edge_logs the same way",
+      "status": "pass",
+      "detail": "service GET /storage/v1/bucket?sec18=<nonce> -> 200; found 15s later (rich); client IP field present: true.",
+      "measurements": {
+        "storage_status": 200,
+        "found": "true",
+        "lag_s": 15
+      },
+      "durationMs": 123309
+    },
+    {
+      "id": "S18d",
+      "title": "auth: failed login in auth_logs, successful login in the admin audit log",
+      "status": "pass",
+      "detail": "failed login -> 400 invalid_credentials: Invalid login credentials; auth_logs match found 2s later (matched by path=/token + error_code=invalid_credentials; the line carries method, path, status, error_code and remote_addr, not the email). Successful login -> 200: an auth_event line with action=login and the actor's email appeared in auth_logs 3s after the audit poll; GET /auth/v1/admin/audit (service key) -> HTTP 200, 0 entries, user absent within 60s - the audit trail is the auth_logs auth_event, not the admin audit endpoint.",
+      "measurements": {
+        "failed_login_status": 400,
+        "auth_logs_found": "true",
+        "auth_logs_lag_s": 2,
+        "login_status": 200,
+        "login_event_found": "true",
+        "login_event_lag_s": 3,
+        "audit_status": 200,
+        "audit_entries": 0,
+        "audit_found": "false"
+      },
+      "durationMs": 123309
+    },
+    {
+      "id": "S18e",
+      "title": "network bans: retrieve, provoke via failed pooler auth, remove",
+      "status": "pass",
+      "detail": "retrieve -> HTTP 201, 0 banned before. 10 failed psql auths via the pooler (psql: error: connection to server at \"<pooler-host>\" (<pooler-ip>), port 5432 failed: FATAL: password authentication failed for use). After: 1 banned (1 new); DELETE /network-bans -> 200, 0 after removal. Enriched -> HTTP 201. Correct-password psql afterwards: OK.",
+      "measurements": {
+        "retrieve_status": 201,
+        "banned_before": 0,
+        "failed_attempts": 10,
+        "banned_after": 1,
+        "ban_appeared": "true",
+        "remove_status": 200,
+        "banned_after_remove": 0,
+        "psql_ok_after": "yes"
+      },
+      "evidence": "{\"banned_ipv4_addresses\":[{\"banned_address\":\"<ip>\",\"identifier\":\"<ref>\",\"type\":\"PRIMARY\"}]}",
+      "durationMs": 123309
+    },
+    {
+      "id": "S18z",
+      "title": "cleanup",
+      "status": "pass",
+      "detail": "auth user deleted; any new ban removed",
+      "durationMs": 123309
+    }
+  ]
+}

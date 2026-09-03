@@ -1,2 +1,3 @@
 secrets.example.tfvars
 experiments/*/experiment.tfvars
+experiments/*/out/*
