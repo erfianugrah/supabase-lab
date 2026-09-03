@@ -996,12 +996,12 @@ a throwaway probe Worker + two Hyperdrive configs via wrangler (account from
   `cf-connecting-ip`, never the first XFF element. `pgrst.db_pre_request` on
   the authenticator role persists but fires neither after `NOTIFY pgrst,
   'reload config'` (61s) nor after `POST /projects/{ref}/restart` (182s after
-  REST returned; the restart took REST down for 303s and the health endpoint
-  said ACTIVE_HEALTHY throughout). L09 stands, now with the restart path
+  REST returned; the restart took REST down for 303s and the first health poll
+  after it already said ACTIVE_HEALTHY - not readiness). L09 stands, now with the restart path
   measured too.
 - S18: the audit trail a customer credential reaches is the logs endpoint.
-  `edge_logs` carries every REST/Storage request with
-  `metadata.request.headers.cf_connecting_ip` (15-18s lag); `auth_logs`
+  `edge_logs` carries every REST/Storage request with a client-address
+  header field (`cf_connecting_ip` or `x_real_ip`; the probe checks either) in 15-18s; `auth_logs`
   carries a failed login as a request line (path, status, `error_code`,
   `remote_addr`, no email) and a successful one as an `auth_event` with
   `actor_username`. `GET /auth/v1/admin/audit` returned 0 entries throughout.
