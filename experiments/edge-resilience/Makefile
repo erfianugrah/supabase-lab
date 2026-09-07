@@ -11,6 +11,10 @@ REF = $(shell tofu output -raw project_ref 2>/dev/null | tr -d '\n' | grep -Eo '
 FILE_TOK := $(shell grep -E '^supabase_access_token' $(ROOT)/secrets.tfvars 2>/dev/null | cut -d'"' -f2)
 TOK := $(if $(SUPABASE_ACCESS_TOKEN),$(SUPABASE_ACCESS_TOKEN),$(FILE_TOK))
 PW := $(shell grep -E '^db_password' $(ROOT)/secrets.tfvars 2>/dev/null | cut -d'"' -f2)
+# The harness labels the artifact with AWS_REGION and falls back to
+# ap-southeast-1 when it is unset; every run before 2026-09-07 carried that
+# label while the project sat in ap-southeast-2 (W27's reviewer caught it).
+REGION := $(shell grep -E '^region' experiment.tfvars 2>/dev/null | cut -d'"' -f2)
 
 # MANDATORY. `--experiment` only LABELS the report; one registry carries every
 # experiment's tests and planRun filters on where/capabilities/only/destructive.
@@ -92,7 +96,7 @@ probe:
 	test -n "$$pub" || (echo "could not fetch the publishable key"; exit 1); \
 	edge=$$(bun -e 'console.log(JSON.parse(require("fs").readFileSync("wrangler.jsonc","utf8")).vars.EDGE_URL)' 2>/dev/null || true); \
 	PVLAB_REF="$(REF)" SUPABASE_ACCESS_TOKEN="$(TOK)" SUPABASE_ANON_KEY="$$pub" DB_PASSWORD="$(PW)" \
-		PVLAB_ENDPOINT_EDGE_URL="$$edge" \
+		AWS_REGION="$(REGION)" PVLAB_ENDPOINT_EDGE_URL="$$edge" \
 		PVLAB_ENDPOINT_JWKS_PRIV="$(CURDIR)/jwks/private.json" \
 		$(ROOT)/harness/dist/pvlab --where local --experiment edge-resilience \
 		--only $(ONLY) $(RUNNER_FLAGS) --out evidence/$(TS)

@@ -42,7 +42,7 @@
 import { createHmac } from "node:crypto";
 import type { Ctx, TestModule, TestResult } from "../../../harness/src/types";
 import { mgmt } from "../../../harness/src/mgmt";
-import { fetchKeys, logsQuery as logsStream, sql } from "../../../harness/src/platform";
+import { fetchKeys, logsAllQuery, logsQuery as logsStream, sql } from "../../../harness/src/platform";
 
 const ID = "W27";
 const SUB = "00000000-0000-0000-0000-000000000027";
@@ -129,16 +129,8 @@ interface LogRow {
 }
 
 async function logsAll(ctx: Ctx, sqlText: string): Promise<{ rows: LogRow[]; error: string }> {
-  const end = new Date();
-  const start = new Date(end.getTime() - 3600_000);
-  const qs =
-    `sql=${encodeURIComponent(sqlText)}` +
-    `&iso_timestamp_start=${encodeURIComponent(start.toISOString())}` +
-    `&iso_timestamp_end=${encodeURIComponent(end.toISOString())}`;
-  const r = await mgmt(ctx, "GET", `/projects/${ctx.ref}/analytics/endpoints/logs.all?${qs}`, undefined, 60_000);
-  const j = (r.json ?? {}) as { result?: LogRow[]; error?: unknown };
-  if (j.error) return { rows: [], error: JSON.stringify(j.error).slice(0, 300) };
-  return { rows: Array.isArray(j.result) ? j.result : [], error: r.status >= 300 ? r.text.slice(0, 300) : "" };
+  const r = await logsAllQuery(ctx, sqlText, 1);
+  return { rows: r.rows as unknown as LogRow[], error: r.error };
 }
 
 /** Poll logs.all until every expected User-Agent has a row, or the budget is spent. */
