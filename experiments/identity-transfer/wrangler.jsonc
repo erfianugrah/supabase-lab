@@ -1,0 +1,6 @@
+{
+  "name": "identity-transfer-issuer",
+  "main": "worker/issuer.ts",
+  "compatibility_date": "2026-01-01",
+  "workers_dev": true
+}

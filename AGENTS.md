@@ -1214,6 +1214,41 @@ history.
   `gotrue-down` / `probe IDS=...` (`BUILD=0 RUNNER="bun .../run.ts"` to run
   from source while another battery holds the binary) / `destroy`.
 
+## experiments/identity-transfer - key facts (validated 2026-09-07, micro, one project)
+
+- Question: a person returns from an OAuth provider with a NEW subject (the
+  Apple Developer team-transfer shape - Apple's `sub` and private relay email
+  are team-scoped). Apple is not mintable, so IT01 drives the project's
+  Keycloak slot: `external_keycloak_url` is a per-project issuer URL (Azure,
+  GitLab and WorkOS have URL settings too); the Auth server appends
+  `/protocol/openid-connect/{auth,token,userinfo}`, checks no issuer, and reads
+  sub/email/email_verified from userinfo. `worker/issuer.ts` is a stateless
+  Cloudflare Worker: the test appends `persona=<base64url JSON>` to the
+  authorize URL the Auth server redirected to; the persona rides back as the
+  code, the access token, and the userinfo body. The sign-in is the browser
+  flow with `redirect: "manual"` on all three hops; the user id is the token's
+  `sub`. `site_url` is set to a localhost callback for the run and restored.
+- Measured: identity = (provider, subject) with `provider_id` equal to
+  `identity_data.sub`; a new subject with the same VERIFIED email links as a
+  second identity on the same user; a different email is a new user (the
+  relay-address case); `update auth.identities set provider_id = new,
+  identity_data = identity_data || {"sub": new}` makes the new subject, even
+  with a new email, land on the old user with one identity row and the old
+  subject a stranger - `identity_data.email` takes the new address while
+  `auth.users.email` and the token's email claim keep the old one; an
+  unverified email is refused with `provider_email_needs_verification` but the
+  server still writes an identity row AND a user row with `auth.users.email`
+  NULL - sweep cleanup by identity subject, not by user email (the first run
+  left that row). Config settle: false on the first `/auth/v1/settings` read,
+  true on the second, 3-5 s from the PATCH at a 3 s poll interval. See
+  experiments/identity-transfer/RUNLOG.md.
+- Apple-specific and source-read only: the Apple parser copies `transfer_sub`
+  and `is_private_email` into the provider claims' custom-claims map; Apple's
+  `/auth/usermigrationinfo` exchange (sending team mints `transfer_sub` per
+  user with `target=<recipient team id>`, receiving team exchanges it for the
+  new `sub` and relay email, within 60 days of accepting the transfer) is the
+  other half.
+
 ## Write-up workflow (added 2026-09-02 after three review passes)
 
 The numbers that went wrong in that day's write-ups were all retyped from
