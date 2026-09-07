@@ -8,8 +8,9 @@
 import type { Ctx, TestModule, TestResult } from "../../../harness/src/types.js";
 
 // The legacy free-era project under test (created before the org moved to a
-// paid plan; it sits INACTIVE while paid-plan projects cannot be paused).
-const LEGACY_REF = "<ref>";
+// paid plan; it sits INACTIVE while paid-plan projects cannot be paused) is
+// read from ctx.peers.legacy (PVLAB_PEER_LEGACY); a ref is an account
+// identifier and this repo is public.
 import { mgmt } from "../../../harness/src/mgmt.js";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -22,6 +23,8 @@ const mod: TestModule = {
 	destructive: true,
 	async run(ctx: Ctx): Promise<TestResult[]> {
     const results: TestResult[] = [];
+    const LEGACY_REF = ctx.peers.legacy ?? "";
+    if (!LEGACY_REF) return [{ id: "I03", title: this.title, status: "skip", detail: "PVLAB_PEER_LEGACY not set (the legacy paused project ref)" }];
 
     // I03-control
     let initialStatus = "unknown";

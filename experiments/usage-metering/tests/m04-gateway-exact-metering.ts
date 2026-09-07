@@ -26,7 +26,7 @@ import { mgmt } from "../../../harness/src/mgmt.js";
 
 let PRO_ORG = ""; // from PVLAB_ORG_PRO via ctx.orgs.pro; set in run()
 const REGION = "ap-southeast-1";
-const STANDING_REF = "<ref>"; // an existing project, read-only target
+let STANDING_REF = ""; // an existing project, read-only target; from PVLAB_PEER_STANDING via ctx.peers.standing, set in run()
 const CALLS_A = 7;
 const CALLS_B = 5;
 
@@ -48,6 +48,8 @@ const mod: TestModule = {
   async run(ctx: Ctx): Promise<TestResult[]> {
     PRO_ORG = ctx.orgs.pro ?? "";
     if (!PRO_ORG) return [{ id: "M04", title: this.title, status: "skip", detail: "PVLAB_ORG_PRO not set" }];
+    STANDING_REF = ctx.peers.standing ?? "";
+    if (!STANDING_REF) return [{ id: "M04", title: this.title, status: "skip", detail: "PVLAB_PEER_STANDING not set (the read-only standing project ref)" }];
     const gateUrl = process.env.GATEKEEPER_URL;
     const adminKey = process.env.GATEKEEPER_ADMIN_KEY;
     const missing = [
