@@ -22,6 +22,11 @@ facts):
   same-region only): endpoint + SG (5432 AND 6543), Route53 PHZ for
   verify-full, in-VPC runner, CLI migration paths, network-restriction
   closure, restart behaviour.
+- `identity-transfer` - an OAuth identity comes back with a new subject for
+  an existing person (the Apple Developer team-transfer shape): linked by
+  verified email, a new user, or the same user after a rewrite of the
+  identity row. Driven through the Keycloak provider slot from a
+  lab-controlled issuer worker.
 - `edge-resilience` - what a client can do about platform incidents that
   are not theirs to fix: 25 measured modules (W01-W26) across JWT skew,
   edge cache/failover (Cloudflare worker), warm-standby replication and

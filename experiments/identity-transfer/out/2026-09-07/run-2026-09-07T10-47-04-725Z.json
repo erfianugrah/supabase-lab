@@ -1,0 +1,113 @@
+{
+  "startedAt": "2026-09-07T10:47:04.725Z",
+  "finishedAt": "2026-09-07T10:47:14.179Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "identity-transfer",
+  "labCommit": "28009bd",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "OpenSSL 3.6.4 25 Aug 2026 (Library: OpenSSL 3.6.4 25 Aug 2026)"
+  },
+  "results": [
+    {
+      "id": "IT01-setup",
+      "title": "keycloak slot pointed at the lab issuer",
+      "status": "pass",
+      "detail": "PATCH /config/auth HTTP 200; /auth/v1/settings external.keycloak true after 4s (2 reads); mailer_autoconfirm=false, security_manual_linking_enabled=false",
+      "measurements": {
+        "patch_status": 200,
+        "settle_s": 4,
+        "settle_reads": 2,
+        "mailer_autoconfirm": "false",
+        "manual_linking_enabled": "false"
+      },
+      "durationMs": 9454
+    },
+    {
+      "id": "IT01a",
+      "title": "first sign-in: new user, identity keyed by subject",
+      "status": "pass",
+      "detail": "user 32c0d356... email <email>; auth.identities rows for subject a1: 1, provider_id = identity_data.sub: true",
+      "measurements": {
+        "authorize_status": 302,
+        "callback_status": 302,
+        "session": 1,
+        "identity_rows": 1,
+        "provider_id_equals_sub": "true",
+        "email_verified_in_identity_data": "true"
+      },
+      "durationMs": 9454
+    },
+    {
+      "id": "IT01b",
+      "title": "new subject, same verified email: linked to the existing user",
+      "status": "pass",
+      "detail": "user 32c0d356... email <email>; same user as a1: true; identities on that user now: 2",
+      "measurements": {
+        "callback_status": 302,
+        "same_user_as_a1": "true",
+        "identities_on_user": 2,
+        "error_code": "-"
+      },
+      "durationMs": 9454
+    },
+    {
+      "id": "IT01c",
+      "title": "new subject, different email (relay address changed): a new user",
+      "status": "pass",
+      "detail": "b1 user c7efea02... email <email>; b2 user 88dfe1c7... email <email>; different users: true",
+      "measurements": {
+        "b1_session": 1,
+        "b2_session": 1,
+        "different_users": "true"
+      },
+      "durationMs": 9454
+    },
+    {
+      "id": "IT01d",
+      "title": "remap provider_id in SQL, sign in with the new subject and a new email: same user",
+      "status": "pass",
+      "detail": "c1 user a7239008... email <email>; remap updated 1 row(s); c2 (different email) user a7239008... email <email>; same user as c1: true, identities on that user: 1; after the c2 sign-in auth.users.email is the old address and identity_data.email the new one; control c1-with-new-email is a different user: true",
+      "measurements": {
+        "remap_rows": 1,
+        "c2_same_user_as_c1": "true",
+        "identities_on_user": 1,
+        "users_email_after": "old",
+        "identity_data_email_after": "new",
+        "token_email_after": "old",
+        "control_old_subject_new_user": "true",
+        "c2_callback_status": 302
+      },
+      "durationMs": 9454
+    },
+    {
+      "id": "IT01e",
+      "title": "new subject, same email but unverified: not linked",
+      "status": "pass",
+      "detail": "d1 user c1136166... email <email>; d2 no session: error=access_denied code=provider_email_needs_verification \"Unverified email with keycloak. Verify the email with keycloak in order to sign in\"; identities on d1's user: 1; rows the refused sign-in left for d2: 1 identity, 1 user (auth.users.email NULL, confirmed false)",
+      "measurements": {
+        "d2_session": 0,
+        "d2_error": "access_denied",
+        "d2_error_code": "provider_email_needs_verification",
+        "d2_identity_rows": 1,
+        "d2_shadow_user_rows": 1,
+        "d2_shadow_user_email": "null",
+        "d2_shadow_user_confirmed": "false",
+        "identities_on_d1_user": 1
+      },
+      "evidence": "callback error_description: Unverified email with keycloak. Verify the email with keycloak in order to sign in",
+      "durationMs": 9454
+    },
+    {
+      "id": "IT01z",
+      "title": "cleanup",
+      "status": "pass",
+      "detail": "deleted 6 user(s) via admin API, 1 more by identity-subject sweep; auth config restored: HTTP 200",
+      "durationMs": 9454
+    }
+  ]
+}
