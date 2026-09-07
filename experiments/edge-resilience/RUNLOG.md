@@ -1,8 +1,10 @@
 # edge-resilience - RUNLOG
 
 What a client can do about Supabase platform incidents that are not theirs to
-fix. Four modules, all green against the live drill project
-(ap-southeast-2, micro, tofu-managed) on 2026-08-15. Consolidated artifact:
+fix. 26 modules as of 2026-09-07 (W01-W13, W15-W27; W14 was a manual
+drill), each with its own section below, run against the live drill project
+(ap-southeast-2, micro, tofu-managed). The first four (W01-W04) went green on
+2026-08-15, consolidated artifact
 `evidence/final/run-2026-08-15T07-41-58-013Z.{json,md}` (4 pass, 0 fail).
 
 ## W01 - JWT issued-at skew map (the PGRST303 incident class)
