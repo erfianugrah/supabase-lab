@@ -1235,9 +1235,16 @@ assumes prose quotes by paste.
   number on a measured line of a doc that appears in none of the artifacts -
   the reviewer's hand check as a command. Judge each hit: a documented figure
   is fine, a retyped measurement is the bug.
-- `harness/src/identifiers.test.ts` scans every tracked markdown file and
-  every `out/` artifact for the project-ref SHAPE (20 lowercase letters) and
-  for emails, so a ref nobody listed still fails `bun test harness`. Its first
+- `harness/src/identifiers.test.ts` scans every tracked markdown file,
+  every `out/` artifact and (since 2026-09-07) every tracked source, config
+  and script file for the project-ref SHAPE (20 lowercase letters) and for
+  emails, so a ref nobody listed still fails `bun test harness`. The
+  2026-09-07 history sweep found four modules (I03, L01, M04) and the
+  rendered edge-resilience wrangler.jsonc holding refs as constants at HEAD
+  while the prose-only scan passed; the refs moved to `ctx.peers.legacy`,
+  `ctx.peers.scoped` (else `ctx.ref`) and `ctx.peers.standing`, wrangler.jsonc
+  is gitignored (render-wrangler.ts recreates it), and the history was
+  rewritten with git filter-repo the same day. Its first
   run (2026-09-02) found two project refs and the Pro org slug in three tracked
   files from August (two RUNLOGs, one plan doc), all redacted the same day; the
   hand-run sweeps had missed them for a month. The eighteen modules that
