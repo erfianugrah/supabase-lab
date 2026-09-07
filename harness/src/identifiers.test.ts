@@ -6,8 +6,11 @@
  * (`postgres.<ref>`) and the ids that turn up in copied error bodies. The
  * confidentiality sweep before every 2026-09-02 commit was a hand-run `rg`
  * with that day's refs pasted in; a hand-run check is an intention. This test
- * scans every tracked markdown file and every published `out/` artifact for the
- * SHAPE, so a ref that was never in anyone's list still fails.
+ * scans every tracked markdown file, every published `out/` artifact and, since
+ * 2026-09-07, every tracked source, config and script file for the SHAPE, so a
+ * ref that was never in anyone's list still fails. The source scan was added
+ * after a history sweep found four modules and a rendered wrangler.jsonc
+ * carrying refs as constants at HEAD while the prose scan passed.
  *
  * Allowlist: 20-letter tokens that are ordinary words or identifiers. Add to it
  * deliberately; a growing list is the signal to stop and look.
@@ -26,12 +29,15 @@ const ALLOW = new Set<string>([
   "uncharacteristically",
   // the alphabet, used as the placeholder ref in plan docs and fixtures
   "abcdefghijklmnopqrst",
+  // the all-a placeholder a gateway fixture uses for a ref-shaped scope
+  "aaaaaaaaaaaaaaaaaaaa",
 ]);
 
 const REF = /\b[a-z]{20}\b/g;
 const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
-// Example addresses are fine; the lab uses example.com for fixtures.
-const EMAIL_ALLOW = /@example\.(com|org|net)$|@supabase\.com$/;
+// Example addresses are fine: example.com, the reserved lab.test / lab.invalid
+// fixture domains, and the disposable-domain LIKE pattern S19 sends.
+const EMAIL_ALLOW = /@example\.(com|org|net)$|@supabase\.com$|@lab\.(test|invalid)$|^%@mailinator\.com$/;
 
 /**
  * Tracked prose and published artifacts, PLUS untracked files that git would
@@ -39,15 +45,16 @@ const EMAIL_ALLOW = /@example\.(com|org|net)$|@supabase\.com$/;
  * `git add -A` away from public is the case a tracked-only scan misses; the
  * first run of this test found exactly that in two experiments' out/ dirs.
  */
+const SCAN = ["*.md", "experiments/*/out/**", "*.ts", "*.tf", "*.tfvars", "*.jsonc", "*.sh", "Makefile", "*/Makefile", "*.yaml", "*.yml", "*.toml"];
+const SKIP = /node_modules\/|\.lock$|\.lock\.hcl$|\/dist\//;
+
 async function trackedProse(): Promise<string[]> {
-  const tracked = await $`git -C ${ROOT} ls-files -- '*.md' 'experiments/*/out/**'`.quiet().text();
-  const untracked = await $`git -C ${ROOT} ls-files --others --exclude-standard -- '*.md' 'experiments/*/out/**'`.quiet().text();
-  return [...new Set(`${tracked}\n${untracked}`.split("\n").map((l) => l.trim()))].filter(
-    (l) => l && !l.includes("node_modules/"),
-  );
+  const tracked = await $`git -C ${ROOT} ls-files -- ${SCAN}`.quiet().text();
+  const untracked = await $`git -C ${ROOT} ls-files --others --exclude-standard -- ${SCAN}`.quiet().text();
+  return [...new Set(`${tracked}\n${untracked}`.split("\n").map((l) => l.trim()))].filter((l) => l && !SKIP.test(l));
 }
 
-describe("tracked prose carries no project ref, project hostname or email", async () => {
+describe("tracked prose, source and config carry no project ref, project hostname or email", async () => {
   const files = await trackedProse();
   test("there is prose to scan", () => {
     expect(files.length).toBeGreaterThan(10);
