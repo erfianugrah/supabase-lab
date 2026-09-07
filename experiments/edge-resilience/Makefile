@@ -18,11 +18,11 @@ PW := $(shell grep -E '^db_password' $(ROOT)/secrets.tfvars 2>/dev/null | cut -d
 ONLY ?= W01,W02,W03
 RUNNER_FLAGS ?=
 
-.PHONY: init validate apply keygen worker-deploy worker-outage worker-normal seed probe probe-destructive destroy up down battery
+.PHONY: init validate apply keygen worker-deploy worker-outage worker-normal seed probe probe-destructive publish-evidence destroy up down battery
 
 # Battery ids - every module in the experiment (W14/W21 do not exist as
 # modules: W14 was a manual drill, W21 is unbuilt pending a Pro org).
-BATTERY := W01,W02,W03,W04,W05,W06,W07,W08,W09,W10,W11,W12,W13,W15,W16,W17,W18,W19,W20,W21,W22,W23,W24,W25,W26
+BATTERY := W01,W02,W03,W04,W05,W06,W07,W08,W09,W10,W11,W12,W13,W15,W16,W17,W18,W19,W20,W21,W22,W23,W24,W25,W26,W27
 
 # One-command lifecycle. `make down` tears everything down (worker + both
 # projects); `make up` returns to an equivalent state: fresh projects, same
@@ -104,6 +104,13 @@ probe:
 # script, which always passes --destructive).
 probe-destructive:
 	@$(MAKE) probe RUNNER_FLAGS=--destructive ONLY=W04,W24
+
+# Redacted copy of a run artifact plus its facts.md into out/<date>/ (committed).
+# Filter with PUBLISH_ONLY, not ONLY: ONLY defaults to W01,W02,W03 above, and
+# the first W27 publish inherited it and wrote an artifact with 0 results.
+publish-evidence:
+	@test -n "$(RUN)" || (echo "RUN=evidence/<ts>/run-<stamp>.json required"; exit 1)
+	@cd $(ROOT)/harness && bun scripts/publish-evidence.ts $(abspath $(RUN)) $(abspath .) $(if $(PUBLISH_ONLY),--only $(PUBLISH_ONLY),)
 
 destroy:
 	tofu plan -destroy $(VARS) -var="supabase_access_token=$(TOK)" -out=tfplan-destroy
