@@ -417,3 +417,115 @@ recorded a platform finding: `custom_oauth_max_providers` defaults
 differ across project generations (32767 vs 3) - auth config defaults
 are not stable across time, which is itself config-parity-relevant.
 Battery artifact: out/run-2026-08-17T07-41-07-229Z.{json,md}.
+
+## W27 - PGRST303 body length through edge_logs, and the Logs Explorer split (2026-09-07, green, module)
+
+Question: when PostgREST rejects a JWT with PGRST303, can a reader of
+edge_logs tell "JWT issued at future" from "JWT expired" without the response
+body, and does the byte-count discriminator the body implies survive the API
+gateway into `response.headers.content_length`? Fresh micro project
+(ap-southeast-2 per `experiment.tfvars`, tofu-managed, provisioned and
+destroyed the same day; the artifact's `region` field reads ap-southeast-1,
+which is the harness default label when no region is exported, not a project
+read).
+Artifact: `out/2026-09-07/run-2026-09-07T08-15-44-142Z.{json,facts.md}`,
+4 pass, 0 fail. A first run three minutes earlier
+(`evidence/20260907-161251/`, local-time stamp for run 2026-09-07T08:12:51Z,
+private) had W27c fail on the schema-cache timing described below; W27a and
+W27b passed identically in both.
+
+Setup: legacy HS256 tokens minted locally under the project's own
+`jwt_secret` (the W07 break-glass read, `GET /projects/{ref}/postgrest`),
+sent with the `sb_publishable_` key as `apikey` against `public.w_probe`.
+Each request carries a unique User-Agent so its edge_logs row can be found
+without a body. Three claims sets: `iat` 300 s ahead (`exp` 3900 s ahead),
+`exp` 300 s behind (`iat` 3900 s behind), and valid.
+
+| row | request | wire | edge_logs (logs.all) |
+| --- | --- | --- | --- |
+| W27a/b future | iat +300 s | 401 PGRST303 "JWT issued at future", 79 bytes, `content-length: 79`, `proxy-status: PostgREST; error=PGRST303` | status_code 401, content_length "79", proxy_status "PostgREST; error=PGRST303", issued_at minus request timestamp 300 s, auth_user set |
+| W27a/b expired | exp -300 s | 401 PGRST303 "JWT expired", 70 bytes, `content-length: 70`, same proxy-status | status_code 401, content_length "70", same proxy_status, issued_at minus request timestamp -3900 s, auth_user set |
+| W27a/b valid | iat now | 200, 10 bytes (`[{"id":1}]`) | status_code 200, content_length "10", proxy_status null, issued_at minus request timestamp -1 s |
+| W27c anon, publishable key only | table with all privileges revoked from anon and authenticated (`revoke all on table`) | 401 42501 "permission denied for table w27_locked", 190 bytes, no content-length header | status_code 401, content_length null, transfer_encoding "chunked", proxy_status "PostgREST; error=42501", no jwt payload, auth_user null |
+| W27c anon, legacy anon JWT as bearer | same table | 401 42501, 190 bytes, no content-length header | as above, jwt payload role "anon", auth_user null |
+| W27c authenticated (minted) | same table | 403 42501, 199 bytes, no content-length header | status_code 403, content_length null, transfer_encoding "chunked", proxy_status "PostgREST; error=42501", role "authenticated", auth_user set |
+
+- **The 79 versus 70 discriminator was measured on this project.** The two
+  PGRST303 bodies differ only in the message string, the response reaches the
+  client with a `content-length` header (which hop sets it is not measured
+  here), and edge_logs records the same value as
+  `metadata.response.headers.content_length` (a string). 79 is
+  "JWT issued at future", 70 is "JWT expired". The `proxy-status` response
+  header (`PostgREST; error=PGRST303`) is also logged, so the class can be
+  selected without the body at all.
+- **The JWT payload is logged even on the 401.** Both rejected requests carry
+  `metadata.request.sb.jwt.authorization.payload` with `issued_at`,
+  `expires_at`, `role` and `subject` (the module's read) and `sb.auth_user`
+  non-null; a hand read of the same rows also showed `algorithm` (HS256 here),
+  a `signature_prefix`, and `auth_user` equal to `subject`, which the module
+  does not assert. So the split
+  does not need the byte count: `issued_at` minus the row's own `timestamp`
+  (microseconds) reproduces the skew directly, 300 s for the future token,
+  -3900 s for the expired one, -1 s for the valid one. Use the byte count as
+  the cross-check, the payload as the primary read.
+- **content_length is not universal.** The 42501 bodies (190 and 199 bytes)
+  arrive chunked: no `content-length` on the wire, `content_length` null and
+  `transfer_encoding` "chunked" in edge_logs. A content_length filter finds the
+  PGRST303 rows and silently drops permission-denied rows; select on
+  `proxy_status` for the class and only then read `content_length`.
+- **Endpoint and lag.** `/analytics/endpoints/logs.all` answered the query
+  below on every call; `/analytics/endpoints/logs` (the stream endpoint the
+  shared `logsQuery` helper uses) answered `Backend error! Retry your query.
+  Please contact support if this continues.` to the identical SQL, as S18
+  recorded on 2026-09-03. Rows were queryable 46 s after the request in W27b
+  (51 s in the first run) and 17 s in W27c; poll, do not read once.
+- **42501 mapping through the same path (W27c).** anon -> 401, whether the
+  request carried only the publishable key or the legacy anon JWT as bearer;
+  authenticated -> 403. Same SQLSTATE in the body and in `proxy_status`
+  (`PostgREST; error=42501`) for all three. Agrees with S21 (2026-09-03,
+  security-lockdown), which measured anon 401 / authenticated 403 on the wire
+  (module S21, no edge_logs read); this row adds the legacy-anon-JWT-as-bearer
+  case and the edge_logs shape. The publishable-key-only row returns null for
+  every `jwt.authorization.payload` field through the left join (the module's
+  read); that `sb.apikey` carries the key prefix and hash is from a hand read
+  of the row, not from the module.
+- **Schema cache lag is a real hazard for this shape of probe.** The first run
+  hit the table 1 s after `CREATE TABLE ... REVOKE` and the two anon requests
+  answered 404 PGRST205 "Could not find the table 'public.w27_locked' in the
+  schema cache" while the third request, seconds later, got the 403. The
+  module now sends `notify pgrst, 'reload schema'` and polls 3 s apart for up
+  to 120 s until the code is not PGRST205 (1 attempt, 1 s, in the green run).
+
+The query that returned the rows, as sent to `logs.all` with a 1-hour
+`iso_timestamp_start`/`iso_timestamp_end` window (the module's marker in the
+`like` is the run's User-Agent prefix):
+
+```sql
+select id, timestamp, r.method, r.path, h.user_agent, res.status_code,
+       rh.content_length, rh.transfer_encoding, rh.proxy_status,
+       jp.issued_at, jp.expires_at, jp.role, jp.subject, sb.auth_user
+from edge_logs
+cross join unnest(metadata) as m
+cross join unnest(m.request) as r
+cross join unnest(r.headers) as h
+cross join unnest(m.response) as res
+cross join unnest(res.headers) as rh
+cross join unnest(r.sb) as sb
+left join unnest(sb.jwt) as jwt
+left join unnest(jwt.authorization) as auth
+left join unnest(auth.payload) as jp
+where h.user_agent like 'pvlab-w27-%'
+order by timestamp desc
+```
+
+To split an incident window instead of a marked probe, replace the User-Agent
+predicate with `rh.proxy_status = 'PostgREST; error=PGRST303'` and add
+`jp.issued_at - div(timestamp, 1000000) as iat_skew_s` to the select list;
+rows with `iat_skew_s` above 30 s (a threshold chosen here, not measured) are
+the future-iat class, rows with `jp.expires_at < div(timestamp, 1000000)`
+(both in seconds) are the expired class. Neither predicate ran in the module,
+which did the same subtraction client-side; `timestamp` is microseconds, so
+comparing `expires_at` to it without the `div` classifies every row as
+expired. Not settled here: whether a project provisioned in an earlier Logs
+Explorer era exposes the same field paths, and the stale-time cache itself
+(that needs a PostgREST build with a one-second skew, out of scope here).
