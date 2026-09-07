@@ -585,6 +585,22 @@ Ported from throwaway bash that produced the same findings; see RUNLOG.md.
 - **Storage dual-write** (W26): parallel write 200/200 with 107ms skew,
   bytes equal; partial failure is not atomic (200/400 leaves the object
   on one side); sync-after closes the gap in 97ms.
+- **PGRST303 through edge_logs** (W27, 2026-09-07): the gateway logs the
+  PostgREST error body's `content-length` verbatim (79 = "JWT issued at
+  future", 70 = "JWT expired"), the `proxy-status` header
+  (`PostgREST; error=PGRST303`) and the parsed JWT payload (`issued_at`,
+  `expires_at`, `role`, `subject`, `auth_user`) even on the 401, so the
+  future-iat/expired split is issued_at minus the row timestamp in seconds
+  (the module computed it client-side; the SQL form
+  `issued_at - div(timestamp, 1000000)` is untested), with the byte count as
+  cross-check. 42501 bodies are chunked (content_length null,
+  transfer_encoding "chunked") - select on `proxy_status`, not
+  `content_length`. anon -> 401 42501 (key-only or legacy anon JWT),
+  authenticated -> 403 42501, matching S21. Only `logs.all` answers the
+  unnest query; `logs` says `Backend error! Retry your query.` Rows landed
+  17-46 s after the request in the published run (51 s in the private first
+  run). DDL then probe within 1 s got 404 PGRST205
+  (schema cache) - `notify pgrst, 'reload schema'` and poll first.
 - **The spend cap is not a request-path circuit breaker** (W21,
   Pro-org drill): 105 renders against a 100-transform quota all
   returned 200 - no synchronous disallow at quota+5. Consequences ride
