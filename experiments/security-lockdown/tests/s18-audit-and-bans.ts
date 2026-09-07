@@ -26,7 +26,7 @@
 import { spawnSync } from "node:child_process";
 import type { Ctx, TestModule, TestResult } from "../../../harness/src/types.js";
 import { mgmt } from "../../../harness/src/mgmt.js";
-import { logsQuery as logsQueryStream } from "../../../harness/src/platform.js";
+import { logsAllQuery, logsQuery as logsQueryStream } from "../../../harness/src/platform.js";
 
 /**
  * Same query, against `/analytics/endpoints/logs.all` with a 1-hour window.
@@ -35,14 +35,10 @@ import { logsQuery as logsQueryStream } from "../../../harness/src/platform.js";
  * answered the identical SQL by hand; both are tried, logs.all first.
  */
 async function logsQuery(ctx: Ctx, sqlText: string, windowHours = 1) {
-  const end = new Date();
-  const start = new Date(end.getTime() - windowHours * 3600_000);
-  const qs = `sql=${encodeURIComponent(sqlText)}&iso_timestamp_start=${encodeURIComponent(start.toISOString())}&iso_timestamp_end=${encodeURIComponent(end.toISOString())}`;
-  const r = await mgmt(ctx, "GET", `/projects/${ctx.ref}/analytics/endpoints/logs.all?${qs}`, undefined, 60_000);
-  const j = (r.json ?? {}) as { result?: Record<string, unknown>[]; error?: unknown };
-  if (Array.isArray(j.result) && !j.error) return { status: r.status, rows: j.result, error: "" };
+  const r = await logsAllQuery(ctx, sqlText, windowHours);
+  if (!r.error) return { status: r.status, rows: r.rows as Record<string, unknown>[], error: "" };
   const alt = await logsQueryStream(ctx, sqlText, windowHours);
-  return { status: alt.status, rows: alt.rows as Record<string, unknown>[], error: j.error ? `logs.all: ${JSON.stringify(j.error).slice(0, 120)}; logs: ${alt.error}` : alt.error };
+  return { status: alt.status, rows: alt.rows as Record<string, unknown>[], error: `logs.all: ${r.error.slice(0, 120)}; logs: ${alt.error}` };
 }
 import { fetchKeys, httpBody, errCode, waitFor } from "../lib/sec.js";
 
