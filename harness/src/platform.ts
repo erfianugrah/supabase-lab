@@ -17,6 +17,13 @@
  *                 an `error` field on every failure, so the status code says
  *                 nothing. 10 requests per window. Edge Function console
  *                 output is `source = 'function_logs'`.
+ *  - `logsAllQuery()` the same query against `/analytics/endpoints/logs.all`.
+ *                 The stream endpoint above answered `Backend error! Retry
+ *                 your query.` to every edge_logs `cross join unnest` query on
+ *                 2026-09-03 (S18) and 2026-09-07 (W27) while `logs.all`
+ *                 answered the identical SQL; both modules had their own copy
+ *                 of this before it moved here. Use it for anything that
+ *                 flattens `metadata`.
  *  - `functionPresent()` a deploy is not done on its status or exit code; this
  *                 is the read that says whether the function exists, with a
  *                 retry through the 429 a burst of deploys provokes.
@@ -78,13 +85,27 @@ export interface LogsResult {
  * over 24 hours.
  */
 export async function logsQuery(ctx: Ctx, sqlText: string, windowHours = 3): Promise<LogsResult> {
+  return logsEndpointQuery(ctx, "logs", sqlText, windowHours);
+}
+
+/** The same query against `logs.all`, which answers the unnest queries the stream endpoint refuses. */
+export async function logsAllQuery(ctx: Ctx, sqlText: string, windowHours = 1): Promise<LogsResult> {
+  return logsEndpointQuery(ctx, "logs.all", sqlText, windowHours);
+}
+
+async function logsEndpointQuery(
+  ctx: Ctx,
+  endpoint: "logs" | "logs.all",
+  sqlText: string,
+  windowHours: number,
+): Promise<LogsResult> {
   const end = new Date();
   const start = new Date(end.getTime() - windowHours * 3600_000);
   const qs =
     `sql=${encodeURIComponent(sqlText)}` +
     `&iso_timestamp_start=${encodeURIComponent(start.toISOString())}` +
     `&iso_timestamp_end=${encodeURIComponent(end.toISOString())}`;
-  const r = await mgmt(ctx, "GET", `/projects/${ctx.ref}/analytics/endpoints/logs?${qs}`, undefined, 60_000);
+  const r = await mgmt(ctx, "GET", `/projects/${ctx.ref}/analytics/endpoints/${endpoint}?${qs}`, undefined, 60_000);
   const j = (r.json ?? {}) as { result?: LogRow[]; error?: unknown };
   return {
     status: r.status,

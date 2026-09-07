@@ -517,9 +517,11 @@ Ported from throwaway bash that produced the same findings; see RUNLOG.md.
 
 - What a CLIENT can do about platform incidents. Full matrix in
   experiments/edge-resilience/FAILURE-MATRIX.md; consolidated reference in
-  RELIABILITY.md at the repo root. 23 modules (W01-W13, W15-W24;
-  W14 was a manual drill), all green, full battery 22/22 unattended in
-  ~27 min via `.pi/probe-edge-resilience.sh W01,...,W24` (or
+  RELIABILITY.md at the repo root. 26 modules as of 2026-09-07 (W01-W13,
+  W15-W27; W14 was a manual drill), all green; the last full battery was
+  25 modules, 24/25 on 2026-08-17 (W17 race, fixed and re-probed), and
+  the 22/22 unattended run in ~27 min was 2026-08-16 via
+  `.pi/probe-edge-resilience.sh W01,...,W24` (or
   `make battery` inside the experiment; lifecycle is `make up` /
   `make down`, not the AWS-style suite targets). W21 runs in the Pro org
   (ErfiCorp) and provisions/deletes its own project - it needs no drill
