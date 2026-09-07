@@ -34,7 +34,7 @@ proves it (module). Status: [green] lab-validated, [doc] doc/design only,
 
 | # | Failure point | Signature | Detection | Workaround | Test |
 |---|---------------|-----------|-----------|------------|------|
-| 3.1 | JWT claim rejection (skewed issuer) | 401 PGRST303 | PGRST303-rate alert | TTL raise (W03), no runtime fix (W01) | [green W01/W03] |
+| 3.1 | JWT claim rejection (skewed issuer) | 401 PGRST303 | PGRST303-rate alert; edge_logs: select PGRST303 rows on proxy_status, split future-iat from expired on jwt payload issued_at minus request timestamp; content_length 79/70 as cross-check (W27) | TTL raise (W03), no runtime fix (W01) | [green W01/W03/W27] |
 | 3.2 | Unknown/rotated signing key | 401 PGRST301 | PGRST301-rate alert | key hygiene; TPA lag ~30s both directions (W01) | [green W01] |
 | 3.3 | Schema-cache wedge | 503 PGRST002 | pgrst code probe | pg_notify reload (http-tier-lockdown) | [green L-series] |
 | 3.4 | DB unreachable behind healthy tier | 503 PGRST000/002 while status ACTIVE_HEALTHY | probe a REAL table | probe design (never trust status) | [green F7] |
