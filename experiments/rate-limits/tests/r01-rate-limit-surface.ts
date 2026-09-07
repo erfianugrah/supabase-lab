@@ -1,6 +1,8 @@
 import type { Ctx, TestModule, TestResult } from "../../../harness/src/types";
 
-const SCOPED_PROJECT = "<ref>";
+// The project the per-project rate-limit rows read; from ctx.peers.scoped
+// (PVLAB_PEER_SCOPED), else the run's own ref.
+const scopedRef = (ctx: Ctx) => ctx.peers.scoped ?? ctx.ref;
 const MGMT_URL = "https://api.supabase.com/v1";
 
 async function l01Control(ctx: Ctx): Promise<TestResult> {
@@ -37,7 +39,7 @@ async function l01a(ctx: Ctx): Promise<TestResult> {
 
   try {
     for (let i = 1; i <= 3; i++) {
-      const res = await fetch(`${MGMT_URL}/projects/${SCOPED_PROJECT}`, {
+      const res = await fetch(`${MGMT_URL}/projects/${scopedRef(ctx)}`, {
         headers: { Authorization: `Bearer ${ctx.pat}` },
       });
       if (i === 1) {
@@ -86,13 +88,13 @@ async function l01b(ctx: Ctx): Promise<TestResult> {
 
   try {
     for (let i = 0; i < 4; i++) {
-      const res1 = await fetch(`${MGMT_URL}/projects/${SCOPED_PROJECT}`, {
+      const res1 = await fetch(`${MGMT_URL}/projects/${scopedRef(ctx)}`, {
         headers: { Authorization: `Bearer ${pat1}` },
       });
       const rem1 = res1.headers.get("x-ratelimit-remaining");
       p1_rems.push(rem1 ? parseInt(rem1, 10) : -1);
 
-      const res2 = await fetch(`${MGMT_URL}/projects/${SCOPED_PROJECT}`, {
+      const res2 = await fetch(`${MGMT_URL}/projects/${scopedRef(ctx)}`, {
         headers: { Authorization: `Bearer ${pat2}` },
       });
       const rem2 = res2.headers.get("x-ratelimit-remaining");
@@ -129,7 +131,7 @@ async function l01c(ctx: Ctx): Promise<TestResult> {
   try {
     for (let i = 0; i < 150; i++) {
       requests_sent++;
-      const res = await fetch(`${MGMT_URL}/projects/${SCOPED_PROJECT}`, {
+      const res = await fetch(`${MGMT_URL}/projects/${scopedRef(ctx)}`, {
         headers: { Authorization: `Bearer ${ctx.pat}` },
       });
 
@@ -149,7 +151,7 @@ async function l01c(ctx: Ctx): Promise<TestResult> {
       // Wait ~65s and re-probe once
       await new Promise((r) => setTimeout(r, 65000));
       try {
-        const res = await fetch(`${MGMT_URL}/projects/${SCOPED_PROJECT}`, {
+        const res = await fetch(`${MGMT_URL}/projects/${scopedRef(ctx)}`, {
           headers: { Authorization: `Bearer ${ctx.pat}` },
         });
         recovered_status = String(res.status);
