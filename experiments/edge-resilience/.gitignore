@@ -7,3 +7,5 @@ secrets.tfvars
 terraform.tfstate*
 tfplan*
 __pycache__/
+# rendered by scripts/render-wrangler.ts from tofu state; carries the project ref
+wrangler.jsonc
