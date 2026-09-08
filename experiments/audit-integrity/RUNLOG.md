@@ -296,6 +296,36 @@ three were fixed and re-run, and one of them came back the OPPOSITE way.
   this pass against 0 on a fresh project, which is what tests the earlier
   "returns only the overrides that have been set" inference.
 
+## Run 7 - 2026-09-08 06:56 and 06:59 UTC - Team-plan project, A10c + A13
+
+A second Team-plan Micro (the first pair was destroyed after Run 6, and this
+one was destroyed after this run). Two things the earlier passes left open.
+
+- **A13 closes the organization-audit-log question with a valid control.** The
+  earlier read used `GET /functions` as its positive control; that action turns
+  out not to be audited, so its absence proved nothing. A13 uses a `PATCH` of
+  the project auth config, which the Dashboard was observed to record, fired
+  0.2 s before the SQL it is compared against:
+
+  | Event | Fired (UTC) | Executed, proven by | In the audit log |
+  | --- | --- | --- | --- |
+  | `PATCH config/auth` (control) | 06:56:48.376 | HTTP 200 | yes, 06:56:47 (+ the restore PATCH at 06:57:22) |
+  | `POST database/query` DELETE on the audit table | 06:56:48.602 | witness DDL in `postgres_logs` at 34 s | no entry |
+  | a Dashboard SQL Editor statement | ~06:54-06:56 | its own marker in `postgres_logs` at 1 s | no entry |
+
+  Both SQL paths absent, the control one second away present, and both SQL
+  paths independently proven to have run. Project lifecycle IS audited
+  (`POST Create a project`, `DELETE Deletes the given project`). 71 entries in
+  the 24 h window. The audit-log column is an OPERATOR READ recorded verbatim
+  in the artifact - there is no `/v1` path to assert it from, which is the
+  finding A07b measures.
+- **A10c prices the recovery path instead of leaving it a hand-wave.**
+  `GET /v1/projects/{ref}/billing/addons`: PITR is \$100/month for 7 days,
+  \$200 for 14, \$400 for 28. Applying it does not create a restore point -
+  that needs a base backup to land, and a fresh project reads no physical
+  window. So the restore-and-diff is a monthly charge plus an indeterminate
+  wait, and it stays unrun by decision rather than by omission.
+
 ## The platform audit log, read by hand
 
 No `/v1` path exposes it (A07b: 0 of 115), so this is a Dashboard read on the
