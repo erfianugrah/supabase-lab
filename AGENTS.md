@@ -1339,23 +1339,30 @@ history.
   WRONG password, which cannot distinguish a revoked role from a live one. A
   freshly minted credential is also not immediately usable: one connect failed
   seconds after minting while later probes on the same role authenticated.
-- **The organization audit log records control-plane calls; SQL execution is
-  absent from it.** Dashboard-only read (no `/v1` path exists), Team-plan org: it
-  carries actor + organization role + method + description + status + target
-  project + timestamp, INCLUDING reads (`GET Get project api keys`), while the
-  dozens of `POST /database/query` calls from the same battery minutes -
-  deletes and truncates on the audit table among them - produced no entry (30
-  entries in the window, fewer than the query calls). The first control choice
+- **The organization audit log records control-plane calls and project
+  lifecycle; SQL execution is absent from it.** Dashboard-only read (no `/v1`
+  path exists), Team-plan org: it carries actor + organization role + method +
+  description + status + target project + timestamp, INCLUDING reads (`GET Get
+  project api keys`) and lifecycle (`Create a project`, `Deletes the given
+  project`). A13 settles it with a control that IS audited - a `PATCH
+  config/auth` fired 0.2 s before a `database/query` DELETE: control recorded
+  at 06:56:47, neither the API SQL nor a Dashboard SQL Editor statement
+  recorded, both proven to have executed via `postgres_logs`. The audit-log
+  column is an operator read the module stores verbatim
+  (`PVLAB_AUDIT_OBSERVED`), because nothing in the harness can assert it. The
+  first control choice
   for this comparison (`GET /functions`) was itself unaudited and proved
   nothing; the battery's own PUT/PATCH/POST/DELETE served as the control.
 - The Dashboard UI labels the switch in the POSITIVE form ("Write audit logs to
   the database"), where the vendor docs describe the negative ("Disable
   writing auth audit logs to project database"). Anyone following the doc text
   looks for the opposite switch.
-- Pending: a restore-and-diff recovery of deleted rows (flagged, not run); a
-  dedicated read of whether a Dashboard SQL Editor statement appears in the
-  organization audit log; a Read-Only member exercised end to end (none exists
-  in any of the three orgs). See experiments/audit-integrity/RUNLOG.md.
+- Pending: a restore-and-diff recovery of deleted rows. NOT an omission - a
+  decision: A10c prices PITR at \$100/month (7 days), \$200 (14), \$400 (28),
+  and applying it does not create a restore point until a base backup lands, so
+  the probe is a monthly charge plus an indeterminate wait. Also pending: a
+  Read-Only member exercised end to end (none exists in any of the three orgs).
+  See experiments/audit-integrity/RUNLOG.md.
 
 ## Write-up workflow (added 2026-09-02 after three review passes)
 

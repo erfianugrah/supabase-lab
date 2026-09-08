@@ -1,0 +1,45 @@
+{
+  "startedAt": "2026-09-08T06:59:08.674Z",
+  "finishedAt": "2026-09-08T06:59:41.767Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "audit-integrity",
+  "labCommit": "9125b00",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "OpenSSL 3.6.4 25 Aug 2026 (Library: OpenSSL 3.6.4 25 Aug 2026)"
+  },
+  "results": [
+    {
+      "id": "A13a",
+      "title": "control-plane control and API-side SQL, fired at recorded times",
+      "status": "pass",
+      "detail": "control PATCH config/auth (a value patched to itself) -> HTTP 200 at 2026-09-08T06:59:08.995Z. API-side SQL (POST /database/query, a DELETE on auth.audit_log_entries) -> HTTP 201 at 2026-09-08T06:59:09.414Z. Independent execution witness: a DDL statement with nonce a13witf0jg86os appeared in postgres_logs 32s later, so the API SQL path was live at that moment. Dashboard SQL Editor marker \"a13probe\" WAS found in postgres_logs (1s), so the operator step ran.",
+      "measurements": {
+        "control_status": 200,
+        "control_at": "2026-09-08T06:59:08.995Z",
+        "api_sql_status": 201,
+        "api_sql_at": "2026-09-08T06:59:09.414Z",
+        "witness_seen": "true",
+        "editor_step_ran": "true",
+        "search_window_s": 32
+      },
+      "evidence": "control PATCH at 2026-09-08T06:59:08.995Z\nAPI SQL at 2026-09-08T06:59:09.414Z\ncompare these two timestamps against the organization audit log",
+      "durationMs": 33094
+    },
+    {
+      "id": "A13b",
+      "title": "what the organization audit log showed (operator-supplied)",
+      "status": "info",
+      "detail": "operator reading, verbatim: \"control=yes (PATCH \"Updates a project auth config\" at 14:56:47 SGT = 06:56:47 UTC, and the restore PATCH at 14:57:22), api_sql=no (no entry for the 06:56:48.602 POST database/query DELETE), editor_sql=no (no entry for the SQL Editor statement, confirmed executed via postgres_logs); also audited: project create at 14:52:29 and project delete at 14:47:50, so lifecycle is recorded; 71 entries in the 24h window\". This is a human Dashboard read, not a measurement: the organization audit log has no API path (A07b), so nothing in this harness can assert or contradict it. The control entry is what makes a negative meaningful - if the control is absent too, the reading says nothing.",
+      "measurements": {
+        "observation_supplied": "true",
+        "observation": "control=yes (PATCH \"Updates a project auth config\" at 14:56:47 SGT = 06:56:47 UTC, and the restore PATCH at 14:57:22), api_sql=no (no entry for the 06:56:48.602 POST database/query DELETE), editor_sql=no (no entry for the SQL Editor statement, confirmed executed via postgres_logs); also audited: project create at 14:52:29 and project delete at 14:47:50, so lifecycle is recorded; 71 entries in the 24h window"
+      },
+      "durationMs": 33094
+    }
+  ]
+}
