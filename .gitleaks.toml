@@ -1,0 +1,32 @@
+# gitleaks configuration for supabase-lab.
+#
+# Extends the default ruleset. The only addition is an allowlist for the
+# synthetic credential fixtures the redaction tests have to CONTAIN in order to
+# prove the publisher strips them: harness/src/redact.test.ts asserts that
+# `redact()` removes a provenance-comment credential id, and
+# harness/src/identifiers.test.ts allowlists the same literal so its own
+# tracked-source scan does not fire on the fixture.
+#
+# Both values are counted-up placeholders (`pat:1234567`, and an OAuth id whose
+# hex runs 0a1b2c3d-4e5f-...). gitleaks' generic-api-key rule matches the second
+# on shape. They are allowlisted BY EXACT VALUE rather than by path, so a real
+# credential appearing in either of those files still blocks the push.
+#
+# The class this guards against is real: the Management API appends a
+# provenance comment naming the acting credential to statements it runs, and
+# audit-integrity A03d keeps that comment verbatim as evidence, so four
+# published artifacts carried a live PAT id before `redact()` covered it.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "synthetic credential fixtures in the redaction tests"
+# regexTarget = "line" because the default target is the EXTRACTED secret,
+# which here is the bare uuid without its `oauth:` prefix - a prefixed pattern
+# never matches it. Matching the line keeps the entry specific to the fixture
+# rather than blanket-allowing a uuid shape anywhere in the repo.
+regexTarget = "line"
+regexes = [
+  '''oauth:0a1b2c3d-4e5f-6a7b-8c9d-0e1f2a3b4c5d''',
+  '''pat:1234567''',
+]
