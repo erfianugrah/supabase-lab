@@ -1,0 +1,206 @@
+{
+  "startedAt": "2026-09-08T05:31:57.518Z",
+  "finishedAt": "2026-09-08T05:36:24.081Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "audit-integrity",
+  "labCommit": "60e7194",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "OpenSSL 3.6.4 25 Aug 2026 (Library: OpenSSL 3.6.4 25 Aug 2026)"
+  },
+  "results": [
+    {
+      "id": "A00",
+      "title": "control: fresh project healthy, keys present, version recorded",
+      "status": "pass",
+      "detail": "health: auth=ACTIVE_HEALTHY rest=ACTIVE_HEALTHY db=ACTIVE_HEALTHY after 0s. Keys: anon, service_role, publishable, secret. Postgres 17.6, project 42 min old at first probe.",
+      "measurements": {
+        "healthy": "true",
+        "health_wait_s": 0,
+        "pg_version": "17.6",
+        "project_age_min": 42,
+        "key_generations": 4
+      },
+      "durationMs": 996
+    },
+    {
+      "id": "A07a",
+      "title": "audit and log retention per plan, from the entitlement API",
+      "status": "pass",
+      "detail": "team (plan=team, HTTP 200, 64 entitlements): security.audit_logs_days=62 days; log.retention_days=28 days; backup.retention_days=14 days; audit_log_drains=true; log_drains=true; pitr.available_variants=pitr_7|pitr_14|pitr_28; security.private_link=true; security.soc2_report=true || pro (plan=pro, HTTP 200, 64 entitlements): security.audit_logs_days=no-access:0 days; log.retention_days=7 days; backup.retention_days=7 days; audit_log_drains=false; log_drains=true; pitr.available_variants=pitr_7|pitr_14|pitr_28; security.private_link=false; security.soc2_report=false || free (plan=free, HTTP 200, 64 entitlements): security.audit_logs_days=no-access:0 days; log.retention_days=1 days; backup.retention_days=no-access:0 days; audit_log_drains=false; log_drains=false; pitr.available_variants=none; security.private_link=false; security.soc2_report=false",
+      "measurements": {
+        "orgs_probed": 3,
+        "team_plan": "team",
+        "team_audit_log_days": "62 days",
+        "team_log_retention_days": "28 days",
+        "team_backup_retention_days": "14 days",
+        "team_audit_log_drains": "true",
+        "team_log_drains": "true",
+        "pro_plan": "pro",
+        "pro_audit_log_days": "no-access:0 days",
+        "pro_log_retention_days": "7 days",
+        "pro_backup_retention_days": "7 days",
+        "pro_audit_log_drains": "false",
+        "pro_log_drains": "true",
+        "free_plan": "free",
+        "free_audit_log_days": "no-access:0 days",
+        "free_log_retention_days": "1 days",
+        "free_backup_retention_days": "no-access:0 days",
+        "free_audit_log_drains": "false",
+        "free_log_drains": "false"
+      },
+      "evidence": "team (plan=team, HTTP 200, 64 entitlements): security.audit_logs_days=62 days; log.retention_days=28 days; backup.retention_days=14 days; audit_log_drains=true; log_drains=true; pitr.available_variants=pitr_7|pitr_14|pitr_28; security.private_link=true; security.soc2_report=true\npro (plan=pro, HTTP 200, 64 entitlements): security.audit_logs_days=no-access:0 days; log.retention_days=7 days; backup.retention_days=7 days; audit_log_drains=false; log_drains=true; pitr.available_variants=pitr_7|pitr_14|pitr_28; security.private_link=false; security.soc2_report=false\nfree (plan=free, HTTP 200, 64 entitlements): security.audit_logs_days=no-access:0 days; log.retention_days=1 days; backup.retention_days=no-access:0 days; audit_log_drains=false; log_drains=false; pitr.available_variants=none; security.private_link=false; security.soc2_report=false",
+      "durationMs": 845
+    },
+    {
+      "id": "A07b",
+      "title": "the platform audit log on the Management API",
+      "status": "info",
+      "detail": "115 paths in the /v1 spec; 0 mention audit - the platform audit log has no read path, no export path and no delete path on the public API. It is Dashboard-only, which is why no tenant credential can rewrite it and also why nobody can pull it into a SIEM.",
+      "measurements": {
+        "spec_paths": 115,
+        "audit_paths": 0
+      },
+      "durationMs": 845
+    },
+    {
+      "id": "A11a",
+      "title": "logged statements in the last hour, by role and application_name",
+      "status": "info",
+      "detail": "postgres/mgmt-api x14, postgres/supabase/dashboard-query-editor x1. Every path this harness uses arrives as one role, so a per-person question cannot be answered from Postgres alone.",
+      "measurements": {
+        "groups": 2,
+        "apps": "postgres/mgmt-api x14 | postgres/supabase/dashboard-query-editor x1"
+      },
+      "evidence": "postgres/mgmt-api x14\npostgres/supabase/dashboard-query-editor x1",
+      "durationMs": 4113
+    },
+    {
+      "id": "A11b",
+      "title": "a Dashboard SQL Editor session, if the operator step has been run",
+      "status": "pass",
+      "detail": "found the operator statement: role=postgres, application_name=supabase/dashboard-query-editor. That is the identity a Dashboard member's SQL runs as.",
+      "measurements": {
+        "operator_step_found": "true",
+        "non_mgmt_groups": 1
+      },
+      "evidence": "statement: create temp table who_am_i as\r\n  select current_user, session_user, current_setting('application_name');\r\nselect * from who_am_i;\r\n\n\n-- source: dashboard\n-- user: session:<id>\n-- date: 2026-09-08T05:24:59.659Z",
+      "durationMs": 4113
+    },
+    {
+      "id": "A06a",
+      "title": "audit-log keys in the documented auth config",
+      "status": "info",
+      "detail": "GET config/auth -> HTTP 200, 243 keys returned, 1 of them mention audit (audit_log_disable_postgres=true). audit_log_disable_postgres is present and reads true.",
+      "measurements": {
+        "config_keys": 243,
+        "audit_keys": 1,
+        "get_status": 200,
+        "key_present_before": "true",
+        "key_before": "true"
+      },
+      "evidence": "audit_log_disable_postgres",
+      "durationMs": 129974
+    },
+    {
+      "id": "A06b",
+      "title": "PATCH audit_log_disable_postgres through the Management API",
+      "status": "info",
+      "detail": "asked for audit_log_disable_postgres=false (the opposite of the true it held). PATCH -> HTTP 200; on re-read the key is true. A 2xx that leaves the value unchanged: the switch is accepted and ignored on the public API, so it is Dashboard-only (Authentication -> Configuration -> Audit Logs).",
+      "measurements": {
+        "patch_status": 200,
+        "patch_target": "false",
+        "key_after_patch": "true",
+        "write_took": "false"
+      },
+      "durationMs": 129974
+    },
+    {
+      "id": "A06c",
+      "title": "does a new auth event still reach the table",
+      "status": "pass",
+      "detail": "admin user create -> HTTP 200 in 1 attempt(s); password login -> HTTP 200. Table rows 0 -> 0; a row tagged with this run did not appear within 121s. On a fresh project the Postgres copy is OFF by default.",
+      "measurements": {
+        "create_status": 200,
+        "login_status": 200,
+        "create_attempts": 1,
+        "rows_before": 0,
+        "rows_after": 0,
+        "tagged_row_appeared": "false",
+        "postgres_copy_default": "off"
+      },
+      "durationMs": 129974
+    },
+    {
+      "id": "A06z",
+      "title": "cleanup",
+      "status": "pass",
+      "detail": "auth config PATCH reverted; test user deleted",
+      "durationMs": 129974
+    },
+    {
+      "id": "A09a",
+      "title": "install a chained mirror fed by a trigger on the audit table",
+      "status": "pass",
+      "detail": "schema, chained table, SECURITY DEFINER capture function, verifier and trigger created; 1 trigger now on auth.audit_log_entries. A tenant CAN attach a trigger to the Auth server's own table - the ACL grants postgres the TRIGGER privilege.",
+      "measurements": {
+        "install_ok": "true",
+        "triggers_on_audit_table": 1
+      },
+      "durationMs": 130647
+    },
+    {
+      "id": "A09b",
+      "title": "a real auth event reaches the mirror through the trigger",
+      "status": "fail",
+      "detail": "admin user create -> HTTP 200, password login -> HTTP 200; the mirror captured nothing within 125s. Mirror holds 0 rows (seq null..null); verifier: 0 rows checked, first break none. GoTrue writes as supabase_auth_admin and the SECURITY DEFINER function still records it.",
+      "measurements": {
+        "create_status": 200,
+        "login_status": 200,
+        "mirrored": "false",
+        "mirror_lag_s": 125,
+        "mirror_rows": 0,
+        "verify_checked": 0,
+        "verify_break": "none"
+      },
+      "durationMs": 130647
+    },
+    {
+      "id": "A09c",
+      "title": "delete one mirror row: does the verifier notice",
+      "status": "info",
+      "detail": "could not delete a mirror row: no second row to delete",
+      "measurements": {
+        "deleted_seq": 0,
+        "verify_break_after_delete": "none",
+        "verify_checked": 0
+      },
+      "durationMs": 130647
+    },
+    {
+      "id": "A09d",
+      "title": "the same identity rebuilds the chain and the verifier goes quiet",
+      "status": "pass",
+      "detail": "rehash of every row -> true; verifier now reports first break none over 0 rows. The head hash moved from ... to ..., so the ONE thing that survives an owner with a rehash loop is a head hash that was copied out of the database before the tampering. In-database immutability against the database owner does not exist; off-box anchoring is the control.",
+      "measurements": {
+        "rebuild_ok": "true",
+        "verify_break_after_rebuild": "none",
+        "head_hash_changed": "false",
+        "head_before": "",
+        "head_after": ""
+      },
+      "durationMs": 130647
+    },
+    {
+      "id": "A09z",
+      "title": "cleanup",
+      "status": "pass",
+      "detail": "trigger and schema dropped (0 user triggers left on the audit table); test user deleted",
+      "durationMs": 130647
+    }
+  ]
+}

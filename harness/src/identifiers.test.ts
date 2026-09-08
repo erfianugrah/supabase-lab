@@ -34,6 +34,23 @@ const ALLOW = new Set<string>([
 ]);
 
 const REF = /\b[a-z]{20}\b/g;
+/**
+ * Credential identifiers the PLATFORM writes into its own output, which no
+ * hand-written redaction list anticipated. The Management API appends a
+ * provenance comment to statements it runs (`-- user: pat:<digits>`, or
+ * `oauth:<uuid>` for an OAuth client), and audit-integrity A03d keeps that
+ * footer verbatim as evidence - so four published artifacts carried the
+ * account's real PAT id on 2026-09-08. The ref scan passed on all four,
+ * because a PAT id is not ref-shaped.
+ */
+const CRED = /\bpat:\d+|\boauth:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g;
+/**
+ * Deliberately-synthetic credential fixtures, the same idea as the placeholder
+ * refs in ALLOW: redact.test.ts has to contain the SHAPE to prove the redactor
+ * removes it. Two entries, both counted-up digits. Add to this only for another
+ * fixture, never to excuse a real value.
+ */
+const CRED_ALLOW = new Set<string>(["pat:1234567", "oauth:0a1b2c3d-4e5f-6a7b-8c9d-0e1f2a3b4c5d"]);
 const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
 // Example addresses are fine: example.com, the reserved lab.test / lab.invalid
 // fixture domains, and the disposable-domain LIKE pattern S19 sends.
@@ -54,7 +71,7 @@ async function trackedProse(): Promise<string[]> {
   return [...new Set(`${tracked}\n${untracked}`.split("\n").map((l) => l.trim()))].filter((l) => l && !SKIP.test(l));
 }
 
-describe("tracked prose, source and config carry no project ref, project hostname or email", async () => {
+describe("tracked prose, source and config carry no project ref, hostname, email or credential id", async () => {
   const files = await trackedProse();
   test("there is prose to scan", () => {
     expect(files.length).toBeGreaterThan(10);
@@ -64,7 +81,8 @@ describe("tracked prose, source and config carry no project ref, project hostnam
       const text = await Bun.file(resolve(ROOT, rel)).text();
       const refs = [...new Set((text.match(REF) ?? []).filter((t) => !ALLOW.has(t)))];
       const emails = [...new Set((text.match(EMAIL) ?? []).filter((e) => !EMAIL_ALLOW.test(e)))];
-      expect({ refs, emails }).toEqual({ refs: [], emails: [] });
+      const creds = [...new Set((text.match(CRED) ?? []).filter((c) => !CRED_ALLOW.has(c)))];
+      expect({ refs, emails, creds }).toEqual({ refs: [], emails: [], creds: [] });
     });
   }
 });
