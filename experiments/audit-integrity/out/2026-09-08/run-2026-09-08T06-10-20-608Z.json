@@ -1,0 +1,227 @@
+{
+  "startedAt": "2026-09-08T06:10:20.608Z",
+  "finishedAt": "2026-09-08T06:13:23.781Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "audit-integrity",
+  "labCommit": "60e7194",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "OpenSSL 3.6.4 25 Aug 2026 (Library: OpenSSL 3.6.4 25 Aug 2026)"
+  },
+  "results": [
+    {
+      "id": "A11a",
+      "title": "logged statements in the last hour, by role and application_name",
+      "status": "info",
+      "detail": "postgres/mgmt-api x13, postgres/supabase/dashboard x6, postgres/supabase/dashboard-query-editor x1. Every path this harness uses arrives as one role, so a per-person question cannot be answered from Postgres alone.",
+      "measurements": {
+        "groups": 3,
+        "apps": "postgres/mgmt-api x13 | postgres/supabase/dashboard x6 | postgres/supabase/dashboard-query-editor x1"
+      },
+      "evidence": "postgres/mgmt-api x13\npostgres/supabase/dashboard x6\npostgres/supabase/dashboard-query-editor x1",
+      "durationMs": 7227
+    },
+    {
+      "id": "A11b",
+      "title": "a Dashboard SQL Editor session, if the operator step has been run",
+      "status": "pass",
+      "detail": "found the operator statement: role=postgres, application_name=supabase/dashboard-query-editor. That is the identity a Dashboard member's SQL runs as.",
+      "measurements": {
+        "operator_step_found": "true",
+        "non_mgmt_groups": 2
+      },
+      "evidence": "statement:   create temp table who_am_i as\r\n    select current_user, session_user, current_setting('application_name');\r\n  select * from who_am_i;\n\n-- source: dashboard\n-- user: session:<id>\n-- date: 2026-09-08T05:40:50.653Z",
+      "durationMs": 7227
+    },
+    {
+      "id": "A05a",
+      "title": "log sources on this project, and whether auth audit events have their own",
+      "status": "pass",
+      "detail": "9 sources in the last 3 h: postgrest_logs, auth_logs, postgres_logs, supavisor_logs, pgbouncer_logs, edge_logs, realtime_logs, storage_logs, auth_audit_logs. auth_audit_logs is present.",
+      "measurements": {
+        "sources": 9,
+        "auth_audit_logs_present": "true",
+        "stream_error": "no"
+      },
+      "evidence": "{\"n\":129,\"source\":\"postgrest_logs\"}\n{\"n\":59,\"source\":\"auth_logs\"}\n{\"n\":54,\"source\":\"postgres_logs\"}\n{\"n\":25,\"source\":\"supavisor_logs\"}\n{\"n\":23,\"source\":\"pgbouncer_logs\"}\n{\"n\":15,\"source\":\"edge_logs\"}\n{\"n\":8,\"source\":\"realtime_logs\"}\n{\"n\":6,\"source\":\"storage_logs\"}\n{\"n\":3,\"source\":\"auth_audit_logs\"}",
+      "durationMs": 166031
+    },
+    {
+      "id": "A05b",
+      "title": "auth events reach auth.audit_log_entries, and which actions GoTrue records",
+      "status": "pass",
+      "detail": "3/3 users created, 3 password logins. 6 rows in auth.audit_log_entries carry the run tag (first row 0s after the writes): login x3, user_signedup x3. The in-database copy is ENABLED on this project.",
+      "measurements": {
+        "users_created": 3,
+        "logins_ok": 3,
+        "table_rows": 6,
+        "table_lag_s": 0,
+        "actions": 2
+      },
+      "evidence": "{\"action\":\"login\",\"n\":3}\n{\"action\":\"user_signedup\",\"n\":3}",
+      "durationMs": 166031
+    },
+    {
+      "id": "A05c",
+      "title": "the same auth events in the auth_audit_logs source",
+      "status": "pass",
+      "detail": "found 6 matching rows in auth_audit_logs, first visible 33s after the writes. This copy is written by the platform, not by the tenant's database, and no tenant credential has a write path to it.",
+      "measurements": {
+        "stream_found": "true",
+        "stream_rows": 6,
+        "stream_lag_s": 33
+      },
+      "evidence": "{\"auth_audit_event\":{\"action\":\"login\",\"actor_id\":\"24b67047-87a4-4c93-b781-c9f81839b80d\",\"actor_username\":\"<email>\",\"actor_via_sso\":false,\"audit_log_id\":\"642debe4-363d-4acd-9c90-b2fa7954261a\",\"created_at\":\"2026-09-08T06:10\n{\"auth_audit_event\":{\"action\":\"user_signedup\",\"actor_id\":\"00000000-0000-0000-0000-000000000000\",\"actor_username\":\"service_role\",\"actor_via_sso\":false,\"audit_log_id\":\"7128a9bb-4284-4d5d-98d1-b3de3faae2b3\",\"created_at\":\"2026-09-08T06:10:28.86\n{\"auth_audit_event\":{\"action\":\"login\",\"actor_id\":\"364ec0b3-b401-4cdd-b6cd-04dcda86878c\",\"actor_username\":\"<email>\",\"actor_via_sso\":false,\"audit_log_id\":\"33eb97a4-8992-47fc-994d-89eb0c5b64d5\",\"created_at\":\"2026-09-08T06:10\n{\"auth_audit_event\":{\"action\":\"user_signedup\",\"actor_id\":\"00000000-0000-0000-0000-000000000000\",\"actor_username\":\"service_role\",\"actor_via_sso\":false,\"audit_log_id\":\"e77639a9-6adc-47c7-a55a-6996d33a13cf\",\"created_at\":\"2026-09-08T06:10:28.63\n{\"auth_audit_event\":{\"action\":\"login\",\"actor_id\":\"8d8234ef-9c48-4734-b1fa-42064fba2807\",\"actor_username\":\"<email>\",\"actor_via_sso\":false,\"audit_log_id\":\"d27558df-ca30-4e01-a11a-608dcbe7e095\",\"created_at\":\"2026-09-08T06:10",
+      "durationMs": 166031
+    },
+    {
+      "id": "A05d",
+      "title": "a forged entry: in the table, not in the stream",
+      "status": "pass",
+      "detail": "forged insert -> true; the table now holds 1 row for that actor; the stream holds none after 126s, so the stream is fed by the Auth server and not by the table. A row in one store with no counterpart in the other is the signature - in both directions.",
+      "measurements": {
+        "forge_ok": "true",
+        "forge_in_table": 1,
+        "forge_in_stream": "false",
+        "forge_search_s": 126
+      },
+      "durationMs": 166031
+    },
+    {
+      "id": "A05e",
+      "title": "delete the in-database copy; count both stores again",
+      "status": "pass",
+      "detail": "DELETE -> true. Table rows for the tag: 6 before, 0 after. Stream rows for the same tag: 6 before, 6 after. The erasure is complete in the store the tenant owns and invisible in the store the platform owns, so comparing the two counts for one window detects it.",
+      "measurements": {
+        "delete_ok": "true",
+        "table_before": 6,
+        "table_after": 0,
+        "stream_before": 6,
+        "stream_after": 6,
+        "divergence": 6,
+        "postgres_copy_enabled": "true"
+      },
+      "durationMs": 166031
+    },
+    {
+      "id": "A05z",
+      "title": "cleanup",
+      "status": "pass",
+      "detail": "3 auth users deleted; tagged audit rows already removed by A05e",
+      "durationMs": 166031
+    },
+    {
+      "id": "A08a",
+      "title": "a fresh auth event through GET /auth/v1/admin/audit",
+      "status": "pass",
+      "detail": "user create -> HTTP 200, password login -> HTTP 200. GET /auth/v1/admin/audit (service key) -> HTTP 200, 5 entries, 2 carrying this run's tag (visible 0s after the write). The same event has 2 rows in auth.audit_log_entries (in-database copy enabled). ",
+      "measurements": {
+        "login_status": 200,
+        "endpoint_status": 200,
+        "entries": 5,
+        "tagged_entries": 2,
+        "table_rows": 2,
+        "endpoint_lag_s": 0
+      },
+      "durationMs": 2401
+    },
+    {
+      "id": "A08b",
+      "title": "the same read after the table rows are deleted",
+      "status": "info",
+      "detail": "DELETE -> true; table rows for the tag 2 -> 0. Endpoint entries carrying the tag: 2 -> 0. The endpoint reads the table: erasing the rows blinds the admin API too, so it is a window rather than a second copy.",
+      "measurements": {
+        "delete_ok": "true",
+        "table_after": 0,
+        "endpoint_tagged_before": 2,
+        "endpoint_tagged_after": 0,
+        "endpoint_is_table_window": "true",
+        "postgres_copy_enabled": "true"
+      },
+      "durationMs": 2401
+    },
+    {
+      "id": "A08c",
+      "title": "write and delete routes on the admin audit endpoint",
+      "status": "info",
+      "detail": "DELETE /auth/v1/admin/audit -> HTTP 405 (); POST -> HTTP 405 (). A service-key holder has no API path to the audit trail's contents; the database password is the path.",
+      "measurements": {
+        "delete_status": 405,
+        "post_status": 405
+      },
+      "durationMs": 2401
+    },
+    {
+      "id": "A08z",
+      "title": "cleanup",
+      "status": "pass",
+      "detail": "test user deleted",
+      "durationMs": 2401
+    },
+    {
+      "id": "A09a",
+      "title": "install a chained mirror fed by a trigger on the audit table",
+      "status": "pass",
+      "detail": "schema, chained table, SECURITY DEFINER capture function, verifier and trigger created; 1 trigger now on auth.audit_log_entries. A tenant CAN attach a trigger to the Auth server's own table - the ACL grants postgres the TRIGGER privilege.",
+      "measurements": {
+        "install_ok": "true",
+        "triggers_on_audit_table": 1
+      },
+      "durationMs": 7521
+    },
+    {
+      "id": "A09b",
+      "title": "a real auth event reaches the mirror through the trigger",
+      "status": "pass",
+      "detail": "admin user create -> HTTP 200, password login -> HTTP 200; the mirror captured the tagged entry 0s later. Mirror holds 2 rows (seq 1..2); verifier: 2 rows checked, first break none. GoTrue writes as supabase_auth_admin and the SECURITY DEFINER function still records it.",
+      "measurements": {
+        "create_status": 200,
+        "login_status": 200,
+        "mirrored": "true",
+        "mirror_lag_s": 0,
+        "mirror_rows": 2,
+        "verify_checked": 2,
+        "verify_break": "none"
+      },
+      "durationMs": 7521
+    },
+    {
+      "id": "A09c",
+      "title": "delete one mirror row: does the verifier notice",
+      "status": "info",
+      "detail": "deleted mirror seq 2; verifier now reports first break at seq none over 1 rows. A row removed from the middle of a chain cannot be removed quietly - the next row's prev_hash no longer recomputes.",
+      "measurements": {
+        "deleted_seq": 2,
+        "verify_break_after_delete": "none",
+        "verify_checked": 1
+      },
+      "durationMs": 7521
+    },
+    {
+      "id": "A09d",
+      "title": "the same identity rebuilds the chain and the verifier goes quiet",
+      "status": "pass",
+      "detail": "rehash of every row -> true; verifier now reports first break none over 1 rows. The head hash moved from ec83cf53fde2... to ec83cf53fde2..., so the ONE thing that survives an owner with a rehash loop is a head hash that was copied out of the database before the tampering. In-database immutability against the database owner does not exist; off-box anchoring is the control.",
+      "measurements": {
+        "rebuild_ok": "true",
+        "verify_break_after_rebuild": "none",
+        "head_hash_changed": "false",
+        "head_before": "ec83cf53fde2650b",
+        "head_after": "ec83cf53fde2650b",
+        "postgres_copy_enabled": "true"
+      },
+      "durationMs": 7521
+    },
+    {
+      "id": "A09z",
+      "title": "cleanup",
+      "status": "pass",
+      "detail": "trigger and schema dropped (0 user triggers left on the audit table); test user deleted",
+      "durationMs": 7521
+    }
+  ]
+}
