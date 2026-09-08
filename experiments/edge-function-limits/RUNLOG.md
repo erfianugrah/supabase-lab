@@ -27,6 +27,7 @@ Full write-up: https://erfi.dev/reference/supabase-edge-function-limits/
 | EF09 | destructive | Wall clock on an ACTIVE request: a stream that ticks every 5 s asks for 450 s; where the platform cuts it. |
 | EF10 | destructive | The recursive-call cap (~5000 per minute in the docs): one minute of self-calling chains at concurrency 100, depth 2. |
 | EF11 | destructive | The metadata races repeated: delete during deploy x10 with a redeploy after each; same slug 4 concurrent x5. |
+| EF12 | destructive | Concurrency: no published per-project/per-function limit (per_worker policy); a CPU-exhausting request in a concurrent burst takes queued light requests down with it as 546. Control: light requests alone all 200. |
 
 Pure logic (docs table, spec readers, the triage classifier) is unit tested:
 `make unit` (or `bun test experiments/edge-function-limits` at the root). The
@@ -40,6 +41,26 @@ classifier's tests include the strings the platform actually returned below.
    merged with 429.
 3. Whether anyone checked the functions landed rather than trusting the exit
    code. Exit 0 or 2xx with the function absent afterwards is `silent-loss`.
+
+## EF12 validated 2026-09-08 (Free + Pro + Team orgs, ap-southeast-1)
+
+Concurrency, run on one throwaway project in each of three tiers, then all
+destroyed. Identical result across tiers:
+
+- **EF12a** - 12 light requests fired concurrently, alone: all 200. Concurrency
+  on its own is not the failure.
+- **EF12b** - 12 light requests in the same burst as ONE CPU-exhausting request:
+  the heavy request answered 546, and all 12 lights still answered 200. So
+  co-tenancy alone does NOT cancel the lights - the runtime spun up enough
+  isolates to serve them while the heavy one died. This corrects the intuition
+  that any request sharing an isolate with a heavy one is a casualty.
+- **EF12c** - a saturating burst of 40 CPU-exhausting requests at once: 40/40
+  answered 546 (100%). The queued-casualty / resource-limit cancellation shows
+  up under isolate-pool saturation, not under mere co-tenancy.
+
+Read for the email: a single heavy request among light ones kills only itself;
+you get mass 546s when concurrent HEAVY load exceeds the isolates the platform
+will spin up. Tier-independent.
 
 ## Validated 2026-09-02 (micro, ap-southeast-1, Pro org; CLI 2.116.0, Docker present)
 

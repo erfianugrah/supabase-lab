@@ -8,7 +8,7 @@ TS := $(shell date +%Y%m%d-%H%M%S)
 # EF02 reads organization entitlements. Everything else deploys into the lab
 # project and is destructive by construction.
 READONLY := EF01,EF02
-DESTRUCTIVE := EF03,EF04,EF05,EF06,EF07,EF08,EF09,EF10,EF11
+DESTRUCTIVE := EF03,EF04,EF05,EF06,EF07,EF08,EF09,EF10,EF11,EF12
 
 .PHONY: init fmt validate apply probe probe-destructive unit destroy
 
