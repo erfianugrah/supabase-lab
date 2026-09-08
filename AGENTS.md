@@ -1249,6 +1249,114 @@ history.
   new `sub` and relay email, within 60 days of accepting the transfer) is the
   other half.
 
+## experiments/audit-integrity - key facts (validated 2026-09-08, micro x2 on Pro + Team orgs; entitlements and members read on Free + Pro + Team)
+
+- Question: the tenant of a managed project is also its administrator, so
+  "is the audit trail tamper-proof" reduces to which side of the tenant
+  boundary each copy of an event lives on. Two fresh Micros, one per plan,
+  because the DB-side facts turned out plan-independent and the retention and
+  export surfaces are entitlements. `make probe ORG=team` repoints the battery.
+- `auth.audit_log_entries` is owned by `supabase_auth_admin` with ACL
+  `{supabase_auth_admin=arwdDxtm, dashboard_user=arwdDxtm, postgres=ar*wdDxtm}`.
+  4 of 10 roles can delete; `supabase_read_only_user` is select-only;
+  `service_role`, `anon` and `authenticated` hold NOTHING, not even select (an
+  older session note claiming service_role can tamper here is wrong for PG17).
+  PK only, no FK, no triggers, so no cascade and no sequence gap to detect a
+  deletion by. As `postgres`: insert of a backdated forged entry, in-place
+  UPDATE of `ip_address` and action, DELETE and TRUNCATE all accepted.
+- **The in-database copy is OFF by default and the API cannot switch it on.**
+  `GET config/auth` returns `audit_log_disable_postgres=true` (present in the
+  response, absent from the spec); PATCHing the OPPOSITE value answers 200 and
+  changes nothing. Dashboard-only. This confirms the lexicanum MFA/impersonation
+  guide's 2026-07-24 measurement on a fresh project in another region. Any
+  module that needs a populated table reads `auditCopyEnabled()` and skips with
+  a reason - patching a value to itself, and scoring `0 before, 0 after` as a
+  pass, were both bugs in the first pass.
+- **Erasure is unlogged by default; the positive control is what makes that
+  claim safe.** Defaults are `log_statement=ddl`, `log_connections=off`,
+  `log_min_duration_statement=-1`, no pgaudit. A nonce-carrying DDL statement was
+  first seen in `postgres_logs` 32 s after it was fired, while a bare DELETE and
+  TRUNCATE with their own nonces were still absent at the end of a 192 s search
+  at a 30 s poll interval. The 189 s / 191 s figures the first write-up
+  published as the control's lag were the search loop's EXIT time:
+  `findMarkers` ran to its timeout because the two missing nonces never arrive.
+  It records per-marker first-seen times now, which is what produced the 32 s. `PUT config/database/postgres {log_statement}` -> 400
+  `Unrecognized key`; the GET answered 0 keys on both fresh projects, and
+  "returns only overrides that have been set" is the inference that fits, not a
+  tested rule.
+  pgaudit SESSION mode catches DELETE and TRUNCATE, both first seen 32 s later;
+  OBJECT mode catches the DELETE at 33 s and produces NO line for the TRUNCATE
+  across a 193 s window even with `truncate` granted to the auditor role. So
+  object mode alone leaves the fastest erasure path unlogged - the write-up
+  claimed both modes caught both until the 06:35 UTC pass measured it. Neither
+  mode needs a restart (`alter role postgres set pgaudit.log` applies to new
+  sessions). `log_connections` DOES take through the API (PUT 200, GET echoes
+  true, a later session reports `on`), though no connection line was seen in
+  the 97 s after.
+- **The stream is the copy the tenant cannot reach.** With the copy OFF: 3
+  users + 3 logins -> 6 rows in `auth_audit_logs` 2 s after the writes, 0 in
+  the table. With it ON (Dashboard, Run 4): 6 in each, stream at 33 s, then a
+  DELETE took the table **6 -> 0** and left the stream at **6**. That count
+  pair over one window is the tamper check, and it needs nothing from the
+  tenant's own logging. A forged table row never appears in the stream (126-127
+  s searches, two runs). `GET /auth/v1/admin/audit` is a window onto the TABLE:
+  0 entries with the copy off, and with it on the tagged entries went **2 -> 0**
+  when the table rows were deleted. DELETE/POST on it are 405.
+- **A hash-chained mirror catches an interior deletion, and by construction an
+  edit to a row's hashed contents; it does not catch truncation.** No module
+  edited a mirror row, so the edit half is arithmetic and not a measurement. A trigger on `auth.audit_log_entries` fires for GoTrue's own
+  insert (SECURITY DEFINER capture, 4-row mirror, chain clean). Deleting the
+  TAIL (`seq 4` of 4) leaves the verifier silent; deleting an interior row
+  (`seq 2` of 3) breaks it at `seq 3`; rehashing every row silences it again and
+  moves only the head hash (`5d462b0c1893` -> `2eb685578caa`). The A09c row in
+  the 06:10 UTC pass was WRONG - a 2-row mirror made "the second row" the tail,
+  so it measured truncation while claiming an interior cut. The module now makes
+  two users and reports the two shapes separately (06:15 UTC pass).
+- **Attribution is by path, never by person.** Every tenant path arrives as
+  `postgres`; only `application_name` differs (`mgmt-api` vs
+  `supabase/dashboard-query-editor`, confirmed both in the Dashboard and in
+  `postgres_logs`). The platform appends `-- source:` / `-- user: pat:<id>` /
+  `-- date:` to statements it runs. `postgres` CANNOT `set role dashboard_user`
+  or `supabase_read_only_user` (`permission denied to set role`), so the
+  Dashboard connects as those roles directly.
+- **Retention and export are per-plan entitlements** (`GET
+  /organizations/{slug}/entitlements`, 64 each): `security.audit_logs_days`
+  free 0/no-access, pro 0/no-access, team 62; `log.retention_days` 1 / 7 / 28;
+  `backup.retention_days` 0 / 7 / 14; `audit_log_drains` false/false/true;
+  `log_drains` false/true/true. A Pro project has NO platform audit log; its
+  whole auth audit trail is a 7-day stream and its only preservation lever is a
+  project log drain. The platform audit log has no API surface at all - 0 of
+  115 `/v1` paths mention audit - so it cannot be exported OR rewritten.
+- **`POST /projects/{ref}/cli/login-role {read_only}` is the practical
+  control**: 201 with role + password + `ttl 300`, and BOTH variants
+  (`cli_login_supabase_read_only_user` and `cli_login_postgres`) are refused on
+  the audit table with `permission denied for schema auth` when connected
+  through the session pooler. A JIT credential is strictly weaker against the
+  audit trail than the project database password. Revocation is measured with
+  the credential itself (06:35 UTC pass): the same role and password answered
+  before `DELETE /cli/login-role` (200) and got `FATAL: (EAUTHQUERY) user not
+  found in the database` after. The earlier version probed with a deliberately
+  WRONG password, which cannot distinguish a revoked role from a live one. A
+  freshly minted credential is also not immediately usable: one connect failed
+  seconds after minting while later probes on the same role authenticated.
+- **The organization audit log records control-plane calls; SQL execution is
+  absent from it.** Dashboard-only read (no `/v1` path exists), Team-plan org: it
+  carries actor + organization role + method + description + status + target
+  project + timestamp, INCLUDING reads (`GET Get project api keys`), while the
+  dozens of `POST /database/query` calls from the same battery minutes -
+  deletes and truncates on the audit table among them - produced no entry (30
+  entries in the window, fewer than the query calls). The first control choice
+  for this comparison (`GET /functions`) was itself unaudited and proved
+  nothing; the battery's own PUT/PATCH/POST/DELETE served as the control.
+- The Dashboard UI labels the switch in the POSITIVE form ("Write audit logs to
+  the database"), where the vendor docs describe the negative ("Disable
+  writing auth audit logs to project database"). Anyone following the doc text
+  looks for the opposite switch.
+- Pending: a restore-and-diff recovery of deleted rows (flagged, not run); a
+  dedicated read of whether a Dashboard SQL Editor statement appears in the
+  organization audit log; a Read-Only member exercised end to end (none exists
+  in any of the three orgs). See experiments/audit-integrity/RUNLOG.md.
+
 ## Write-up workflow (added 2026-09-02 after three review passes)
 
 The numbers that went wrong in that day's write-ups were all retyped from

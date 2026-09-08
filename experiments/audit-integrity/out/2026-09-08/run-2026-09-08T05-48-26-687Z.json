@@ -1,0 +1,63 @@
+{
+  "startedAt": "2026-09-08T05:48:26.687Z",
+  "finishedAt": "2026-09-08T05:48:28.396Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "audit-integrity",
+  "labCommit": "60e7194",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "OpenSSL 3.6.4 25 Aug 2026 (Library: OpenSSL 3.6.4 25 Aug 2026)"
+  },
+  "results": [
+    {
+      "id": "A02a",
+      "title": "matrix: role x operation against auth.audit_log_entries",
+      "status": "info",
+      "detail": "exercised (service_role, authenticated, anon, postgres): service_role=nothing; authenticated=nothing; anon=nothing; postgres=select/insert/update/delete/truncate. NOT exercisable from a postgres session - \"permission denied to set role\": dashboard_user, supabase_read_only_user; the postgres role is not a member of them, so their privileges are the A01b grant read (dashboard_user holds all five, supabase_read_only_user holds select only) and the Dashboard connects as them directly rather than by SET ROLE. Distinct denial: permission denied for table audit_log_entries | permission denied to set role \"dashboard_user\" | permission denied to set role \"supabase_read_only_user\".",
+      "measurements": {
+        "cells": 30,
+        "postgres_allowed": 5,
+        "dashboard_user_allowed": "none",
+        "read_only_user_allowed": "none",
+        "service_role_allowed": 0,
+        "authenticated_allowed": 0,
+        "anon_allowed": 0,
+        "denial_kinds": 3,
+        "roles_exercised": 4,
+        "roles_unassumable": "dashboard_user|supabase_read_only_user"
+      },
+      "evidence": "anon\tselect\tDENIED: permission denied for table audit_log_entries\nanon\tinsert\tDENIED: permission denied for table audit_log_entries\nanon\tupdate\tDENIED: permission denied for table audit_log_entries\nanon\tdelete\tDENIED: permission denied for table audit_log_entries\nanon\ttruncate\tDENIED: permission denied for table audit_log_entries\nauthenticated\tselect\tDENIED: permission denied for table audit_log_entries\nauthenticated\tinsert\tDENIED: permission denied for table audit_log_entries\nauthenticated\tupdate\tDENIED: permission denied for table audit_log_entries\nauthenticated\tdelete\tDENIED: permission denied for table audit_log_entries\nauthenticated\ttruncate\tDENIED: permission denied for table audit_log_entries\ndashboard_user\tselect\tDENIED: permission denied to set role \"dashboard_user\"\ndashboard_user\tinsert\tDENIED: permission denied to set role \"dashboard_user\"\ndashboard_user\tupdate\tDENIED: permission denied to set role \"dashboard_user\"\ndashboard_user\tdelete\tDENIED: permission denied to set role \"dashboard_user\"\ndashboard_user\ttruncate\tDENIED: permission denied to set role \"dashboard_user\"\npostgres\tselect\tALLOWED\npostgres\tinsert\tALLOWED\npostgres\tupdate\tALLOWED\npostgres\tdelete\tALLOWED\npostgres\ttruncate\tALLOWED\nservice_role\tselect\tDENIED: permission denied for table audit_log_entries\nservice_role\tinsert\tDENIED: permission denied for table audit_log_entries\nservice_role\tupdate\tDENIED: permission denied for table audit_log_entries\nservice_role\tdelete\tDENIED: permission denied for table audit_log_entries\nservice_role\ttruncate\tDENIED: permission denied for table audit_log_entries\nsupabase_read_only_user\tselect\tDENIED: permission denied to set role \"supabase_read_only_user\"\nsupabase_read_only_user\tinsert\tDENIED: permission denied to set role \"supabase_read_only_user\"\nsupabase_read_only_user\tupdate\tDENIED: permission denied to set role \"supabase_read_only_user\"\nsupabase_read_only_user\tdelete\tDENIED: permission denied to set role \"supabase_read_only_user\"\nsupabase_read_only_user\ttruncate\tDENIED: permission denied to set role \"supabase_read_only_user\"",
+      "durationMs": 1708
+    },
+    {
+      "id": "A02b",
+      "title": "forging an audit entry GoTrue never wrote",
+      "status": "info",
+      "detail": "insert accepted; read back 1 row with a chosen actor (<email>), a chosen source IP and a created_at three days in the past. Removed afterwards: true. The table has no FK to auth.users and no trigger, so nothing reconciles a forged row against a real user.",
+      "measurements": {
+        "forge_accepted": "true",
+        "rows_read_back": 1,
+        "backdated": "true",
+        "removed": "true"
+      },
+      "evidence": "{\"id\":\"de864841-a8ec-4430-a40e-f91dc6fe7678\",\"created_at\":\"2026-09-05 05:48:26.259497+00\",\"ip_address\":\"198.51.100.7\",\"actor\":\"<email>\"}",
+      "durationMs": 1708
+    },
+    {
+      "id": "A02c",
+      "title": "rewriting an existing entry in place (source IP and action)",
+      "status": "info",
+      "detail": "UPDATE accepted: the row's source IP and its action were both rewritten (1 row now reads action=logout from 10.0.0.1). An audit row is a plain heap row - no immutability, no version, no updated_at to notice the edit by. Table left at 0 rows.",
+      "measurements": {
+        "update_accepted": "true",
+        "rows_rewritten": 1,
+        "table_rows_after": 0
+      },
+      "durationMs": 1708
+    }
+  ]
+}
