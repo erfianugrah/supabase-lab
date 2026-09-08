@@ -1,0 +1,83 @@
+{
+  "startedAt": "2026-09-08T06:56:47.499Z",
+  "finishedAt": "2026-09-08T06:57:23.471Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "audit-integrity",
+  "labCommit": "9125b00",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "OpenSSL 3.6.4 25 Aug 2026 (Library: OpenSSL 3.6.4 25 Aug 2026)"
+  },
+  "results": [
+    {
+      "id": "A10a",
+      "title": "physical copies available on this project",
+      "status": "info",
+      "detail": "GET database/backups -> HTTP 200: pitr_enabled=false, walg_enabled=true, 1 logical backups listed, physical window none .. none. A fresh project has no history yet, which is itself the finding: the backstop only exists after the plan's first backup, and PITR is an add-on rather than a default.",
+      "measurements": {
+        "http": 200,
+        "pitr_enabled": "false",
+        "walg_enabled": "true",
+        "logical_backups": 1,
+        "physical_window_present": "false"
+      },
+      "evidence": "{\"region\":\"ap-southeast-1\",\"walg_enabled\":true,\"pitr_enabled\":false,\"backups\":[{\"id\":1612627213,\"is_physical_backup\":true,\"status\":\"COMPLETED\",\"inserted_at\":\"2026-09-08T06:41:25.917Z\"}],\"physical_backup_data\":{}}",
+      "durationMs": 647
+    },
+    {
+      "id": "A10b",
+      "title": "restore levers on the Management API",
+      "status": "info",
+      "detail": "6 backup paths: backups, backups/restore-pitr, backups/restore-point, backups/restore, backups/schedule, backups/undo. Any of them is reachable with the same PAT that can delete the audit rows, so the backstop is not protected from the actor it protects against - unless the restore lands in a DIFFERENT project (backup.restore_to_new_project in the entitlements A07 reads).",
+      "measurements": {
+        "backup_paths": 6
+      },
+      "durationMs": 647
+    },
+    {
+      "id": "A10c",
+      "title": "what the recovery path costs before anyone starts it",
+      "status": "info",
+      "detail": "GET billing/addons -> HTTP 200; PITR variants: 7 days=$100/month, 14 days=$200/month, 28 days=$400/month. A restore point does not exist the moment the addon is applied: it needs a base backup to have landed, and A10a reads no physical window on a fresh project. So the recovery path is a monthly charge plus a wait of indeterminate length, which is why the restore-and-diff is flagged and not run.",
+      "measurements": {
+        "addons_status": 200,
+        "pitr_variants": 3,
+        "pitr_prices": "7 days=$100/month | 14 days=$200/month | 28 days=$400/month"
+      },
+      "evidence": "7 days=$100/month\n14 days=$200/month\n28 days=$400/month",
+      "durationMs": 647
+    },
+    {
+      "id": "A13a",
+      "title": "control-plane control and API-side SQL, fired at recorded times",
+      "status": "pass",
+      "detail": "control PATCH config/auth (a value patched to itself) -> HTTP 200 at 2026-09-08T06:56:48.376Z. API-side SQL (POST /database/query, a DELETE on auth.audit_log_entries) -> HTTP 201 at 2026-09-08T06:56:48.602Z. Independent execution witness: a DDL statement with nonce a13witog31h7hg appeared in postgres_logs 34s later, so the API SQL path was live at that moment. Dashboard SQL Editor marker \"a13probe\" WAS found in postgres_logs (1s), so the operator step ran.",
+      "measurements": {
+        "control_status": 200,
+        "control_at": "2026-09-08T06:56:48.376Z",
+        "api_sql_status": 201,
+        "api_sql_at": "2026-09-08T06:56:48.602Z",
+        "witness_seen": "true",
+        "editor_step_ran": "true",
+        "search_window_s": 34
+      },
+      "evidence": "control PATCH at 2026-09-08T06:56:48.376Z\nAPI SQL at 2026-09-08T06:56:48.602Z\ncompare these two timestamps against the organization audit log",
+      "durationMs": 35326
+    },
+    {
+      "id": "A13b",
+      "title": "what the organization audit log showed (operator-supplied)",
+      "status": "skip",
+      "detail": "not supplied. Run the operator step in the module header, read the organization audit log for the two timestamps in A13a, and re-run with PVLAB_AUDIT_OBSERVED set. Without it this experiment has no evidence either way about SQL execution in the organization audit log.",
+      "measurements": {
+        "observation_supplied": "false",
+        "observation": "none"
+      },
+      "durationMs": 35326
+    }
+  ]
+}
