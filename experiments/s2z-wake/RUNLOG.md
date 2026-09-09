@@ -243,36 +243,39 @@ settle per endpoint, and the restore alone is ~3 minutes.
 
 ## HOW TO RESUME (written 2026-09-09 for a check-back ~2026-09-14)
 
-Two fleets are parked and two systemd user timers are sampling them. Nothing in
-this repo records the project refs - they are account identifiers and the
-identifiers test scans for that shape - so the state lives outside it:
+Two fleets are parked. Nothing in this repo records the project refs - they are
+account identifiers and the identifiers test scans for that shape - so the
+state lives outside it:
 
 ```
 ~/.local/share/s2z-wake/
-  status.tsv          15-min status samples, both orgs (env column: green | prod-free)
   fleet-sfp.tsv       the 12-project auto-pause fleet: candidate -> ref
   hib-ladder.tsv      hibernation ladder results (idle rung, TTFB, validation_errors)
   hib-ladder.state    which rung is next
-  sample-status.sh    the sampler
+  hib-ladder.key      the ladder project's publishable key
   hib-ladder.sh       the ladder
 ```
 
-Timers: `systemctl --user list-timers 's2z-*'`.
+One systemd user timer, the ladder: `systemctl --user list-timers 's2z-*'`.
+
+A 15-minute status sampler ran here for part of 2026-09-09 and was REMOVED, on
+the grounds that it earned nothing. It existed to pin the moment a project
+auto-paused, since no API surface reports a pause timestamp - but Z04 checks
+parked-ness itself at run time, the threshold is documented elsewhere rather
+than something this lab needs to measure, and a timer on a workstation that
+gets shut down reports the state at boot rather than the state at the
+transition. Do not reinstate it without a question that actually needs the
+timestamp.
 
 ### 1. Did the SfP fleet auto-pause?
 
-```
-awk -F'\t' '$2=="green" && $5=="INACTIVE"' ~/.local/share/s2z-wake/status.tsv | head
-```
+Just run Z04 - `Z04a` reads every fleet project's status and refuses to fire
+unless all 12 are `INACTIVE`, so readiness needs no separate check. The fleet's
+clock started 2026-09-09T08:50Z; Supabase's public pricing page puts
+free-project auto-pause at a week of inactivity, so budget days rather than
+hours before the first attempt.
 
-The fleet's clock started 2026-09-09T08:50Z. Do not predict the parking date -
-read `status.tsv`, which is the only thing that pins it, because there is NO
-API-observable pause timestamp and the moment is unrecoverable if the sampler
-was not running. For scale: Supabase's public pricing page puts free-project
-auto-pause at a week of inactivity, so budget days rather than hours before
-checking.
-
-If every fleet project is `INACTIVE`, run the wake matrix:
+Needs a fresh staging PAT: the one used on 2026-09-09 was revoked.
 
 ```
 secretctl exec keyfile:~/.supabase/green-access-token --as SUPABASE_ACCESS_TOKEN -- \
@@ -290,16 +293,27 @@ without being fired at.
 
 ### 2. Did the free project hibernate?
 
-`hib-ladder.tsv` is the answer. Awake baseline is 0.04-0.11 s TTFB; a rung with
-a multi-second TTFB is a wake, and the window sits between that rung and the
-one before it. `validation_errors` containing `project_hibernating` names the
-state directly. All rungs at baseline latency means hibernation is not enabled
-for that account, NOT that there is no window.
+`hib-ladder.tsv` is the answer, read with the noise floor in mind. The awake
+baseline is 0.04-0.11 s TTFB, but sub-second spikes around 0.65 s occur on a
+project known to be warm - measured 2026-09-09, a warm repeat came back
+0.656 s while forced new TCP+TLS connections ran 0.048-0.056 s, so a spike that
+size is neither a wake nor connection setup. The wake threshold is therefore
+**over 3 s on the first sample of a rung**, not "elevated over baseline": the
+first version of this check would have reported noise as a finding at every
+rung.
+
+Only the FIRST sample of a rung can show a wake; the two that follow are noise
+context. `validation_errors` containing `project_hibernating` names the state
+directly and is the stronger signal when present. All rungs at baseline latency
+mean hibernation is not enabled for that account, NOT that there is no window.
+
+Rung 1 (15 min idle, 2026-09-09) measured 0.634 s with
+`validation_errors: none` - no hibernation, and inside the noise floor above.
 
 ### 3. Teardown
 
 ```
-systemctl --user disable --now s2z-wake-sample.timer s2z-hib-ladder.timer
+systemctl --user disable --now s2z-hib-ladder.timer
 rm -rf ~/.local/share/s2z-wake ~/.config/systemd/user/s2z-*.{timer,service}
 ```
 
