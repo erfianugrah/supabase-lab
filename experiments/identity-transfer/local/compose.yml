@@ -1,0 +1,80 @@
+# A throwaway GoTrue at a pinned version, for the questions in this experiment
+# that are about the Auth server's own code rather than about the managed
+# platform's config surface: which stored copies of a provider's claims a
+# sign-in rewrites, where a custom claim lands and how long it lasts, and which
+# account-resolution decision arms the Before User Created hook.
+#
+# internal/models/linking.go, internal/api/hooks.go, internal/api/provider/
+# {keycloak,oidc}.go are byte-identical between v2.197.0 and master as of
+# 2026-09-11, so this rig runs the code those questions are asked about.
+#
+# The issuer shares the auth container's network namespace so GoTrue can reach
+# both it and the hook as 127.0.0.1: the hook config validator accepts `http`
+# only for localhost, 127.0.0.1, ::1 and host.docker.internal. Both ports are
+# published on the auth service because that namespace is where they live.
+name: pvlab-identity-transfer-local
+
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_PASSWORD: ${PVLAB_LOCAL_DB_PASSWORD}
+      POSTGRES_DB: postgres
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - ./init-db.sql:/docker-entrypoint-initdb.d/10-auth-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 2s
+      timeout: 3s
+      retries: 40
+
+  auth:
+    image: supabase/auth:v2.197.0
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:9999:9999"
+      - "127.0.0.1:8080:8080"
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: "9999"
+      API_EXTERNAL_URL: http://127.0.0.1:9999
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://postgres:${PVLAB_LOCAL_DB_PASSWORD}@db:5432/postgres?sslmode=disable&search_path=auth
+      DATABASE_URL: postgres://postgres:${PVLAB_LOCAL_DB_PASSWORD}@db:5432/postgres?sslmode=disable&search_path=auth
+      GOTRUE_SITE_URL: http://127.0.0.1:3000/pvlab-callback
+      GOTRUE_URI_ALLOW_LIST: "*"
+      GOTRUE_DISABLE_SIGNUP: "false"
+      GOTRUE_JWT_SECRET: ${PVLAB_LOCAL_JWT_SECRET}
+      GOTRUE_JWT_EXP: "3600"
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      # Matches the managed project IT01 ran against: an unverified address
+      # does not count as verified in linking.go's first loop.
+      GOTRUE_MAILER_AUTOCONFIRM: "false"
+      GOTRUE_LOG_LEVEL: info
+      # The social-provider slot every case drives, pointed at the issuer
+      # sharing this container's network namespace.
+      GOTRUE_EXTERNAL_KEYCLOAK_ENABLED: "true"
+      GOTRUE_EXTERNAL_KEYCLOAK_CLIENT_ID: pvlab-issuer
+      GOTRUE_EXTERNAL_KEYCLOAK_SECRET: unused. the lab issuer ignores client auth
+      GOTRUE_EXTERNAL_KEYCLOAK_URL: http://127.0.0.1:8080
+      GOTRUE_EXTERNAL_KEYCLOAK_REDIRECT_URI: http://127.0.0.1:9999/callback
+      # Fixed at boot, so the worker picks refuse-or-allow per request from the
+      # custom claim being signed up (see /hook/decide in worker/issuer.ts).
+      GOTRUE_HOOK_BEFORE_USER_CREATED_ENABLED: "true"
+      GOTRUE_HOOK_BEFORE_USER_CREATED_URI: http://127.0.0.1:8080/hook/decide
+      GOTRUE_HOOK_BEFORE_USER_CREATED_SECRETS: ${PVLAB_LOCAL_HOOK_SECRET}
+
+  issuer:
+    image: oven/bun:1.3-alpine
+    depends_on:
+      - auth
+    network_mode: "service:auth"
+    volumes:
+      - ..:/lab:ro
+    working_dir: /lab
+    command: ["bun", "run", "local/issuer-server.ts"]
