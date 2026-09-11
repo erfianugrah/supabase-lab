@@ -26,7 +26,12 @@ facts):
   an existing person (the Apple Developer team-transfer shape): linked by
   verified email, a new user, or the same user after a rewrite of the
   identity row. Driven through the Keycloak provider slot from a
-  lab-controlled issuer worker.
+  lab-controlled issuer worker, against a managed project (IT01-IT03) or a
+  throwaway GoTrue in Docker (ITL1-ITL3, `make local-up`) for the questions
+  that are about the Auth server's code rather than the platform's config
+  surface: which stored copies of the subject and email a sign-in rewrites,
+  where a `transfer_sub`-shaped claim lands, and which account-resolution
+  decision arms the Before User Created hook.
 - `edge-resilience` - what a client can do about platform incidents that
   are not theirs to fix: 25 measured modules (W01-W26) across JWT skew,
   edge cache/failover (Cloudflare worker), warm-standby replication and
