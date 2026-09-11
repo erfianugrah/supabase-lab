@@ -28,7 +28,9 @@
  *               signs in; SQL rewrites the identity row's provider_id and
  *               identity_data.sub to c2; c2 signs in with a DIFFERENT email
  *               c2 -> the same user, still one identity row; records which
- *               stored email (identity_data.email, auth.users.email) moved.
+ *               stored copy of the subject and the email moved
+ *               (identity_data, auth.users.email, and auth.users
+ *               .raw_user_meta_data read either side of that sign-in).
  *               Control: c1 again with another email -> a new user (the old
  *               subject is no longer known).
  *   IT01e       subject d2, same email as d1 but email_verified=false ->
@@ -40,10 +42,10 @@
  * internal/api/external.go) says; fail is a measured disagreement. Platform
  * error text is quoted verbatim in `detail`, numbers live in `measurements`.
  *
- * Not settled by this module: anything Apple-specific - that `transfer_sub`
- * and `is_private_email` are copied into the provider claims' custom-claims
- * map (source-read only; where they surface in identity_data was not run),
- * the audience check across Services ID and bundle ID, and Apple's own
+ * Not settled by this module: where a provider custom claim of the
+ * `transfer_sub` shape surfaces and how long it survives (IT02), whether the
+ * Before User Created hook sees it and on which decisions it runs (IT03), the
+ * audience check across Services ID and bundle ID, and Apple's own
  * transfer-identifier exchange (open for 60 days after acceptance).
  *
  * DESTRUCTIVE: writes auth config (restored in finally), creates users
@@ -52,98 +54,9 @@
 import type { Ctx, TestModule, TestResult } from "../../../harness/src/types";
 import { mgmt } from "../../../harness/src/mgmt";
 import { fetchKeys, sql } from "../../../harness/src/platform";
+import { CONFIG_KEYS, note, pointAtIssuer, signIn } from "../lib/flow";
 
 const ID = "IT01";
-const CONFIG_KEYS = [
-  "external_keycloak_enabled",
-  "external_keycloak_client_id",
-  "external_keycloak_secret",
-  "external_keycloak_url",
-  "site_url",
-] as const;
-const SITE_URL = "http://localhost:3000/pvlab-callback";
-const SETTLE_BUDGET_MS = 120_000;
-
-interface Persona {
-  sub: string;
-  email?: string;
-  email_verified?: boolean;
-  name?: string;
-}
-
-interface SignIn {
-  /** HTTP status of the Auth server's /authorize hop. */
-  authorizeStatus: number;
-  /** HTTP status of the Auth server's /callback hop. */
-  callbackStatus: number;
-  userId?: string;
-  email?: string;
-  /** Verbatim error and error_description the callback redirected with, if any. */
-  error?: string;
-  errorCode?: string;
-  errorDescription?: string;
-  /** Where the callback sent the browser (host + path, no tokens). */
-  landed?: string;
-}
-
-const b64url = (s: string) => Buffer.from(s).toString("base64").replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
-
-function jwtPayload(token: string): Record<string, unknown> {
-  try {
-    const p = token.split(".")[1] ?? "";
-    return JSON.parse(Buffer.from(p.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8")) as Record<string, unknown>;
-  } catch {
-    return {};
-  }
-}
-
-/**
- * The full browser flow with redirects followed by hand: Auth server
- * /authorize -> issuer /auth (persona appended) -> Auth server /callback ->
- * site_url with tokens or an error in the fragment/query.
- */
-async function signIn(ctx: Ctx, apikey: string, persona: Persona): Promise<SignIn> {
-  const base = `https://${ctx.apiHost}/auth/v1`;
-  const r1 = await fetch(`${base}/authorize?provider=keycloak`, {
-    headers: { apikey },
-    redirect: "manual",
-    signal: AbortSignal.timeout(30_000),
-  });
-  const issuerAuth = r1.headers.get("location");
-  if (r1.status !== 302 || !issuerAuth) {
-    const body = (await r1.text()).slice(0, 300);
-    return { authorizeStatus: r1.status, callbackStatus: -1, error: `authorize did not redirect: ${body}` };
-  }
-  const u = new URL(issuerAuth);
-  u.searchParams.set("persona", b64url(JSON.stringify(persona)));
-  const r2 = await fetch(u, { redirect: "manual", signal: AbortSignal.timeout(30_000) });
-  const callback = r2.headers.get("location");
-  if (r2.status !== 302 || !callback) {
-    return { authorizeStatus: r1.status, callbackStatus: -1, error: `issuer did not redirect: HTTP ${r2.status}` };
-  }
-  const r3 = await fetch(callback, { redirect: "manual", signal: AbortSignal.timeout(30_000) });
-  const landing = r3.headers.get("location");
-  if (!landing) {
-    const body = (await r3.text()).slice(0, 300);
-    return { authorizeStatus: r1.status, callbackStatus: r3.status, error: `callback did not redirect: ${body}` };
-  }
-  const l = new URL(landing);
-  const frag = new URLSearchParams(l.hash.replace(/^#/, ""));
-  const q = l.searchParams;
-  const pick = (k: string) => frag.get(k) ?? q.get(k) ?? undefined;
-  const out: SignIn = { authorizeStatus: r1.status, callbackStatus: r3.status, landed: `${l.host}${l.pathname}` };
-  const access = pick("access_token");
-  if (access) {
-    const p = jwtPayload(access);
-    out.userId = typeof p.sub === "string" ? p.sub : undefined;
-    out.email = typeof p.email === "string" ? p.email : undefined;
-  } else {
-    out.error = pick("error");
-    out.errorCode = pick("error_code");
-    out.errorDescription = pick("error_description");
-  }
-  return out;
-}
 
 const mod: TestModule = {
   id: ID,
@@ -167,7 +80,6 @@ const mod: TestModule = {
       sql(ctx, `select provider, provider_id, identity_data->>'sub' as sub, identity_data->>'email' as email, (identity_data->>'email_verified') as email_verified, user_id::text as user_id from auth.identities where provider = 'keycloak' and ${where} order by created_at`);
     const userRow = async (id: string) =>
       sql(ctx, `select id::text, email, email_confirmed_at is not null as confirmed, (select count(*) from auth.identities i where i.user_id = u.id) as identities from auth.users u where id = '${id}'`);
-    const note = (s: SignIn) => (s.userId ? `user ${s.userId.slice(0, 8)}... email ${s.email}` : `no session: error=${s.error ?? "-"} code=${s.errorCode ?? "-"} "${s.errorDescription ?? ""}"`);
 
     try {
       // ---- setup: point the Keycloak slot at the lab issuer -----------------
@@ -177,48 +89,22 @@ const mod: TestModule = {
       }
       const cfg = cur.json as Record<string, unknown>;
       original = Object.fromEntries(CONFIG_KEYS.map((k) => [k, cfg[k] ?? null]));
-      const t0 = Date.now();
-      const patch = await mgmt(ctx, "PATCH", `/projects/${ctx.ref}/config/auth`, {
-        external_keycloak_enabled: true,
-        external_keycloak_client_id: "pvlab-issuer",
-        external_keycloak_secret: "unused. the lab issuer ignores client auth",
-        external_keycloak_url: issuer,
-        site_url: SITE_URL,
-      });
-      let settled = false;
-      let settleAttempts = 0;
-      let settingsText = "";
-      while (Date.now() - t0 < SETTLE_BUDGET_MS) {
-        settleAttempts++;
-        const s = await fetch(`https://${ctx.apiHost}/auth/v1/settings`, { headers: { apikey }, signal: AbortSignal.timeout(15_000) });
-        settingsText = await s.text();
-        try {
-          const j = JSON.parse(settingsText) as { external?: Record<string, boolean> };
-          if (j.external?.keycloak === true) {
-            settled = true;
-            break;
-          }
-        } catch {
-          // not JSON yet
-        }
-        await Bun.sleep(3_000);
-      }
-      const settleS = Math.round((Date.now() - t0) / 1000);
+      const st = await pointAtIssuer(ctx, apikey, issuer);
       out.push({
         id: `${ID}-setup`,
         title: "keycloak slot pointed at the lab issuer",
-        status: patch.status < 300 && settled ? "pass" : "fail",
-        detail: `PATCH /config/auth HTTP ${patch.status}; /auth/v1/settings external.keycloak true after ${settleS}s (${settleAttempts} reads); mailer_autoconfirm=${String(cfg.mailer_autoconfirm)}, security_manual_linking_enabled=${String(cfg.security_manual_linking_enabled)}`,
+        status: st.patchStatus < 300 && st.settled ? "pass" : "fail",
+        detail: `PATCH /config/auth HTTP ${st.patchStatus}; /auth/v1/settings external.keycloak true after ${st.settleS}s (${st.reads} reads); mailer_autoconfirm=${String(cfg.mailer_autoconfirm)}, security_manual_linking_enabled=${String(cfg.security_manual_linking_enabled)}`,
         measurements: {
-          patch_status: patch.status,
-          settle_s: settleS,
-          settle_reads: settleAttempts,
+          patch_status: st.patchStatus,
+          settle_s: st.settleS,
+          settle_reads: st.reads,
           mailer_autoconfirm: String(cfg.mailer_autoconfirm),
           manual_linking_enabled: String(cfg.security_manual_linking_enabled),
         },
-        evidence: settled ? undefined : settingsText.slice(0, 300),
+        evidence: st.settled ? undefined : st.lastBody.slice(0, 300),
       });
-      if (!settled) return out;
+      if (!st.settled) return out;
 
       // ---- IT01a: first sign-in -------------------------------------------
       const a1 = await signIn(ctx, apikey, { sub: subj("a1"), email: email("a"), email_verified: true, name: "A" });
@@ -280,12 +166,21 @@ const mod: TestModule = {
         ctx,
         `update auth.identities set provider_id = '${subj("c2")}', identity_data = identity_data || jsonb_build_object('sub', '${subj("c2")}') where provider = 'keycloak' and provider_id = '${subj("c1")}' returning user_id::text`,
       );
+      // auth.users carries its OWN copy of the provider claims in
+      // raw_user_meta_data. The SQL above does not touch it; read it either
+      // side of the next sign-in to see whether the sign-in does.
+      const metaRow = async (id: string) =>
+        (await sql(ctx, `select raw_user_meta_data->>'sub' as sub, raw_user_meta_data->>'provider_id' as provider_id, raw_user_meta_data->>'email' as email, email as users_email from auth.users where id = '${id}'`)).rows[0] ?? {};
+      const which = (v: unknown, k: "c1" | "c2") => (v === subj(k) ? k : v == null ? "null" : "other");
+      const metaBefore = c1.userId ? await metaRow(c1.userId) : {};
       const c2 = await signIn(ctx, apikey, { sub: subj("c2"), email: email("c2"), email_verified: true, name: "C" });
       if (c2.userId) createdUsers.add(c2.userId);
+      const metaAfter = c1.userId ? await metaRow(c1.userId) : {};
       const cUser = c1.userId ? (await userRow(c1.userId)).rows[0] ?? {} : {};
       const cIdentity = (await identityRows(`provider_id = '${subj("c2")}'`)).rows[0] ?? {};
       const userEmailMoved = cUser.email === email("c2") ? "new" : cUser.email === email("c") ? "old" : "other";
       const identityEmailMoved = cIdentity.email === email("c2") ? "new" : cIdentity.email === email("c") ? "old" : "other";
+      const metaEmailAfter = metaAfter.email === email("c2") ? "new" : metaAfter.email === email("c") ? "old" : "other";
       // control: the old subject is gone; with another email it must be a stranger
       const c1again = await signIn(ctx, apikey, { sub: subj("c1"), email: email("c-old"), email_verified: true, name: "C" });
       if (c1again.userId) createdUsers.add(c1again.userId);
@@ -294,7 +189,7 @@ const mod: TestModule = {
         id: `${ID}d`,
         title: "remap provider_id in SQL, sign in with the new subject and a new email: same user",
         status: dPass ? "pass" : "fail",
-        detail: `c1 ${note(c1)}; remap updated ${remap.rows.length} row(s)${remap.error ? ` (${remap.error})` : ""}; c2 (different email) ${note(c2)}; same user as c1: ${String(c2.userId === c1.userId)}, identities on that user: ${String(cUser.identities ?? "-")}; after the c2 sign-in auth.users.email is the ${userEmailMoved} address and identity_data.email the ${identityEmailMoved} one; control c1-with-new-email is a different user: ${String(!!c1again.userId && c1again.userId !== c1.userId)}`,
+        detail: `c1 ${note(c1)}; remap updated ${remap.rows.length} row(s)${remap.error ? ` (${remap.error})` : ""}; c2 (different email) ${note(c2)}; same user as c1: ${String(c2.userId === c1.userId)}, identities on that user: ${String(cUser.identities ?? "-")}; after the c2 sign-in auth.users.email is the ${userEmailMoved} address and identity_data.email the ${identityEmailMoved} one; raw_user_meta_data.sub was ${which(metaBefore.sub, "c1")} straight after the SQL rewrite and ${which(metaAfter.sub, "c2")} after the sign-in (provider_id ${which(metaBefore.provider_id, "c1")} -> ${which(metaAfter.provider_id, "c2")}, its email copy ${metaEmailAfter}); control c1-with-new-email is a different user: ${String(!!c1again.userId && c1again.userId !== c1.userId)}`,
         measurements: {
           remap_rows: remap.rows.length,
           c2_same_user_as_c1: String(c2.userId === c1.userId),
@@ -302,6 +197,10 @@ const mod: TestModule = {
           users_email_after: userEmailMoved,
           identity_data_email_after: identityEmailMoved,
           token_email_after: c2.email === email("c2") ? "new" : c2.email === email("c") ? "old" : "other",
+          user_metadata_sub_before_signin: which(metaBefore.sub, "c1"),
+          user_metadata_sub_after_signin: which(metaAfter.sub, "c2"),
+          user_metadata_provider_id_after_signin: which(metaAfter.provider_id, "c2"),
+          user_metadata_email_after_signin: metaEmailAfter,
           control_old_subject_new_user: String(!!c1again.userId && c1again.userId !== c1.userId),
           c2_callback_status: c2.callbackStatus,
         },

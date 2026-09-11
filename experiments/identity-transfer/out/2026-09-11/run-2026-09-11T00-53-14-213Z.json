@@ -1,0 +1,180 @@
+{
+  "startedAt": "2026-09-11T00:53:14.213Z",
+  "finishedAt": "2026-09-11T00:53:14.600Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "identity-transfer",
+  "labCommit": "7fe4809",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "ITL1a",
+      "title": "first sign-in on the local rig",
+      "status": "pass",
+      "detail": "user b9c42278... email <email>",
+      "measurements": {
+        "session": 1,
+        "callback_status": 302
+      },
+      "durationMs": 105
+    },
+    {
+      "id": "ITL1b",
+      "title": "rewriting provider_id alone is enough: the lookup does not read identity_data.sub",
+      "status": "pass",
+      "detail": "remap updated 1 row(s), leaving identity_data.sub at the OLD subject (itl1-v2djmg-c1); c2 then signed in with a different email: user b9c42278... email <email>; same user as c1: true, identities on that user: 1",
+      "measurements": {
+        "remap_rows": 1,
+        "identity_data_sub_left_stale": "true",
+        "same_user": "true",
+        "identities_on_user": 1
+      },
+      "durationMs": 105
+    },
+    {
+      "id": "ITL1c",
+      "title": "the claim copies repair themselves on the next sign-in; auth.users.email does not",
+      "status": "pass",
+      "detail": "after the SQL rewrite and before the sign-in: raw_user_meta_data.sub old, .provider_id old, identity_data.sub old, auth.users.email old. After it: raw_user_meta_data.sub new, .provider_id new, .email new, identity_data.sub new, identity_data.email new, auth.users.email old",
+      "measurements": {
+        "meta_sub_before": "old",
+        "meta_sub_after": "new",
+        "meta_provider_id_after": "new",
+        "meta_email_after": "new",
+        "identity_sub_after": "new",
+        "identity_email_after": "new",
+        "users_email_after": "old",
+        "token_email_after": "old"
+      },
+      "durationMs": 105
+    },
+    {
+      "id": "ITL1z",
+      "title": "cleanup",
+      "status": "pass",
+      "detail": "deleted 1 user(s) by run prefix",
+      "durationMs": 105
+    },
+    {
+      "id": "ITL2a",
+      "title": "the claim is stored on the identity AND on the user",
+      "status": "pass",
+      "detail": "user 43067af1... email <email>; identity_data.custom_claims.transfer_sub matches; raw_user_meta_data.custom_claims.transfer_sub matches",
+      "measurements": {
+        "session": 1,
+        "identity_data_transfer_sub": "present",
+        "user_metadata_transfer_sub": "present"
+      },
+      "durationMs": 150
+    },
+    {
+      "id": "ITL2b",
+      "title": "a transfer_sub naming the old identity does not find it",
+      "status": "pass",
+      "detail": "user 8d8d34d0... email <email>; same user as e1: false - the claim carried e1's exact subject and the email matched nothing",
+      "measurements": {
+        "session": 1,
+        "new_user": "true",
+        "callback_status": 302
+      },
+      "durationMs": 150
+    },
+    {
+      "id": "ITL2c",
+      "title": "one sign-in without the claim and the stored copy is gone",
+      "status": "pass",
+      "detail": "user 43067af1... email <email>; same user as e1: true; identity_data.custom_claims.transfer_sub is now absent (custom_claims key present: true), raw_user_meta_data.custom_claims.transfer_sub is now absent (key present: true)",
+      "measurements": {
+        "same_user": "true",
+        "identity_data_transfer_sub_after": "absent",
+        "user_metadata_transfer_sub_after": "absent",
+        "identity_data_has_custom_claims_key": "true",
+        "user_metadata_has_custom_claims_key": "true"
+      },
+      "durationMs": 150
+    },
+    {
+      "id": "ITL2z",
+      "title": "cleanup",
+      "status": "pass",
+      "detail": "deleted 2 user(s) by run prefix",
+      "durationMs": 150
+    },
+    {
+      "id": "ITL3a",
+      "title": "a signup the hook is not asked to refuse goes through",
+      "status": "pass",
+      "detail": "user 0d28c495... email <email> - the hook ran (CreateAccount) and returned no error",
+      "measurements": {
+        "session": 1,
+        "callback_status": 302
+      },
+      "durationMs": 132
+    },
+    {
+      "id": "ITL3b",
+      "title": "linking on a verified email: the hook does not run",
+      "status": "pass",
+      "detail": "user 0d28c495... email <email>; same user as f1: true, identities on that user now 2. It carried a claim the hook refuses, and was not refused",
+      "measurements": {
+        "session": 1,
+        "same_user_as_f1": "true",
+        "identities_on_user": 2,
+        "error_code": "-"
+      },
+      "durationMs": 132
+    },
+    {
+      "id": "ITL3c",
+      "title": "a known subject signing in again: the hook does not run",
+      "status": "pass",
+      "detail": "user 0d28c495... email <email>; same user as f1: true. Same refusable claim, same silence",
+      "measurements": {
+        "session": 1,
+        "same_user_as_f1": "true",
+        "error_code": "-"
+      },
+      "durationMs": 132
+    },
+    {
+      "id": "ITL3d",
+      "title": "a stranger is refused, and the payload carried the provider custom claim",
+      "status": "pass",
+      "detail": "no session: error=access_denied code= \"top%3Dmetadata%7Cuser um%3Dcustom_claims%7Cemail%7Cemail_verified%7Cfull_name%7Ciss%7Cname%7Cphone_verified%7Cprovider_id%7Csub cc%3Dpreferred_username%7Ctransfer_sub tsub%3DREJECT-2upyfi email%3Ditl3-2upyfi-g1%40example.com\"; the hook's own digest of what it was handed: user_metadata keys [custom_claims|email|email_verified|full_name|iss|name|phone_verified|provider_id|sub], custom_claims keys [preferred_username|transfer_sub], transfer_sub matched the claim the issuer sent; auth.users rows for that address after the refusal: 0",
+      "measurements": {
+        "session": 0,
+        "error_code": "",
+        "user_metadata_keys": "custom_claims|email|email_verified|full_name|iss|name|phone_verified|provider_id|sub",
+        "custom_claims_keys": "preferred_username|transfer_sub",
+        "transfer_sub_visible": "true",
+        "user_rows_after_refusal": 0
+      },
+      "evidence": "callback error_description verbatim: top=metadata|user um=custom_claims|email|email_verified|full_name|iss|name|phone_verified|provider_id|sub cc=preferred_username|transfer_sub tsub=REJECT-2upyfi email=<email>",
+      "durationMs": 132
+    },
+    {
+      "id": "ITL3e",
+      "title": "control: the same shape with a claim the hook accepts is created",
+      "status": "pass",
+      "detail": "user a4f042f5... email <email>. The persona differs from d only in the value of transfer_sub, so the refusal in d was the hook acting on its payload",
+      "measurements": {
+        "session": 1,
+        "new_user": "true"
+      },
+      "durationMs": 132
+    },
+    {
+      "id": "ITL3z",
+      "title": "cleanup",
+      "status": "pass",
+      "detail": "deleted 2 user(s) by run prefix",
+      "durationMs": 132
+    }
+  ]
+}
