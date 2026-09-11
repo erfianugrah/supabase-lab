@@ -1214,7 +1214,7 @@ history.
   `gotrue-down` / `probe IDS=...` (`BUILD=0 RUNNER="bun .../run.ts"` to run
   from source while another battery holds the binary) / `destroy`.
 
-## experiments/identity-transfer - key facts (validated 2026-09-07, micro, one project)
+## experiments/identity-transfer - key facts (IT01 2026-09-07 managed micro; ITL1-ITL3 2026-09-11 local rig)
 
 - Question: a person returns from an OAuth provider with a NEW subject (the
   Apple Developer team-transfer shape - Apple's `sub` and private relay email
@@ -1247,7 +1247,47 @@ history.
   `/auth/usermigrationinfo` exchange (sending team mints `transfer_sub` per
   user with `target=<recipient team id>`, receiving team exchanges it for the
   new `sub` and relay email, within 60 days of accepting the transfer) is the
-  other half.
+  other half. Apple's public docs carry the pre-transfer steps IT01 cannot see,
+  none of them verified here: the migration call needs an access token from
+  `POST /auth/token` with `grant_type=client_credentials&scope=user.migration`
+  and carries `client_id` and `client_secret` as well as `sub`/`target`;
+  grouped Sign in with Apple apps must be ungrouped before the transfer; the
+  Services ID transfers with the primary App ID; past 60 days both teams'
+  endpoints go dead and the app has to be transferred back and forward again
+  (TN3159, "Migrating Sign in with Apple users for an app transfer"). The
+  "Authenticating users with Sign in with Apple" page also states that the
+  identity token carries the user's email address "on all subsequent API
+  responses" while name is returned only on the first - relevant because the
+  email fallback in `DetermineAccountLinking` is what relinks a real-address
+  Apple user after a transfer. Treat that as Apple's documented claim rather
+  than a measured one: no run here has watched a real Apple token sequence.
+- ITL1-ITL3 (2026-09-11, green, local rig, NOT the managed platform): a
+  throwaway `supabase/auth:v2.197.0` in Docker (`local/compose.yml`, `make
+  local-up` / `local-probe` / `local-down`), same issuer worker served over
+  HTTP by Bun and sharing the auth container's network namespace, because the
+  hook validator accepts `http` only for localhost, 127.0.0.1, ::1 and
+  host.docker.internal. Chosen vantage: linking.go, api/hooks.go and
+  provider/{keycloak,oidc}.go are byte-identical between v2.197.0 and master
+  as of that date, and these three questions are about that code. Measured:
+  the identity lookup reads the `provider_id` COLUMN, not `identity_data.sub`
+  (ITL1b rewrote only the column, left the JSON copy stale, and the new
+  subject still landed on the old user - IT01d rewrote both and could not
+  separate them); one sign-in after the remap rewrites `raw_user_meta_data`
+  sub/provider_id/email AND `identity_data` sub/email to the new values, while
+  `auth.users.email` and the token's email claim keep the old address (ITL1c),
+  so hand-patching the metadata is wasted work and skipping `auth.users.email`
+  leaves the project mailing a dead relay; a `transfer_sub`-shaped claim is
+  stored on both rows, is read by nothing (ITL2b hands it the old identity's
+  exact subject and still gets a new user), and does not survive one sign-in
+  that omits it (ITL2c); the Before User Created hook is armed by the
+  CreateAccount decision ALONE (ITL3b/ITL3c carry a claim ITL3d proves it
+  refuses, down the LinkAccount and AccountExists paths, and get sessions),
+  its payload carries `user.user_metadata.custom_claims.transfer_sub` and
+  `user.email`, and a refusal leaves 0 `auth.users` rows behind - unlike
+  IT01e's unverified-email refusal. Not probed: the managed platform's hook
+  config surface (`hook_before_user_created_enabled` / `_uri` / `_secrets` are
+  read off the published Management API document; IT02 and IT03 are the
+  managed-vantage modules and have NOT been run).
 
 ## experiments/audit-integrity - key facts (validated 2026-09-08, micro x2 on Pro + Team orgs; entitlements and members read on Free + Pro + Team)
 

@@ -17,7 +17,7 @@ ISSUER := $(shell cat .issuer-url 2>/dev/null)
 ONLY ?= IT01
 RUNNER_FLAGS ?= --destructive
 
-.PHONY: init validate apply issuer-deploy issuer-delete probe publish-evidence destroy up down
+.PHONY: init validate apply issuer-deploy issuer-delete probe publish-evidence destroy up down local-up local-probe local-logs local-down
 
 up: init validate apply issuer-deploy
 	@echo "lab up: project=$$(tofu output -raw project_ref) issuer=$(shell cat .issuer-url 2>/dev/null)"
@@ -73,3 +73,50 @@ publish-evidence:
 destroy:
 	tofu plan -destroy $(VARS) -var="supabase_access_token=$(TOK)" -out=tfplan-destroy
 	tofu apply tfplan-destroy
+
+# ---------------------------------------------------------------------------
+# Local rig (ITL1-ITL3). A throwaway GoTrue at a pinned version for the
+# questions that are about the Auth server's own code rather than the managed
+# platform's config surface - no PAT, no cloud, no credentials. See
+# local/compose.yml. The managed modules (IT01-IT03) are unaffected.
+# ---------------------------------------------------------------------------
+LOCAL_ENV := local/.env
+COMPOSE := docker compose --env-file $(LOCAL_ENV) -f local/compose.yml
+LOCAL_ONLY ?= ITL1,ITL2,ITL3
+
+# The rig's three secrets are generated per rig, live only in local/.env
+# (gitignored) and die with `make local-down`. Nothing here is shared with a
+# real project.
+$(LOCAL_ENV):
+	@mkdir -p local
+	@{ \
+	  echo "PVLAB_LOCAL_DB_PASSWORD=$$(openssl rand -hex 16)"; \
+	  echo "PVLAB_LOCAL_JWT_SECRET=$$(openssl rand -hex 32)"; \
+	  echo "PVLAB_LOCAL_HOOK_SECRET=v1,whsec_$$(openssl rand -base64 32)"; \
+	} > $(LOCAL_ENV)
+	@echo "$(LOCAL_ENV) written (gitignored)"
+
+local-up: $(LOCAL_ENV)
+	$(COMPOSE) up -d --wait
+	@for i in $$(seq 1 40); do \
+	  code=$$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:9999/health || true); \
+	  [ "$$code" = "200" ] && { echo "gotrue healthy: $$(curl -s http://127.0.0.1:9999/health)"; break; }; \
+	  sleep 2; \
+	done
+	@curl -s -o /dev/null -w 'issuer discovery: HTTP %{http_code}\n' http://127.0.0.1:8080/.well-known/openid-configuration
+
+local-probe: $(LOCAL_ENV)
+	@mkdir -p evidence/$(TS)
+	@set -a; . ./$(LOCAL_ENV); set +a; \
+	PVLAB_ENDPOINT_LOCAL_AUTH=http://127.0.0.1:9999 \
+	PVLAB_LOCAL_DB_PORT=5433 \
+	bun $(ROOT)/harness/src/run.ts --where local --experiment identity-transfer \
+		--only $(LOCAL_ONLY) --destructive --out evidence/$(TS)
+	@echo "== evidence/$(TS)/ =="
+
+local-logs:
+	$(COMPOSE) logs --tail 80 auth issuer
+
+local-down:
+	-$(COMPOSE) down -v
+	@rm -f $(LOCAL_ENV)

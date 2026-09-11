@@ -58,3 +58,10 @@ experiments/*/out/*
 
 # wrangler dev local state (miniflare cache, sqlite, trace store) - regenerable
 **/.wrangler/
+
+# the issuer worker's deployed URL, written by `make issuer-deploy`
+**/.issuer-url
+
+# local rig secrets (identity-transfer): generated per `make local-up`,
+# thrown away by `make local-down`. Nothing here is shared with a real project.
+experiments/*/local/.env
