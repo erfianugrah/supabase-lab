@@ -157,3 +157,35 @@ the other three thinly or not at all. Six modules close that, on one micro.
   Ops: S20 needs `make postgrest-up` + `make edge-up`. S16 restarts the project
   and runs LAST in its own invocation; S18 bans this machine's IP from the DB
   socket mid-module and removes it, so it runs alone after S17/S19/S21.
+
+### S22 - header-keyed checks, and the packaged wrong answer (2026-09-14)
+
+S16 left two things asserted rather than run: the TRUST of `cf-connecting-ip`
+(it saw the key reach SQL and never tested whether a caller can set it), and
+the POLICY form of a header check on hosted (every prior hosted header probe
+was an RPC). pg_headerkit - the dbdev package reachable from the registry's
+launch blog post, still the packaged answer to "IP-restrict the Data API" -
+makes two independent mistakes, and this module separates them so neither
+alibis the other. One micro, no restart, no containers.
+
+  S22a - can a caller put a `cf-connecting-ip` on the wire at all? The same RPC
+         with and without the header. Expected either an overwrite or a
+         refusal; measured a refusal (403 at the edge).
+  S22b - two tables, two policies differing ONLY in the header they read
+         (`cf-connecting-ip` vs the `hdr.ip()` expression
+         `split_part(x-forwarded-for, ',', 1)`), one allowlist holding only the
+         forged address, one request carrying it. The `hdr.ip()` form admits
+         the caller; the `cf-connecting-ip` form does not. Both functions kept
+         STABLE so this isolates the HEADER CHOICE from S22c.
+  S22c - volatility, which is a planner property and wrong whichever header is
+         read. EXPLAIN the same body as IMMUTABLE and as STABLE. SQL inlining
+         removes the function name from both plans, so the tell is whether
+         `current_setting` survives into the plan.
+  S22d - does the security advisor lint EXTENSION-OWNED objects? pg_tle makes
+         the objects real extension members, which plain SQL would not. Install
+         a slice of pg_headerkit (unpinned `search_path`, an RLS-less table),
+         diff the lint list before and after by NAME.
+
+  Ops: no containers, no restart, self-contained. Safe to run with the rest of
+  the read-only battery; `destructive` only because it creates and drops
+  objects and a pg_tle extension.
