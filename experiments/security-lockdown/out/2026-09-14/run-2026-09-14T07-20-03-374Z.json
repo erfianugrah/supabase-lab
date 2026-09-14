@@ -1,0 +1,77 @@
+{
+  "startedAt": "2026-09-14T07:20:03.374Z",
+  "finishedAt": "2026-09-14T07:20:11.407Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "security-lockdown",
+  "labCommit": "cb22739",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "OpenSSL 3.6.4 25 Aug 2026 (Library: OpenSSL 3.6.4 25 Aug 2026)"
+  },
+  "results": [
+    {
+      "id": "S22a",
+      "title": "a client-supplied cf-connecting-ip is refused at the edge, not silently overwritten",
+      "status": "pass",
+      "detail": "RPC returning request.headers with the anon key. No client header -> 200, cf-connecting-ip present (true), x-forwarded-for carried 1 address(es), and cf-connecting-ip equalled its sole element (true). Same call carrying cf-connecting-ip=203.0.113.9 -> 403: the edge REFUSES the request rather than overwriting the header, so the forged value never reaches SQL (true). Addresses deliberately not recorded.",
+      "measurements": {
+        "plain_status": 200,
+        "spoof_status": 403,
+        "cfip_present": "true",
+        "cfip_matches_sole_xff": "true",
+        "forged_reached_sql": "false"
+      },
+      "durationMs": 8034
+    },
+    {
+      "id": "S22b",
+      "title": "the hdr.ip() expression admits a forged caller; the cf-connecting-ip form does not",
+      "status": "pass",
+      "detail": "Allowlist contains only 203.0.113.9. One request, carrying x-forwarded-for=203.0.113.9, against two tables whose policies differ only in which header they read. Keyed on cf-connecting-ip -> 200, 0 row(s): the forged value is not what the edge set, so the policy denies. Keyed on split_part(x-forwarded-for, ',', 1) - the hdr.ip() body - to 200, 1 row(s): the caller chose an address in the allowlist and the policy admitted them.",
+      "measurements": {
+        "cfip_policy_status": 200,
+        "cfip_policy_rows": 0,
+        "hdrip_policy_status": 200,
+        "hdrip_policy_rows": 1
+      },
+      "durationMs": 8034
+    },
+    {
+      "id": "S22c",
+      "title": "a zero-arg IMMUTABLE function reading request.headers is evaluated at plan time",
+      "status": "pass",
+      "detail": "Same body, same qual, two volatility classes. IMMUTABLE: the plan is a constant One-Time Filter with no current_setting call left in it (true) - the planner evaluated the header read once and baked the answer in, dropping the scan. STABLE: the GUC read survives into the plan and runs per execution (true). pg_headerkit marks in_allow_list()/in_deny_list() IMMUTABLE and both take zero arguments, so a policy written with them is a plan-time constant rather than a per-request check.",
+      "measurements": {
+        "immutable_folded_to_const": "true",
+        "stable_keeps_guc_read": "true"
+      },
+      "evidence": "IMMUTABLE plan:\nResult\n  Output: id\n  One-Time Filter: false\nQuery Identifier: -1120285296399882152\n\nSTABLE plan:\nResult\n  Output: id\n  One-Time Filter: (COALESCE(((current_setting('request.headers'::text, true))::json ->> 'cf-connecting-ip'::text), ''::text) <> ''::text)\n  ->  Seq Scan on public.sec22_by_cfip\n        Output: id\nQuery Identifier: 4362663836978990796",
+      "durationMs": 8034
+    },
+    {
+      "id": "S22d",
+      "title": "the platform security advisor and extension-owned objects",
+      "status": "info",
+      "detail": "pg_tle available; installed a slice of pg_headerkit as a real extension (two unpinned-search_path functions + an RLS-less table in schema hdr). Advisor lints before: 8, after: 9; lints added: extension_in_publicx1; any lint naming an hdr object: false. Same-run control - this module's own plain-SQL objects of the same two shapes are named by: anon_security_definer_function_executable,authenticated_security_definer_function_executable,extension_in_public,function_search_path_mutable,rls_disabled_in_public. The advisor raises those lints for plain SQL and not for the extension's objects in the SAME response, so extension membership is the difference and a customer installing a dbdev package gets no advisor coverage of what it brought in.",
+      "measurements": {
+        "lints_before": 8,
+        "lints_after": 9,
+        "lints_added": "extension_in_publicx1",
+        "mentions_hdr_object": "false",
+        "control_plain_sql_lints": "anon_security_definer_function_executable,authenticated_security_definer_function_executable,extension_in_public,function_search_path_mutable,rls_disabled_in_public"
+      },
+      "durationMs": 8034
+    },
+    {
+      "id": "S22z",
+      "title": "cleanup",
+      "status": "pass",
+      "detail": "tables, policies, functions, and the pg_tle extension dropped",
+      "durationMs": 8034
+    }
+  ]
+}
