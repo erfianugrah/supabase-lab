@@ -279,6 +279,83 @@ without schema CREATE, a leftover role from a killed run) and are not cited.
 `make postgrest-down edge-down` after S20; `make destroy` after S16: project
 GET 400, tofu state empty, no `sec-*` containers. Nothing left standing.
 
+## Run 6 - 2026-09-14 - header-keyed checks and the packaged wrong answer (S22)
+
+Two micros in ap-southeast-1, each provisioned -> probed -> destroyed (the
+second only to add the S22d control that the first run could not support).
+Verify-gone on both: the ref absent from `GET /v1/projects` and tofu state
+empty; the per-ref GET answered 404 on the first and 403 on the second, so the
+list check is the reliable one. The published artifact is the SECOND run,
+redacted, under `out/2026-09-14/`.
+
+Motivation: pg_headerkit (supabase-community, v1.0.0 on dbdev, last
+substantive commit 2023-03-03; the 2026-05-15 commit is a dependabot chore) is
+the packaged form of the IP-allowlist recipe, reachable from the dbdev launch
+blog post, and its README advertises rate limiting, request logging and user
+allow/denylists as UNCHECKED roadmap boxes - none of those exist in the 1.0
+SQL, which is header accessors, two `inet` tables, membership checks and
+user-agent sniffing. Two properties the corpus asserted but had never run: the
+trust of `cf-connecting-ip` (S16 saw the key reach SQL and never tested it),
+and the policy form of a header check on hosted (every prior hosted header
+probe was an RPC).
+
+- **S22a cf-connecting-ip is not client-settable at all.** With no client
+  header the RPC saw it present, and equal to the sole `x-forwarded-for`
+  element. The SAME call carrying `cf-connecting-ip: 203.0.113.9` returned
+  **403** - the edge REFUSES the request rather than overwriting the header,
+  so the forged value never reaches SQL. Stronger than the documented
+  overwrite behaviour the doc cited: the request does not get through at all.
+- **S22b the hdr.ip() expression admits a forged caller; cf-connecting-ip does
+  not.** One allowlist holding only `203.0.113.9`, one request carrying
+  `x-forwarded-for: 203.0.113.9`, two tables whose policies differ only in the
+  header they read. Keyed on `cf-connecting-ip`: 200, **0 rows**. Keyed on
+  `split_part(x-forwarded-for, ',', 1)` - the `hdr.ip()` body: 200, **1 row**.
+  The caller chose their own address and the policy let them in. This is the
+  bypass, measured, on the managed tier.
+- **S22c a zero-arg IMMUTABLE function reading request.headers is evaluated at
+  PLAN time.** Same body, same qual, two volatility classes. IMMUTABLE ->
+  `Result / One-Time Filter: false`, no `current_setting` left in the plan and
+  the scan dropped: the planner ran the header read once and baked the answer
+  in. STABLE -> the GUC read survives into the plan and runs per execution
+  (SQL inlining removes the function NAME from both plans, so the name is not
+  the tell - the surviving `current_setting` call is). pg_headerkit marks
+  `in_allow_list()`/`in_deny_list()` IMMUTABLE and both take zero arguments,
+  so a policy written with them is a plan-time constant rather than a
+  per-request check - independent of which header it reads. Volatility census
+  of the published SQL: 3 of 24 functions are STABLE (`headers()`, `header()`,
+  `ip()`), the other 21 IMMUTABLE - so `hdr.ip()` itself is correctly marked,
+  and the zero-arg membership checks that call it are not.
+- **S22d the security advisor does not lint extension-owned objects.** pg_tle
+  is available on a micro. Installed a faithful slice of pg_headerkit as a
+  REAL extension (two functions with unpinned `search_path`, one table in
+  schema `hdr` with no RLS). Advisor lints 8 -> 9, and the single lint added
+  was `extension_in_public`; no lint named an `hdr` object. The same-run
+  CONTROL is what makes that a finding rather than an absence: this module's
+  own plain-SQL objects are the same two shapes (unpinned `search_path` on
+  `sec22_cfip`/`_hdrip`/`_headers`/`_imm`/`_stb`, no RLS on `sec22_allow`), and
+  in the SAME advisor response they are named by
+  `function_search_path_mutable`, `rls_disabled_in_public`,
+  `anon_security_definer_function_executable` and
+  `authenticated_security_definer_function_executable`. Same rules, same
+  response, same shapes: extension membership is the only difference, so a
+  customer who installs a dbdev package gets no advisor coverage of what it
+  brought in. (Run 1 of this module asserted that comparison without recording
+  the control; the second provision exists to measure it.)
+
+Probe bugs fixed on the way (three runs): comparing the spoofed call's header
+value against the plain call's, which reads empty when the edge answers 403 -
+the assertion had to become "refused"; grepping the EXPLAIN output for the
+function NAME, which SQL inlining removes from both plans; and calling the RPC
+straight after `notify pgrst, 'reload schema'`, which 404'd once on a stale
+schema cache and now waits.
+
+### Teardown (run 6)
+
+Both projects destroyed via `tofu apply tfplan-destroy` (1 destroyed each).
+Verified by absence from `GET /v1/projects` plus an empty tofu state rather
+than by the per-ref status code, which was 404 for the first project and 403
+for the second. Nothing left standing.
+
 ## Remaining
 
 - Phase C PrivateLink (iap-lockdown L20-L23) - needs a Team-tier org, an AWS
