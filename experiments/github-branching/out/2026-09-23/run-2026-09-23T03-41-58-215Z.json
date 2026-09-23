@@ -1,0 +1,54 @@
+{
+  "startedAt": "2026-09-23T03:41:58.215Z",
+  "finishedAt": "2026-09-23T04:03:00.491Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "github-branching",
+  "labCommit": "2ebb438",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "OpenSSL 3.6.4 25 Aug 2026 (Library: OpenSSL 3.6.4 25 Aug 2026)"
+  },
+  "results": [
+    {
+      "id": "GB05",
+      "title": "changes-only on: Supabase changes pushed after open, reopen, and seed on push",
+      "status": "info",
+      "detail": "late: on open no; after migration pushed no; after close+reopen yes@20s. reseed: first run FUNCTIONS_DEPLOYED; seed row from a pushed seed.sql change present false.",
+      "measurements": {
+        "poll_s": 20,
+        "phase_s": 240,
+        "late_on_open": "no",
+        "late_after_push": "no",
+        "late_after_reopen": "yes@20s",
+        "reseed_first_run": "FUNCTIONS_DEPLOYED",
+        "reseed_new_row_present": "false",
+        "leftover_after_close": 0
+      },
+      "durationMs": 923483
+    },
+    {
+      "id": "GB06",
+      "title": "merging an A-only pull request: production runs on A and B",
+      "status": "info",
+      "detail": "merge 200. New action runs after merge: A 1, B 1. Migration 20260923035722 on A true, on B false. Supabase check-runs on the merge commit: A success+in_progress+in_progress; B success+in_progress+in_progress.",
+      "measurements": {
+        "preview_before_merge": "FUNCTIONS_DEPLOYED",
+        "merge_status": 200,
+        "a_prod_runs": 1,
+        "b_prod_runs": 1,
+        "a_has_migration": "true",
+        "b_has_migration": "false",
+        "merge_commit_checks_a": "success+in_progress+in_progress",
+        "merge_commit_checks_b": "success+in_progress+in_progress",
+        "merge_commit_checks_total": 6,
+        "watch_s": 240
+      },
+      "evidence": "{\n  \"new_action_runs\": {\n    \"a\": [\n      \"clone:EXITED,configure:PAUSED,deploy:EXITED,health:EXITED,migrate:EXITED,pull:EXITED,seed:EXITED\"\n    ],\n    \"b\": [\n      \"clone:EXITED,configure:PAUSED,deploy:EXITED,health:EXITED,migrate:EXITED,pull:EXITED,seed:EXITED\"\n    ]\n  }\n}",
+      "durationMs": 338793
+    }
+  ]
+}

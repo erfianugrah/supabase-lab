@@ -1512,6 +1512,26 @@ reads it back, including `supabase_changes_only`. Details: RUNLOG.md.
   `CREATING_PROJECT` appeared at 32 s, so a waiter should not accept
   `FUNCTIONS_DEPLOYED` until it has seen a non-terminal state. The OpenAPI
   document marks the field deprecated. The failed preview's action run showed `migrate:DEAD`.
+- **Each of four file kinds under `<workdir>/supabase/` triggered a preview
+  with changes-only on** (GB04, project A only): `seed.sql`, a `config.toml`
+  comment, a new function (flagged: only functions declared in `config.toml`
+  deploy to branches) and a `NOTES.md` the CLI never reads.
+- **With changes-only on, a pull request that opened without Supabase changes
+  did not preview after a migration was pushed; close and reopen did** (GB05):
+  no preview in 240 s after the push; one at the first 20 s poll after the
+  reopen. A
+  `seed.sql` change pushed to an existing preview did not re-seed it (row
+  absent 240 s later), as the bot comment says.
+- **The bot comments once per connected project** (GB04), each starting
+  `[supa]:<ref>`. The ignored project's comment carries its parent ref and
+  names its directory; a branching project's carries its preview ref (not the
+  parent's), so the comments alone do not tie a branching project to its
+  parent; check-run `details_url` does on the early runs (GB01).
+- **A merge that changed only A's `supabase/` also started a production action
+  run on B** (GB06, one merge): 1 new action run on each parent within 240 s,
+  both `clone,deploy,health,migrate,pull,seed` EXITED and `configure` PAUSED,
+  and 3 check-runs per project on the merge commit; changes-only on did not
+  stop B's run. The migration landed on A only.
 - Harness notes: `gh api` writes under `.github/workflows/` need the OAuth
   `workflow` scope, so GB02's workflow goes in over SSH (`make push-ci`).
   The connection form defaults Branch limit to 3; raise it before a matrix
