@@ -82,7 +82,8 @@ Artifacts: `run-2026-09-23T01-47-40-105Z.*`, `run-2026-09-23T01-49-08-899Z.*`,
   is not comparable with Run 1's 30 s.
 - With the setting on, a project previews a pull request only when it changes
   files under that project's `<workdir>/supabase/` (tested with migrations
-  only; `config.toml`, `seed.sql` and functions were not changed). `apps/a/README.md` sits
+  only; `config.toml`, `seed.sql` and functions were not changed here, Run 5
+  covers them). `apps/a/README.md` sits
   inside A's working directory and did not trigger A.
 - On every pull request head commit read, each connected project posted at
   least one `skipped` run, whether or not it branched; a project that did not
@@ -155,6 +156,93 @@ exist, a valid migration under `apps/b`. Sampled every 15 s for 480 s.
   `success` + `skipped` + 3 `in_progress`.
 - One failure sample, a migration error only.
 
+## Second session - 03:27 to 04:03 UTC - fresh projects, changes only ON
+
+Two new Micro projects (same names, same org, `make apply` again) and a new
+private throwaway repository with the same fixture, both connected in the
+dashboard with the same working directories, "Supabase changes only" on and
+Branch limit 10. GB00 at 03:27:26 read both connections on the same
+repository, `apps/a` and `apps/b`, changes only true, automatic branching
+true and limit=10 on both (`run-2026-09-23T03-27-26-360Z.*`). The artifacts
+record lab commit `2ebb438`; the GB04-GB06 modules ran from the working tree
+and are the revisions committed next.
+
+### Run 5 - 03:27 UTC - GB04, kinds of file under supabase/
+
+`out/2026-09-23/run-2026-09-23T03-27-33-845Z.*`
+
+| PR changes (all under `apps/a/supabase/`) | preview on A (first seen) | preview on B |
+|---|---|---|
+| `seed.sql` (a second insert) | yes, 56 s | no |
+| `config.toml` (a comment line appended) | yes, 56 s | no |
+| `functions/probe/index.ts` (new function) | yes, 56 s | no |
+| `NOTES.md` (a file the CLI does not read) | yes, 56 s | no |
+
+- All four files under A's `<workdir>/supabase/` triggered a preview on A,
+  including one the CLI does not read. First-seen times count from when the
+  module started creating the pull requests, at a 30 s poll.
+- On the a-function pull request A's comment marked Edge Functions with a
+  warning, "Only Functions declared in config.toml will be automatically
+  deployed to branches". The module did not check whether `probe` was
+  deployed to the preview.
+- Every pull request got 2 comments from `supabase[bot]`, one per connected
+  project. Each body starts with a `[supa]:<ref>` marker line. B's comment
+  carried B's parent ref and read "This pull request has been ignored for the
+  connected project `<ref>` because there are no changes detected in
+  `apps/b/supabase` directory." A's comment carried A's preview ref (not A's
+  parent), a deployments and tasks table, and "Tasks are run on every commit
+  but only new migration files are pushed. Close and reopen this PR if you
+  want to apply changes from existing seed or migration files."
+- In the artifact, `preview:B` on B's comment is B's parent ref matched
+  through B's default branch row, which the module's preview-ref map
+  includes; B had no preview.
+- So on a one-app pull request the ignored project's comment is identifiable
+  by its parent ref. A branching project's comment carries only its preview
+  ref; GB04 opened no two-app pull request, so two branching projects'
+  comments were not compared. Check-run `details_url` still carries parent
+  refs on the early runs (Run 1, Run 2).
+
+### Run 6 - 03:42 UTC - GB05, changes that arrive after the PR opened
+
+`out/2026-09-23/run-2026-09-23T03-41-58-215Z.*`
+
+| Step (20 s poll) | preview on A |
+|---|---|
+| PR opened with `apps/a/README.md` only, watched 120 s | no |
+| migration under `apps/a/supabase/` pushed to it, watched 240 s | no |
+| PR closed, reopened 15 s later | yes, first poll (20 s) |
+
+- With the setting on, a pull request that opened without Supabase changes
+  did not get a preview when one was pushed later; closing and reopening it
+  did.
+- A separate pull request opened with a migration (A previewed, settled at
+  `FUNCTIONS_DEPLOYED`); a commit adding a row to `seed.sql` was then pushed.
+  240 s later the new row was absent from A's preview database (read with
+  `select count(*)` through the Management API query endpoint on the preview
+  project), which matches the comment text above.
+
+### Run 7 - about 03:57 UTC - GB06, merging an A-only pull request (same battery as Run 6)
+
+Same artifact as Run 6; the time is from the merged migration's version,
+`20260923035722`. Both projects' default branch rows read `git_branch` `main`
+(the module skips otherwise; not recorded in the artifact). The dashboard form
+writes that field only when Deploy to production is enabled
+(`gitBranch: data.enableProductionSync ? data.branchName : ''` in the Studio
+source), so the toggle was on for both.
+
+- A pull request with one migration under `apps/a/supabase/` was merged
+  (squash, 200) after A's preview settled. In the 240 s after the merge each
+  parent project got 1 new action run: A and B both
+  `clone:EXITED,configure:PAUSED,deploy:EXITED,health:EXITED,migrate:EXITED,pull:EXITED,seed:EXITED`.
+- The merged migration's version was in A's migrations list and not in B's.
+- Read at the end of the 240 s watch, the merge commit carried 6 check-runs
+  from app `supabase`, 3 per project by the parent ref in `details_url`:
+  `success` + 2 `in_progress` each.
+- "Supabase changes only" (last read on for B by GB00 at 03:27) did not stop
+  B's production run on a merge that changed nothing under `apps/b/`. One
+  merge was tried. Whether B's `deploy` step redeployed
+  anything was not measured; B had no functions.
+
 ## Not settled
 
 - A single connected project on its own: whether its own `skipped` run is ever
@@ -164,9 +252,13 @@ exist, a valid migration under `apps/b`. Sampled every 15 s for 480 s.
 - Failures other than a migration error; whether a `DEAD` step always means
   failure.
 - Anything about the Vercel integration.
+- A push that changes an existing migration file; a `config.toml` change that
+  alters a value rather than a comment.
+- Branch `notify_url` as a per-branch push signal (not run).
 
 ## Teardown
 
-`make destroy` 2026-09-23: 2 resources destroyed (both projects). The operator
-deleted the probe repository the same day, outside this state (the GitHub
-API answered 404 for it afterwards).
+`make destroy` 2026-09-23 after each session: 2 resources destroyed each time
+(both projects). The first session's probe repository was deleted by the
+operator the same day (the GitHub API answered 404 for it afterwards); the
+second session's is deleted by the operator, outside this state.
