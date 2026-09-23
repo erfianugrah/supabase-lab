@@ -154,7 +154,7 @@ facts):
   with its own working directory (`apps/a`, `apps/b`). Measured 2026-09-23:
   with "Supabase changes only" off each project created a preview for all five
   pull request shapes; with it on, only for those changing its own
-  `<workdir>/supabase/`. Every connected project posts check-runs named
+  `<workdir>/supabase/` (tested with migrations only). Every connected project posts check-runs named
   `Supabase Preview` to every pull request commit (`skipped` from every
   project, and only `skipped` from one that does not branch), so the docs'
   wait-by-check-name workflow for app A read project B's run on both an A-only
