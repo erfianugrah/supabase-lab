@@ -1467,11 +1467,11 @@ every run, printing uncovered operations by name.
 - **Staging PATs expire after 24 hours.** Every `401` across this experiment
   was expiry, not revocation; a resume instruction that assumes a stored token
   survives between sessions is wrong.
-- Two endpoints hand live credentials to any PAT holder: `GET /pgsodium`
-  returns the vault root key in plaintext and `GET /api-keys` returns anon,
-  service_role, publishable and secret keys unredacted. The `?reveal=true`
-  redaction sfp-platforms S14 documented applies to the api-keys CREATE
-  response, not to this listing.
+- Two of the control-plane reads in this sweep return live credential material
+  in full rather than redacted, to any PAT holder. Treat a PAT as equivalent to
+  full project access when scoping one; it is not a read-only analytics
+  credential. The `?reveal=true` redaction sfp-platforms S14 documented applies
+  to the api-keys CREATE response and does not extend to every read.
 
 
 ## Write-up workflow (added 2026-09-02 after three review passes)
