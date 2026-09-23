@@ -44,8 +44,11 @@ one migration and one seed file each.
 | GB01 | opens five pull requests at once (root README, app A non-Supabase file, A migration, B migration, both migrations), watches both projects' branch lists and the head commits' check-runs (`filter=all`) for 10 minutes, then closes them and records which previews survive the close |
 | GB02 | the docs' wait-by-check-name workflow (`fixture-ci/wait-a.yaml`, path filter `apps/a/supabase/**`) on an A-only and a two-app pull request: which project's run the wait step returned, and each action run's `check_run_id` |
 | GB03 | one pull request, A's migration fails and B's succeeds: branch `status`, latest action-run steps and check-runs per project, every 15 s for 480 s |
+| GB04 | changes-only on: one pull request each for `seed.sql`, `config.toml`, a new function and a non-CLI file under `apps/a/supabase/`; which project previews, and what the integration's pull request comments say |
+| GB05 | changes-only on: a migration pushed to a pull request that opened without Supabase changes, then close and reopen; a `seed.sql` change pushed to an existing preview |
+| GB06 | merging a pull request that changes only app A, with both default branch rows on `git_branch` `main` (Deploy to production on): production action runs on each parent |
 
-GB01-GB03 are DESTRUCTIVE (git branches, pull requests, billed preview
+GB01-GB06 are DESTRUCTIVE (git branches, pull requests, billed preview
 branches). GB01 runs once per "Supabase changes only" setting; GB00's reading
 of the toggle is the label on each run.
 
@@ -61,6 +64,7 @@ make probe REPO=owner/name
 make push-ci REPO=owner/name          # GB02's workflow onto main, over SSH
 make probe REPO=owner/name ONLY=GB02
 make probe REPO=owner/name ONLY=GB03
+make probe REPO=owner/name ONLY=GB04,GB05,GB06   # changes only ON
 make destroy
 ```
 
