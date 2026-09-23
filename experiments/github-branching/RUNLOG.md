@@ -261,4 +261,5 @@ source), so the toggle was on for both.
 `make destroy` 2026-09-23 after each session: 2 resources destroyed each time
 (both projects). The first session's probe repository was deleted by the
 operator the same day (the GitHub API answered 404 for it afterwards); the
-second session's is deleted by the operator, outside this state.
+second session's was deleted by the operator the same day too (404
+afterwards).
