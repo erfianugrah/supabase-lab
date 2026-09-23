@@ -168,6 +168,15 @@ facts):
   a pushed `seed.sql` change did not re-seed; and merging an A-only pull
   request still started a production action run on B.
 
+- `wrappers-delete-scope` - what one dashboard Wrappers Delete or Edit removes,
+  replaying the SQL Studio's own pg-meta generates (pinned commit). Measured
+  2026-09-23 on five BigQuery connections: created in the dashboard, each owns
+  its foreign data wrapper and a Delete removes one; set up in SQL on one shared
+  wrapper, a Delete on any row removes all five servers, their foreign tables
+  and views built on them (Vault secrets left behind), and an Edit leaves only
+  the edited connection. `drop foreign table` + `drop server` without cascade
+  removes exactly one, and RESTRICT refuses each over-reach.
+
 ## Ad-hoc platform probes (no experiment dir)
 
 Small Management API probes that never graduated to an experiment. Full
