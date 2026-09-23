@@ -1600,6 +1600,29 @@ automated path (SSM-deployed phases, S3 artifact pull, REPORT.md);
 `make suite-clean` removes the suite S3 bucket, which is orchestration
 state tofu does not track.
 
+## experiments/wrappers-delete-scope - key facts (validated 2026-09-23, free org, Postgres 17.6, wrappers 0.6.2)
+
+One throwaway project per run, created and deleted through the Management API
+(free org, no tofu). The Studio SQL is generated from Studio's own pg-meta by
+`scripts/gen-studio-sql.ts` into `lib/studio-sql.generated.ts`, pinned to a
+supabase/supabase commit; regenerate it rather than hand-editing - the first
+hand copy got the Vault secret name wrong. Details: RUNLOG.md.
+
+- **The Wrappers list is per foreign server but labelled with the FDW name,
+  and Delete and Edit both run `drop foreign data wrapper <name> cascade`.**
+  Dashboard-created connections each own an FDW, so this removes one (X01a).
+  Five servers on one shared FDW: Delete on any row removes all five, their
+  foreign tables, and views/materialized views on them (X01b); Edit leaves only
+  the edited one (X01c). Nothing warns.
+- **The shared shape only comes from SQL.** Studio's create refuses an existing
+  FDW name with `42710` and rolls back (X01e).
+- **Without cascade, each step refuses to take more than it names.** `drop foreign data wrapper`,
+  `drop server` and `drop foreign table` without cascade each refuse with
+  `2BP01` while anything depends on them; drop view -> table -> server removes
+  exactly one connection (X01d).
+- **A cascade delete leaves the servers' Vault secrets**: Studio only deletes
+  `<fdw>_<option>`, so SQL-created secrets survive.
+
 ## Related
 
 - ~/.pi/agent/skills/terraform/SKILL.md - tofu conventions used here
