@@ -1474,6 +1474,48 @@ every run, printing uncovered operations by name.
   to the api-keys CREATE response and does not extend to every read.
 
 
+## experiments/github-branching - key facts (validated 2026-09-23, micro x2, Pro org)
+
+Two projects connected to ONE repository, workdirs `apps/a` and `apps/b`,
+Automatic branching on. The GitHub connection is dashboard-only (no provider
+resource); `GET /v2/organizations/{slug}/integrations/github/connections`
+reads it back, including `supabase_changes_only`. Details: RUNLOG.md.
+
+- **With "Supabase changes only" off, the working directory does not scope
+  preview creation; with it on, a project previews only pull requests changing
+  its own `<workdir>/supabase/`.** Off: both projects previewed all five pull
+  request shapes, a root README change included (GB01 run 1). On:
+  `apps/a/README.md` did not trigger A (GB01 run 2); tested with migrations
+  only.
+- **Every connected project posts `Supabase Preview` check-runs to every
+  commit.** Same name, same app, same check suite. A project that branches
+  posted 5 or 6 (1 `skipped`, 1 `success` or `failure`, 3 or 4 left
+  `in_progress`: at 600 s in GB01, at 480 s in GB03); one that does not, with
+  changes-only on, posted 2, both `skipped`. Of `external_id`, `details_url`,
+  output title and summary, only `details_url` carries a project ref (the
+  parent's, then the preview branch's own).
+- **Read check-runs with `filter=all`.** The endpoint's default (`latest`)
+  returns one run per name, which on these commits is one project's. GB01's
+  first revision undercounted 10 runs as 1 because of it.
+- **The docs' `fountainhead/action-wait-for-check@v1.2.0` workflow read
+  project B's run on both GB02 pull requests.** With a path filter on app A,
+  it returned B's `skipped` on an A-only pull request (migrate job skipped)
+  and B's `success` on a two-app one.
+- **An action run's `check_run_id` is not a wait target**: it pointed at a
+  run left `in_progress` while the action's steps were all `EXITED`.
+- **Per-project signal: the parent's branch list, matched on `git_branch`.**
+  `status` went `CREATING_PROJECT` -> `RUNNING_MIGRATIONS` ->
+  `MIGRATIONS_FAILED` for A and -> `FUNCTIONS_DEPLOYED` for B (GB03). The
+  first sample (15 s) read `FUNCTIONS_DEPLOYED` on both, before
+  `CREATING_PROJECT` appeared at 32 s, so a waiter should not accept
+  `FUNCTIONS_DEPLOYED` until it has seen a non-terminal state. The OpenAPI
+  document marks the field deprecated. The failed preview's action run showed `migrate:DEAD`.
+- Harness notes: `gh api` writes under `.github/workflows/` need the OAuth
+  `workflow` scope, so GB02's workflow goes in over SSH (`make push-ci`).
+  The connection form defaults Branch limit to 3; raise it before a matrix
+  run. `make publish-evidence REPO=...` strips the repository name, which has
+  no identifier shape for the shared redaction to catch.
+
 ## Write-up workflow (added 2026-09-02 after three review passes)
 
 The numbers that went wrong in that day's write-ups were all retyped from

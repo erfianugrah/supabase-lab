@@ -1,0 +1,36 @@
+{
+  "startedAt": "2026-09-23T02:35:42.488Z",
+  "finishedAt": "2026-09-23T02:46:05.849Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "github-branching",
+  "labCommit": "2bad035",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "OpenSSL 3.6.4 25 Aug 2026 (Library: OpenSSL 3.6.4 25 Aug 2026)"
+  },
+  "results": [
+    {
+      "id": "GB03",
+      "title": "per-project signal when A's preview fails and B's succeeds",
+      "status": "info",
+      "detail": "changes_only A=true,B=true. A (broken migration): status MIGRATIONS_FAILED, checks failure+in_progress+in_progress+in_progress+skipped. B (valid): status FUNCTIONS_DEPLOYED, checks in_progress+in_progress+in_progress+skipped+success.",
+      "measurements": {
+        "toggle_changes_only": "A=true,B=true",
+        "window_s": 480,
+        "a_final_status": "MIGRATIONS_FAILED",
+        "b_final_status": "FUNCTIONS_DEPLOYED",
+        "a_final_checks": "failure+in_progress+in_progress+in_progress+skipped",
+        "b_final_checks": "in_progress+in_progress+in_progress+skipped+success",
+        "a_final_action": "clone:EXITED,configure:EXITED,deploy:CREATED,health:EXITED,migrate:DEAD,pull:EXITED,seed:CREATED",
+        "b_final_action": "clone:EXITED,configure:EXITED,deploy:EXITED,health:EXITED,migrate:EXITED,pull:EXITED,seed:EXITED",
+        "leftover_after_close": 0
+      },
+      "evidence": "{\n  \"pr\": 13,\n  \"sequences\": {\n    \"a_status\": [\n      \"15s=FUNCTIONS_DEPLOYED\",\n      \"32s=CREATING_PROJECT\",\n      \"65s=RUNNING_MIGRATIONS\",\n      \"81s=MIGRATIONS_FAILED\"\n    ],\n    \"b_status\": [\n      \"15s=FUNCTIONS_DEPLOYED\",\n      \"32s=CREATING_PROJECT\",\n      \"65s=RUNNING_MIGRATIONS\",\n      \"81s=FUNCTIONS_DEPLOYED\"\n    ],\n    \"a_action\": [\n      \"15s=configure:RUNNING,deploy:EXITED,migrate:CREATED\",\n      \"32s=none\",\n      \"65s=clone:EXITED,configure:EXITED,deploy:CREATED,health:EXITED,migrate:CREATED,pull:EXITED,seed:CREATED\",\n      \"81s=clone:EXITED,configure:EXITED,deploy:CREATED,health:EXITED,migrate:DEAD,pull:EXITED,seed:CREATED\"\n    ],\n    \"b_action\": [\n      \"15s=configure:EXITED,deploy:EXITED,migrate:CREATED\",\n      \"32s=none\",\n      \"65s=clone:EXITED,configure:CREATED,deploy:CREATED,health:CREATED,migrate:CREATED,pull:CREATED,seed:CREATED\",\n      \"81s=clone:EXITED,configure:EXITED,deploy:EXITED,health:EXITED,migrate:EXITED,pull:EXITED,seed:EXITED\"\n    ],\n    \"a_checks\": [\n      \"15s=in_progress+skipped\",\n      \"48s=in_progress+in_progress+skipped\",\n      \"65s=failure+in_progress+in_progress+in_progress+skipped\"\n    ],\n    \"b_checks\": [\n      \"15s=in_progress+skipped\",\n      \"65s=in_progress+in_progress+in_progress+skipped\",\n      \"81s=in_progress+in_progress+in_progress+skipped+success\"\n    ]\n  }\n}",
+      "durationMs": 623384
+    }
+  ]
+}
