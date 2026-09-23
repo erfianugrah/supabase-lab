@@ -1,0 +1,36 @@
+{
+  "startedAt": "2026-09-23T01:47:40.105Z",
+  "finishedAt": "2026-09-23T01:47:40.705Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "github-branching",
+  "labCommit": "2bad035",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "OpenSSL 3.6.4 25 Aug 2026 (Library: OpenSSL 3.6.4 25 Aug 2026)"
+  },
+  "results": [
+    {
+      "id": "GB00",
+      "title": "control: two projects, one repository, one workdir each",
+      "status": "fail",
+      "detail": "v2 connections 200. A: ACTIVE_HEALTHY, workdir=apps/a changes_only=false auto_branching=true limit=3. B: ACTIVE_HEALTHY, NOT CONNECTED. Same repository: false.",
+      "measurements": {
+        "connections_status": 200,
+        "a_status": "ACTIVE_HEALTHY",
+        "b_status": "ACTIVE_HEALTHY",
+        "a_workdir": "apps/a",
+        "b_workdir": "",
+        "a_changes_only": "false",
+        "b_changes_only": "",
+        "a_auto_branching": "true",
+        "b_auto_branching": "",
+        "same_repository": "false"
+      },
+      "durationMs": 600
+    }
+  ]
+}
