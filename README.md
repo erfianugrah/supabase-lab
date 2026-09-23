@@ -150,6 +150,18 @@ facts):
   configurable rate limits) are present and settable; and Storage/Realtime
   answer with the Data API off, so a db-pre-request (a PostgREST control) never
   reaches them.
+- `github-branching` - two projects connected to one GitHub repository, each
+  with its own working directory (`apps/a`, `apps/b`). Measured 2026-09-23:
+  with "Supabase changes only" off each project created a preview for all five
+  pull request shapes; with it on, only for those changing its own
+  `<workdir>/supabase/`. Every connected project posts check-runs named
+  `Supabase Preview` to every pull request commit (`skipped` from every
+  project, and only `skipped` from one that does not branch), so the docs'
+  wait-by-check-name workflow for app A read project B's run on both an A-only
+  and a two-app pull request. Per project, the Management API branch list
+  ended on `MIGRATIONS_FAILED` for a broken migration and `FUNCTIONS_DEPLOYED`
+  for a valid one, but read `FUNCTIONS_DEPLOYED` on both at the first 15 s
+  sample, before `CREATING_PROJECT`.
 
 ## Ad-hoc platform probes (no experiment dir)
 

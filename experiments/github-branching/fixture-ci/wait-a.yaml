@@ -1,0 +1,41 @@
+# The branching docs' "wait for the Supabase Preview check" pattern, verbatim
+# except for the path filter (app A's supabase/ directory) and the migrate job,
+# which only echoes: GB02 asks what the wait step returns, not what a migration
+# does. No Supabase secret is involved.
+name: Wait for app A preview
+
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+    branches:
+      - main
+    paths:
+      - 'apps/a/supabase/**'
+
+permissions:
+  checks: read
+  contents: read
+
+jobs:
+  wait:
+    runs-on: ubuntu-latest
+    outputs:
+      status: ${{ steps.check.outputs.conclusion }}
+    steps:
+      - uses: fountainhead/action-wait-for-check@v1.2.0
+        id: check
+        with:
+          checkName: Supabase Preview
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  migrate:
+    needs:
+      - wait
+    if: ${{ needs.wait.outputs.status == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "wait returned success; app A's preview would be migrated or seeded here"
