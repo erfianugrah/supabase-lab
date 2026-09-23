@@ -1,0 +1,48 @@
+{
+  "startedAt": "2026-09-23T01:49:50.172Z",
+  "finishedAt": "2026-09-23T02:02:41.550Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "github-branching",
+  "labCommit": "2bad035",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "OpenSSL 3.6.4 25 Aug 2026 (Library: OpenSSL 3.6.4 25 Aug 2026)"
+  },
+  "results": [
+    {
+      "id": "GB01",
+      "title": "PR shape x project: which previews get created, and which checks land",
+      "status": "info",
+      "detail": "changes_only A=false,B=false. root: A yes@30s, B yes@30s, checks Supabase Preview[supabase:success]; a-app: A yes@30s, B yes@30s, checks Supabase Preview[supabase:success]; a-db: A yes@30s, B yes@30s, checks Supabase Preview[supabase:success]; b-db: A yes@97s, B yes@97s, checks Supabase Preview[supabase:success]; both-db: A yes@30s, B yes@30s, checks Supabase Preview[supabase:success]. both-db check identity: none. Previews left 2 min after close: 0.",
+      "measurements": {
+        "toggle_changes_only": "A=false,B=false",
+        "window_s": 600,
+        "root_a_branch": "yes@30s",
+        "root_b_branch": "yes@30s",
+        "root_checks": 1,
+        "a-app_a_branch": "yes@30s",
+        "a-app_b_branch": "yes@30s",
+        "a-app_checks": 1,
+        "a-db_a_branch": "yes@30s",
+        "a-db_b_branch": "yes@30s",
+        "a-db_checks": 1,
+        "b-db_a_branch": "yes@97s",
+        "b-db_b_branch": "yes@97s",
+        "b-db_checks": 1,
+        "both-db_a_branch": "yes@30s",
+        "both-db_b_branch": "yes@30s",
+        "both-db_checks": 1,
+        "both_supabase_checks": 1,
+        "both_check_names": "Supabase Preview",
+        "both_identifying_fields": "none",
+        "leftover_after_close": 0
+      },
+      "evidence": "{\n  \"toggle\": \"A=false,B=false\",\n  \"connections\": [\n    {\n      \"project_ref\": \"A\",\n      \"repository\": \"<repo>\",\n      \"workdir\": \"apps/a\",\n      \"supabase_changes_only\": false,\n      \"new_branch_per_pr\": true,\n      \"branch_limit\": 10\n    },\n    {\n      \"project_ref\": \"B\",\n      \"repository\": \"<repo>\",\n      \"workdir\": \"apps/b\",\n      \"supabase_changes_only\": false,\n      \"new_branch_per_pr\": true,\n      \"branch_limit\": 10\n    }\n  ],\n  \"shapes\": {\n    \"root\": {\n      \"pr\": 1,\n      \"a_seen_s\": 30,\n      \"b_seen_s\": 30,\n      \"checks\": [\n        {\n          \"name\": \"Supabase Preview\",\n          \"app\": \"supabase\",\n          \"status\": \"completed\",\n          \"conclusion\": \"success\",\n          \"external_id\": \"\",\n          \"details_url\": \"https://supabase.com/dashboard/project/<ref>\",\n          \"title\": \"\",\n          \"summary\": \"\"\n        }\n      ],\n      \"statuses\": []\n    },\n    \"a-app\": {\n      \"pr\": 2,\n      \"a_seen_s\": 30,\n      \"b_seen_s\": 30,\n      \"checks\": [\n        {\n          \"name\": \"Supabase Preview\",\n          \"app\": \"supabase\",\n          \"status\": \"completed\",\n          \"conclusion\": \"success\",\n          \"external_id\": \"\",\n          \"details_url\": \"https://supabase.com/dashboard/project/<ref>\",\n          \"title\": \"\",\n          \"summary\": \"\"\n        }\n      ],\n      \"statuses\": []\n    },\n    \"a-db\": {\n      \"pr\": 3,\n      \"a_seen_s\": 30,\n      \"b_seen_s\": 30,\n      \"checks\": [\n        {\n          \"name\": \"Supabase Preview\",\n          \"app\": \"supabase\",\n          \"status\": \"completed\",\n          \"conclusion\": \"success\",\n          \"external_id\": \"\",\n          \"details_url\": \"https://supabase.com/dashboard/project/<ref>\",\n          \"title\": \"\",\n          \"summary\": \"\"\n        }\n      ],\n      \"statuses\": []\n    },\n    \"b-db\": {\n      \"pr\": 4,\n      \"a_seen_s\": 97,\n      \"b_seen_s\": 97,\n      \"checks\": [\n        {\n          \"name\": \"Supabase Preview\",\n          \"app\": \"supabase\",\n          \"status\": \"completed\",\n          \"conclusion\": \"success\",\n          \"external_id\": \"\",\n          \"details_url\": \"https://supabase.com/dashboard/project/<ref>\",\n          \"title\": \"\",\n          \"summary\": \"\"\n        }\n      ],\n      \"statuses\": []\n    },\n    \"both-db\": {\n      \"pr\": 5,\n      \"a_seen_s\": 30,\n      \"b_seen_s\": 30,\n      \"checks\": [\n        {\n          \"name\": \"Supabase Preview\",\n          \"app\": \"supabase\",\n          \"status\": \"completed\",\n          \"conclusion\": \"success\",\n          \"external_id\": \"\",\n          \"details_url\": \"https://supabase.com/dashboard/project/<ref>\",\n          \"title\": \"\",\n          \"summary\": \"\"\n        }\n      ],\n      \"statuses\": []\n    }\n  },\n  \"leftovers\": []\n}",
+      "durationMs": 771415
+    }
+  ]
+}
