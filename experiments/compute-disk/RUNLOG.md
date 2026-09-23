@@ -39,3 +39,39 @@ Reference: COMPUTE-DISK.md at repo root. Probes: `.pi/probe-compute-disk.sh D01[
 - The first fill round ran a 5-mod disk increase burst without triggering
   the quota; the second round caught the cooldown on the second attempt.
   Recorded as nondeterministic, not a clean pass/fail.
+
+## 2026-09-23 - the disk write accepts autoscale fields and silently discards them
+
+Prompted by a customer asking whether the Advanced Disk Settings cap can be set
+programmatically, so that automatic growth cannot bill them without approval.
+Curl replay against a throwaway nano project on a platform-plan org, STAGING
+control plane, created and deleted for the run.
+
+- **No write verb exists on the autoscale route.** `PATCH`, `PUT`, `POST` and
+  `DELETE` on `/config/disk/autoscale` all answer
+  `404 {"message":"Cannot <VERB> /v1/projects/<ref>/config/disk/autoscale"}` -
+  the same shape an entirely unknown path returns, checked as a control
+  (`PATCH /config/disk/nonesuch`). `GET` answers `200` with
+  `{"growth_percent":null,"min_increment_gb":null,"max_size_gb":null}`.
+  This replicates the D04/D07 reading on Pro and Team, now on a third org
+  class and a second control plane.
+- **The documented disk write accepts autoscale fields and ignores them.**
+  `POST /config/disk` with a full valid `attributes` object plus autoscale keys
+  answers `201` in every shape tried - keys inside `attributes`, keys at the
+  top level, and a nested `autoscale` object. `GET /config/disk/autoscale` still
+  reads all-null after a 60 s settle. So a caller who reaches for the obvious
+  workaround gets a success code and no effect, which is a worse failure than
+  the 404: nothing tells them the cap was not applied.
+- Getting there needs the full attribute set. A partial body is rejected on the
+  missing field rather than on the autoscale keys (`attributes.type: Invalid
+  discriminator value. Expected 'gp3' | 'io2'`, then `attributes.iops: Invalid
+  input: expected number, received undefined`), so a probe that stops at the
+  first 400 concludes "rejected" when the real answer is "accepted and
+  discarded".
+
+Consequence for anyone billing on provisioned capacity: there is no API lever
+to cap growth, and no error to detect a failed attempt. The readable half is
+the mitigation - `GET /config/disk/autoscale` and `GET /config/disk/util` are
+both per-project reads, so utilisation can be polled and capacity raised
+deliberately with `POST /config/disk` after approval. That does not stop
+autoscale firing between polls.

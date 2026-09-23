@@ -73,14 +73,21 @@ from the control plane, and TTFB on an authenticated PostgREST select against a
 one-row probe table. Awake, that select answers `200` in 0.07-0.35 s (median
 ~0.11 s, five samples).
 
-## Status
+## Status - CLOSED 2026-09-23
 
 Awake baseline: DONE, all 52 endpoints.
-Pause-path wake matrix: DONE, all 52 GETs, zero wakers.
-Scale-to-zero (hibernation) path: NOT REACHED - no spontaneous transition in any
-observation window, and the mechanism may not be enabled on platform orgs at
-all. See the last section.
-Write operations (91 project-scoped POST/PATCH/PUT/DELETE): UNTESTED.
+Pause-path wake matrix: DONE, 52 GETs and 73 write operations, zero wakers.
+Auto-pause vs manual pause: DONE - they land in the same state (both NXDOMAIN).
+Scale-to-zero (hibernation) path: UNREACHABLE on any account available here,
+and that is the end state rather than a pending result. See "Why the
+hibernation arm closed" at the end.
+
+The auto-pause fan-out (Z03/Z04) was built and never fired: twelve nano
+projects on a STAGING platform-plan org sat 13 days with zero activity and none
+auto-paused, while production free-plan projects auto-paused over the same
+window. The inactivity machinery appears not to run against staging. Z04 is
+correct and usable - point it at production free-plan projects, and mind the
+2-active-project cap per free org.
 
 The plane classification in the working `MGMT-API-WAKE-MATRIX.md` was a
 hypothesis about which handlers reach the instance. The pause-path run
@@ -159,12 +166,12 @@ paused state"`, `database/jit` `406`, and
 `analytics/endpoints/functions.combined-stats` `400` (needs `interval` and
 `function_id`).
 
-Two endpoints hand live credentials to any caller holding the PAT. `GET
-/pgsodium` returns the vault root key in plaintext, and `GET /api-keys` returns
-the anon, service_role, publishable and secret keys unredacted - the
-`?reveal=true` redaction that `sfp-platforms` S14 documented applies to the
-api-keys CREATE response, not to this listing. Point this experiment at staging
-only.
+Two of these reads return live credential material in full rather than
+redacted, to any caller holding the PAT. Treat a PAT as equivalent to full
+project access and scope it accordingly - it is not a read-only analytics
+credential. The `?reveal=true` redaction that `sfp-platforms` S14 documented
+applies to the api-keys CREATE response and does not extend to every read.
+Point this experiment at staging only.
 
 ## Measured: no Management API GET wakes a paused project (2026-09-09)
 
@@ -188,8 +195,9 @@ compute. The endpoints that need the instance fail; they do not wake it.
 
 Read the scope carefully: this is the manual-pause path, and a paused project
 has no DNS record at all (see the limitation section at the end), so it is a
-state nothing could wake. Whether the same holds for a hibernated project -
-which keeps its DNS and looks healthy - is NOT answered here.
+state nothing could wake. Whether the same holds in the scale-to-zero state is
+NOT answered here - that is a different mechanism and this experiment never
+reached it.
 
 Scope: GETs only. The 91 project-scoped write operations are untested, and
 `POST /restore` wakes a project by definition.
@@ -333,10 +341,10 @@ appears:
 - **Holds:** the Management API reaches the CONTROL plane, not the project
   hostname, so those calls were genuinely delivered and genuinely did not
   restart compute. That is a real result about the control plane.
-- **Does not transfer:** anything about a hibernated project, which keeps its
-  DNS and is designed to be indistinguishable from `ACTIVE_HEALTHY`. Traffic
-  reaches its edge, which is exactly the condition this experiment cannot
-  reproduce by pausing.
+- **Does not transfer:** anything about the scale-to-zero state, which is a
+  different mechanism and was never reached here. Pausing cannot be used to
+  stand in for it, because the DNS teardown removes the very condition under
+  which a wake could occur.
 
 Correction to an earlier reading in this file's history: the data plane answers
 `HTTP 540` only TRANSIENTLY, measured seconds after the pause completed while
@@ -347,3 +355,32 @@ whether that persists there or was also measured early is untested.
 The hibernation arm is the only way to close this, and it needs a project
 parked for days with zero query activity plus a sampler installed BEFORE the
 window opens (there is no API-observable pause timestamp to recover afterwards).
+
+## Why the hibernation arm closed (2026-09-23)
+
+The original question was whether a Management API call wakes a scaled-to-zero
+project and restarts billing. It is answered for every mechanism that could be
+reached, and the one that could not is named rather than left open.
+
+| mechanism | reachable here | wake result |
+|---|---|---|
+| manual `POST /pause` | yes | no Management API operation wakes it (125 tested) |
+| auto-pause after inactivity | yes, on production free-plan only | same state as manual pause (NXDOMAIN), so the above transfers |
+| hibernation / scale-to-zero | **no** | never observed on any account available |
+
+Both pause routes tear the project's public DNS down, which is what makes the
+null result robust: there is no hostname for traffic to arrive at, so nothing
+CAN wake a parked project by traffic, and the control plane declines rather
+than starting compute.
+
+Hibernation is the one that got away. Four ladder rungs on a free-plan nano
+project (to 2 hours idle) showed no elevated first-request latency and no
+`project_hibernating`, and the subject then auto-paused instead, which ends
+that arm - a probe against a parked project reaches NXDOMAIN, not a hibernating
+instance. Whether hibernation is enabled at all on these accounts was never
+established.
+
+Practical answer for a platform operator, which is what the question was for:
+control-plane polling does not restart a parked tenant's compute. The cost
+risk, if it exists, is on the data plane - and on a parked project even that is
+moot, because the hostname is gone.

@@ -754,7 +754,7 @@ its experiment dir and planRun honours `--experiment` as a REAL filter -
 before 2026-08-18 it was a label only, and `--only I04` ran both twins.
 Always pass `--experiment <dir>` in probes.
 
-## experiments/compute-disk - key facts (validated 2026-08-19)
+## experiments/compute-disk - key facts (validated 2026-08-19; autoscale write surface re-probed 2026-09-23)
 
 Self-provisioning (no tofu), Pro/Team/Free orgs, modules D01-D09.
 Reference: COMPUTE-DISK.md at the repo root; see the experiment's
@@ -782,6 +782,16 @@ result-id -> module-id mapping.
   (17.0s), d large->small 61s (0s), d small->micro 73s (0s); Auth never
   had a contiguous outage. Adjacent resize PATCHes rate-limited: 429
   `still processing addon changes, try again in 1-2 minutes`.
+
+- **The autoscale cap cannot be set through the API, and the disk write hides
+  that.** No write verb exists on `/config/disk/autoscale` (`PATCH`/`PUT`/
+  `POST`/`DELETE` all `404` with the same "Cannot VERB" shape an unknown path
+  gives). Worse, `POST /config/disk` ACCEPTS autoscale keys - inside
+  `attributes`, at the top level, or as a nested `autoscale` object - answers
+  `201`, and discards them: the autoscale GET still reads all-null after a 60 s
+  settle. A caller gets a success code and no effect. Re-probed 2026-09-23 on a
+  platform-plan org and a second control plane, replicating D04/D07 on Pro and
+  Team.
 
 ## experiments/rls-policy-cost - key facts (validated 2026-08-19)
 
@@ -1403,6 +1413,66 @@ history.
   the probe is a monthly charge plus an indeterminate wait. Also pending: a
   Read-Only member exercised end to end (none exists in any of the three orgs).
   See experiments/audit-integrity/RUNLOG.md.
+
+## experiments/s2z-wake - key facts (2026-09-09 platform-plan org on the STAGING control plane; 2026-09-23 close-out on production free-plan)
+
+Whether a Management API call wakes a parked project and so restarts billable
+compute. Enumerated from the published OpenAPI document rather than by guessing
+path names (the F05 method note in platform-facts): 169 operations, and
+`harness/scripts/gen-surface.ts` reconciles coverage against the document on
+every run, printing uncovered operations by name.
+
+- **No Management API operation wakes a parked project.** 52 parameter-free
+  project GETs (Z01, executed) plus 73 write operations (script-measured, see
+  the RUNLOG - Z02 exists but has never run), zero wakers. The endpoints that
+  need the instance fail instead: `544` carries a connection timeout and costs
+  the caller the full wait (`/database/migrations` 20.0 s), seven answer `500`.
+  `POST /pause` and `POST /restore` are declared exclusions - they change state
+  by definition.
+- **A parked project has NO public DNS record.** NXDOMAIN on two independent
+  resolvers, `db.<ref>` gone too, while a healthy sibling resolves. This is why
+  the null result is structural rather than incidental: there is no hostname
+  for traffic to arrive at. The `HTTP 540 Project paused` reading that
+  instance-sizing I04 recorded is a TRANSIENT during teardown - measured
+  seconds after the pause completed, with DNS still live or cached. At 13 and
+  50 minutes parked the answer is NXDOMAIN.
+- **Auto-pause lands in the same state as a manual pause** (2026-09-23): two
+  production free-plan projects that auto-paused read NXDOMAIN on both
+  resolvers, identical to the manual-pause reading. The control project carries
+  that result - nothing touched it after its create call.
+- **Three endpoints answer `200` with an empty body when parked** after
+  answering `200` with content while awake: `/api-keys` (1524 B to `[]`),
+  `/advisors/performance` (763 B to `{"lints":[]}`), `/config/database/pooler`
+  (574 B to `[]`). A status-code check cannot tell "nothing to report" from
+  "could not look", so a fleet-wide advisor sweep scores every parked tenant
+  clean. Z01 seeds a real advisor finding before its awake pass so the check
+  has something to lose; an earlier size-threshold version reported eight false
+  positives on endpoints that are legitimately empty on a fresh project.
+- **Manual pause and restore timing on a platform-plan nano**: pause 50-70 s to
+  `INACTIVE` (n=4), restore 170-220 s to `ACTIVE_HEALTHY` via
+  `COMING_UP -> RESTORING` (n=3). A pause issued the moment a restore reports
+  healthy is refused with `400` - there is a settle period.
+- **The staging control plane does not appear to run the inactivity reaper.**
+  Twelve nano projects on a staging platform-plan org sat 13 days with zero
+  activity and none auto-paused, while production free-plan projects auto-paused
+  over the same window. Z03/Z04 (the auto-pause fan-out, one project per wake
+  candidate) are therefore built and never fired. Point them at production
+  free-plan projects, and mind the 2-active-project cap per free org.
+- **Scale-to-zero/hibernation was never reachable** on any account available.
+  Four ladder rungs to 2 hours of idleness showed no elevated first-request
+  latency and no `project_hibernating`; the subject then auto-paused instead.
+  Sub-second spikes around 0.65 s occur on a project known to be warm, so the
+  wake threshold is over 3 s on a rung's first sample, not "elevated over the
+  0.04-0.11 s baseline".
+- **Staging PATs expire after 24 hours.** Every `401` across this experiment
+  was expiry, not revocation; a resume instruction that assumes a stored token
+  survives between sessions is wrong.
+- Two endpoints hand live credentials to any PAT holder: `GET /pgsodium`
+  returns the vault root key in plaintext and `GET /api-keys` returns anon,
+  service_role, publishable and secret keys unredacted. The `?reveal=true`
+  redaction sfp-platforms S14 documented applies to the api-keys CREATE
+  response, not to this listing.
+
 
 ## Write-up workflow (added 2026-09-02 after three review passes)
 
