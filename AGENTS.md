@@ -754,7 +754,7 @@ its experiment dir and planRun honours `--experiment` as a REAL filter -
 before 2026-08-18 it was a label only, and `--only I04` ran both twins.
 Always pass `--experiment <dir>` in probes.
 
-## experiments/compute-disk - key facts (validated 2026-08-19)
+## experiments/compute-disk - key facts (validated 2026-08-19; autoscale write surface re-probed 2026-09-23)
 
 Self-provisioning (no tofu), Pro/Team/Free orgs, modules D01-D09.
 Reference: COMPUTE-DISK.md at the repo root; see the experiment's
@@ -782,6 +782,15 @@ result-id -> module-id mapping.
   (17.0s), d large->small 61s (0s), d small->micro 73s (0s); Auth never
   had a contiguous outage. Adjacent resize PATCHes rate-limited: 429
   `still processing addon changes, try again in 1-2 minutes`.
+
+- **The autoscale cap cannot be set through the API, and the disk write hides
+  that.** No write verb exists on `/config/disk/autoscale` (`PATCH`/`PUT`/
+  `POST`/`DELETE` all `404` with the same "Cannot VERB" shape an unknown path
+  gives). Worse, `POST /config/disk` ACCEPTS autoscale keys - inside
+  `attributes`, at the top level, or as a nested `autoscale` object - answers
+  `201`, and discards them: the autoscale GET still reads all-null after a 60 s
+  settle. A caller gets a success code and no effect. Re-probed 2026-09-23 on a
+  platform-plan org, replicating D04/D07 on Pro and Team.
 
 ## experiments/rls-policy-cost - key facts (validated 2026-08-19)
 
@@ -1403,6 +1412,47 @@ history.
   the probe is a monthly charge plus an indeterminate wait. Also pending: a
   Read-Only member exercised end to end (none exists in any of the three orgs).
   See experiments/audit-integrity/RUNLOG.md.
+
+## experiments/s2z-wake - key facts (2026-09-09 to 2026-09-23 free-plan hibernation ladder and auto-pause; Z01 2026-10-13, free-plan org, ap-southeast-1)
+
+Whether a Management API call wakes a parked project and so restarts billable
+compute. Enumerated from the published OpenAPI document rather than by guessing
+path names (the F05 method note in platform-facts): 169 operations on
+2026-09-09, and `harness/scripts/gen-surface.ts` reconciles coverage against the
+document on every run, printing uncovered operations by name.
+
+- **No Management API GET wakes a manually paused project** (Z01, 2026-10-13,
+  one run, free-plan nano). All 52 parameter-free project GETs left the project
+  `INACTIVE`; 16 answered a different status code from the awake pass. Pause
+  `200`, `INACTIVE` in 62 s via `PAUSING`, data plane `540` while parked;
+  restore `200`, healthy in 181 s via `COMING_UP`, `RESTORING`. The write
+  surface (Z02) is built and has never run. `POST /pause` and `POST /restore`
+  are declared exclusions - they change state by definition.
+- **Four endpoints answer `200` with an empty body when parked** after
+  answering `200` with content while awake (Z01, 2026-10-13): `/api-keys`
+  (1524 B to 2 B), `/advisors/performance` (590 B to 12 B), `/advisors/security`
+  (618 B to 12 B, the first run whose seed table carried an anon grant and so a
+  security finding) and `/config/database/pooler` (568 B to 2 B). A status-code
+  check cannot tell "nothing to report" from "could not look", so a fleet-wide
+  advisor sweep scores every parked tenant clean. Z01 seeds a real advisor
+  finding before its awake pass so the check has something to lose, and
+  compares the awake and parked passes on the same project rather than
+  thresholding a size.
+- **Auto-pause tears the public DNS record down** (2026-09-23): two free-plan
+  nano projects auto-paused within 13 days and read NXDOMAIN on two independent
+  resolvers, `db.<ref>` gone too, while a healthy sibling resolved. The control
+  project carries that result - nothing touched it after its create call. So
+  there is no hostname for traffic to arrive at on an auto-paused project.
+- **Z03/Z04 (the auto-pause fan-out, one project per wake candidate) are built
+  and have never fired.** Both read one org; under the 2-active-project cap per
+  free org the fleet has to shrink or be spread across orgs.
+- **Scale-to-zero/hibernation was never reachable** on any account available.
+  Four ladder rungs to 2 hours of idleness on a free-plan nano project showed
+  no elevated first-request latency and no `project_hibernating`; the subject
+  then auto-paused instead. Sub-second spikes around 0.65 s occur on a project
+  known to be warm, so the wake threshold is over 3 s on a rung's first sample,
+  not "elevated over the 0.04-0.11 s baseline".
+
 
 ## Write-up workflow (added 2026-09-02 after three review passes)
 
