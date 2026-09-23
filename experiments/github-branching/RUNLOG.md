@@ -104,7 +104,7 @@ Artifacts: `run-2026-09-23T01-47-40-105Z.*`, `run-2026-09-23T01-49-08-899Z.*`,
 `fountainhead/action-wait-for-check@v1.2.0` with `checkName: Supabase
 Preview`, path filter `apps/a/supabase/**`, migrate job reduced to an echo.
 
-| PR | wait step returned | run it read belonged to | migrate job | A's own first `success` (first seen, s after the PRs opened, 30 s poll) |
+| PR | wait step returned | run it read belonged to | migrate job | A's own first `success` (first seen, s after the run started creating the PRs, 30 s poll) |
 |---|---|---|---|---|
 | a-db (A only) | `skipped` | B | skipped | 108 s |
 | both-db | `success` | B | success | 108 s |
@@ -167,5 +167,6 @@ exist, a valid migration under `apps/b`. Sampled every 15 s for 480 s.
 
 ## Teardown
 
-`make destroy` 2026-09-23: 2 resources destroyed (both projects). The probe
-repository is deleted by the operator, outside this state.
+`make destroy` 2026-09-23: 2 resources destroyed (both projects). The operator
+deleted the probe repository the same day, outside this state (the GitHub
+API answered 404 for it afterwards).
