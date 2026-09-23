@@ -1487,10 +1487,12 @@ reads it back, including `supabase_changes_only`. Details: RUNLOG.md.
   request shapes, a root README change included (GB01 run 1). On:
   `apps/a/README.md` did not trigger A (GB01 run 2); tested with migrations
   only.
-- **Every connected project posts `Supabase Preview` check-runs to every
-  commit.** Same name, same app, same check suite. A project that branches
+- **Every connected project posts `Supabase Preview` check-runs to every pull
+  request head commit read.** Same name, same app; one check suite on the
+  setting-off commits (RUNLOG snapshot). A project that branches
   posted 5 or 6 (1 `skipped`, 1 `success` or `failure`, 3 or 4 left
-  `in_progress`: at 600 s in GB01, at 480 s in GB03); one that does not, with
+  `in_progress`: at 600 s in GB01 run 2 and GB02, at the 01:59:12 snapshot in
+  GB01 run 1, at 480 s in GB03); one that does not, with
   changes-only on, posted 2, both `skipped`. Of `external_id`, `details_url`,
   output title and summary, only `details_url` carries a project ref (the
   parent's, then the preview branch's own).
