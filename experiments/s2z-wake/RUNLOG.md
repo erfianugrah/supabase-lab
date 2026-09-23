@@ -55,11 +55,12 @@ could be generating its tenants' compute bills.
   `200` in 0.07-0.35 s over five samples. An unauthenticated request is NOT a
   usable liveness signal - the `401 "No API key found in request"` comes from
   the edge gateway, not from PostgREST on the instance.
-- **Incidental finding, security-relevant**: `GET /pgsodium` returns the vault
-  root key in plaintext and `GET /api-keys` returns anon, service_role,
-  publishable and secret keys UNREDACTED to any PAT holder. S14 documented
-  that api-keys CREATE redacts without `?reveal=true`; that redaction does not
-  apply to this listing.
+- **Incidental finding, security-relevant**: two of the control-plane reads in
+  this sweep return live credential material to any PAT holder, in full rather
+  than redacted. Treat a PAT as equivalent to full project access and scope it
+  accordingly - it is not a read-only analytics credential. Related: S14
+  documented that the api-keys CREATE response redacts without
+  `?reveal=true`; that redaction does not extend to every read.
 
 IN FLIGHT at time of writing: the hibernation threshold. A watcher is parked on
 the project touching only org-scoped metadata (60 s) plus `upgrade/eligibility`
@@ -193,19 +194,19 @@ independent public resolvers, same org, same moment: both `INACTIVE` projects
 NXDOMAIN on `<ref>.<suffix>` and on `db.<ref>.<suffix>`, while the
 `ACTIVE_HEALTHY` one resolved to two Cloudflare edge addresses.
 
-So the wake path for a hibernated project (traffic to the project URL) cannot
-exist on a paused one. The sweep result is real about the CONTROL plane - those
-125 calls were delivered and did not restart compute - and says nothing about a
-hibernated project, which keeps its DNS and is designed to look healthy.
+So a paused project cannot be reached by traffic at all. The sweep result is
+real about the CONTROL plane - those 125 calls were delivered and did not
+restart compute - and says nothing about the scale-to-zero state, which this
+experiment never reached.
 
 Also corrects the `HTTP 540` reading recorded earlier today: 540 was measured
 seconds after the pause completed, with DNS still live or locally cached. At 13
 and 50 minutes parked the answer is NXDOMAIN.
 
-Consequence for the hibernation arm: install the sampler BEFORE the idle window
-opens. A durable 15-minute sampler now runs outside the repo
-(`~/.local/share/s2z-wake/`, a systemd user timer) reading org-scoped metadata
-only, because a tenant query would reset the very clock being measured.
+A 15-minute status sampler was installed here to catch that moment. It was
+REMOVED the same day and the reasoning was wrong twice over - see the resume
+section: the moment is not needed by any open question, and a timer on a
+workstation cannot capture it anyway.
 
 ## 2026-09-09 - Z01 executed for the first time; it reproduced the result and found two bugs in itself
 
@@ -241,6 +242,63 @@ Runtime note for anyone running the probe: Z01 takes ~35 minutes. The parked
 sweep pays a 15-20 s connection timeout on each `544` endpoint plus a 5 s
 settle per endpoint, and the restore alone is ~3 minutes.
 
+## 2026-09-23 - the check-back, 13 days in: the staging arm is a dead end
+
+Both fleets were parked 2026-09-09 and read back 13 days later.
+
+### The SfP fleet did not auto-pause; the production free projects did
+
+**Twelve nano projects on the staging platform-plan org, 13 days of zero
+activity, all still `ACTIVE_HEALTHY`.** Not one parked. Over the same window
+BOTH free-plan projects on a production org went `INACTIVE` on their own -
+including the control, which nothing touched after its create call.
+
+The straightforward reading is that the inactivity-shutdown machinery does not
+run against the staging control plane: it is production cost control, and
+staging has no cost to control. That is inference from a clean 13-day negative
+plus a positive on production, not something the API will confirm.
+
+Consequence for this experiment: **Z04 can never fire.** It refuses to run
+until all twelve are parked, and on staging they never will be. The fan-out
+design is sound and the module works; the environment simply does not exercise
+the mechanism. Anyone repeating this should run the auto-pause arm on
+PRODUCTION free-plan projects, and accept the 2-active-project cap per free
+org - which means either one candidate per org across several orgs, or a much
+smaller candidate set.
+
+### Auto-pause lands in the same state as a manual pause
+
+Measured on the two production projects that auto-paused, against 1.1.1.1 and
+8.8.8.8 independently: **`status: NXDOMAIN`, zero A records, and `db.<ref>`
+absent too**, while a healthy sibling project resolved to two edge addresses.
+Identical to the manual-pause reading from 2026-09-09.
+
+The control project carries this result: it was never touched after creation,
+so nothing in the harness put it there.
+
+This answers the first open question outright and largely settles the second by
+implication. Same `INACTIVE` status, same DNS teardown, same control plane - so
+the 125-operation "zero wakers" result from the manual-pause path very probably
+transfers, and the four data-plane candidates in Z04 are moot either way
+because there is no hostname left to send traffic to.
+
+### The hibernation ladder is finished, not stalled
+
+Four rungs ran (to 2 hours idle) before the timer died with the host, all
+sub-second with no `project_hibernating`. Its subject has since auto-paused, so
+the remaining rungs cannot run - a probe now reaches NXDOMAIN rather than a
+hibernating instance. Final reading from that arm: no hibernation up to two
+hours, then the project auto-paused instead.
+
+**Hibernation was never reachable on any account available here.** That is the
+honest end state of the original question, not a pending result.
+
+### Operational note that invalidates stored-token guidance
+
+**Staging PATs expire after 24 hours.** Every 401 across this run was expiry,
+not revocation. Any resume instruction that assumes a token file survives
+between sessions is wrong; issue a fresh PAT at the start of each attempt.
+
 ## HOW TO RESUME (written 2026-09-09 for a check-back ~2026-09-14)
 
 Two fleets are parked. Nothing in this repo records the project refs - they are
@@ -256,16 +314,21 @@ state lives outside it:
   hib-ladder.sh       the ladder
 ```
 
-One systemd user timer, the ladder: `systemctl --user list-timers 's2z-*'`.
+**Nothing runs in the background, and nothing should.** Two systemd user timers
+were set up on 2026-09-09 - a status sampler and the ladder - and both were the
+wrong shape. The host is a workstation that gets shut down; the sampler was
+removed the same day for earning nothing, and the ladder died with the box
+overnight after four rungs, which is the identical mistake made twice.
 
-A 15-minute status sampler ran here for part of 2026-09-09 and was REMOVED, on
-the grounds that it earned nothing. It existed to pin the moment a project
-auto-paused, since no API surface reports a pause timestamp - but Z04 checks
-parked-ness itself at run time, the threshold is documented elsewhere rather
-than something this lab needs to measure, and a timer on a workstation that
-gets shut down reports the state at boot rather than the state at the
-transition. Do not reinstate it without a question that actually needs the
-timestamp.
+The reason no daemon is needed: **the inactivity clock runs on the platform's
+side whether this machine is on or not.** Projects accumulate idleness on their
+own. So both remaining questions are on-demand - park, walk away, come back,
+run one command. `Z04` checks fleet readiness itself, and the ladder records
+`actual_idle_s` separately from the intended rung, so a probe fired late is
+still a valid "idle for X, TTFB was Y" reading. Coarser rung spacing is the
+only cost, and the remaining rungs are hours long anyway.
+
+Do not reinstate a timer here.
 
 ### 1. Did the SfP fleet auto-pause?
 
@@ -307,14 +370,36 @@ context. `validation_errors` containing `project_hibernating` names the state
 directly and is the stronger signal when present. All rungs at baseline latency
 mean hibernation is not enabled for that account, NOT that there is no window.
 
-Rung 1 (15 min idle, 2026-09-09) measured 0.634 s with
-`validation_errors: none` - no hibernation, and inside the noise floor above.
+#### Measured so far: no hibernation up to 2 hours idle
+
+Four rungs ran on 2026-09-09 before the timer died with the host. Free-plan
+nano project on a production org, `validation_errors: none` on every rung:
+
+| idle | first sample | ctx2 | ctx3 |
+|---|---|---|---|
+| 15 min | 0.634 s | - | - |
+| 32 min | 0.447 s | 0.047 s | 0.082 s |
+| 64 min | 0.524 s | 0.078 s | 0.060 s |
+| 122 min | 0.763 s | 0.068 s | 0.062 s |
+
+Every first sample is sub-second, nowhere near a reclaim-and-reattach, and
+`project_hibernating` never appeared. **No hibernation up to ~2 hours of
+idleness on that account.**
+
+The three-sample design paid for itself. There is a consistent 0.45-0.76 s
+penalty on the first request after idle against 0.05-0.08 s on the follow-ups,
+and it does NOT scale with idle length - 122 min looks like 32 min - so it is a
+routing or connection effect rather than compute starting. The original
+"elevated over baseline" threshold would have called all four rungs a wake.
+
+Remaining rungs are 4h, 8h, 16h, 24h, 48h. Run `hib-ladder.sh` by hand when
+convenient; it reads its own state file and only probes when the next rung is
+due.
 
 ### 3. Teardown
 
 ```
-systemctl --user disable --now s2z-hib-ladder.timer
-rm -rf ~/.local/share/s2z-wake ~/.config/systemd/user/s2z-*.{timer,service}
+rm -rf ~/.local/share/s2z-wake
 ```
 
 Then delete the projects: 12 `z04-*` plus `s2z-wake-*` / `s2z-writes-*` on the
@@ -331,3 +416,44 @@ paused project must be restored before `DELETE` is accepted.
 4. Z02 has never been executed. The write-surface numbers in the README came
    from a throwaway script; the module has to reproduce them before they are
    reproducible by anyone else.
+
+## 2026-09-23 - the boundary this experiment did not cross, stated plainly
+
+Everything above measured a PAUSED project - manual or automatic, both of which
+tear the public DNS record down. Scale-to-zero is a DIFFERENT mechanism, and
+this experiment never reached it, so nothing here describes how a project in
+that state behaves.
+
+The distinction matters for how far the null result travels. The 125-operation
+"zero wakers" reading rests on a state with no DNS record, where traffic has
+nowhere to arrive; it does not automatically carry to a state that keeps its
+hostname. Anyone extending this work should treat the two as separate
+questions rather than assuming the paused answer generalises.
+
+NOT MEASURED HERE, recorded so the next run does not re-derive it:
+
+- Whether control-plane reads wake a project in the scale-to-zero state. The
+  reading for paused is a clean no across 125 operations; the other state was
+  never reachable on any account available.
+- Storage accounting while a project is in that state. This lab has no access
+  to the hourly usage export and measured nothing about it.
+- The idle window before it triggers. Four ladder rungs to two hours of
+  idleness on a free-plan nano project saw no transition and no
+  `project_hibernating`, so either the window exceeds two hours or the
+  mechanism was not enabled on that account. Unresolved.
+
+Reaching any of it needs an account where the mechanism is demonstrably
+enabled, which is the prerequisite to establish first.
+
+### Measured: there is no control-plane route for object storage size
+
+`GET /v1/projects/{ref}/storage/buckets` lists buckets and carries
+`created_at, id, name, owner, public, updated_at` - no size field - and no
+other operation in the 169 exposes object storage size. Per-project bucket size
+is therefore reachable only by listing objects and summing (usage-metering M01d
+measured that exact to the byte) or from the hourly export. A parity gap with
+the dashboard, which shows the figure directly.
+
+Two routes a caller may expect do not exist at all: `/v1/projects/{ref}/quota`
+and `/v1/projects/quota/active` are absent from the document, as is any `/v2`
+namespace. Checked 2026-09-23.
