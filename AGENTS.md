@@ -211,6 +211,38 @@ can be done about the managed HTTP tier on `<ref>.supabase.co`.
   what a connected client may do; it does not remove the endpoint.
 - Auth and Storage have no equivalent toggle.
 
+## experiments/data-api-reenable - key facts (validated 2026-09-24)
+
+One project, no AWS. What re-enabling the Data API costs a client, and what a
+client can poll. See RUNLOG.md; artifacts in `out/2026-09-24/`.
+
+- "Off" points PostgREST at a nonexistent schema: the platform restarts it with
+  `db-schemas=pg_pgrst_no_exposed_schemas`, the schema-cache load fails, and
+  PostgREST retries with backoff 1, 2, 4, 8, 16, then 32 s (capped).
+  Clients get `503 PGRST002`.
+- "On" restarts the PostgREST process: both enable PATCHes in the log extract
+  (300 s and 900 s cycles) logged a fresh `Starting PostgREST 14.5...`, so the
+  32 s retry timer does not gate recovery. A no-op PATCH restarts it too.
+- Recovery does not grow with the outage: the slower data path answered 200 at
+  2870 / 1320 / 952 ms after holds of 30 / 300 / 900 s (DA02), and at 1738 ms
+  with 3002 tables (DA04).
+  `notify pgrst, 'reload config'` after the enable did not help (DA05 run 2:
+  plain 1347/1184/1004 ms, NOTIFY 1767/1342/2581 ms).
+- Readiness: `GET /rest-admin/v1/ready` (service_role key) is reachable through
+  the gateway - 200 healthy, bare `503` off - but turned 200 930 ms before the
+  RPC path in the 30 s cycle; confirm with a data read. Management API
+  `/health?services=rest` flips too, at 2 s polling from 666 ms ahead to
+  1522 ms behind the slower data path.
+- The Dashboard toggle calls `/platform/projects/{ref}/config/postgrest` (not
+  PAT-reachable) and on enable writes `public` alone; replayed through the API
+  (DA03) the extra schema and `/graphql/v1` answered `406 PGRST106` about 71 s
+  later and stay that way. Its click-to-serve time is unmeasured (DA06 manual drill, not run).
+- Harness gotchas: `PATCH /postgrest` 400s on `db_pool: null` (a fresh project
+  reads null back - omit it); `postgrest_logs` answers only on `logs.all`; new
+  the project created for this run (2026-09-24) did not have `pg_graphql`
+  enabled, so `/graphql/v1` returned 200 with an errors envelope and is not a
+  health signal.
+
 ## Provisioning: ACTIVE_HEALTHY is not readiness (validated 2026-08-03)
 
 Affects every experiment here, since they all create projects.
