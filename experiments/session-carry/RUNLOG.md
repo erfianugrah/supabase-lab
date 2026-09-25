@@ -183,9 +183,9 @@ aal2.
   SSO and SAML tables, `audit_log_entries`. Not copied, not probed.
 - Whether kid uniqueness spans accounts. Both orgs tested belong to one
   account.
-- Lowering the target's JWT expiry before cutover to shrink the window in
-  which held access tokens fail. It follows from S02a/b, but it is an
-  inference, not a measurement.
+- Lowering the source's JWT expiry before cutover (the held access tokens
+  are source-issued) to shrink the window in which they fail at the target.
+  It follows from S02a/b; inferred, unmeasured.
 
 ## Cost / teardown
 
