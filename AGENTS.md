@@ -386,6 +386,9 @@ Ported from throwaway bash that produced the same findings; see RUNLOG.md.
   arrives `status: verified`, and the SAME secret produces a code that verifies
   at the destination for an `aal2` session. Without this the zero-re-login
   result would silently exclude every MFA-enrolled account.
+  A session that was ALREADY aal2 is a different question: it drops to aal1
+  on its first destination refresh unless `auth.mfa_amr_claims` is copied too
+  (session-carry S04, 2026-09-25).
 - `auth.refresh_tokens.user_id` is `character varying` while `auth.users.id` is
   `uuid`, so a subquery predicate errors instead of matching. Combined with the
   fact that inserting zero rows SUCCEEDS, that presented as a copy reporting a
@@ -403,6 +406,41 @@ Ported from throwaway bash that produced the same findings; see RUNLOG.md.
   hostname is rejected before availability is evaluated).
 - Emails are randomised per run: `adminCreate` 422s on a duplicate address, so a
   module with a constant address passes exactly once against a given pair.
+
+## experiments/session-carry - key facts (validated 2026-09-25)
+
+Two projects, no AWS. What it takes for EXISTING sessions to survive an app
+moving between Supabase projects, testing "one signing key on both, copy
+each user's auth rows". Findings and artifacts in RUNLOG.md; out/2026-09-25/.
+
+- A kid cannot be on two projects while one of them holds it `in_use` (other
+  key states not run). Importing a private JWK whose kid another
+  project already holds answers `409 Signing key with kid "..." already
+  exists`, across organizations too (S01b, S01x). Both orgs were one account.
+- The same private material under a new kid does not help (02:56 run): target
+  Auth refuses with `403 bad_jwt` naming the unrecognised kid (S01g), and
+  target PostgREST refuses with `401 PGRST301` (S01f) even after the target
+  JWKS published the new kid (S01e). Kid lookup is shown for Auth; for
+  PostgREST it is inferred. With unrelated keys (02:55 run) the held access
+  token also fails at the target until the client refreshes (S02a, S02b).
+  Without third-party-auth trust (cross-project-auth X02, not probed here),
+  only the refresh token crosses, via the row copy.
+- Copy `auth.mfa_amr_claims` after `auth.sessions`. Without it the first
+  target refresh of an aal2 session returns aal1 with no `amr` claim (S04a);
+  with it, aal2 and `password+totp` (S04b).
+- A refresh at the source after the copy leaves the client holding a token
+  the target never saw (`refresh_token_not_found`, S03a). A client still on
+  the pre-copy token refreshes at the target although the source revoked it,
+  giving one session two live lineages (S03b, S03c).
+- A project holds at most three `previously_used` signing keys (422 on the
+  next import). Before importing, S01 revokes the oldest non-HS256 one on any
+  project already at 3; never revoke the
+  HS256 legacy secret, which signs the legacy anon/service_role keys.
+- Target JWKS first listed the target's new kid 450882 ms (10 s poll step)
+  after polling began, and polling began only after S01d, not at the S01c
+  promotion (S01e, one run). The source issued tokens with the imported kid by
+  the second 5 s poll, 5190 ms after polling began, which itself began after
+  S01b, S01x and S01c (S01d). Neither figure is a promotion-to-effect latency.
 
 ## experiments/platform-downtime - key facts (validated 2026-08-04)
 
