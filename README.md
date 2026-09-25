@@ -12,6 +12,13 @@ facts):
 - `tenant-promotion` - the same road backwards: one tenant moved OUT of a shared
   project into its own, whether a client follows without re-authenticating, and
   what it takes to retire the identity left behind.
+- `session-carry` - existing sessions across a move between two projects:
+  whether one signing key can serve both (the same material can, under a
+  different kid, but a kid is unique across projects, so the target still
+  refuses source tokens), what the held access and refresh tokens do at the
+  target, and the auth table (`auth.mfa_amr_claims`) that a copy of users,
+  identities, sessions, refresh_tokens and mfa_factors misses for aal2
+  sessions.
 - `key-rotation` - what happens to a trusting project when the issuer rotates
   its signing key. Ported mechanism; the findings it reproduces are already
   measured, the port itself has not been run live.
