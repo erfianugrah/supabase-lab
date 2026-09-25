@@ -1,0 +1,122 @@
+{
+  "startedAt": "2026-09-25T02:56:35.467Z",
+  "finishedAt": "2026-09-25T03:04:16.480Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "session-carry",
+  "labCommit": "61f2dc2",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "OpenSSL 3.6.4 25 Aug 2026 (Library: OpenSSL 3.6.4 25 Aug 2026)"
+  },
+  "results": [
+    {
+      "id": "S01-",
+      "title": "Revoked the oldest previously_used key to stay under the 3-key cap",
+      "status": "info",
+      "detail": "source=3da31688 target=c0e41060",
+      "durationMs": 461030
+    },
+    {
+      "id": "S01a",
+      "title": "Imported key and promoted to in_use on the source",
+      "status": "pass",
+      "detail": "import HTTP 201, kid preserved=true, promote HTTP 200",
+      "measurements": {
+        "import_status": 201,
+        "promote_status": 200
+      },
+      "durationMs": 461030
+    },
+    {
+      "id": "S01b",
+      "title": "Platform refuses the same kid on a second project",
+      "status": "pass",
+      "detail": "HTTP 409",
+      "measurements": {
+        "status": 409
+      },
+      "evidence": "{\"message\":\"Signing key with kid \\\"1da48649-e326-4c65-b67c-a06ae9cd4969\\\" already exists\"}",
+      "durationMs": 461030
+    },
+    {
+      "id": "S01x",
+      "title": "Same kid refused on a project in a different organization",
+      "status": "pass",
+      "detail": "HTTP 409 (different key material, same kid)",
+      "measurements": {
+        "status": 409
+      },
+      "evidence": "{\"message\":\"Signing key with kid \\\"1da48649-e326-4c65-b67c-a06ae9cd4969\\\" already exists\"}",
+      "durationMs": 461030
+    },
+    {
+      "id": "S01c",
+      "title": "Same private material under a fresh kid is accepted on the target",
+      "status": "pass",
+      "detail": "import HTTP 201, promote HTTP 200",
+      "measurements": {
+        "import_status": 201,
+        "promote_status": 200
+      },
+      "durationMs": 461030
+    },
+    {
+      "id": "S01d",
+      "title": "Source issues tokens signed with the imported kid",
+      "status": "pass",
+      "detail": "after 5190ms of polling (5s step)",
+      "measurements": {
+        "ms": 5190
+      },
+      "durationMs": 461030
+    },
+    {
+      "id": "S01e",
+      "title": "Target JWKS publishes its kid for the shared material",
+      "status": "pass",
+      "detail": "after 450882ms (10s step)",
+      "measurements": {
+        "ms": 450882
+      },
+      "durationMs": 461030
+    },
+    {
+      "id": "S01f",
+      "title": "Target PostgREST refuses the source token (same material, different kid)",
+      "status": "pass",
+      "detail": "HTTP 401 code=PGRST301",
+      "measurements": {
+        "status": 401,
+        "code": "PGRST301"
+      },
+      "evidence": "{\"code\":\"PGRST301\",\"details\":\"No suitable key was found to decode the JWT\",\"hint\":null,\"message\":\"No suitable key or wrong key type\"}",
+      "durationMs": 461030
+    },
+    {
+      "id": "S01g",
+      "title": "Target Auth /user refuses the source token (same material, different kid)",
+      "status": "pass",
+      "detail": "HTTP 403 bad_jwt invalid JWT: unable to parse or verify signature, token is unverifiable: error while executing keyfunc: unrecognized JWT kid 1da48649-e326-4c65-b67c-a06ae9cd4969 for algorithm ES256",
+      "measurements": {
+        "status": 403,
+        "error_code": "bad_jwt"
+      },
+      "durationMs": 461030
+    },
+    {
+      "id": "S01h",
+      "title": "Target refuses the source refresh token (no rows copied)",
+      "status": "pass",
+      "detail": "HTTP 400 refresh_token_not_found Invalid Refresh Token: Refresh Token Not Found",
+      "measurements": {
+        "status": 400,
+        "error_code": "refresh_token_not_found"
+      },
+      "durationMs": 461030
+    }
+  ]
+}
