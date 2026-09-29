@@ -1544,7 +1544,7 @@ every run, printing uncovered operations by name.
   to the api-keys CREATE response and does not extend to every read.
 
 
-## experiments/github-branching - key facts (validated 2026-09-23, micro x2, Pro org)
+## experiments/github-branching - key facts (validated 2026-09-23 and 2026-09-29, micro x2, Pro org)
 
 Two projects connected to ONE repository, workdirs `apps/a` and `apps/b`,
 Automatic branching on. The GitHub connection is dashboard-only (no provider
@@ -1602,6 +1602,25 @@ reads it back, including `supabase_changes_only`. Details: RUNLOG.md.
   both `clone,deploy,health,migrate,pull,seed` EXITED and `configure` PAUSED,
   and 3 check-runs per project on the merge commit; changes-only on did not
   stop B's run. The migration landed on A only.
+- **Preview-branch secrets (GB07, 2026-09-29, project A, one run per shape).**
+  `GET /v1/projects/{ref}/secrets` lists `value` as the SHA-256 of the value
+  set (2 of 2 checked: the parent control and the dotenvx preview). An Edge
+  Function secret set on the parent, not referenced in `config.toml`, was
+  absent from the three previews that returned readings (secrets list and
+  function env); the wrongkey preview listed nothing at all. A
+  dotenvx `.env.preview` under `apps/a/supabase/`, mapped through
+  `[edge_runtime.secrets]` + `env()`, with `DOTENV_PRIVATE_KEY_PREVIEW` set on
+  the parent only, reached the preview's function with the set value; the key
+  itself was absent from the dotenvx preview, so decryption used the parent's copy
+  (inferred: no shape ran without the key on the parent). A `.env.preview`
+  built the same way but encrypted to a key the parent does not hold:
+  `clone:DEAD`, nothing deployed, bot comment (read by hand, not in the
+  artifact) `failed to decrypt secret: ... message authentication failed`,
+  and branch `status` `MIGRATIONS_FAILED` although no migration ran. An
+  `env(NAME)` with no value anywhere: every step `EXITED`,
+  `FUNCTIONS_DEPLOYED`, the secret absent. The parser error in the bot
+  comment (read by hand) gives the secret name lowercased
+  (`pvlab_gb07_wrongkey`).
 - Harness notes: `gh api` writes under `.github/workflows/` need the OAuth
   `workflow` scope, so GB02's workflow goes in over SSH (`make push-ci`).
   The connection form defaults Branch limit to 3; raise it before a matrix
