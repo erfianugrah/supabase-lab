@@ -47,9 +47,10 @@ one migration and one seed file each.
 | GB04 | changes-only on: one pull request each for `seed.sql`, `config.toml`, a new function and a non-CLI file under `apps/a/supabase/`; which project previews, and what the integration's pull request comments say |
 | GB05 | changes-only on: a migration pushed to a pull request that opened without Supabase changes, then close and reopen; a `seed.sql` change pushed to an existing preview |
 | GB06 | merging a pull request that changes only app A, with both default branch rows on `git_branch` `main` (Deploy to production on): production action runs on each parent |
+| GB07 | where a preview's secrets come from: four pull requests under `apps/a/supabase/` (a secret set on parent A only; a dotenvx `.env.preview` with the key on A as `DOTENV_PRIVATE_KEY_PREVIEW`; the same encrypted to a key A does not hold; an `env()` reference with no value anywhere), each deploying a probe function; per name, what the preview's `GET /secrets` lists and what the function sees at runtime, compared by SHA-256 so no value is recorded |
 
-GB01-GB06 are DESTRUCTIVE (git branches, pull requests, billed preview
-branches). GB01 runs once per "Supabase changes only" setting; GB00's reading
+GB01-GB07 are DESTRUCTIVE (git branches, pull requests, billed preview
+branches; GB07 also sets two secrets on parent A and deletes them after). GB01 runs once per "Supabase changes only" setting; GB00's reading
 of the toggle is the label on each run.
 
 ## Run
@@ -65,6 +66,7 @@ make push-ci REPO=owner/name          # GB02's workflow onto main, over SSH
 make probe REPO=owner/name ONLY=GB02
 make probe REPO=owner/name ONLY=GB03
 make probe REPO=owner/name ONLY=GB04,GB05,GB06   # changes only ON
+make probe REPO=owner/name ONLY=GB07             # either toggle; needs bunx (dotenvx)
 make destroy
 ```
 
