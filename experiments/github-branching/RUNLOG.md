@@ -243,6 +243,49 @@ source), so the toggle was on for both.
   merge was tried. Whether B's `deploy` step redeployed
   anything was not measured; B had no functions.
 
+## Third session - 03:39 to 03:44 UTC 2026-09-29 - GB07, preview-branch secrets
+
+Two new Micro projects on the Pro org (`make apply`), a new private probe
+repository, A connected on `apps/a` and B on `apps/b`, "Supabase changes
+only" on for both. GB07 ran from lab commit `e77720e`.
+
+### Run 6 - GB07, where a preview's secrets come from
+
+`out/2026-09-29/run-2026-09-29T03-39-22-005Z.*`
+
+Control: `GET /v1/projects/{parent}/secrets` lists a secret's `value` as the
+SHA-256 of the value set, not the value (`control_parent_listed_as: sha256`).
+Every "list" reading below is on that basis.
+
+| PR (all under `apps/a/supabase/`) | branch status | action run | probe fn | reading |
+|---|---|---|---|---|
+| inherit: `PVLAB_GB07_PARENT` set on parent A only | `FUNCTIONS_DEPLOYED` at 85 s | all steps `EXITED` | 200 | absent from the preview's list and from the function's env |
+| dotenvx: `.env.preview` encrypted, private key on parent A as `DOTENV_PRIVATE_KEY_PREVIEW`, `env()` in `[edge_runtime.secrets]` | `FUNCTIONS_DEPLOYED` at 85 s | all `EXITED` | 200 | listed as the SHA-256 of the set value; the function saw the set value |
+| wrongkey: the same, encrypted to a key A does not hold | `MIGRATIONS_FAILED` at 85 s | `clone:DEAD`, every other step `CREATED` | 404 | nothing deployed |
+| unset: `env(PVLAB_GB07_UNSET)` with no value anywhere | `FUNCTIONS_DEPLOYED` at 106 s | all `EXITED` | 200 | absent from the list and from the function's env |
+
+- The docs' "secrets are branch-specific" holds: a secret on the parent did
+  not reach the preview, in the list or at runtime. `DOTENV_PRIVATE_KEY_PREVIEW`
+  did not reach any preview either.
+- dotenvx works as documented. The preview never held the private key, so
+  the executor decrypted with the parent's copy. The run has no shape with the
+  key absent from the parent, so this is inferred from the wrongkey result
+  plus the key's absence on the preview, not measured on its own.
+- A key mismatch fails loudly. The integration's PR comment carried
+  `failed to parse config: ... 'edge_runtime.secrets[pvlab_gb07_wrongkey]'
+  failed to decrypt secret: cannot decrypt ciphertext: cipher: message
+  authentication failed`. The branch `status` read `MIGRATIONS_FAILED`,
+  though no migration ran: the step that died was `clone`. A CI wait on
+  `status` sees a failure but not which one.
+- An `env()` reference with no value fails silently. The run is green, the
+  function deploys, and the secret is simply not there. This is the shape
+  that ships a preview with a missing credential.
+- The secret name as the parser reports it is lowercased
+  (`pvlab_gb07_wrongkey`); the function saw the uppercase name set in
+  `config.toml`.
+- One run per shape; the dotenvx and wrongkey PRs each changed `.env.preview`
+  together with `config.toml` and a function.
+
 ## Not settled
 
 - A single connected project on its own: whether its own `skipped` run is ever
@@ -255,6 +298,10 @@ source), so the toggle was on for both.
 - A push that changes an existing migration file; a `config.toml` change that
   alters a value rather than a comment.
 - Branch `notify_url` as a per-branch push signal (not run).
+- GB07: the dotenvx shape with no key on the parent at all; the docs'
+  `encrypted:` literal in `config.toml`; `[remotes.<name>]` on persistent
+  branches; `[db.vault]` secrets; whether a `secrets set` on the parent
+  reaches an already-open preview.
 
 ## Teardown
 
@@ -263,3 +310,8 @@ source), so the toggle was on for both.
 operator the same day (the GitHub API answered 404 for it afterwards); the
 second session's was deleted by the operator the same day too (404
 afterwards).
+
+`make destroy` 2026-09-29 after the third session: 2 resources destroyed.
+GB07's cleanup had already closed its four PRs, deleted the previews and
+removed both parent secrets (checked by API before the destroy). The probe
+repository was deleted by the operator the same day (404 afterwards).

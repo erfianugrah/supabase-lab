@@ -1,0 +1,57 @@
+{
+  "startedAt": "2026-09-29T03:39:22.005Z",
+  "finishedAt": "2026-09-29T03:45:25.954Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "github-branching",
+  "labCommit": "e77720e",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "OpenSSL 3.6.4 25 Aug 2026 (Library: OpenSSL 3.6.4 25 Aug 2026)"
+  },
+  "results": [
+    {
+      "id": "GB07",
+      "title": "preview-branch secrets: parent carry-over, dotenvx, wrong key, unset env()",
+      "status": "info",
+      "detail": "control: parent lists its secret as sha256. inherit: FUNCTIONS_DEPLOYED, fn 200; dotenvx: FUNCTIONS_DEPLOYED, fn 200; wrongkey: MIGRATIONS_FAILED, fn 404; unset: FUNCTIONS_DEPLOYED, fn 200. Per-name readings in measurements.",
+      "measurements": {
+        "toggle_changes_only": "true",
+        "window_s": 720,
+        "control_parent_listed_as": "sha256",
+        "inherit_status": "FUNCTIONS_DEPLOYED",
+        "inherit_steps": "clone:EXITED,configure:EXITED,deploy:EXITED,health:EXITED,migrate:EXITED,pull:EXITED,seed:EXITED",
+        "inherit_ready_s": 85,
+        "inherit_fn_http": 200,
+        "inherit_parent": "list:absent runtime:absent",
+        "inherit_dotenv_key": "list:absent runtime:absent",
+        "dotenvx_status": "FUNCTIONS_DEPLOYED",
+        "dotenvx_steps": "clone:EXITED,configure:EXITED,deploy:EXITED,health:EXITED,migrate:EXITED,pull:EXITED,seed:EXITED",
+        "dotenvx_ready_s": 85,
+        "dotenvx_fn_http": 200,
+        "dotenvx_parent": "list:absent runtime:absent",
+        "dotenvx_dotenv_key": "list:absent runtime:absent",
+        "dotenvx_value": "list:sha256 runtime:value=set",
+        "wrongkey_status": "MIGRATIONS_FAILED",
+        "wrongkey_steps": "clone:DEAD,configure:CREATED,deploy:CREATED,health:CREATED,migrate:CREATED,pull:CREATED,seed:CREATED",
+        "wrongkey_ready_s": 85,
+        "wrongkey_fn_http": 404,
+        "wrongkey_parent": "list:absent runtime:no-reading",
+        "wrongkey_dotenv_key": "list:absent runtime:no-reading",
+        "wrongkey_value": "list:absent runtime:no-reading",
+        "unset_status": "FUNCTIONS_DEPLOYED",
+        "unset_steps": "clone:EXITED,configure:EXITED,deploy:EXITED,health:EXITED,migrate:EXITED,pull:EXITED,seed:EXITED",
+        "unset_ready_s": 106,
+        "unset_fn_http": 200,
+        "unset_parent": "list:absent runtime:absent",
+        "unset_dotenv_key": "list:absent runtime:absent",
+        "unset_value": "list:absent runtime:absent"
+      },
+      "evidence": "{\n  \"inherit\": {\n    \"pr\": 1,\n    \"status_sequence\": [\n      \"40s=CREATING_PROJECT\",\n      \"62s=RUNNING_MIGRATIONS\",\n      \"85s=FUNCTIONS_DEPLOYED\"\n    ],\n    \"steps\": \"clone:EXITED,configure:EXITED,deploy:EXITED,health:EXITED,migrate:EXITED,pull:EXITED,seed:EXITED\",\n    \"fn_http\": 200,\n    \"listed_names\": [\n      \"SUPABASE_ANON_KEY\",\n      \"SUPABASE_DB_URL\",\n      \"SUPABASE_JWKS\",\n      \"SUPABASE_PUBLISHABLE_KEYS\",\n      \"SUPABASE_SECRET_KEYS\",\n      \"SUPABASE_SERVICE_ROLE_KEY\",\n      \"SUPABASE_URL\"\n    ],\n    \"per_name\": {\n      \"PVLAB_GB07_PARENT\": \"list:absent runtime:absent\",\n      \"PVLAB_GB07_DOTENV\": \"list:absent runtime:absent\",\n      \"PVLAB_GB07_WRONGKEY\": \"list:absent runtime:absent\",\n      \"PVLAB_GB07_UNSET\": \"list:absent runtime:absent\",\n      \"DOTENV_PRIVATE_KEY_PREVIEW\": \"list:absent runtime:absent\"\n    }\n  },\n  \"dotenvx\": {\n    \"pr\": 2,\n    \"status_sequence\": [\n      \"40s=CREATING_PROJECT\",\n      \"62s=RUNNING_MIGRATIONS\",\n      \"85s=FUNCTIONS_DEPLOYED\"\n    ],\n    \"steps\": \"clone:EXITED,configure:EXITED,deploy:EXITED,health:EXITED,migrate:EXITED,pull:EXITED,seed:EXITED\",\n    \"fn_http\": 200,\n    \"listed_names\": [\n      \"PVLAB_GB07_DOTENV\",\n      \"SUPABASE_ANON_KEY\",\n      \"SUPABASE_DB_URL\",\n      \"SUPABASE_JWKS\",\n      \"SUPABASE_PUBLISHABLE_KEYS\",\n      \"SUPABASE_SECRET_KEYS\",\n      \"SUPABASE_SERVICE_ROLE_KEY\",\n      \"SUPABASE_URL\"\n    ],\n    \"per_name\": {\n      \"PVLAB_GB07_PARENT\": \"list:absent runtime:absent\",\n      \"PVLAB_GB07_DOTENV\": \"list:sha256 runtime:value=set\",\n      \"PVLAB_GB07_WRONGKEY\": \"list:absent runtime:absent\",\n      \"PVLAB_GB07_UNSET\": \"list:absent runtime:absent\",\n      \"DOTENV_PRIVATE_KEY_PREVIEW\": \"list:absent runtime:absent\"\n    }\n  },\n  \"wrongkey\": {\n    \"pr\": 3,\n    \"status_sequence\": [\n      \"40s=CREATING_PROJECT\",\n      \"85s=MIGRATIONS_FAILED\"\n    ],\n    \"steps\": \"clone:DEAD,configure:CREATED,deploy:CREATED,health:CREATED,migrate:CREATED,pull:CREATED,seed:CREATED\",\n    \"fn_http\": 404,\n    \"listed_names\": [],\n    \"per_name\": {\n      \"PVLAB_GB07_PARENT\": \"list:absent runtime:no-reading\",\n      \"PVLAB_GB07_DOTENV\": \"list:absent runtime:no-reading\",\n      \"PVLAB_GB07_WRONGKEY\": \"list:absent runtime:no-reading\",\n      \"PVLAB_GB07_UNSET\": \"list:absent runtime:no-reading\",\n      \"DOTENV_PRIVATE_KEY_PREVIEW\": \"list:absent runtime:no-reading\"\n    }\n  },\n  \"unset\": {\n    \"pr\": 4,\n    \"status_sequence\": [\n      \"40s=CREATING_PROJECT\",\n      \"85s=RUNNING_MIGRATIONS\",\n      \"106s=FUNCTIONS_DEPLOYED\"\n    ],\n    \"steps\": \"clone:EXITED,configure:EXITED,deploy:EXITED,health:EXITED,migrate:EXITED,pull:EXITED,seed:EXITED\",\n    \"fn_http\": 200,\n    \"listed_names\": [\n      \"SUPABASE_ANON_KEY\",\n      \"SUPABASE_DB_URL\",\n      \"SUPABASE_JWKS\",\n      \"SUPABASE_PUBLISHABLE_KEYS\",\n      \"SUPABASE_SECRET_KEYS\",\n      \"SUPABASE_SERVICE_ROLE_KEY\",\n      \"SUPABASE_URL\"\n    ],\n    \"per_name\": {\n      \"PVLAB_GB07_PARENT\": \"list:absent runtime:absent\",\n      \"PVLAB_GB07_DOTENV\": \"list:absent runtime:absent\",\n      \"PVLAB_GB07_WRONGKEY\": \"list:absent runtime:absent\",\n      \"PVLAB_GB07_UNSET\": \"list:absent runtime:absent\",\n      \"DOTENV_PRIVATE_KEY_PREVIEW\": \"list:absent runtime:absent\"\n    }\n  }\n}",
+      "durationMs": 363964
+    }
+  ]
+}
