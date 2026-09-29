@@ -173,7 +173,15 @@ facts):
   function, a non-CLI file) triggered; a migration pushed to a pull request
   that opened without Supabase changes needed a close and reopen to preview;
   a pushed `seed.sql` change did not re-seed; and merging an A-only pull
-  request still started a production action run on B.
+  request still started a production action run on B. Measured 2026-09-29
+  (GB07, project A): an Edge Function secret set on the parent, not referenced
+  in `config.toml`, reached none of the three previews that returned a
+  reading; a dotenvx-encrypted `.env.preview`, with its private key set on the
+  parent, reached the preview's function; a `.env.preview` built the same way
+  but encrypted to a key the parent does not hold failed the run at `clone`
+  while the branch `status` read `MIGRATIONS_FAILED`; and an `env()` reference
+  with no value anywhere deployed with every step `EXITED` and the secret
+  absent.
 
 - `wrappers-delete-scope` - what one dashboard Wrappers Delete or Edit removes,
   replaying the SQL Studio's own pg-meta generates (pinned commit). Measured
