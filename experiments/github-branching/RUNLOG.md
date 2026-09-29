@@ -243,13 +243,13 @@ source), so the toggle was on for both.
   merge was tried. Whether B's `deploy` step redeployed
   anything was not measured; B had no functions.
 
-## Third session - 03:39 to 03:44 UTC 2026-09-29 - GB07, preview-branch secrets
+## Third session - 03:39 to 03:45 UTC 2026-09-29 - GB07, preview-branch secrets
 
 Two new Micro projects on the Pro org (`make apply`), a new private probe
 repository, A connected on `apps/a` and B on `apps/b`, "Supabase changes
 only" on for both. GB07 ran from lab commit `e77720e`.
 
-### Run 6 - GB07, where a preview's secrets come from
+### Run 8 - GB07, where a preview's secrets come from
 
 `out/2026-09-29/run-2026-09-29T03-39-22-005Z.*`
 
@@ -264,25 +264,34 @@ Every "list" reading below is on that basis.
 | wrongkey: the same, encrypted to a key A does not hold | `MIGRATIONS_FAILED` at 85 s | `clone:DEAD`, every other step `CREATED` | 404 | nothing deployed |
 | unset: `env(PVLAB_GB07_UNSET)` with no value anywhere | `FUNCTIONS_DEPLOYED` at 106 s | all `EXITED` | 200 | absent from the list and from the function's env |
 
-- The docs' "secrets are branch-specific" holds: a secret on the parent did
-  not reach the preview, in the list or at runtime. `DOTENV_PRIVATE_KEY_PREVIEW`
-  did not reach any preview either.
+Times are seconds after GB07 began opening the four PRs, at 20 s poll
+resolution. The inherit PR's `config.toml` did not reference
+`PVLAB_GB07_PARENT`; the wrongkey file held a different name and value,
+encrypted to a second keypair whose private key was discarded.
+
+- The docs' "secrets are branch-specific" holds for a parent secret that
+  `config.toml` does not reference: it was absent from the inherit preview's
+  secrets list and from its function's env. `DOTENV_PRIVATE_KEY_PREVIEW` was
+  absent from the three previews that returned readings (inherit, dotenvx,
+  unset); the wrongkey preview listed nothing at all and deployed no function.
 - dotenvx works as documented. The preview never held the private key, so
   the executor decrypted with the parent's copy. The run has no shape with the
   key absent from the parent, so this is inferred from the wrongkey result
   plus the key's absence on the preview, not measured on its own.
-- A key mismatch fails loudly. The integration's PR comment carried
+- A key mismatch stops the run. The integration's PR comment (read by hand
+  after the run; not in the artifact) carried
   `failed to parse config: ... 'edge_runtime.secrets[pvlab_gb07_wrongkey]'
   failed to decrypt secret: cannot decrypt ciphertext: cipher: message
   authentication failed`. The branch `status` read `MIGRATIONS_FAILED`,
   though no migration ran: the step that died was `clone`. A CI wait on
   `status` sees a failure but not which one.
-- An `env()` reference with no value fails silently. The run is green, the
-  function deploys, and the secret is simply not there. This is the shape
-  that ships a preview with a missing credential.
-- The secret name as the parser reports it is lowercased
-  (`pvlab_gb07_wrongkey`); the function saw the uppercase name set in
-  `config.toml`.
+- An `env()` reference with no value reports nothing. The action run has
+  every step `EXITED`, the function deploys, and the secret is not there.
+  The unset PR's check-runs and bot comment were not read.
+- The secret name in the parser's error is lowercased
+  (`pvlab_gb07_wrongkey`, wrongkey PR comment); in the dotenvx shape the
+  function read the name as set in `config.toml`, uppercase
+  (`PVLAB_GB07_DOTENV`).
 - One run per shape; the dotenvx and wrongkey PRs each changed `.env.preview`
   together with `config.toml` and a function.
 
