@@ -1,0 +1,12 @@
+server: https://vikunja.erfi.io
+project_id: 33
+view_id: 132
+buckets:
+    todo: 97
+    in_progress: 98
+    in_review: 123
+    done: 99
+    scrapped: 124
+bot:
+    username: bot-supabase-lab
+    user_id: 6

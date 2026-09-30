@@ -1,0 +1,10 @@
+{
+  "name": "ms-prisma-probe",
+  "private": true,
+  "type": "module",
+  "description": "Prisma 6.19 (a current 6.x) against each pooled path. Installed at run time by MS10; node_modules is gitignored.",
+  "dependencies": {
+    "@prisma/client": "6.19.3",
+    "prisma": "6.19.3"
+  }
+}

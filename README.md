@@ -55,7 +55,11 @@ facts):
   cache matrix (including a cached-private-object policy-bypass finding),
   realtime.messages partitioning, and the log-drain API surface.
 - `pooler-semantics` - Supavisor session-vs-transaction mode behaviour,
-  error codes, and capacity signatures.
+  error codes, and capacity signatures. No OpenTofu state of its own: S01/S02
+  run against `medium-serverless`'s project through that Makefile
+  (`EXPERIMENT=pooler-semantics`). First run 2026-09-30: all nine features
+  pass on every mode with ONE client per mode, which is the probe's shape, not
+  a licence - see medium-serverless MS10 for the same pooler under 20 clients.
 - `pdf-corpus-graph` - PDF corpus ingestion + entity graph experiment.
 - `stripe-sync-schema` - does the Stripe Sync Engine's projected Postgres
   schema stay in sync with the Stripe API surface.
@@ -191,6 +195,21 @@ facts):
   and views built on them (Vault secrets left behind), and an Edit leaves only
   the edited connection. `drop foreign table` + `drop server` without cascade
   removes exactly one, and RESTRICT refuses each over-reach.
+- `medium-serverless` - one Medium project in ap-southeast-2 on a Team org,
+  probed from an IPv4-only vantage as a serverless client would see it: the
+  IPv4 add-on switch (a DNS gap longer than ten minutes from this resolver),
+  a network restriction per Postgres path (Supavisor refuses by name, the
+  direct and dedicated-pooler paths drop to a client timeout), role-level
+  `statement_timeout` and `idle_in_transaction_session_timeout` through both
+  poolers (a dead client's backend is closed by the pooler itself; a hung one
+  needs the role timeout), which client strings reach which log source
+  (object paths and failing SQL literals do, a Realtime topic did not), Prisma
+  6.19 on each pooled path (Supavisor transaction mode needs `pgbouncer=true`
+  or breaks; the dedicated PgBouncer does not, and the flag costs about five
+  times the latency on either), the dedicated pooler's CPU cost under equal
+  load, the client ramp to the published 600 on both poolers, a same-region
+  read replica, and a Medium to Large resize per path. Measured 2026-09-30;
+  see its RUNLOG.
 
 ## Ad-hoc platform probes (no experiment dir)
 

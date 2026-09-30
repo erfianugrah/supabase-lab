@@ -1,0 +1,80 @@
+{
+  "startedAt": "2026-09-30T05:25:15.855Z",
+  "finishedAt": "2026-09-30T05:35:40.808Z",
+  "where": "local",
+  "region": "ap-southeast-2",
+  "ref": "<ref>",
+  "experiment": "pooler-semantics",
+  "labCommit": "6f55c11",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "OpenSSL 3.6.4 25 Aug 2026 (Library: OpenSSL 3.6.4 25 Aug 2026)"
+  },
+  "results": [
+    {
+      "id": "S02a",
+      "title": "direct-5432",
+      "status": "info",
+      "detail": "31.34425 tps median over 3x60s, p95 262.2 ms",
+      "measurements": {
+        "path": "direct-5432",
+        "tps_median": 31.34425,
+        "vs_baseline": "+0.0%",
+        "p50_ms": 254.45,
+        "p95_ms": 262.2,
+        "p99_ms": 263.6,
+        "failed_tx": 0,
+        "clients": 8,
+        "protocol": "extended",
+        "tps_spread_pct": 2.8156679454764495,
+        "sbperf_run_id": 1
+      },
+      "evidence": "server 17.6, pgbench 18.6\nscript select-only, protocol extended, clients 8\nsbperf run id 1 - 'sbperf bench --show 1' for the pg_settings snapshot\n> pgbench 18.6 -> db.<ref>.supabase.co:5432/postgres (as postgres)\n> 8 clients / 8 threads, 3 x 60s + 10s warmup, protocol extended\n> warmup: 10s (unmeasured)\n> run 1/3: 60s (measured, logged)\n> run 2/3: 60s (measured, logged)\n> run 3/3: 60s (measured, logged)",
+      "durationMs": 624976
+    },
+    {
+      "id": "S02b",
+      "title": "dedicated-pooler-6543",
+      "status": "info",
+      "detail": "31.449556 tps median over 3x60s, p95 262.74 ms",
+      "measurements": {
+        "path": "dedicated-pooler-6543",
+        "tps_median": 31.449556,
+        "vs_baseline": "+0.3%",
+        "p50_ms": 253.27,
+        "p95_ms": 262.74,
+        "p99_ms": 265.43,
+        "failed_tx": 0,
+        "clients": 8,
+        "protocol": "extended",
+        "tps_spread_pct": 0.7514573496681441,
+        "sbperf_run_id": 2
+      },
+      "evidence": "server 17.6, pgbench 18.6\nscript select-only, protocol extended, clients 8\nsbperf run id 2 - 'sbperf bench --show 2' for the pg_settings snapshot\n> pgbench 18.6 -> db.<ref>.supabase.co:6543/postgres (as postgres)\n> 8 clients / 8 threads, 3 x 60s + 10s warmup, protocol extended\n> warmup: 10s (unmeasured)\n> run 1/3: 60s (measured, logged)\n> run 2/3: 60s (measured, logged)\n> run 3/3: 60s (measured, logged)",
+      "durationMs": 624976
+    },
+    {
+      "id": "S02c",
+      "title": "shared-pooler-6543",
+      "status": "info",
+      "detail": "31.173369 tps median over 3x60s, p95 263.41 ms",
+      "measurements": {
+        "path": "shared-pooler-6543",
+        "tps_median": 31.173369,
+        "vs_baseline": "-0.5%",
+        "p50_ms": 254.81,
+        "p95_ms": 263.41,
+        "p99_ms": 265.77,
+        "failed_tx": 0,
+        "clients": 8,
+        "protocol": "extended",
+        "tps_spread_pct": 1.0839027376219765,
+        "sbperf_run_id": 3
+      },
+      "evidence": "server 17.6, pgbench 18.6\nscript select-only, protocol extended, clients 8\nsbperf run id 3 - 'sbperf bench --show 3' for the pg_settings snapshot\n> pgbench 18.6 -> <pooler-host>:6543/postgres (as postgres.<ref>)\n> 8 clients / 8 threads, 3 x 60s + 10s warmup, protocol extended\n> warmup: 10s (unmeasured)\n> run 1/3: 60s (measured, logged)\n> run 2/3: 60s (measured, logged)\n> run 3/3: 60s (measured, logged)",
+      "durationMs": 624976
+    }
+  ]
+}
