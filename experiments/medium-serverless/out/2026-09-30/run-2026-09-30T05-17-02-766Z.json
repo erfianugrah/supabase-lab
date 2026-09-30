@@ -1,0 +1,101 @@
+{
+  "startedAt": "2026-09-30T05:17:02.766Z",
+  "finishedAt": "2026-09-30T05:25:14.638Z",
+  "where": "local",
+  "region": "ap-southeast-2",
+  "ref": "<ref>",
+  "experiment": "medium-serverless",
+  "labCommit": "6f55c11",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "OpenSSL 3.6.4 25 Aug 2026 (Library: OpenSSL 3.6.4 25 Aug 2026)"
+  },
+  "results": [
+    {
+      "id": "MS08a",
+      "title": "idle baseline: instance CPU busy % over 30s",
+      "status": "info",
+      "detail": "cpu busy 0% (7 scrapes); 123 pooler-named metric lines exposed",
+      "measurements": {
+        "cpu_busy_pct": 0,
+        "scrapes": 7,
+        "pooler_metric_lines": 123
+      },
+      "durationMs": 210066
+    },
+    {
+      "id": "MS08b",
+      "title": "shared pooler 6543: pgbench -S 16 clients 60s, and the instance's CPU while it ran",
+      "status": "info",
+      "detail": "62.16422 tps, avg latency 257.383 ms, cpu busy 3.5% (idle baseline 0%), MemAvailable delta 6 MiB",
+      "measurements": {
+        "path": "shared pooler 6543",
+        "tps": 62.16422,
+        "latency_avg_ms": 257.383,
+        "cpu_busy_pct": 3.5,
+        "cpu_over_idle_pct": 3.5,
+        "mem_avail_delta_mib": 6,
+        "clients": 16,
+        "time_s": 60,
+        "scrapes": 13
+      },
+      "evidence": "",
+      "durationMs": 210066
+    },
+    {
+      "id": "MS08c",
+      "title": "dedicated pooler 6543: pgbench -S 16 clients 60s, and the instance's CPU while it ran",
+      "status": "info",
+      "detail": "62.866998 tps, avg latency 254.506 ms, cpu busy 5.8% (idle baseline 0%), MemAvailable delta 19 MiB",
+      "measurements": {
+        "path": "dedicated pooler 6543",
+        "tps": 62.866998,
+        "latency_avg_ms": 254.506,
+        "cpu_busy_pct": 5.8,
+        "cpu_over_idle_pct": 5.8,
+        "mem_avail_delta_mib": 19,
+        "clients": 16,
+        "time_s": 60,
+        "scrapes": 13
+      },
+      "evidence": "",
+      "durationMs": 210066
+    },
+    {
+      "id": "MS09a",
+      "title": "dedicated_6543: client ramp to 700 in steps of 50 (published cap unknown)",
+      "status": "info",
+      "detail": "first refusal at client #551: no more connections allowed (max_client_conn)",
+      "measurements": {
+        "path": "dedicated_6543",
+        "published_cap": "unknown",
+        "held_max": 599,
+        "first_refusal_at": 551,
+        "first_refusal_text": "no more connections allowed (max_client_conn)",
+        "first_timeout_at": "none",
+        "notices": 0
+      },
+      "evidence": "50 held after step to 50: connect p50 5883ms p95 9803ms, 0 failed, notices so far 0\n100 held after step to 100: connect p50 5775ms p95 9716ms, 0 failed, notices so far 0\n150 held after step to 150: connect p50 5764ms p95 9751ms, 0 failed, notices so far 0\n200 held after step to 200: connect p50 5787ms p95 9719ms, 0 failed, notices so far 0\n250 held after step to 250: connect p50 5792ms p95 9738ms, 0 failed, notices so far 0\n300 held after step to 300: connect p50 5859ms p95 9748ms, 0 failed, notices so far 0\n350 held after step to 350: connect p50 5803ms p95 9733ms, 0 failed, notices so far 0\n400 held after step to 400: connect p50 5766ms p95 9728ms, 0 failed, notices so far 0\n450 held after step to 450: connect p50 5763ms p95 9714ms, 0 failed, notices so far 0\n500 held after step to 500: connect p50 5771ms p95 9713ms, 0 failed, notices so far 0\n550 held after step to 550: connect p50 5778ms p95 9716ms, 0 failed, notices so far 0\n599 held after step to 600: connect p50 5761ms p95 9714ms, 1 failed, notices so far 0\n599 held after step to 650: connect p50 n/ams p95 n/ams, 50 failed, notices so far 0\nmodes: no more connections allowed (max_client_conn)",
+      "durationMs": 281823
+    },
+    {
+      "id": "MS09b",
+      "title": "shared_6543: client ramp to 700 in steps of 50 (published cap unknown)",
+      "status": "info",
+      "detail": "first refusal at client #601: (EMAXCONN) max client connections reached, limit: 600",
+      "measurements": {
+        "path": "shared_6543",
+        "published_cap": "unknown",
+        "held_max": 600,
+        "first_refusal_at": 601,
+        "first_refusal_text": "(EMAXCONN) max client connections reached, limit: 600",
+        "first_timeout_at": "none",
+        "notices": 0
+      },
+      "evidence": "50 held after step to 50: connect p50 6011ms p95 8052ms, 0 failed, notices so far 0\n100 held after step to 100: connect p50 5701ms p95 7778ms, 0 failed, notices so far 0\n150 held after step to 150: connect p50 5702ms p95 7776ms, 0 failed, notices so far 0\n200 held after step to 200: connect p50 5707ms p95 7778ms, 0 failed, notices so far 0\n250 held after step to 250: connect p50 5757ms p95 7777ms, 0 failed, notices so far 0\n300 held after step to 300: connect p50 5767ms p95 7961ms, 0 failed, notices so far 0\n350 held after step to 350: connect p50 5920ms p95 8114ms, 0 failed, notices so far 0\n400 held after step to 400: connect p50 5701ms p95 7773ms, 0 failed, notices so far 0\n450 held after step to 450: connect p50 5753ms p95 7776ms, 0 failed, notices so far 0\n500 held after step to 500: connect p50 5704ms p95 7777ms, 0 failed, notices so far 0\n550 held after step to 550: connect p50 5752ms p95 7771ms, 0 failed, notices so far 0\n600 held after step to 600: connect p50 5701ms p95 7774ms, 0 failed, notices so far 0\n600 held after step to 650: connect p50 n/ams p95 n/ams, 50 failed, notices so far 0\nmodes: (EMAXCONN) max client connections reached, limit: 600",
+      "durationMs": 281823
+    }
+  ]
+}

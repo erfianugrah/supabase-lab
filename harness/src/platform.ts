@@ -17,13 +17,17 @@
  *                 an `error` field on every failure, so the status code says
  *                 nothing. 10 requests per window. Edge Function console
  *                 output is `source = 'function_logs'`.
- *  - `logsAllQuery()` the same query against `/analytics/endpoints/logs.all`.
- *                 The stream endpoint above answered `Backend error! Retry
- *                 your query.` to every edge_logs `cross join unnest` query on
- *                 2026-09-03 (S18) and 2026-09-07 (W27) while `logs.all`
- *                 answered the identical SQL; both modules had their own copy
- *                 of this before it moved here. Use it for anything that
- *                 flattens `metadata`.
+ *  - `logsAllQuery()` DEAD since 2026-09-23: `/analytics/endpoints/logs.all`
+ *                 answers 410 "The logs.all endpoint has been removed"
+ *                 (measured medium-serverless MS05, 2026-09-30; changelog
+ *                 48235). Kept so S18/W27 still compile; new modules use
+ *                 `logsQuery()` against the unified `logs` table: ClickHouse
+ *                 dialect, `where source_name = 'edge_logs'` instead of a
+ *                 per-source table, nested fields via
+ *                 `log_attributes['request.method']` instead of `cross join
+ *                 unnest(metadata)`. The 2026-09-03/07 note that `logs.all`
+ *                 answered unnest queries the stream endpoint refused is
+ *                 history, not guidance.
  *  - `functionPresent()` a deploy is not done on its status or exit code; this
  *                 is the read that says whether the function exists, with a
  *                 retry through the 429 a burst of deploys provokes.

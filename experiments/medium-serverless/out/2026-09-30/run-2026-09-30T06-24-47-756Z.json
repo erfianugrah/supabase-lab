@@ -1,0 +1,46 @@
+{
+  "startedAt": "2026-09-30T06:24:47.756Z",
+  "finishedAt": "2026-09-30T06:29:56.977Z",
+  "where": "local",
+  "region": "ap-southeast-2",
+  "ref": "<ref>",
+  "experiment": "medium-serverless",
+  "labCommit": "6f55c11",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "OpenSSL 3.6.4 25 Aug 2026 (Library: OpenSSL 3.6.4 25 Aug 2026)"
+  },
+  "results": [
+    {
+      "id": "MS15a",
+      "title": "create a persistent branch without git; time to ACTIVE_HEALTHY; its connection facts",
+      "status": "fail",
+      "detail": "adopted the branch left by the previous run (healthy_s counted from its created_at); healthy after nevers; Postgres ?; db no host:? user ?; compute unread",
+      "measurements": {
+        "create_http": 200,
+        "adopted": "true",
+        "healthy_s": "never",
+        "postgres_version": "",
+        "db_port": "",
+        "db_user_shape": "",
+        "compute": "unread",
+        "status": ""
+      },
+      "evidence": "",
+      "durationMs": 309235
+    },
+    {
+      "id": "MS15e",
+      "title": "branch deleted",
+      "status": "fail",
+      "detail": "DELETE HTTP 422; gone from the list after nevers",
+      "measurements": {
+        "delete_http": 422,
+        "gone_s": "never"
+      },
+      "durationMs": 309235
+    }
+  ]
+}

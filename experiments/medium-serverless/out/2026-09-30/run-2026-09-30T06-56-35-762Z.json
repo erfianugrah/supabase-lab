@@ -1,0 +1,90 @@
+{
+  "startedAt": "2026-09-30T06:56:35.762Z",
+  "finishedAt": "2026-09-30T07:00:46.346Z",
+  "where": "local",
+  "region": "ap-southeast-2",
+  "ref": "<ref>",
+  "experiment": "medium-serverless",
+  "labCommit": "6f55c11",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "OpenSSL 3.6.4 25 Aug 2026 (Library: OpenSSL 3.6.4 25 Aug 2026)"
+  },
+  "results": [
+    {
+      "id": "MS13a",
+      "title": "custom_domain add-on and custom-hostname/initialize",
+      "status": "pass",
+      "detail": "add-on HTTP 200; initialize HTTP 201 status 2_initiated; 0 TLS validation TXT record(s), ownership record txt",
+      "measurements": {
+        "addon": "HTTP 200",
+        "initialize_http": 201,
+        "initialize_status": "2_initiated",
+        "validation_records": 0,
+        "ownership_type": "txt",
+        "elapsed_s": 3
+      },
+      "evidence": "{\"status\":\"2_initiated\",\"custom_hostname\":\"ms13d.lab.erfi.io\",\"data\":{\"success\":true,\"errors\":[],\"messages\":[],\"result\":{\"id\":\"3a656de7-8468-46f3-a856-b1acdecb072b\",\"hostname\":\"ms13d.lab.erfi.io\",\"ssl\":{\"status\":\"initializing\",\"id\":\"e8bacb01-c51d-401d-a859-1b709ecd047c\",\"type\":\"dv\",\"method\":\"txt\",\"settings\":{\"http2\":\"on\",\"tls_1_3\":\"on\",\"min_tls_version\":\"1.2\"},\"wildcard\":false,\"bundle_method\":\"ubiquitous\",\"certificate_authority\":\"google\"},\"ownership_verification\":{\"type\":\"txt\",\"name\":\"_cf-custom-hostname.ms13d.lab.erfi.io\",\"value\":\"97ae4141-6baf-49ff-8984-2dec220f1217\"},\"custom_origin_server\":\"<ref>.supabase.co\",\"status\":\"pending\",\"created_at\":\"2026-09-30T06:56:36.779257Z\",\"custom_metadata\":null,\"ownership_verification_http\":{\"http_url\":\"http://ms13d.lab.erfi.io/.well-known/",
+      "durationMs": 250596
+    },
+    {
+      "id": "MS13b",
+      "title": "DNS written as the platform asks for it, reverify polled to 3_challenge_verified",
+      "status": "pass",
+      "detail": "CNAME exit 0, TXT _cf-custom-hostname.ms13d.lab.erfi.io exit 0, TXT _acme-challenge.ms13d.lab.erfi.io exit 0 at 22s; ACME validation record first returned at 22s; verified after 171s (status 4_origin_setup_completed, ssl active)",
+      "measurements": {
+        "verified_s": 171,
+        "acme_record_returned_s": 22,
+        "status_after_verify": "4_origin_setup_completed",
+        "ssl_status": "active",
+        "dns_records_written": 3
+      },
+      "durationMs": 250596
+    },
+    {
+      "id": "MS13c",
+      "title": "activate polled to 5_services_reconfigured; the custom host answers with TLS",
+      "status": "pass",
+      "detail": "activate HTTP 201; reconfigured after 1s; ms13d.lab.erfi.io (pinned to 1.1.1.1's answer) /auth/v1/health 200 at 71s after reconfigure, /rest/v1/ 401",
+      "measurements": {
+        "activate_http": 201,
+        "active_s": 1,
+        "custom_auth_health": 200,
+        "custom_auth_first_ok_s": 71,
+        "custom_rest_root": 401,
+        "edge_ip_via_1111": "104.18.38.10",
+        "tls": "issuer=C=US, O=Google Trust Services, CN=WE1 subject=CN=ms13d.lab.erfi.io ",
+        "trace": "0s: ip=172.64.149.246 -> 400 | 61s: ip=172.64.149.246 -> 400"
+      },
+      "durationMs": 250596
+    },
+    {
+      "id": "MS13d",
+      "title": "origin-minted Storage signed URL via origin and via custom host; Realtime on custom host; origin still serving",
+      "status": "pass",
+      "detail": "signed URL via origin 200, via custom host 200; realtime handshake on custom host: HTTP 500; origin /auth/v1/health 200",
+      "measurements": {
+        "signed_via_origin": 200,
+        "signed_via_custom": 200,
+        "realtime_custom": "HTTP 500",
+        "origin_auth_health": 200
+      },
+      "durationMs": 250596
+    },
+    {
+      "id": "MS13e",
+      "title": "teardown: custom hostname deleted, DNS removed, add-on removed",
+      "status": "info",
+      "detail": "DELETE custom-hostname HTTP 200; 3 DNS record(s) removed; cd_default DELETE HTTP 200 ",
+      "measurements": {
+        "delete_http": 200,
+        "dns_removed": 3,
+        "addon_remove_http": 200,
+        "teardown_s": 2
+      },
+      "durationMs": 250596
+    }
+  ]
+}

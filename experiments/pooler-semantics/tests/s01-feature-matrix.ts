@@ -71,7 +71,10 @@ const MODES: ModeSpec[] = [
     label: "pooler transaction mode",
     endpointKey: "pooler_txn",
     defaultPort: 6543,
-    user: poolerUser,
+    // The DEDICATED pooler (db.<ref>.supabase.co:6543) takes the bare `postgres`
+    // user, not the Supavisor tenant shape - measured medium-serverless MS01d,
+    // 2026-09-30. Pass PVLAB_ENDPOINT_POOLER_TXN_USER when the endpoint is it.
+    user: (ctx) => ctx.endpoints.pooler_txn_user ?? poolerUser(ctx),
     control: false,
   },
   {

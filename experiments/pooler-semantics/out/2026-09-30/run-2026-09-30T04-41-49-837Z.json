@@ -1,0 +1,112 @@
+{
+  "startedAt": "2026-09-30T04:41:49.837Z",
+  "finishedAt": "2026-09-30T04:42:21.625Z",
+  "where": "local",
+  "region": "ap-southeast-2",
+  "ref": "<ref>",
+  "experiment": "pooler-semantics",
+  "labCommit": "6f55c11",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "OpenSSL 3.6.4 25 Aug 2026 (Library: OpenSSL 3.6.4 25 Aug 2026)"
+  },
+  "results": [
+    {
+      "id": "S01a",
+      "title": "direct 5432 (session, no pooler)",
+      "status": "pass",
+      "detail": "control mode supports all 9 features",
+      "measurements": {
+        "mode": "direct 5432 (session, no pooler)",
+        "host_port": "db.<ref>.supabase.co:5432",
+        "pid_stable": "ok (pid 1478560)",
+        "prepared_first": "ok",
+        "prepared_reuse": "ok (bind/execute with no re-parse)",
+        "advisory_lock": "ok",
+        "listen_notify": "ok",
+        "session_guc": "ok",
+        "cursor_with_hold": "ok",
+        "temp_table": "ok",
+        "explicit_txn": "ok (pinned to pid 1478560)"
+      },
+      "evidence": "pid_stable: ok (pid 1478560)\nprepared_first: ok\nprepared_reuse: ok (bind/execute with no re-parse)\nadvisory_lock: ok\nlisten_notify: ok\nsession_guc: ok\ncursor_with_hold: ok\ntemp_table: ok\nexplicit_txn: ok (pinned to pid 1478560)",
+      "durationMs": 31789
+    },
+    {
+      "id": "S01b",
+      "title": "pooler session mode",
+      "status": "info",
+      "detail": "0/9 unsupported - behaved as a direct session on every feature",
+      "measurements": {
+        "mode": "pooler session mode",
+        "host_port": "<pooler-host>:5432",
+        "pid_stable": "ok (pid 1478562)",
+        "prepared_first": "ok",
+        "prepared_reuse": "ok (bind/execute with no re-parse)",
+        "advisory_lock": "ok",
+        "listen_notify": "ok",
+        "session_guc": "ok",
+        "cursor_with_hold": "ok",
+        "temp_table": "ok",
+        "explicit_txn": "ok (pinned to pid 1478562)"
+      },
+      "evidence": "pid_stable: ok (pid 1478562)\nprepared_first: ok\nprepared_reuse: ok (bind/execute with no re-parse)\nadvisory_lock: ok\nlisten_notify: ok\nsession_guc: ok\ncursor_with_hold: ok\ntemp_table: ok\nexplicit_txn: ok (pinned to pid 1478562)",
+      "durationMs": 31789
+    },
+    {
+      "id": "S01c",
+      "title": "pooler transaction mode",
+      "status": "info",
+      "detail": "0/9 unsupported - behaved as a direct session on every feature",
+      "measurements": {
+        "mode": "pooler transaction mode",
+        "host_port": "db.<ref>.supabase.co:6543",
+        "pid_stable": "ok (pid 1478391)",
+        "prepared_first": "ok",
+        "prepared_reuse": "ok (bind/execute with no re-parse)",
+        "advisory_lock": "ok",
+        "listen_notify": "ok",
+        "session_guc": "ok",
+        "cursor_with_hold": "ok",
+        "temp_table": "ok",
+        "explicit_txn": "ok (pinned to pid 1478391)"
+      },
+      "evidence": "pid_stable: ok (pid 1478391)\nprepared_first: ok\nprepared_reuse: ok (bind/execute with no re-parse)\nadvisory_lock: ok\nlisten_notify: ok\nsession_guc: ok\ncursor_with_hold: ok\ntemp_table: ok\nexplicit_txn: ok (pinned to pid 1478391)",
+      "durationMs": 31789
+    },
+    {
+      "id": "S01d",
+      "title": "public shared pooler, transaction mode",
+      "status": "info",
+      "detail": "0/9 unsupported - behaved as a direct session on every feature",
+      "measurements": {
+        "mode": "public shared pooler, transaction mode",
+        "host_port": "<pooler-host>:6543",
+        "pid_stable": "ok (pid 1478868)",
+        "prepared_first": "ok",
+        "prepared_reuse": "ok (bind/execute with no re-parse)",
+        "advisory_lock": "ok",
+        "listen_notify": "ok",
+        "session_guc": "ok",
+        "cursor_with_hold": "ok",
+        "temp_table": "ok",
+        "explicit_txn": "ok (pinned to pid 1478868)"
+      },
+      "evidence": "pid_stable: ok (pid 1478868)\nprepared_first: ok\nprepared_reuse: ok (bind/execute with no re-parse)\nadvisory_lock: ok\nlisten_notify: ok\nsession_guc: ok\ncursor_with_hold: ok\ntemp_table: ok\nexplicit_txn: ok (pinned to pid 1478868)",
+      "durationMs": 31789
+    },
+    {
+      "id": "S01e",
+      "title": "Prepared statements on the dedicated pooler, re-measured against the recorded result",
+      "status": "pass",
+      "detail": "reproduces T11 / AGENTS.md (prepared statements ok on 6543): prepared_first still works",
+      "measurements": {
+        "prior_result": "ok (T11)",
+        "this_run": "ok"
+      },
+      "durationMs": 31789
+    }
+  ]
+}
