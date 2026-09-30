@@ -217,7 +217,7 @@ const mod: TestModule = {
       }
       // Realtime: a pinned HTTP upgrade attempt; 101 or a 4xx from the Realtime
       // server both prove the custom host reaches it, a connect error does not.
-      const rtProbe = await pinned(`/realtime/v1/websocket?apikey=${anon}&vsn=1.0.0`, ["Connection: Upgrade", "Upgrade: websocket", "Sec-WebSocket-Version: 13", "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ=="]);
+      const rtProbe = await pinned(`/realtime/v1/websocket?apikey=${anon}&vsn=1.0.0`, ["Connection: Upgrade", "Upgrade: websocket", "Sec-WebSocket-Version: 13", `Sec-WebSocket-Key: ${Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString("base64")}`]);
       const rt = rtProbe.status ? `HTTP ${rtProbe.status}` : `error ${rtProbe.err}`;
       const origin = await http(`https://${ctx.apiHost}/auth/v1/health`, { apikey: anon });
       out.push({
