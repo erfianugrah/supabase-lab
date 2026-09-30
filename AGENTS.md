@@ -1768,7 +1768,7 @@ Redacted artifacts: `out/2026-09-30/`. Details: RUNLOG.md.
   either pooler (p50 20384-20553 ms vs 4090-4207 ms; direct 4212 ms) (MS10).
   The single-client S01 matrix passes all 9 features on every mode and cannot
   see this.
-- **Both poolers cap at the published 600 clients on Medium** (MS09):
+- **Both poolers cap at the published 600 clients on Medium, Supavisor refusing the 601st and the dedicated PgBouncer holding 599** (MS09):
   PgBouncer `no more connections allowed (max_client_conn)`, Supavisor
   `(EMAXCONN) max client connections reached, limit: 600`. Connect p50 sat at
   5701-6011 ms from the first 50 clients up - the pool queue, not the cap, is
