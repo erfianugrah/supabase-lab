@@ -1,0 +1,23 @@
+// One table, the shape a multi-tenant app has: rows keyed by a tenant id, read by
+// tenant and by primary key. DATABASE_URL is the pooled runtime path under
+// test; DIRECT_URL is what `prisma db push` uses (session pooler on 5432 here,
+// which is the usual migration path from an IPv4-only CI).
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model MsRecord {
+  id        Int      @id @default(autoincrement())
+  tenantId  String   @map("tenant_id")
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId])
+  @@map("ms_record")
+}

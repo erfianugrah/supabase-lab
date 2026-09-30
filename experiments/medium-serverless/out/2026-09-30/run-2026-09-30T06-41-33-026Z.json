@@ -1,0 +1,87 @@
+{
+  "startedAt": "2026-09-30T06:41:33.026Z",
+  "finishedAt": "2026-09-30T06:52:26.614Z",
+  "where": "local",
+  "region": "ap-southeast-2",
+  "ref": "<ref>",
+  "experiment": "medium-serverless",
+  "labCommit": "6f55c11",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "OpenSSL 3.6.4 25 Aug 2026 (Library: OpenSSL 3.6.4 25 Aug 2026)"
+  },
+  "results": [
+    {
+      "id": "MS13a",
+      "title": "custom_domain add-on and custom-hostname/initialize",
+      "status": "pass",
+      "detail": "add-on HTTP 200; initialize HTTP 201 status 2_initiated; 0 TLS validation TXT record(s), ownership record txt",
+      "measurements": {
+        "addon": "HTTP 200",
+        "initialize_http": 201,
+        "initialize_status": "2_initiated",
+        "validation_records": 0,
+        "ownership_type": "txt",
+        "elapsed_s": 3
+      },
+      "evidence": "{\"status\":\"2_initiated\",\"custom_hostname\":\"ms13c.lab.erfi.io\",\"data\":{\"success\":true,\"errors\":[],\"messages\":[],\"result\":{\"id\":\"82f64d2b-be78-4cd6-839f-6d1244200985\",\"hostname\":\"ms13c.lab.erfi.io\",\"ssl\":{\"status\":\"initializing\",\"id\":\"1b79fbf0-0755-4e79-bee5-35c73adb5827\",\"type\":\"dv\",\"method\":\"txt\",\"settings\":{\"http2\":\"on\",\"tls_1_3\":\"on\",\"min_tls_version\":\"1.2\"},\"wildcard\":false,\"bundle_method\":\"ubiquitous\",\"certificate_authority\":\"google\"},\"ownership_verification\":{\"type\":\"txt\",\"name\":\"_cf-custom-hostname.ms13c.lab.erfi.io\",\"value\":\"5642965b-9c70-490b-a782-6673232e7234\"},\"custom_origin_server\":\"<ref>.supabase.co\",\"status\":\"pending\",\"created_at\":\"2026-09-30T06:41:34.389428Z\",\"custom_metadata\":null,\"ownership_verification_http\":{\"http_url\":\"http://ms13c.lab.erfi.io/.well-known/",
+      "durationMs": 653619
+    },
+    {
+      "id": "MS13b",
+      "title": "DNS written as the platform asks for it, reverify polled to 3_challenge_verified",
+      "status": "pass",
+      "detail": "CNAME exit 0, TXT _cf-custom-hostname.ms13c.lab.erfi.io exit 0, TXT _acme-challenge.ms13c.lab.erfi.io exit 0 at 3s; ACME validation record first returned at 3s; verified after 45s (status 4_origin_setup_completed, ssl active)",
+      "measurements": {
+        "verified_s": 45,
+        "acme_record_returned_s": 3,
+        "status_after_verify": "4_origin_setup_completed",
+        "ssl_status": "active",
+        "dns_records_written": 3
+      },
+      "durationMs": 653619
+    },
+    {
+      "id": "MS13c",
+      "title": "activate polled to 5_services_reconfigured; the custom host answers with TLS",
+      "status": "fail",
+      "detail": "activate HTTP 201; reconfigured after 0s; ms13c.lab.erfi.io /auth/v1/health Unable to connect. Is the computer able to access the url? (first ok 601s after reconfigure), /rest/v1/ 0",
+      "measurements": {
+        "activate_http": 201,
+        "active_s": 0,
+        "custom_auth_health": 0,
+        "custom_rest_root": 0,
+        "tls": ""
+      },
+      "durationMs": 653619
+    },
+    {
+      "id": "MS13d",
+      "title": "origin-minted Storage signed URL via origin and via custom host; Realtime on custom host; origin still serving",
+      "status": "info",
+      "detail": "signed URL via origin 200, via custom host Unable to connect. Is the computer able to access the url?; realtime handshake on custom host: error [object ErrorEvent]; origin /auth/v1/health 200",
+      "measurements": {
+        "signed_via_origin": 200,
+        "signed_via_custom": 0,
+        "realtime_custom": "error [object ErrorEvent]",
+        "origin_auth_health": 200
+      },
+      "durationMs": 653619
+    },
+    {
+      "id": "MS13e",
+      "title": "teardown: custom hostname deleted, DNS removed, add-on removed",
+      "status": "info",
+      "detail": "DELETE custom-hostname HTTP 200; 3 DNS record(s) removed; cd_default DELETE HTTP 200 ",
+      "measurements": {
+        "delete_http": 200,
+        "dns_removed": 3,
+        "addon_remove_http": 200,
+        "teardown_s": 2
+      },
+      "durationMs": 653619
+    }
+  ]
+}

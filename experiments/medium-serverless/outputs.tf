@@ -1,0 +1,12 @@
+output "project_ref" {
+  description = "Named project_ref because the harness Ctx expects that key."
+  value       = supabase_project.probe.id
+}
+
+output "api_host" {
+  value = "${supabase_project.probe.id}.supabase.co"
+}
+
+output "region" {
+  value = var.region
+}

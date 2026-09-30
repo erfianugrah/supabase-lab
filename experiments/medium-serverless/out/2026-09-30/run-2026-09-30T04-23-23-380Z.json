@@ -1,0 +1,92 @@
+{
+  "startedAt": "2026-09-30T04:23:23.380Z",
+  "finishedAt": "2026-09-30T04:23:39.402Z",
+  "where": "local",
+  "region": "ap-southeast-2",
+  "ref": "<ref>",
+  "experiment": "medium-serverless",
+  "labCommit": "6f55c11",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "OpenSSL 3.6.4 25 Aug 2026 (Library: OpenSSL 3.6.4 25 Aug 2026)"
+  },
+  "results": [
+    {
+      "id": "MS01a",
+      "title": "platform facts: version, max_connections, role attributes, logging GUCs",
+      "status": "info",
+      "detail": "Postgres 17.6 on ap-southeast-2, max_connections 120, status ACTIVE_HEALTHY",
+      "measurements": {
+        "server_version": "17.6",
+        "max_connections": "120",
+        "postgres_engine": "17",
+        "release_channel": "ga",
+        "postgres_bypassrls": "true",
+        "service_role_bypassrls": "true",
+        "log_statement": "ddl",
+        "log_min_duration_statement": "-1",
+        "log_min_error_statement": "error",
+        "idle_in_transaction_session_timeout": "0"
+      },
+      "evidence": "PostgreSQL 17.6 on x86_64-pc-linux-gnu, compiled by gcc (GCC) 15.2.0, 64-bit\nroles: [{\"rolname\":\"anon\",\"rolsuper\":false,\"rolbypassrls\":false,\"rolreplication\":false},{\"rolname\":\"authenticated\",\"rolsuper\":false,\"rolbypassrls\":false,\"rolreplication\":false},{\"rolname\":\"authenticator\",\"rolsuper\":false,\"rolbypassrls\":false,\"rolreplication\":false},{\"rolname\":\"postgres\",\"rolsuper\":false,\"rolbypassrls\":true,\"rolreplication\":true},{\"rolname\":\"service_role\",\"rolsuper\":false,\"rolbypassrls\":true,\"rolreplication\":false}]\ngucs: [{\"name\":\"effective_cache_size\",\"setting\":\"393216\"},{\"name\":\"idle_in_transaction_session_timeout\",\"setting\":\"0\"},{\"name\":\"idle_session_timeout\",\"setting\":\"0\"},{\"name\":\"log_error_verbosity\",\"setting\":\"default\"},{\"name\":\"log_min_duration_statement\",\"setting\":\"-1\"},{\"name\":\"log_min_error_statement\",\"setting\":\"error\"},{\"name\":\"log_parameter_max_length_on_error\",\"setting\":\"0\"},{\"name\":\"log_statement\",\"setting\":\"ddl\"},{\"name\":\"shared_buffers\",\"setting\":\"131072\"},{\"name\":\"statement_timeout\",\"setting\":\"120000\"},{\"name\":\"work_mem\",\"setting\":\"7168\"}]\nrole configs: [{\"rolname\":\"anon\",\"cfg\":\"statement_timeout=3s\"},{\"rolname\":\"authenticated\",\"cfg\":\"statement_timeout=8s\"},{\"rolname\":\"authenticator\",\"cfg\":\"session_preload_libraries=supautils, safeupdate | statement_timeout=8s | lock_timeout=8s\"},{\"rolname\":\"postgres\",\"cfg\":\"search_path=\\\"\\\\$user\\\", public, extensions\"},{\"rolname\":\"supabase_admin\",\"cfg\":\"search_path=\\\"$user\\\", public, auth, extensions | log_statement=none\"},{\"rolname\":\"supabase_auth_admin\",\"cfg\":\"search_path=auth | idle_in_transaction_session_timeout=60000 | log_statement=none\"},{\"rolname\":\"supabase_read_only_user\",\"cfg\":\"default_transaction_read_only=on\"},{\"rolname\":\"supabase_realtime_admin\",\"cfg\":\"search_path=public, extensions, realtime\"},{\"rolname\":\"supabase_storage_admin\",\"cfg\":\"search_path=storage | log_statement=none\"}]",
+      "durationMs": 16023
+    },
+    {
+      "id": "MS01b",
+      "title": "pooler configs: Supavisor (shared) and PgBouncer (dedicated) as the API reports them",
+      "status": "info",
+      "detail": "shared <pooler-host> user postgres.<ref> pool ? clients ?; dedicated transaction pool ? clients ? (pgbouncer GET 200)",
+      "measurements": {
+        "shared_host": "<pooler-host>",
+        "shared_user": "postgres.<ref>",
+        "shared_default_pool_size": "null",
+        "shared_max_client_conn": "null",
+        "pgb_pool_mode": "transaction",
+        "pgb_default_pool_size": "",
+        "pgb_max_client_conn": "",
+        "pgb_query_wait_timeout": 80,
+        "pgb_server_lifetime": 3600,
+        "pgb_server_idle_timeout": 600
+      },
+      "evidence": "{\n \"supavisor\": {\n  \"identifier\": \"<ref>\",\n  \"database_type\": \"PRIMARY\",\n  \"is_using_scram_auth\": true,\n  \"db_user\": \"postgres.<ref>\",\n  \"db_host\": \"<pooler-host>\",\n  \"db_port\": 6543,\n  \"db_name\": \"postgres\",\n  \"default_pool_size\": null,\n  \"max_client_conn\": null,\n  \"pool_mode\": \"transaction\"\n },\n \"pgbouncer\": {\n  \"ignore_startup_parameters\": \"options,extra_float_digits\",\n  \"pool_mode\": \"transaction\",\n  \"server_idle_timeout\": 600,\n  \"server_lifetime\": 3600,\n  \"query_wait_timeout\": 80,\n  \"reserve_pool_size\": 1\n }\n}",
+      "durationMs": 16023
+    },
+    {
+      "id": "MS01c",
+      "title": "add-ons, per-service health, DNS records for the database host",
+      "status": "info",
+      "detail": "selected [ci_medium], available [custom_domain,compute_instance,pitr,ipv4,auth_mfa_phone,auth_mfa_web_authn,log_drain,etl_pipeline]; A=0 AAAA=1; health auth=ACTIVE_HEALTHY db=ACTIVE_HEALTHY pooler=ACTIVE_HEALTHY realtime=ACTIVE_HEALTHY rest=ACTIVE_HEALTHY storage=ACTIVE_HEALTHY pg_bouncer=ACTIVE_HEALTHY",
+      "measurements": {
+        "addons_selected": "ci_medium",
+        "addons_available": "custom_domain,compute_instance,pitr,ipv4,auth_mfa_phone,auth_mfa_web_authn,log_drain,etl_pipeline",
+        "dns_a_count": 0,
+        "dns_aaaa_count": 1,
+        "health_auth": "ACTIVE_HEALTHY",
+        "health_db": "ACTIVE_HEALTHY",
+        "health_pooler": "ACTIVE_HEALTHY",
+        "health_realtime": "ACTIVE_HEALTHY",
+        "health_rest": "ACTIVE_HEALTHY",
+        "health_storage": "ACTIVE_HEALTHY",
+        "health_pg_bouncer": "ACTIVE_HEALTHY"
+      },
+      "durationMs": 16023
+    },
+    {
+      "id": "MS01d",
+      "title": "reachability of every Postgres path from an IPv4-only vantage (before the IPv4 add-on)",
+      "status": "info",
+      "detail": "direct_5432 as postgres: connect ECONNREFUSED 2406:da1c:61c:d600:c5d0:f663:8d03:2fb7:5432; dedicated_6543 as postgres: connect ECONNREFUSED 2406:da1c:61c:d600:c5d0:f663:8d03:2fb7:6543; shared_5432 as postgres.<ref>: ok in 2471ms; shared_6543 as postgres.<ref>: ok in 1949ms; dedicated_6543 postgres.<ref>: connect ECONNREFUSED 2406:da1c:61c:d600:c5d0:f663",
+      "measurements": {
+        "direct_5432_as_postgres": "refused",
+        "dedicated_6543_as_postgres": "refused",
+        "shared_5432_as_postgres_REDACTED_REF": "ok 2471ms",
+        "shared_6543_as_postgres_REDACTED_REF": "ok 1949ms",
+        "dedicated_6543_as_tenant_user": "refused"
+      },
+      "evidence": "direct_5432 db.<ref>.supabase.co:5432 as postgres: connect ECONNREFUSED 2406:da1c:61c:d600:c5d0:f663:8d03:2fb7:5432\ndedicated_6543 db.<ref>.supabase.co:6543 as postgres: connect ECONNREFUSED 2406:da1c:61c:d600:c5d0:f663:8d03:2fb7:6543\nshared_5432 <pooler-host>:5432 as postgres.<ref>: ok in 2471ms\nshared_6543 <pooler-host>:6543 as postgres.<ref>: ok in 1949ms\ndedicated_6543 as postgres.<ref>: connect ECONNREFUSED 2406:da1c:61c:d600:c5d0:f663:8d03:2fb7:6543",
+      "durationMs": 16023
+    }
+  ]
+}
