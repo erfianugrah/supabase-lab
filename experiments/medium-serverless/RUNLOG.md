@@ -66,10 +66,12 @@ same day.
   during DNS reconfiguration; this run measured time-to-first-usable-record
   for an IPv4-only client, which is a different quantity.
 
-### MS03 - network restriction per path (run-2026-09-30T05-11-13)
+### MS03 - network restriction per path (run-2026-09-30T04-37-45)
 
-A first run at 04:37 gave 8 s / 8 s / 4 s / 4 s and was lost when MS04
-crashed the runner; the figures below are the second run.
+An earlier attempt gave 8 s / 8 s / 4 s / 4 s and was lost when MS04
+crashed the runner; the figures below are from the run whose artifact
+survived (`run-2026-09-30T04-37-45-449Z`, the only published artifact
+with an MS03 section).
 
 - Baseline: all four Postgres paths connect at `0.0.0.0/0`.
 - `POST network-restrictions/apply {192.0.2.0/24}`: HTTP 201, `apply_ms`
