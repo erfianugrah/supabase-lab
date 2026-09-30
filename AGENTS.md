@@ -1712,6 +1712,126 @@ hand copy got the Vault secret name wrong. Details: RUNLOG.md.
 - **A cascade delete leaves the servers' Vault secrets**: Studio only deletes
   `<fdw>_<option>`, so SQL-created secrets survive.
 
+## experiments/medium-serverless - key facts (validated 2026-09-30, Medium, ap-southeast-2, Team org, Postgres 17.6 image 17.6.1.166)
+
+One Medium project probed from an IPv4-only vantage in Singapore, as a
+serverless client on a shared multi-tenant project would see it. Every
+earlier pooler and downtime number in this repo is Micro or Small.
+Redacted artifacts: `out/2026-09-30/`. Details: RUNLOG.md.
+
+- **The dedicated pooler (`db.<ref>.supabase.co:6543`) takes user `postgres`
+  only**; the Supavisor tenant shape `postgres.<ref>` gets `no such user`
+  (MS01d). pooler-semantics S01c/S02b take `PVLAB_ENDPOINT_POOLER_TXN_USER`
+  for this.
+- **Neither pooler's pool size or client cap is readable through the API**
+  on this project: `/config/database/pooler` returns `default_pool_size null`,
+  `max_client_conn null`; `/config/database/pgbouncer` omits both and returns
+  `pool_mode transaction`, `query_wait_timeout 80`, `server_lifetime 3600`,
+  `server_idle_timeout 600`, `reserve_pool_size 1` (MS01b). Measured from
+  `pg_stat_activity` under 40 saturating clients: 16 concurrently active
+  backends through the dedicated pooler, 17 through Supavisor (MS12).
+- **`log_statement` ships as `ddl`, not the docs' `none`** (MS01a); with
+  `log_min_error_statement=error` a FAILING statement's full text, literals
+  included, lands in `postgres_logs` as `log_attributes['parsed.query']`; a
+  succeeding statement's literal does not. Storage object paths are in
+  `edge_logs` (`request.path`) and `storage_logs` (`objectPath`, and the
+  worker's `ObjectRemoved:Delete` event). A Realtime topic name did not appear
+  in `realtime_logs` (MS05). Ingestion lag exceeded 4 minutes on one run.
+- **`logs.all` is gone (410 since 2026-09-23).** The unified `logs` table is
+  ClickHouse SQL, filter on `source` (not the changelog's `source_name` - the
+  corpus guide `supabase-management-api-logs-endpoint` already records this),
+  nested fields via `log_attributes[...]`. The endpoint throttles; one query
+  per 20-30 s held.
+- **Enabling the IPv4 add-on left `db.<ref>.supabase.co` with no record for
+  more than 10 minutes from this resolver** (AAAA withdrawn, A not yet
+  visible, `getaddrinfo ENOTFOUND` for 217 samples at 500 ms), then an A at
+  TTL 30. Shared pooler and REST: 0 failed samples through it (MS02).
+  Negative caching at the vantage not ruled out.
+- **A network restriction presents differently per path** (MS03): Supavisor
+  refuses at 2.7-3.3 s with `(EADDRNOTALLOWED) address not in tenant
+  allow_list`; direct 5432 and dedicated 6543 drop, so the client sees its own
+  connect timeout (6.7 s here). Recovery 3.8-4.3 s on all four after restoring
+  `0.0.0.0/0`. The PrivateLink reference's "hang to timeout means a security
+  group" is not the only cause.
+- **A dead client's open transaction is closed by the pooler itself in
+  1.5-1.6 s on both poolers, with or without a role timeout** (MS04c/d). An
+  ALIVE client stuck idle in a transaction is ended only by the role's
+  `idle_in_transaction_session_timeout` (5s -> gone at 6.7 s, MS04e); with
+  none it was still there at 30 s (MS04f). Role GUCs are honoured through
+  both transaction poolers (MS04a). Supavisor refused a role's password
+  seconds after the role was recreated and accepted it a minute later
+  (MS04a second run, one occurrence).
+- **Prisma 6.19 under 20 concurrent clients breaks on Supavisor transaction
+  mode without `pgbouncer=true`** (7/500 iterations ok, `26000 prepared
+  statement "s10" does not exist`), works on the dedicated PgBouncer with or
+  without the flag, and the flag costs about five times per iteration on
+  either pooler (p50 20384-20553 ms vs 4090-4207 ms; direct 4212 ms) (MS10).
+  The single-client S01 matrix passes all 9 features on every mode and cannot
+  see this.
+- **Both poolers cap at the published 600 clients on Medium** (MS09):
+  PgBouncer `no more connections allowed (max_client_conn)`, Supavisor
+  `(EMAXCONN) max client connections reached, limit: 600`. Connect p50 sat at
+  5701-6011 ms from the first 50 clients up - the pool queue, not the cap, is
+  what a client meets first. The `pg` client surfaced 0 queueing NOTICEs.
+- **The dedicated pooler cost the instance more CPU than Supavisor at equal
+  load**: 5.8% vs 3.5% busy (idle 0%) at 62.866998 vs 62.16422 tps of pgbench
+  -S with 16 clients (MS08). The metrics endpoint exposes 123
+  `pgbouncer_*`/`supavisor_*` lines.
+- **S02 from Singapore is round-trip-bound**: 31.34425 / 31.449556 /
+  31.173369 tps at 8 clients on direct / dedicated / shared, p95 262.2 /
+  262.74 / 263.41 ms. Not a pooler measurement; the 1.5x PrivateLink ratio
+  needs an in-region runner.
+- **Postgres Changes with external-issuer tokens carrying Clerk's `o`
+  claim** (MS11): RLS off, both subscribers received both tenants' rows; RLS
+  on with `tenant_id = auth.jwt()->'o'->>'id'`, each received only its own;
+  anon-key-only and unregistered-issuer subscribers received nothing; the
+  unregistered issuer is refused at join with `JwtSignerError: Failed to
+  generate JWT signer for key ID (kid)`.
+- **Encrypting in an Edge Function before the row lands** (AES-GCM under
+  WebCrypto, key in a function secret, pastebin-shaped envelope) cost p50 371
+  / p95 843 ms per write against 216 / 610 ms for a plaintext Data API write
+  from the same vantage; the row holds a 380-char blob with no plaintext, the
+  function decrypts it, and the marker reached 0 log lines (MS14).
+- **A read replica in the primary's own region is accepted and serves**
+  (MS06): with `pitr_7` on, `read-replicas/setup {read_replica_region:
+  ap-southeast-2}` on an ap-southeast-2 primary returned 204 at once; the
+  `READ_REPLICA` entry appeared in the pooler config after 216 s and answered
+  `pg_is_in_recovery() = true` after 219 s; removal 204, gone on the first
+  poll. The docs only say "across multiple regions".
+- **A Medium <-> Large resize costs 30-55 s per Postgres, Auth and Storage
+  path and nothing on REST or Realtime** (MS07, n=1 each way): up Auth 35 s
+  `HTTP 521`, Storage 34 s, shared 6543 30 s, shared 5432 36 s, dedicated 6543
+  34 s, direct 35 s; down 42 / 44 / 39 / 39 / 55 / 41 s. Same shape as
+  platform-downtime's Micro <-> Small, at a fraction of those windows (Auth
+  131 s, pooler 207 s there). The dedicated PgBouncer came back last on the
+  way down, answering `server login has been failing, cached error: connect
+  failed (server_login_retry)` for ~14 s after Postgres was up. An addon PATCH
+  right after another one answers 429 and `applyAddon` waits it out (185 s).
+- **A custom hostname's `_acme-challenge` TXT is not in the initialize
+  response**; it arrives on a later GET/reverify poll (3-23 s across four
+  runs), after the `_cf-custom-hostname` ownership TXT. Re-read the record
+  list on every poll and write what is new. With the records in DNS,
+  verification took 45-193 s, activation reported complete within a second,
+  and the name served (probed via 1.1.1.1's answer) 71 s after that; a
+  Storage signed URL minted on the origin fetched 200 through the custom
+  host; `/rest/v1/` answers the anon key 401 on both hosts; certificate
+  issuer `Google Trust Services, CN=WE1` (MS13). Probe custom names from a
+  public resolver: the LAN resolver here answers `10.0.10.1` for the lab
+  zone (split-horizon), which cost two runs.
+- **A preview branch created without git is healthy on the create call
+  itself** (`POST /projects/{ref}/branches`, the call runs longer than 30 s,
+  201) on `ci_micro` with a newer image than the parent; its `db_host` is
+  IPv6-only, its Supavisor tenant (`postgres.<branch-ref>`) is readable via
+  `GET /projects/<branch-ref>/config/database/pooler`. `prisma db push`
+  over that path took 14859 ms; `GET /diff` returns the pushed schema as SQL;
+  **`POST /merge` is accepted (201, workflow run id) and applies nothing**
+  when there are no migration files (no `pg_net` on the parent 10 min later).
+  DELETE on a persistent branch is `422 Cannot delete persistent branch.`;
+  PATCH `persistent: false` first (MS15).
+- Harness: `pg` `Client` needs an `error` handler before its socket is
+  destroyed or the whole run dies; `import.meta.dir` in the compiled binary is
+  the bundle; `publish-evidence` does not redact measurement KEYS.
+
 ## Related
 
 - ~/.pi/agent/skills/terraform/SKILL.md - tofu conventions used here

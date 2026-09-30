@@ -1,0 +1,69 @@
+{
+  "startedAt": "2026-09-30T04:23:55.843Z",
+  "finishedAt": "2026-09-30T04:33:57.974Z",
+  "where": "local",
+  "region": "ap-southeast-2",
+  "ref": "<ref>",
+  "experiment": "medium-serverless",
+  "labCommit": "6f55c11",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "OpenSSL 3.6.4 25 Aug 2026 (Library: OpenSSL 3.6.4 25 Aug 2026)"
+  },
+  "results": [
+    {
+      "id": "MS02a",
+      "title": "PATCH billing/addons ipv4_default",
+      "status": "pass",
+      "detail": "HTTP 200 in 146ms",
+      "measurements": {
+        "http_status": 200,
+        "call_ms": 146
+      },
+      "durationMs": 602160
+    },
+    {
+      "id": "MS02b",
+      "title": "DNS swap for the database host, seen from this resolver",
+      "status": "fail",
+      "detail": "no A record within 600s",
+      "measurements": {
+        "a_record_s": "n/a",
+        "aaaa_gone_s": "n/a",
+        "a_after": 0,
+        "aaaa_after": 0,
+        "patch_at_s": 1
+      },
+      "durationMs": 602160
+    },
+    {
+      "id": "MS02c",
+      "title": "time-to-usable from IPv4: direct 5432 and dedicated 6543",
+      "status": "fail",
+      "detail": "direct first ok n/as, dedicated first ok n/as (sampling started 1s before the PATCH returned); 217 samples at 500ms",
+      "measurements": {
+        "direct_first_ok_s": "n/a",
+        "dedicated_first_ok_s": "n/a",
+        "samples": 217,
+        "direct_last_error": "getaddrinfo ENOTFOUND",
+        "dedicated_last_error": "getaddrinfo ENOTFOUND"
+      },
+      "durationMs": 602160
+    },
+    {
+      "id": "MS02d",
+      "title": "control paths across the switch: shared pooler 6543 and REST",
+      "status": "pass",
+      "detail": "shared pooler failed 0/217 samples, REST failed 0/217",
+      "measurements": {
+        "shared_fail_samples": 0,
+        "rest_fail_samples": 0,
+        "shared_mode": "none",
+        "rest_mode": "none"
+      },
+      "durationMs": 602160
+    }
+  ]
+}

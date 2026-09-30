@@ -1,0 +1,176 @@
+{
+  "startedAt": "2026-09-30T04:37:45.449Z",
+  "finishedAt": "2026-09-30T04:41:48.399Z",
+  "where": "local",
+  "region": "ap-southeast-2",
+  "ref": "<ref>",
+  "experiment": "medium-serverless",
+  "labCommit": "6f55c11",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "OpenSSL 3.6.4 25 Aug 2026 (Library: OpenSSL 3.6.4 25 Aug 2026)"
+  },
+  "results": [
+    {
+      "id": "MS03a",
+      "title": "baseline at 0.0.0.0/0",
+      "status": "pass",
+      "detail": "direct_5432: ok; dedicated_6543: ok; shared_5432: ok; shared_6543: ok",
+      "measurements": {
+        "direct_5432_baseline": "ok",
+        "dedicated_6543_baseline": "ok",
+        "shared_5432_baseline": "ok",
+        "shared_6543_baseline": "ok"
+      },
+      "durationMs": 13758
+    },
+    {
+      "id": "MS03b",
+      "title": "restricted to 192.0.2.0/24: time-to-bite and refusal text per path",
+      "status": "pass",
+      "detail": "direct_5432: 7s \"timeout expired\"; dedicated_6543: 7s \"timeout expired\"; shared_5432: 3s \"(EADDRNOTALLOWED) address not in tenant allow_list: {118, 189, 189, 102}\"; shared_6543: 3s \"(EADDRNOTALLOWED) address not in tenant allow_list: {118, 189, 189, 102}\"",
+      "measurements": {
+        "apply_http": 201,
+        "apply_ms": 1733,
+        "rest_during_restriction": "ok",
+        "direct_5432_bite_s": 6.7,
+        "direct_5432_refusal": "timeout expired",
+        "dedicated_6543_bite_s": 6.7,
+        "dedicated_6543_refusal": "timeout expired",
+        "shared_5432_bite_s": 2.7,
+        "shared_5432_refusal": "(EADDRNOTALLOWED) address not in tenant allow_list: {118, 189, 189, 102}",
+        "shared_6543_bite_s": 3.3,
+        "shared_6543_refusal": "(EADDRNOTALLOWED) address not in tenant allow_list: {118, 189, 189, 102}"
+      },
+      "evidence": "shared_5432 @2701ms: (EADDRNOTALLOWED) address not in tenant allow_list: {118, 189, 189, 102}\nshared_6543 @3287ms: (EADDRNOTALLOWED) address not in tenant allow_list: {118, 189, 189, 102}\ndirect_5432 @6735ms: timeout expired\ndedicated_6543 @6735ms: timeout expired",
+      "durationMs": 13758
+    },
+    {
+      "id": "MS03c",
+      "title": "restored to 0.0.0.0/0: time-to-recover per path",
+      "status": "pass",
+      "detail": "direct_5432: 4s; dedicated_6543: 4s; shared_5432: 4s; shared_6543: 4s",
+      "measurements": {
+        "restore_http": 201,
+        "direct_5432_recover_s": 4.1,
+        "dedicated_6543_recover_s": 3.8,
+        "shared_5432_recover_s": 3.8,
+        "shared_6543_recover_s": 4.3
+      },
+      "durationMs": 13758
+    },
+    {
+      "id": "MS04a",
+      "title": "role GUCs as a pooled connection sees them",
+      "status": "pass",
+      "detail": "dedicated_6543 as ms_app: idle_in_transaction_session_timeout=5s statement_timeout=3s; shared_6543 as ms_app.<ref>: idle_in_transaction_session_timeout=5s statement_timeout=3s",
+      "measurements": {
+        "dedicated_6543_idle_timeout": "5s",
+        "dedicated_6543_statement_timeout": "3s",
+        "shared_6543_idle_timeout": "5s",
+        "shared_6543_statement_timeout": "3s"
+      },
+      "durationMs": 30246
+    },
+    {
+      "id": "MS04b",
+      "title": "statement_timeout '3s' on the role vs pg_sleep(10) through dedicated 6543",
+      "status": "pass",
+      "detail": "SQLSTATE 57014 after 4795ms: canceling statement due to statement timeout",
+      "measurements": {
+        "sqlstate": "57014",
+        "wall_ms": 4795,
+        "message": "canceling statement due to statement timeout"
+      },
+      "durationMs": 30246
+    },
+    {
+      "id": "MS04c",
+      "title": "leaked open transaction (socket destroyed, no COMMIT) with idle_in_transaction_session_timeout '5s' on the role",
+      "status": "pass",
+      "detail": "dedicated: pid 1478472 gone after 2.5s (undefined); shared: pid 1478476 gone after 1.9s (undefined)",
+      "measurements": {
+        "dedicated_pid_gone_s": 2.5,
+        "dedicated_states": "",
+        "shared_pid_gone_s": 1.9,
+        "shared_states": ""
+      },
+      "durationMs": 30246
+    },
+    {
+      "id": "MS04d",
+      "title": "control: the same leak on a role with no idle_in_transaction_session_timeout",
+      "status": "info",
+      "detail": "dedicated: pid 1478482 gone after 1.7s (undefined)",
+      "measurements": {
+        "nolimit_pid_gone_s": 1.7,
+        "nolimit_states": ""
+      },
+      "durationMs": 30246
+    },
+    {
+      "id": "MS05a",
+      "title": "Storage object path in the logs",
+      "status": "info",
+      "detail": "edge_logs: query error {\"message\":\"The logs.all endpoint has been removed. Use GET ; storage_logs: query error {\"message\":\"The logs.all endpoint has been removed. Use GET ",
+      "measurements": {
+        "planted": "storage: bucket 200, upload 200, download 200",
+        "edge_logs_hits": 0,
+        "edge_logs_lag_s": "none",
+        "edge_logs_error": "{\"message\":\"The logs.all endpoint has been removed. Use GET /v1/projects/{ref}/a",
+        "storage_logs_hits": 0,
+        "storage_logs_lag_s": "none",
+        "storage_logs_error": "{\"message\":\"The logs.all endpoint has been removed. Use GET /v1/projects/{ref}/a"
+      },
+      "evidence": "",
+      "durationMs": 198956
+    },
+    {
+      "id": "MS05b",
+      "title": "Realtime channel name in the logs",
+      "status": "info",
+      "detail": "realtime_logs: query error {\"message\":\"The logs.all endpoint has been removed. Use GET ",
+      "measurements": {
+        "planted": "realtime: phx_reply ok",
+        "realtime_logs_hits": 0,
+        "realtime_logs_lag_s": "none",
+        "realtime_logs_error": "{\"message\":\"The logs.all endpoint has been removed. Use GET /v1/projects/{ref}/a"
+      },
+      "evidence": "",
+      "durationMs": 198957
+    },
+    {
+      "id": "MS05c",
+      "title": "SQL literal from a FAILING statement in postgres_logs (default log_min_error_statement=error)",
+      "status": "info",
+      "detail": "postgres_logs: query error {\"message\":\"The logs.all endpoint has been removed. Use GET ; supavisor_logs: query error {\"message\":\"ThrottlerException: Too Many Requests\"}; pgbouncer_logs: query error {\"message\":\"ThrottlerException: Too Many Requests\"}",
+      "measurements": {
+        "planted": "postgres: success literal sent, failing insert SQLSTATE 42P01",
+        "failing_sqlstate": "42P01",
+        "postgres_logs_hits": 0,
+        "postgres_logs_lag_s": "none",
+        "postgres_logs_error": "{\"message\":\"The logs.all endpoint has been removed. Use GET /v1/projects/{ref}/a",
+        "supavisor_logs_hits": 0,
+        "supavisor_logs_lag_s": "none",
+        "supavisor_logs_error": "{\"message\":\"ThrottlerException: Too Many Requests\"}",
+        "pgbouncer_logs_hits": 0,
+        "pgbouncer_logs_lag_s": "none",
+        "pgbouncer_logs_error": "{\"message\":\"ThrottlerException: Too Many Requests\"}"
+      },
+      "evidence": "",
+      "durationMs": 198957
+    },
+    {
+      "id": "MS05d",
+      "title": "SQL literal from a SUCCEEDING statement in postgres_logs (default log_statement=none)",
+      "status": "pass",
+      "detail": "query error {\"message\":\"ThrottlerException: Too Many Requests\"}",
+      "measurements": {
+        "success_literal_hits": 0
+      },
+      "durationMs": 198957
+    }
+  ]
+}

@@ -60,7 +60,8 @@ const TARGETS: BenchTarget[] = [
     label: "dedicated-pooler-6543",
     endpointKey: "pooler_txn",
     defaultPort: 6543,
-    user: poolerUser,
+    // Bare `postgres` on the dedicated pooler; see S01c.
+    user: (ctx) => ctx.endpoints.pooler_txn_user ?? poolerUser(ctx),
     protocol: "extended",
   },
   {
