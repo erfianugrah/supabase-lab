@@ -1,0 +1,68 @@
+{
+  "startedAt": "2026-09-30T06:12:54.369Z",
+  "finishedAt": "2026-09-30T06:16:36.170Z",
+  "where": "local",
+  "region": "ap-southeast-2",
+  "ref": "<ref>",
+  "experiment": "medium-serverless",
+  "labCommit": "6f55c11",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "OpenSSL 3.6.4 25 Aug 2026 (Library: OpenSSL 3.6.4 25 Aug 2026)"
+  },
+  "results": [
+    {
+      "id": "MS06a",
+      "title": "pitr add-on (pitr_7) as the replica prerequisite",
+      "status": "pass",
+      "detail": "pitr HTTP 200; selected now [ci_medium,ipv4_default,pitr_7]",
+      "measurements": {
+        "pitr_status": "HTTP 200",
+        "pitr_applied_by_module": "true"
+      },
+      "durationMs": 221812
+    },
+    {
+      "id": "MS06b",
+      "title": "POST read-replicas/setup with read_replica_region = ap-southeast-2 (the primary's region)",
+      "status": "pass",
+      "detail": "accepted HTTP 204 after 1 attempt(s), 0s",
+      "measurements": {
+        "setup_http": 204,
+        "setup_attempts": 1,
+        "setup_accepted_after_s": 0
+      },
+      "evidence": "0s HTTP 204 ",
+      "durationMs": 221812
+    },
+    {
+      "id": "MS06c",
+      "title": "replica appears in the pooler config and serves a read",
+      "status": "pass",
+      "detail": "identifier <ref>-rr-ap-southeast-2-fdggf appeared after 216s; served pg_is_in_recovery()=true after 219s via <pooler-host>",
+      "measurements": {
+        "appeared_s": 216,
+        "served_s": 219,
+        "pg_is_in_recovery": "true",
+        "identifier": "<ref>-rr-ap-southeast-2-fdggf",
+        "replica_user": "postgres.<ref>-rr-ap-southeast-2-fdggf",
+        "primary_db_health": "ACTIVE_HEALTHY"
+      },
+      "durationMs": 221812
+    },
+    {
+      "id": "MS06d",
+      "title": "removal: replica gone from the pooler config; pitr_7 removed again",
+      "status": "pass",
+      "detail": "remove HTTP 204; entry gone after 0s; pitr_7 DELETE HTTP 200 ",
+      "measurements": {
+        "remove_http": 204,
+        "gone_s": 0,
+        "pitr_remove_http": 200
+      },
+      "durationMs": 221812
+    }
+  ]
+}

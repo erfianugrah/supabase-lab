@@ -1,0 +1,94 @@
+{
+  "startedAt": "2026-09-30T06:54:06.169Z",
+  "finishedAt": "2026-09-30T06:56:33.927Z",
+  "where": "local",
+  "region": "ap-southeast-2",
+  "ref": "<ref>",
+  "experiment": "medium-serverless",
+  "labCommit": "6f55c11",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "OpenSSL 3.6.4 25 Aug 2026 (Library: OpenSSL 3.6.4 25 Aug 2026)"
+  },
+  "results": [
+    {
+      "id": "MS15a",
+      "title": "create a persistent branch without git; time to ACTIVE_HEALTHY; its connection facts",
+      "status": "pass",
+      "detail": "HTTP 201; healthy after 2s; Postgres supabase-postgres-17.6.1.171; db host returned:5432 user returned; compute ci_micro",
+      "measurements": {
+        "create_http": 201,
+        "adopted": "false",
+        "healthy_s": 2,
+        "postgres_version": "supabase-postgres-17.6.1.171",
+        "db_port": 5432,
+        "db_user_shape": "postgres",
+        "compute": "ci_micro",
+        "status": "ACTIVE_HEALTHY"
+      },
+      "evidence": "",
+      "durationMs": 147765
+    },
+    {
+      "id": "MS15b",
+      "title": "prisma db push on the branch; a row on the branch; the parent has no such table",
+      "status": "pass",
+      "detail": "db push exit 0 in 14859 ms; row 1; parent public.ms_record: absent",
+      "measurements": {
+        "push_exit": 0,
+        "push_ms": 14859,
+        "branch_insert": "row 1",
+        "parent_table": "absent"
+      },
+      "durationMs": 147765
+    },
+    {
+      "id": "MS15c",
+      "title": "GET /branches/{id}/diff for a db-push schema",
+      "status": "info",
+      "detail": "HTTP 200, 2016 chars: create extension if not exists \"pg_net\" with schema \"extensions\"; create sequence \"public\".\"ms_record_id_seq\"; create table \"public\".\"ms_record\" ( \"id\" integer not null default nextval('ms_record_id_s",
+      "measurements": {
+        "diff_http": 200,
+        "diff_chars": 2016,
+        "mentions_ms_record": "true"
+      },
+      "evidence": "create extension if not exists \"pg_net\" with schema \"extensions\";\n\ncreate sequence \"public\".\"ms_record_id_seq\";\n\n\n  create table \"public\".\"ms_record\" (\n    \"id\" integer not null default nextval('ms_record_id_seq'::regclass),\n    \"tenant_id\" text not null,\n    \"name\" text not null,\n    \"created_at\" timestamp(3) without time zone not null default CURRENT_TIMESTAMP\n      );\n\n\nalter sequence \"public\".\"ms_record_id_seq\" owned by \"public\".\"ms_record\".\"id\";\n\nCREATE UNIQUE INDEX ms_record_pkey ON public.ms_record USING btree (id);\n\nCREATE INDEX ms_record_tenant_id_idx ON public.ms_record USING btree (tenant_id);\n\nalter table \"public\".\"ms_record\" add constraint \"ms_record_pkey\" PRIMARY KEY using index \"ms_record_pkey\";\n\ngrant delete on table \"public\".\"ms_record\" to \"anon\";\n\ngrant insert on table \"public\".\"ms_record\" to \"anon\";\n\ngrant references on table \"public\".\"ms_record\" to \"anon\";\n\ngrant select on table \"public\".\"ms_record\" to \"anon\";\n\ngrant trigger on table \"public\".\"ms_record\" to \"anon\";\n\ngrant truncate on table \"public\".\"ms_record\" to \"anon\";\n\ngrant update on table \"public\".\"ms_record\" to \"anon\";\n\ngrant delete on table \"public\".\"ms_record\" to \"authenticated\";\n\ngrant insert on table \"public\".\"ms_record\" to \"authenticated\";\n\ngrant references on table \"public\".\"ms_record\" to \"authenticated\";\n\ngrant select on table \"public\".\"ms_record\" to \"authenticated\";\n\ngrant trigger on table \"public\".\"ms_record\" to \"authenticated\";\n\ngrant truncate on table \"public\".\"ms_record\" to \"authenticated",
+      "durationMs": 147765
+    },
+    {
+      "id": "MS15d",
+      "title": "POST /branches/{id}/merge with no migration files",
+      "status": "info",
+      "detail": "HTTP 201: {\"workflow_run_id\":\"983ec8155f9d4c59bc5924fefb6934fa\",\"message\":\"ok\"}",
+      "measurements": {
+        "merge_http": 201
+      },
+      "evidence": "{\"workflow_run_id\":\"983ec8155f9d4c59bc5924fefb6934fa\",\"message\":\"ok\"}",
+      "durationMs": 147765
+    },
+    {
+      "id": "MS15d2",
+      "title": "parent schema after merge",
+      "status": "info",
+      "detail": "parent public.ms_record: absent 20 s after the merge call",
+      "measurements": {
+        "parent_table_after_merge": "absent"
+      },
+      "durationMs": 147765
+    },
+    {
+      "id": "MS15e",
+      "title": "branch deleted",
+      "status": "pass",
+      "detail": "first DELETE 422 ({\"message\":\"ok\"}); PATCH persistent=false HTTP 200; second DELETE HTTP 200; gone from the list after 1s",
+      "measurements": {
+        "delete_http": 200,
+        "gone_s": 1,
+        "delete_note": "first DELETE 422 ({\"message\":\"ok\"}); PATCH persistent=false HTTP 200; second DELETE HTTP 200"
+      },
+      "durationMs": 147765
+    }
+  ]
+}

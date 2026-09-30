@@ -1,0 +1,12 @@
+
+
+
+buckets:
+    todo: 97
+
+
+    done: 99
+
+bot:
+
+    user_id: 6

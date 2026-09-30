@@ -1,0 +1,24 @@
+{
+  "startedAt": "2026-09-30T06:40:47.407Z",
+  "finishedAt": "2026-09-30T06:41:30.898Z",
+  "where": "local",
+  "region": "ap-southeast-2",
+  "ref": "<ref>",
+  "experiment": "medium-serverless",
+  "labCommit": "6f55c11",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "OpenSSL 3.6.4 25 Aug 2026 (Library: OpenSSL 3.6.4 25 Aug 2026)"
+  },
+  "results": [
+    {
+      "id": "MS15",
+      "title": "Preview branch as staging with a Prisma-pushed schema: create, push, isolation, diff, merge, delete",
+      "status": "fail",
+      "detail": "test threw: The operation timed out.",
+      "durationMs": 43491
+    }
+  ]
+}

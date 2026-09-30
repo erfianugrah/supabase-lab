@@ -1,0 +1,144 @@
+{
+  "startedAt": "2026-09-30T05:11:13.241Z",
+  "finishedAt": "2026-09-30T05:16:50.279Z",
+  "where": "local",
+  "region": "ap-southeast-2",
+  "ref": "<ref>",
+  "experiment": "medium-serverless",
+  "labCommit": "6f55c11",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "OpenSSL 3.6.4 25 Aug 2026 (Library: OpenSSL 3.6.4 25 Aug 2026)"
+  },
+  "results": [
+    {
+      "id": "MS04a",
+      "title": "role GUCs as a pooled connection sees them",
+      "status": "pass",
+      "detail": "dedicated_6543 as ms_app: idle_in_transaction_session_timeout=5s statement_timeout=3s; shared_6543 as ms_app.<ref>: password authentication failed for user \"ms_app\"",
+      "measurements": {
+        "dedicated_6543_idle_timeout": "5s",
+        "dedicated_6543_statement_timeout": "3s",
+        "shared_6543_idle_timeout": "connect failed"
+      },
+      "durationMs": 69966
+    },
+    {
+      "id": "MS04b",
+      "title": "statement_timeout '3s' on the role vs pg_sleep(10) through dedicated 6543",
+      "status": "pass",
+      "detail": "SQLSTATE 57014 after 4786ms: canceling statement due to statement timeout",
+      "measurements": {
+        "sqlstate": "57014",
+        "wall_ms": 4786,
+        "message": "canceling statement due to statement timeout"
+      },
+      "durationMs": 69966
+    },
+    {
+      "id": "MS04c",
+      "title": "leaked open transaction (socket destroyed, no COMMIT) with idle_in_transaction_session_timeout '5s' on the role",
+      "status": "pass",
+      "detail": "dedicated: pid 1481222 gone after 1.5s (undefined); shared: pid 1481227 gone after 1.6s (undefined)",
+      "measurements": {
+        "dedicated_pid_gone_s": 1.5,
+        "dedicated_states": "",
+        "shared_pid_gone_s": 1.6,
+        "shared_states": ""
+      },
+      "durationMs": 69966
+    },
+    {
+      "id": "MS04d",
+      "title": "control: the same leak on a role with no idle_in_transaction_session_timeout",
+      "status": "info",
+      "detail": "dedicated: pid 1481232 gone after 1.6s (undefined)",
+      "measurements": {
+        "nolimit_pid_gone_s": 1.6,
+        "nolimit_states": ""
+      },
+      "durationMs": 69966
+    },
+    {
+      "id": "MS04e",
+      "title": "alive client idle in transaction, role timeout '5s': seconds until the server ends it, and the client's error",
+      "status": "pass",
+      "detail": "pid 1481234 gone after 6.7s; client then saw Client has encountered a connection error and is not queryable",
+      "measurements": {
+        "pid_gone_s": 6.7,
+        "client_sqlstate": "",
+        "client_message": "Client has encountered a connection error and is not queryable"
+      },
+      "durationMs": 69966
+    },
+    {
+      "id": "MS04f",
+      "title": "control: alive client idle in transaction on the role with no timeout (bounded 30 s)",
+      "status": "info",
+      "detail": "pid 1481241 still present after 30s; client then saw next statement succeeded - the transaction was still open",
+      "measurements": {
+        "pid_gone_s": "n/a",
+        "client_sqlstate": "",
+        "client_message": "next statement succeeded - the transaction was still open"
+      },
+      "durationMs": 69966
+    },
+    {
+      "id": "MS05a",
+      "title": "Storage object path in the logs",
+      "status": "pass",
+      "detail": "edge_logs: 2 line(s); storage_logs: 4 line(s)",
+      "measurements": {
+        "planted": "storage: bucket 200, upload 200, download 200",
+        "queries": 12,
+        "first_hit_s": 2,
+        "edge_logs_hits": 2,
+        "storage_logs_hits": 4
+      },
+      "evidence": "edge_logs: ... | 200 | https://<ref>.supabase.co/storage/v1/object/authenticated/ms-logs-pvlab49508536/tenant-pvlab49508536/record-pvlab49508536.txt | Bun/1.3.14...\nedge_logs: ...POST | 200 | https://<ref>.supabase.co/storage/v1/object/ms-logs-pvlab49508536/tenant-pvlab49508536/record-pvlab49508536.txt | Bun/1.3.14...\nstorage_logs: ...[Lifecycle]: ObjectCreated:Post <ref>/ms-logs-pvlab49508536/tenant-pvlab49508536/record-pvlab49508536.txt...\nstorage_logs: ...<ref> | POST | 200 | 10.112.64.68 | a430bb7b2a91a714-SIN | /object/ms-logs-pvlab49508536/tenant-pvlab49508536/record-pvlab49508536.txt | Bun/1.3.14...\nstorage_logs: ...emwvzixv | GET | 200 | 10.112.48.3 | a430bb800c96a714-SIN | /object/authenticated/ms-logs-pvlab49508536/tenant-pvlab49508536/record-pvlab49508536.txt | Bun/1.3.14...",
+      "durationMs": 267084
+    },
+    {
+      "id": "MS05b",
+      "title": "Realtime channel name in the logs",
+      "status": "info",
+      "detail": "realtime_logs: no hit",
+      "measurements": {
+        "planted": "realtime: phx_reply ok",
+        "realtime_logs_hits": 0
+      },
+      "evidence": "",
+      "durationMs": 267084
+    },
+    {
+      "id": "MS05c",
+      "title": "SQL literal from a FAILING statement (log_min_error_statement=error)",
+      "status": "pass",
+      "detail": "postgres_logs: 1 line(s); supavisor_logs: no hit; pgbouncer_logs: no hit",
+      "measurements": {
+        "planted": "postgres: success literal sent, failing insert SQLSTATE 42P01",
+        "failing_sqlstate": "42P01",
+        "postgres_logs_hits": 1,
+        "supavisor_logs_hits": 0,
+        "pgbouncer_logs_hits": 0
+      },
+      "evidence": "postgres_logs: ...relation \"ms_missing_pvlab49508536\" does not exist...",
+      "durationMs": 267084
+    },
+    {
+      "id": "MS05d",
+      "title": "SQL literal from a SUCCEEDING statement (log_statement=ddl): expected absent",
+      "status": "info",
+      "detail": "succeeding literal: 0 line(s); failing literal: 0 line(s)",
+      "measurements": {
+        "success_literal_hits": 0,
+        "failing_literal_hits": 0,
+        "other_sources_seen": "storage_logs,postgres_logs,edge_logs"
+      },
+      "evidence": "",
+      "durationMs": 267084
+    }
+  ]
+}
