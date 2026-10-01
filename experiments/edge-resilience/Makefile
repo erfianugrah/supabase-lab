@@ -37,8 +37,8 @@ up: init validate apply keygen worker-deploy seed
 
 down:
 	-wrangler delete --name edge-resilience-drill 2>/dev/null || true
-	tofu plan -destroy $(VARS) -var="supabase_access_token=$(TOK)" -out=tfplan-destroy
-	tofu apply tfplan-destroy
+	@tofu plan -destroy $(VARS) -var="supabase_access_token=$(TOK)" -out=tfplan-destroy
+	@tofu apply tfplan-destroy
 
 battery: up
 	$(ROOT)/.pi/probe-edge-resilience.sh $(BATTERY)
@@ -51,8 +51,8 @@ validate:
 	tofu validate
 
 apply:
-	tofu plan $(VARS) -var="supabase_access_token=$(TOK)" -out=tfplan
-	tofu apply tfplan
+	@tofu plan $(VARS) -var="supabase_access_token=$(TOK)" -out=tfplan
+	@tofu apply tfplan
 	@echo "project_ref = $$(tofu output -raw project_ref)"
 
 # ES256 keypair for the lab-controlled JWT issuer. Public half lands in the
@@ -79,7 +79,7 @@ worker-normal:
 # the PAT is the only credential needed.
 seed:
 	@test -n "$(REF)" || (echo "no project_ref output - run 'make apply' first"; exit 1)
-	curl -sf -X POST -H "Authorization: Bearer $(TOK)" -H "Content-Type: application/json" \
+	@curl -sf -X POST -H "Authorization: Bearer $(TOK)" -H "Content-Type: application/json" \
 		"https://api.supabase.com/v1/projects/$(REF)/database/query" \
 		-d '{"query":"create table if not exists public.w_probe(id int primary key); insert into public.w_probe values (1) on conflict do nothing;"}'
 	@echo " - w_probe seeded"
@@ -117,5 +117,5 @@ publish-evidence:
 	@cd $(ROOT)/harness && bun scripts/publish-evidence.ts $(abspath $(RUN)) $(abspath .) $(if $(PUBLISH_ONLY),--only $(PUBLISH_ONLY),)
 
 destroy:
-	tofu plan -destroy $(VARS) -var="supabase_access_token=$(TOK)" -out=tfplan-destroy
-	tofu apply tfplan-destroy
+	@tofu plan -destroy $(VARS) -var="supabase_access_token=$(TOK)" -out=tfplan-destroy
+	@tofu apply tfplan-destroy

@@ -163,3 +163,121 @@ first teardown rather than assumed.
 
 Not run here, and each needs its own justification: major upgrade, PITR
 restore, and read-replica add/remove.
+
+## D05 - db-password reset vs pg_stat_checkpointer (added and run 2026-10-01: no restart)
+
+Motivating question: on a managed Postgres 17 project,
+`pg_stat_checkpointer.stats_reset` can move to a restart timestamp even
+though the server's own log calls the shutdown a "fast shutdown request" -
+normally a CLEAN mode. A local `docker.exe` + `postgres:17.4-alpine` control
+(CHECKPOINT, then `docker restart` vs `kill -9`) showed a clean restart does
+NOT reset `pg_stat_checkpointer`, only a crash restart does - so a managed
+"clean" restart that resets it behaves like a crash for this one counter.
+D05 tests one candidate trigger, a database-password change, and checks
+whether `pg_stat_checkpointer.stats_reset` moves across it.
+
+D05 (`tests/d05-db-password-restart.ts`) measures two things in one pass:
+
+1. The same per-path outage shape D01 measures for a direct `/restart` call,
+   but for a password-reset-triggered restart (`PATCH
+   /v1/projects/{ref}/database/password`) - minus the pooler probe, which
+   would be confounded by the password change happening mid-window (see the
+   module's doc comment).
+2. Whether `pg_stat_checkpointer.stats_reset` (or `pg_stat_bgwriter.stats_reset`
+   on pre-17) changes across that restart, cross-checked against
+   `pg_postmaster_start_time()` so "stats survived" and "nothing restarted" are
+   never conflated.
+
+### Why this is a `platform-downtime` module, not a new experiment
+
+Read the whole experiment before deciding: one project, no AWS, Management-
+API-triggered restarts, per-connection-path outage measurement via the shared
+`lib/setup.ts` + `lib/probes.ts` + the harness `sampler.ts`. The project's own
+`supabase.tf` docstring already frames the scope as "what a platform OPERATION
+costs a client" across restart, restriction-flip and resize. A password-reset-
+triggered restart is the same kind of operation, measured with the same
+infrastructure, with one more signal (checkpointer stats survival) layered on
+top of the outage window D01-D04 already capture. There is no second project,
+no peer, no AWS resource to justify a separate OpenTofu state - the
+dir-per-blast-radius rule in AGENTS.md is about blast radius, and this
+module's blast radius is identical to D01's (one Micro project, restarted).
+
+### Why this does NOT provision a Vercel-Marketplace project
+
+Investigated before writing any code, per the task's safety boundary (real
+money, a real third-party account, explicitly out of scope to run here).
+Findings, each checked against Vercel's own current docs rather than recalled:
+
+- **Neither the `supabase/supabase` nor the `vercel/vercel` OpenTofu/Terraform
+  provider exposes a resource for a Marketplace native-integration
+  installation or a provisioned resource inside one.** The Vercel provider's
+  resources are `vercel_project`, `vercel_domain`, etc. - project/deployment
+  management, not the Marketplace installation flow. There is no
+  `vercel_marketplace_*` resource to write a `.tf` file against.
+- **The Marketplace REST API (`/docs/integrations/create-integration/marketplace-api`)
+  is the PARTNER's side of the contract, not a consumer's.** Its endpoints
+  (`POST /v1/installations/{id}/resources`, `PUT .../resources/{resourceId}`,
+  etc.) are called BY Vercel, to be implemented by whoever builds the
+  integration server (i.e. Supabase, for the Supabase-on-Vercel integration).
+  We are a Vercel end-user here, not an integration author; nothing on that
+  API surface is ours to call.
+- **The only consumer-side automation path is the Vercel CLI**:
+  `vercel integration add supabase` (alias `vercel install` / `vc i`), which
+  supports non-interactive flags (`--name`, `--metadata`, `--plan`,
+  `--environment`, `--format=json`, ...) once an integration is already
+  installed on the team. BUT: installing a Marketplace integration for the
+  FIRST time on a team requires `vercel integration accept-terms <integration>`,
+  and Vercel's own CLI reference states plainly that this command **"requires
+  an interactive terminal and human confirmation. It does not replace
+  integrations that require a browser flow or device attestation."** That is
+  a one-time, per-team, Vercel-side design decision - not a gap in our
+  tooling. (Sources: `https://vercel.com/docs/cli/integration`,
+  `https://vercel.com/changelog/vercel-cli-for-marketplace-integrations-optimized-for-agents`,
+  `https://vercel.com/docs/integrations/create-integration/marketplace-flows`,
+  read 2026-10-01.)
+- **Conclusion**: a Vercel-Marketplace-provisioned Supabase project cannot be
+  stood up unattended from OpenTofu, the Supabase Management API, or even the
+  Vercel CLI in a from-scratch CI/agent context - the first installation on
+  any given Vercel team needs one human to type a confirmation. This is
+  exactly the kind of step this session's safety boundary says a human must
+  run, so D05 was scoped to NOT need it: it calls `database/password`
+  directly on an ordinary OpenTofu-provisioned lab project (the existing
+  `supabase_project.probe` resource in `supabase.tf`). Whether an
+  integration-provisioned project handles a credential change differently is
+  outside what this module can reach.
+
+### Run 2026-10-01 (published: `out/2026-10-01/`): no restart
+
+D05 reported `fail`: `pg_postmaster_start_time()` read
+`2026-10-01T06:38:25.763Z` before and after the 7-minute window, every probe
+path stayed up (`rest/auth/storage/realtime_mode = none`), and
+`pg_stat_checkpointer.stats_reset` stayed at `2026-09-29T12:45:56.639Z`. On a
+plain project a password PATCH does not restart Postgres, so the
+checkpointer question is unanswered by this module.
+
+Side observation, inferred rather than measured: that `stats_reset` predates
+the project's own postmaster start by two days, so the stats survived the
+project's first boot - most likely carried in the image the project was
+created from, which would have been written by a clean shutdown.
+
+Cheaper next step for the managed-restart question: read the same
+`pg_postmaster_start_time()` + `stats_reset` pair around D01's direct
+`POST /restart`. That answers "does a managed restart reset
+pg_stat_checkpointer" directly; it does not answer whether other restart
+triggers behave differently.
+
+### To actually run it
+
+```
+cd experiments/platform-downtime
+make apply                              # provisions one Micro project (same as D01-D04)
+make probe-destructive ONLY=D05         # resets the DB password, samples the restart, restores it
+make destroy                            # tear down when done
+```
+
+Needs `SUPABASE_ACCESS_TOKEN` (or a decrypted `secrets.tfvars`) and
+`db_password` in `secrets.tfvars`, same as every other module here. Expect the
+run to take up to `MAX_WAIT_MS` (7 minutes) if the outage never recovers, plus
+the restore step; budget D05 alone, not stacked with D03/D04 in the same
+invocation, because both mutate project-level state that a second concurrent
+module could race.
