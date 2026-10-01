@@ -47,6 +47,11 @@ facts):
 - `platform-downtime` - what a platform operation (restart, resize,
   upgrade, pause) costs a client, per connection path, in measured
   seconds.
+- `checkpointer-reset` - local-only rig (no OpenTofu): `supabase/postgres`
+  vs vanilla `postgres` at the same 17.x line, clean vs unclean restart,
+  and whether `pg_stat_checkpointer.stats_reset` survives. Its RUNLOG.md
+  has the SIGKILL-during-checkpoint table across 17.4, 17.11 and 18.6
+  (version-dependent).
 - `platform-facts` - not a behaviour test; harvests per-project facts
   (pg_settings, extensions, versions) for reference.
 - `residency-facts` - the data-residency doc's claims as measured modules:

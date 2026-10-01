@@ -22,7 +22,7 @@ validate:
 	tofu validate
 
 apply:
-	tofu plan $(VARS) -out=tfplan
+	@tofu plan $(VARS) -out=tfplan
 	tofu apply tfplan
 	@echo "source_ref = $$(tofu output -raw source_ref)"
 	@echo "target_ref = $$(tofu output -raw target_ref)"
@@ -42,7 +42,7 @@ probe:
 	@echo "== evidence/$(TS)/REPORT.md =="
 
 destroy:
-	tofu plan -destroy $(VARS) -out=tfplan-destroy
+	@tofu plan -destroy $(VARS) -out=tfplan-destroy
 	tofu apply tfplan-destroy
 
 publish-evidence:

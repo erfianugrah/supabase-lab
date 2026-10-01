@@ -497,6 +497,36 @@ each user's auth rows". Findings and artifacts in RUNLOG.md; out/2026-09-25/.
   WebSocket probe cannot tell "answered 401" from "dead" under this runtime
   (verified against a live project: curl gets 401, ws gets the string). Do not
   add that handler back expecting it to fire.
+- **D05 (2026-10-01): a database-password PATCH on a plain project does not
+  restart Postgres.** `pg_postmaster_start_time()` and
+  `pg_stat_checkpointer.stats_reset` were unchanged across a 7-minute window,
+  and REST, Auth, Storage and Realtime stayed up (the pooler is not probed:
+  its probe uses the password being changed). Integration-provisioned
+  projects were not tested (a Vercel-Marketplace install needs a human
+  `vercel integration accept-terms` first). For "does a managed restart
+  reset the checkpointer", read the same pair around D01's `POST /restart`.
+
+## experiments/checkpointer-reset - key facts (validated 2026-10-01, local only)
+
+- `supabase/postgres:17.6.1.136` and `postgres:17.11-alpine` behave the same:
+  an unhurried clean restart keeps `pg_stat_checkpointer.stats_reset` and the
+  counters; SIGKILL resets both. Every rig restart ran on a near-idle cluster,
+  so this says nothing about a slow shutdown.
+- **A SIGKILL during a slow shutdown checkpoint depends on the version**
+  (~2 GB dirty shared_buffers, SIGINT then SIGKILL 0.5 s later, two runs per
+  case). Postmaster only, checkpointer survives and finishes: both logs read
+  clean on every version, but PG 17.4 and 17.11 KEEP the stats and PG 18.6
+  resets them. Every process killed (17.11): the next start logs `not
+  properly shut down; automatic recovery in progress` and the stats reset.
+  So on 17.x a stats reset at a restart should come with that startup line;
+  a clean `was shut down at` instead points away from the stop path.
+- Inside a container the postmaster cannot be killed alone under `--init`
+  (tini exits with it and the namespace dies); keep the container on `sleep
+  infinity` and run Postgres under `pg_ctl`. Send both signals inside one
+  `docker exec` - two separate `docker.exe exec` calls add enough latency
+  that the SIGKILL landed after the stop had finished.
+- zsh does not word-split an unquoted `$VAR`: `kill -9 $PM $KIDS` killed only
+  the postmaster in the first attempt. Run such scripts under bash.
 
 ## experiments/platform-facts - key facts
 

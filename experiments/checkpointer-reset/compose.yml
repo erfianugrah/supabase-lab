@@ -1,0 +1,76 @@
+# Two throwaway Postgres 17s, side by side, for one question: a managed PG 17
+# project can show pg_stat_checkpointer.stats_reset moving to a restart time
+# while the server's own log for that restart reads "fast shutdown request" -
+# nominally a CLEAN shutdown. A quick ad-hoc container test showed vanilla
+# Postgres does NOT reset the checkpointer on a clean restart, only on an
+# unclean one. Is that divergence something the self-hosted Supabase stack's
+# own image/entrypoint introduces, or purely a managed-platform-orchestration
+# thing invisible to any container we can run?
+#
+# `supabase_db` is the REAL db service block from supabase/supabase's
+# docker/docker-compose.yml (image tag, command, environment, healthcheck),
+# copied as closely as a standalone single-service fixture allows - see
+# README.md for exactly what was dropped and why. `vanilla_db` is the
+# upstream postgres image at the matching 17.x line, no Supabase layer at
+# all. Same major version (17), same test protocol, so any difference in
+# restart behaviour is attributable to the image/entrypoint, not the version.
+#
+# Ports are published on loopback only, which the real deployment does NOT do
+# for the db service (production routes through Supavisor) - a necessary
+# deviation for a throwaway rig that has to be dialable from the host.
+name: pvlab-checkpointer-reset
+
+services:
+  supabase_db:
+    container_name: pvlab-checkpointer-reset-supabase
+    # Pinned to the exact tag docker/docker-compose.yml ships today
+    # (verified against github.com/supabase/supabase docker/ 2026-10-01) -
+    # major 17, matching the managed platform's current mainline.
+    image: supabase/postgres:17.6.1.136
+    restart: "no"
+    ports:
+      - "127.0.0.1:45432:5432"
+    volumes:
+      - supabase_db_config:/etc/postgresql-custom
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres", "-h", "localhost"]
+      interval: 2s
+      timeout: 3s
+      retries: 40
+    environment:
+      POSTGRES_HOST: /var/run/postgresql
+      PGPORT: ${POSTGRES_PORT:-5432}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+      PGPASSWORD: ${PVLAB_LOCAL_DB_PASSWORD}
+      POSTGRES_PASSWORD: ${PVLAB_LOCAL_DB_PASSWORD}
+      PGDATABASE: postgres
+      POSTGRES_DB: postgres
+      JWT_EXP: "3600"
+    command:
+      [
+        "postgres",
+        "-c",
+        "config_file=/etc/postgresql/postgresql.conf",
+        "-c",
+        "log_min_messages=fatal",
+      ]
+
+  vanilla_db:
+    container_name: pvlab-checkpointer-reset-vanilla
+    # Latest 17.x tag on Docker Hub as of 2026-10-01 (postgres:17.11-alpine) -
+    # no Supabase image layer, no custom command/entrypoint at all.
+    image: postgres:17.11-alpine
+    restart: "no"
+    ports:
+      - "127.0.0.1:45433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 2s
+      timeout: 3s
+      retries: 40
+    environment:
+      POSTGRES_PASSWORD: ${PVLAB_LOCAL_DB_PASSWORD}
+      POSTGRES_DB: postgres
+
+volumes:
+  supabase_db_config:

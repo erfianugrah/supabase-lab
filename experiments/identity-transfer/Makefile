@@ -32,8 +32,8 @@ validate:
 	tofu validate
 
 apply:
-	tofu plan $(VARS) -var="supabase_access_token=$(TOK)" -out=tfplan
-	tofu apply tfplan
+	@tofu plan $(VARS) -var="supabase_access_token=$(TOK)" -out=tfplan
+	@tofu apply tfplan
 	@echo "project_ref = $$(tofu output -raw project_ref)"
 
 # The lab-controlled issuer. Its URL is what `external_keycloak_url` gets
@@ -71,8 +71,8 @@ publish-evidence:
 	@cd $(ROOT)/harness && bun scripts/publish-evidence.ts $(abspath $(RUN)) $(abspath .) $(if $(PUBLISH_ONLY),--only $(PUBLISH_ONLY),)
 
 destroy:
-	tofu plan -destroy $(VARS) -var="supabase_access_token=$(TOK)" -out=tfplan-destroy
-	tofu apply tfplan-destroy
+	@tofu plan -destroy $(VARS) -var="supabase_access_token=$(TOK)" -out=tfplan-destroy
+	@tofu apply tfplan-destroy
 
 # ---------------------------------------------------------------------------
 # Local rig (ITL1-ITL3). A throwaway GoTrue at a pinned version for the

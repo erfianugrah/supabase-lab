@@ -21,6 +21,13 @@ PW := $(shell grep -E '^db_password' $(ROOT)/secrets.tfvars 2>/dev/null | cut -d
 # Measured on this tree: with (pat, anon-key, db, org) and --destructive, an
 # unfiltered run is `F01 F02 F03 F04 F05 C05* D01* D02* V04*` - C05 and V04
 # belong to other experiments and are destructive.
+#
+# D03/D04 (resize pair) and D05 (password-reset restart, pg_stat_checkpointer)
+# are opt-in, same as each other: `make probe-destructive ONLY=D03,D04` or
+# `make probe-destructive ONLY=D05`. D05 changes the real DB password twice
+# (throwaway, then back to secrets.tfvars's db_password in a `finally`) - do
+# not run it concurrently with anything else that assumes a stable password
+# mid-run.
 ONLY ?= D01,D02
 RUNNER_FLAGS ?=
 
@@ -37,8 +44,8 @@ validate:
 	tofu validate
 
 apply:
-	tofu plan $(VARS) -var="supabase_access_token=$(TOK)" -out=tfplan
-	tofu apply tfplan
+	@tofu plan $(VARS) -var="supabase_access_token=$(TOK)" -out=tfplan
+	@tofu apply tfplan
 	@echo "project_ref = $$(tofu output -raw project_ref)"
 
 probe:
@@ -63,5 +70,5 @@ probe-destructive:
 	@$(MAKE) probe RUNNER_FLAGS=--destructive
 
 destroy:
-	tofu plan -destroy $(VARS) -var="supabase_access_token=$(TOK)" -out=tfplan-destroy
-	tofu apply tfplan-destroy
+	@tofu plan -destroy $(VARS) -var="supabase_access_token=$(TOK)" -out=tfplan-destroy
+	@tofu apply tfplan-destroy
