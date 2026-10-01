@@ -831,14 +831,28 @@ Reference: COMPUTE-DISK.md at the repo root; see the experiment's
 RUNLOG.md for the per-module details and the probe script's
 result-id -> module-id mapping.
 
-- Autoscale config unreadable AND unmodifiable on the public v1 API - on
-  both Pro AND Team orgs, GET /config/disk/autoscale returns an empty
-  shape, mutation verbs all 404 (D04/D07).
+- Autoscale config readable-but-empty AND unmodifiable on the public v1 API -
+  on both Pro AND Team orgs, GET /config/disk/autoscale answers 200 with
+  `growth_percent`/`min_increment_gb`/`max_size_gb` all null, mutation verbs
+  all 404 (D04/D07). "Unreadable" was the earlier wording and it leaked into a
+  customer draft as "cannot be read": the route exists and answers.
 - Disk quota enforced as `429 Database disk can only be modified once per
   four hours. Last modified at <UTC>` - contradicts the doc's "4 within
   24h" text; enforcement nondeterministic across runs (D03).
 - Free org db starts with 2GB disk, not the documented 1GB; it did not
   autoscale during a fill to 726MB (D05).
+- Pro starts on 2 GB as well (D10, 2026-10-01). Autoscale fires at ~90% util:
+  2 -> 8 GB first (the baseline, not +50%), then 8 -> 12 GB, and it is not
+  bound by the manual four-hour cooldown. Read-only at ~95% measured, with
+  automatic return after the grow. A fast burst once the manual quota is
+  spent hit `53100` disk full and a 7 min `57P03` outage in one run of two
+  (project status `ACTIVE_HEALTHY` throughout); the other got read-only at
+  95.1%. The ">1.5x import" rule did not fire as
+  written (1.90x accepted). `/config/disk/util` is a five-minute sample. Gate
+  D10 on fresh util samples or Postgres's own data+WAL read, never on a
+  connection error: run 1 called a dropped connection read-only.
+- Grow steps from 2 GB (D11): 4/5 GB `400` on the gp3 IOPS floor (message
+  gives max 500/GB or 80,000), 6 GB `201`.
 - Free org read-only caught at ~726MB db size, not the documented 500MB
   (D06). SELECT still answers 201 on the management query endpoint. TRUNCATE
   rejected (D06b) - recovery needs DELETE + vacuum or the override GUC.
