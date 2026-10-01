@@ -19,9 +19,9 @@ validate:
 	tofu validate
 
 apply:
-	test -n "$(TOK)" || (echo "no PAT in env or secrets.tfvars"; exit 1)
-	TF_VAR_supabase_access_token="$(TOK)" tofu plan $(VARS) -out=tfplan
-	TF_VAR_supabase_access_token="$(TOK)" tofu apply tfplan
+	@test -n "$(TOK)" || (echo "no PAT in env or secrets.tfvars"; exit 1)
+	@TF_VAR_supabase_access_token="$(TOK)" tofu plan $(VARS) -out=tfplan
+	@TF_VAR_supabase_access_token="$(TOK)" tofu apply tfplan
 	@echo "project_ref = $$(tofu output -raw project_ref)"
 
 # Read-only: R01, R03, R07. Needs no project for R01/R07, but harmless with one.
@@ -55,5 +55,5 @@ diff:
 		$(ROOT)/harness/dist/pvlab --diff "$$prev,$$cur" --out evidence/diff-$(TS); }
 
 destroy:
-	TF_VAR_supabase_access_token="$(TOK)" tofu plan -destroy $(VARS) -out=tfplan-destroy
-	TF_VAR_supabase_access_token="$(TOK)" tofu apply tfplan-destroy
+	@TF_VAR_supabase_access_token="$(TOK)" tofu plan -destroy $(VARS) -out=tfplan-destroy
+	@TF_VAR_supabase_access_token="$(TOK)" tofu apply tfplan-destroy
