@@ -3,7 +3,7 @@
 Every load-bearing claim about Supabase compute sizing, disk behaviour, and
 upgrade/downgrade paths, across every plan tier you have access to
 (Free / Pro / Team). Numbers were measured on throwaway projects in
-supabase-lab (experiment `compute-disk`, ids D01-D09); where a number could
+supabase-lab (experiment `compute-disk`, ids D01-D11); where a number could
 not be measured it is labelled. Labels:
 
 - `measured` - ran on a live project here, paste evidence in the experiment files.
@@ -17,9 +17,13 @@ not be measured it is labelled. Labels:
 | Does compute auto-upgrade? | No. Manual addon PATCH; ~2min downtime doc-cited, ~107s measured (micro->small) | D01 (measured) |
 | Does the disk ever shrink? | No (measured; decrease rejected HTTP 400). Only "right-sized" to 1.2x db size (min 8GB) on a Postgres version upgrade | D02 (measured), doc-verified |
 | Disk modification quota on paid plans | Runtime enforces 429 "Database disk can only be modified once per four hours. Last modified at <UTC>." Docs say "4 modifications per rolling 24h". One round burst of 5 accepted, another rejected the 2nd - the quota message contradicts the docs and enforcement is nondeterministic | D03 (measured) |
+| Paid plan read-only trigger | Docs: 95% disk util. Runtime (Pro, 2 GB): read-only at ~95% with `25006`, preceded by ~3 min of `57P03`; returned to read-write by itself once autoscale grew the disk. At 803 MB db size: WAL was ~1 GB of the 2 GB | D10 (measured) |
+| Paid plan: fast import with the quota spent | One run of two skipped read-only: `53100 could not extend file: No space left on device`, then a 7 min outage (`57P03`, postmaster restart) while project status read `ACTIVE_HEALTHY`. The other got read-only at 95.1% and was writable 492 s later, also after a restart. Autoscale recovered both inside the manual 4 h cooldown | D10c/D10d (measured, 2 runs) |
+| Autoscale on paid plans | Fires at ~90% util. First step 2 -> 8 GB (to the plan baseline, not +50%), next 8 -> 12 GB (+50%). Not bound by the manual 4 h cooldown | D10b (measured) |
+| "Import >1.5x current size trips read-only" | Not as written: 1.90x onto a 203 MB db accepted, read-only off. Disk utilisation is the trigger | D10a (measured) |
 | Free plan read-only trigger | Docs: 500MB db size. Runtime: writes accepted to 726MB db size, then read-only kicks in. Verbatim error `ERROR: 25006: cannot execute INSERT in a read-only transaction` | D06 (measured) |
 | Read-only recovery | Docs: delete data + vacuum, or override GUC. Runtime: TRUNCATE is rejected WITH HTTP 400 - use DELETE then vacuum | D06b (measured) |
-| Autoscale config editable via API? | NO. GET /config/disk/autoscale returns an empty shape; PUT/POST/PATCH all 404 on Pro AND Team orgs. Dashboard edits it somewhere else | D04/D07 (measured) |
+| Autoscale config editable via API? | NO. GET /config/disk/autoscale answers 200 with `growth_percent`, `min_increment_gb`, `max_size_gb` all null; PATCH/PUT/POST/DELETE all 404 with the unknown-path shape, on Pro, Team and a platform-plan org. `POST /config/disk` accepts autoscale keys, answers 201 and discards them. Dashboard edits it somewhere else | D04/D07 (measured), re-probe 2026-09-23 |
 | Disk IOPS/throughput gate | Dashboard: "LARGE compute or above". Runtime: POST config/disk with elevated IOPS/throughput accepted AND subsequent GET showed it stuck on Micro. The gate is dashboard-only | D08 (measured) |
 | Spend cap is a request-path breaker? | No - measured in W21: all render calls past quota returned 200. Its consequences ride the billing path (notify, grace, Fair Use restriction) | W21 (measured) |
 
@@ -112,12 +116,25 @@ Compute-hours billed hourly (paused doesn't count), NOT covered by spend cap
 - Trigger at 90% disk usage, growth 50%, min increment 1GB, max 8GB if spend
   cap on (Pro). Autoscale still grows even when it would land you past a
   documented plan limit.
-- CRITICAL finding: the autoscale config is unreadable AND unmodifiable via
-  the public Management API (D04/D07: GET returns empty, mutation verbs all
-  404, on Pro AND Team). Dashboard exposes it. Same pattern as
+- CRITICAL finding: the autoscale config is readable but empty, and
+  unmodifiable, via the public Management API (D04/D07: GET answers 200 with
+  all three fields null, mutation verbs all 404, on Pro AND Team; re-probed
+  2026-09-23 on a platform-plan org with the same result). `POST /config/disk`
+  accepts autoscale keys in any shape, answers 201 and discards them - see
+  RUNLOG 2026-09-23. Dashboard exposes it. Same pattern as
   http-tier-lockdown's Data API toggle.
 - Free project started with 2GB disk, not the documented 1GB, and autoscale
   did not flip during fill (D05 measured).
+- Pro (D10 measured, 2026-10-01): a fresh project starts on 2 GB too. A paced
+  fill crossed 90% util and the disk grew 2 -> 8 GB within ~2 min, no
+  refusal. The next grow went 8 -> 12 GB (+50%). The first step lands on the
+  8 GB baseline, although the autoscale email says "increases the disk by
+  50%" above "2GB -> 8GB". Autoscale grew 10 min after its previous grow,
+  while a manual POST was answering the four-hour 429: the cooldown binds
+  manual changes only.
+- `/config/disk/util` is a five-minute sample (D10): it can lag a fast fill
+  by the whole 90-95% band, and run 1 read the pre-fill baseline while the
+  disk was full.
 
 ### Manual expansion + quota (D02/D03 measured)
 
@@ -138,8 +155,16 @@ Compute-hours billed hourly (paused doesn't count), NOT covered by spend cap
 - In read-only: TRUNCATE is rejected too (D06b). SELECT still answered on
   the management query endpoint (201). Recovery: DELETE + vacuum
   (doc-verified) or the override GUC `set default_transaction_read_only='off'`.
-- Paid plans: read-only at 95% disk util (doc-verified; not tested here -
-  prohibitive fill).
+- Paid plans (D10 measured on Pro): read-only at ~95% disk util with the
+  same `25006` error and `GET /readonly` `enabled:true`; ~3 min of `57P03`
+  before it. Read-write returned automatically once autoscale grew the disk,
+  no restart. With the modification quota already spent by autoscale, a fast
+  burst skipped read-only and hit `53100 No space left on device` in one run
+  of two (7 min outage with a postmaster restart, project status
+  `ACTIVE_HEALTHY` all along); the other run got read-only at 95.1%. Recovery by freeing space under the override GUC was not run on a
+  paid plan.
+- WAL counts: Micro runs `min_wal_size=1GB`/`max_wal_size=4GB`, and `pg_wal`
+  held 816-992 MB under load - half of a 2 GB volume (D10).
 
 ### IOPS/throughput gate (D08 measured)
 
@@ -165,20 +190,26 @@ Compute-hours billed hourly (paused doesn't count), NOT covered by spend cap
 | D01 | micro/small pg_limits table; resize 107s settled |
 | D02 | decrease 400/increase 201 - increase-only |
 | D03 | quota: 429 once-per-four-hours measured |
-| D04 | autoscale GET empty + verbs 404 (Pro) |
+| D04 | autoscale GET 200 all-null + verbs 404 (Pro) |
 | D05 | free db starts 2GB; no autoscale observed through block |
 | D06 | free read-only at 726MB db; verbatim 25006 |
 | D06b | TRUNCATE rejected in read-only |
 | D07 | same autoscale surface gap on Team |
 | D08 | IOPS/throughput accepted + applied on Micro |
 | D09 | upgrade/downgrade timings + sampled window (see report) |
+| D10 | Pro 2 GB start; 1.9x burst no read-only; autoscale 2->8 then 8->12; read-only at 95% + auto-return; quota-spent burst -> 53100 + 7 min outage (1 of 2 runs), read-only (the other) |
+| D11 | grow from 2 GB: 4/5 GB 400 (gp3 IOPS floor), 6 GB 201 |
 
 ## Ops playbook
 
-- Bulk import >1.5x current db size: raise disk FIRST with manual POST or the
-  quota caps you and the write path goes read-only (measured).
-- Track autoscale settings in IaC manually: you cannot read or write them
-  through the API (D04/D07). The dashboard retains them.
+- Bulk import: size it against free DISK (data + WAL + system), not against
+  database size. If the import would cross 90% of the volume, raise the disk
+  first with a manual POST; a fast import outruns the five-minute util
+  sample and autoscale, and after autoscale has already grown the disk once it
+  ended in `53100` disk full and an outage in one run of two (D10).
+- Track autoscale settings in IaC manually: the API GET returns nulls and
+  there is no write (D04/D07, 2026-09-23). A 201 from `POST /config/disk`
+  with autoscale keys is not a cap. The dashboard retains them.
 - Sizing cues: CPU util, Disk IO % consumed (burst-budget drain indicator;
   >0 means past baseline) (doc-verified).
 - On Pro: compute bursts back, then IOPS throttle hits; on small tiers the
