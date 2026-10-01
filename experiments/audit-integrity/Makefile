@@ -34,8 +34,8 @@ validate:
 	tofu validate
 
 apply:
-	tofu plan $(VARS) -var="supabase_access_token=$(TOK)" $(if $(PVLAB_ORG_TEAM),-var="team_org_id=$(PVLAB_ORG_TEAM)",) -out=tfplan
-	tofu apply tfplan
+	@tofu plan $(VARS) -var="supabase_access_token=$(TOK)" $(if $(PVLAB_ORG_TEAM),-var="team_org_id=$(PVLAB_ORG_TEAM)",) -out=tfplan
+	@tofu apply tfplan
 	@echo "project_ref = $$(tofu output -raw project_ref)"
 
 # Every module runs from this machine: the whole experiment is the Management
@@ -65,5 +65,5 @@ publish-evidence:
 	@cd $(ROOT)/harness && bun scripts/publish-evidence.ts $(abspath $(RUN)) $(abspath .) $(if $(PUBLISH_ONLY),--only $(PUBLISH_ONLY),)
 
 destroy:
-	tofu plan -destroy $(VARS) -var="supabase_access_token=$(TOK)" $(if $(PVLAB_ORG_TEAM),-var="team_org_id=$(PVLAB_ORG_TEAM)",) -out=tfplan-destroy
-	tofu apply tfplan-destroy
+	@tofu plan -destroy $(VARS) -var="supabase_access_token=$(TOK)" $(if $(PVLAB_ORG_TEAM),-var="team_org_id=$(PVLAB_ORG_TEAM)",) -out=tfplan-destroy
+	@tofu apply tfplan-destroy

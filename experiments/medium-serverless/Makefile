@@ -66,7 +66,7 @@ pooler-config:
 BENCH_SCALE ?= 10
 bench-init:
 	@test -n "$(REF)" || (echo "no project_ref output - run 'make apply' first"; exit 1)
-	PGSSLMODE=require PGCONNECT_TIMEOUT=10 pgbench -i -s $(BENCH_SCALE) "postgres://postgres:$(PW)@db.$(REF).supabase.co:5432/postgres"
+	@PGSSLMODE=require PGCONNECT_TIMEOUT=10 pgbench -i -s $(BENCH_SCALE) "postgres://postgres:$(PW)@db.$(REF).supabase.co:5432/postgres"
 
 probe:
 	@test -n "$(REF)" || (echo "no project_ref output - run 'make apply' first"; exit 1)

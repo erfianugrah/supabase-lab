@@ -9,6 +9,7 @@
 import type { Ctx, TestResult } from "../../../harness/src/types";
 import type { PathWindow, Probe } from "../../../harness/src/sampler";
 import { mgmt } from "../../../harness/src/mgmt";
+import { sql } from "../../../harness/src/platform";
 import { restProbe, authProbe, storageProbe, realtimeProbe, poolerProbe } from "./probes";
 
 /** Verified 200 on a fresh project 2026-08-04; /auth/v1/settings also answers. */
@@ -148,4 +149,134 @@ export function verdict(
               .join(", ")}`,
     measurements,
   };
+}
+
+/**
+ * D05 support: does a platform-triggered restart preserve or reset
+ * cumulative checkpointer stats? `pg_postmaster_start_time()` is the
+ * independent, version-stable signal that a restart actually happened - it is
+ * read alongside stats_reset so a module can tell "the stats survived a real
+ * restart" apart from "nothing restarted, so of course stats_reset didn't
+ * move" and from "we can't tell, the SQL endpoint errored". Conflating those
+ * three is exactly the kind of ambiguous-signal-to-causal-claim mistake the
+ * pg-analyser AGENTS.md conventions warn about; this experiment measures a
+ * platform operation, not a Postgres internal, so the same discipline applies
+ * here on purpose.
+ *
+ * Counter view moved from `pg_stat_bgwriter` to `pg_stat_checkpointer` in
+ * Postgres 17 (column names changed, not just the view). A newly created
+ * Supabase project comes up on the latest Postgres image (platform-facts F06:
+ * "a newly created project comes up already at the latest app version"), so
+ * `pg_stat_checkpointer` is the expected path; the `pg_stat_bgwriter` probe is
+ * a fallback for anyone re-running this against an older/self-hosted PG16-.
+ * Not re-derived from the CLI or hand-guessed: both views and their
+ * `stats_reset` column are documented in the Postgres "Monitoring Statistics"
+ * chapter (pg_stat_checkpointer and pg_stat_bgwriter), read at
+ * https://www.postgresql.org/docs/current/monitoring-stats.html for the
+ * Postgres version this run reports in F06-style metadata.
+ */
+export interface RestartSignal {
+  /** pg_postmaster_start_time(), ISO-ish text. Null only if the SQL call itself failed. */
+  startTime: string | null;
+  checkpointerStatsReset: string | null;
+  checkpointerSource: "pg_stat_checkpointer" | "pg_stat_bgwriter" | null;
+  /** Non-empty only when something below failed; never throws. */
+  error: string;
+}
+
+const TS_FORMAT = `'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'`;
+
+export async function readRestartSignal(ctx: Ctx): Promise<RestartSignal> {
+  const pm = await sql(ctx, `select to_char(pg_postmaster_start_time(), ${TS_FORMAT}) as start_time`);
+  const startTime =
+    pm.status === 201 && pm.rows[0] ? (String(pm.rows[0]?.start_time ?? "") || null) : null;
+
+  const viaCheckpointer = await sql(
+    ctx,
+    `select to_char(stats_reset, ${TS_FORMAT}) as stats_reset from pg_stat_checkpointer`,
+  );
+  if (viaCheckpointer.status === 201 && viaCheckpointer.rows[0]) {
+    return {
+      startTime,
+      checkpointerStatsReset: String(viaCheckpointer.rows[0]?.stats_reset ?? "") || null,
+      checkpointerSource: "pg_stat_checkpointer",
+      error: pm.error,
+    };
+  }
+
+  const viaBgwriter = await sql(
+    ctx,
+    `select to_char(stats_reset, ${TS_FORMAT}) as stats_reset from pg_stat_bgwriter`,
+  );
+  if (viaBgwriter.status === 201 && viaBgwriter.rows[0]) {
+    return {
+      startTime,
+      checkpointerStatsReset: String(viaBgwriter.rows[0]?.stats_reset ?? "") || null,
+      checkpointerSource: "pg_stat_bgwriter",
+      error: pm.error,
+    };
+  }
+
+  return {
+    startTime,
+    checkpointerStatsReset: null,
+    checkpointerSource: null,
+    error: [pm.error, viaCheckpointer.error, viaBgwriter.error].filter(Boolean).join(" | "),
+  };
+}
+
+/**
+ * Right after a restart, `ACTIVE_HEALTHY` is not readiness (the provisioning
+ * key fact above this file, re-earned here): the Management query endpoint
+ * can keep erroring for a few seconds after the client-visible HTTP paths
+ * have already recovered. Retry rather than trust the first read as "gone".
+ */
+export async function readRestartSignalRetrying(
+  ctx: Ctx,
+  attempts = 5,
+  delayMs = 3000,
+): Promise<RestartSignal> {
+  let last: RestartSignal = {
+    startTime: null,
+    checkpointerStatsReset: null,
+    checkpointerSource: null,
+    error: "not attempted",
+  };
+  for (let i = 0; i < attempts; i++) {
+    last = await readRestartSignal(ctx);
+    if (last.startTime && last.checkpointerStatsReset) return last;
+    await Bun.sleep(delayMs);
+  }
+  return last;
+}
+
+/**
+ * `PATCH /v1/projects/{ref}/database/password` - verified against the LIVE
+ * published OpenAPI document (api.supabase.com/api/v1-json,
+ * `v1-update-database-password`), not recalled: the path is
+ * `database/password`, singular, NOT a `/db-password` shorthand. Body is
+ * `{password: string}` (min length 4 per the spec; this module sends a 64-char
+ * random value regardless), response is `{message: string}` with no secret
+ * echoed back, so logging the response text is safe - the password itself
+ * never is. This is the call a user's password reset makes. On a plain project
+ * it changes the password without a restart (D05, 2026-10-01; see RUNLOG.md's
+ * Vercel Marketplace section for why integration-provisioned projects were
+ * left out).
+ */
+export async function setDatabasePassword(ctx: Ctx, password: string): Promise<void> {
+  const r = await mgmt(ctx, "PATCH", `/projects/${ctx.ref}/database/password`, { password });
+  if (r.status === undefined || r.status >= 300) {
+    throw new Error(`password update failed: HTTP ${r.status} ${(r.text ?? "").slice(0, 200)}`);
+  }
+}
+
+/**
+ * A fresh, high-entropy, throwaway credential - never `ctx.dbPassword`, never
+ * logged, never placed in a `measurements` or `evidence` field. Vault-root-key
+ * applies the same rule to an encryption root key; this applies it to a live
+ * DB password instead. Two concatenated v4 UUIDs with dashes stripped: 64 hex
+ * characters, comfortably past any plausible complexity floor.
+ */
+export function randomPassword(): string {
+  return crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "");
 }

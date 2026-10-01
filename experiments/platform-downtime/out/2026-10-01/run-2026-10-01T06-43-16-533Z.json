@@ -1,0 +1,44 @@
+{
+  "startedAt": "2026-10-01T06:43:16.533Z",
+  "finishedAt": "2026-10-01T06:50:19.016Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "platform-downtime",
+  "labCommit": "e792c23",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "OpenSSL 3.6.5 29 Sep 2026 (Library: OpenSSL 3.6.5 29 Sep 2026)"
+  },
+  "results": [
+    {
+      "id": "D05",
+      "title": "DB password reset: per-path outage, and does the restart reset pg_stat_checkpointer?",
+      "status": "fail",
+      "detail": "pg_postmaster_start_time() never changed within the probe window - no restart was confirmed, so the checkpointer question is moot for this run (raise MAX_WAIT_MS or re-run)",
+      "measurements": {
+        "probe_interval_ms": 500,
+        "rest_first_fail_s": "n/a",
+        "rest_window_s": "n/a",
+        "rest_mode": "none",
+        "auth_first_fail_s": "n/a",
+        "auth_window_s": "n/a",
+        "auth_mode": "none",
+        "storage_first_fail_s": "n/a",
+        "storage_window_s": "n/a",
+        "storage_mode": "none",
+        "realtime_first_fail_s": "n/a",
+        "realtime_window_s": "n/a",
+        "realtime_mode": "none",
+        "postmaster_start_before": "2026-10-01T06:38:25.763Z",
+        "postmaster_start_after": "2026-10-01T06:38:25.763Z",
+        "checkpointer_source": "pg_stat_checkpointer",
+        "checkpointer_stats_reset_before": "2026-09-29T12:45:56.639Z",
+        "checkpointer_stats_reset_after": "2026-09-29T12:45:56.639Z"
+      },
+      "durationMs": 422491
+    }
+  ]
+}
