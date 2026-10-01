@@ -28,8 +28,8 @@ validate:
 	tofu validate
 
 apply:
-	tofu plan $(VARS) -var="supabase_access_token=$(TOK)" $(ORG_VAR) -out=tfplan
-	tofu apply tfplan
+	@tofu plan $(VARS) -var="supabase_access_token=$(TOK)" $(ORG_VAR) -out=tfplan
+	@tofu apply tfplan
 	@echo "A=$$(tofu output -raw project_ref) B=$$(tofu output -raw project_b_ref)"
 
 # Seed the (already created, empty) probe repository with fixture/ as main.
@@ -70,5 +70,5 @@ publish-evidence:
 	@! grep -rqF "$(REPO)" out/ || (echo "repository name still present in out/"; exit 1)
 
 destroy:
-	tofu plan -destroy $(VARS) -var="supabase_access_token=$(TOK)" $(ORG_VAR) -out=tfplan-destroy
-	tofu apply tfplan-destroy
+	@tofu plan -destroy $(VARS) -var="supabase_access_token=$(TOK)" $(ORG_VAR) -out=tfplan-destroy
+	@tofu apply tfplan-destroy

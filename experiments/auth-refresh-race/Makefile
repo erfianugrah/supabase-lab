@@ -32,13 +32,13 @@ validate:
 	tofu validate
 
 apply:
-	tofu plan $(VARS) -var="supabase_access_token=$(TOK)" -out=tfplan
-	tofu apply tfplan
+	@tofu plan $(VARS) -var="supabase_access_token=$(TOK)" -out=tfplan
+	@tofu apply tfplan
 	@echo "project_ref = $$(tofu output -raw project_ref)"
 
 destroy:
-	tofu plan -destroy $(VARS) -var="supabase_access_token=$(TOK)" -out=tfplan-destroy
-	tofu apply tfplan-destroy
+	@tofu plan -destroy $(VARS) -var="supabase_access_token=$(TOK)" -out=tfplan-destroy
+	@tofu apply tfplan-destroy
 
 # One repro run: provision user -> dart run against gotrue $(GOTRUE_VERSION)
 # -> delete user. Prints the RESULT block; verdict line is the differential.
