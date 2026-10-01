@@ -824,9 +824,11 @@ its experiment dir and planRun honours `--experiment` as a REAL filter -
 before 2026-08-18 it was a label only, and `--only I04` ran both twins.
 Always pass `--experiment <dir>` in probes.
 
-## experiments/compute-disk - key facts (validated 2026-08-19; autoscale write surface re-probed 2026-09-23)
+## experiments/compute-disk - key facts (validated 2026-08-19; autoscale write surface re-probed 2026-09-23; paid-plan fill D10/D11 2026-10-01)
 
-Self-provisioning (no tofu), Pro/Team/Free orgs, modules D01-D09.
+Self-provisioning (no tofu), Pro/Team/Free orgs, modules D01-D11 (D11 is a
+curl replay recorded in the RUNLOG, no test file). D10 is not mapped in
+`.pi/probe-compute-disk.sh`; run it directly with `PVLAB_ORG_PRO` set.
 Reference: COMPUTE-DISK.md at the repo root; see the experiment's
 RUNLOG.md for the per-module details and the probe script's
 result-id -> module-id mapping.
@@ -958,6 +960,10 @@ a throwaway probe Worker + two Hyperdrive configs via wrangler (account from
   54321 and open the authorize URL. Steps in
   experiments/byo-oauth/RUNLOG.md.
 - `.pi/sweep-all.sh` runs every acceptance probe in a burst-safe order.
+- compute-disk D10 on the platform-plan org: autoscale entitlement and
+  first-grow step there are unmeasured (D10 ran on Pro only). Needs the
+  platform org's slug and token plus its control-plane base URL; the 2 GB
+  Nano volume makes the fill cheap (~40 min).
 
 ## experiments/auth-refresh-race - key facts (validated 2026-08-19)
 
