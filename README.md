@@ -96,8 +96,10 @@ facts):
 - `compute-disk` - everything about compute sizing and disk across plans:
   per-size pg limits (D01), disk semantics + modification quota (D02/D03),
   the autoscale config surface (D04/D07), the free-org autoscale/read-only
-  lifecycle (D05/D06/D06b), the dashboard-only IOPS gate (D08), and
-  upgrade/downgrade timing + sampled downtime (D09). Root reference:
+  lifecycle (D05/D06/D06b), the dashboard-only IOPS gate (D08),
+  upgrade/downgrade timing + sampled downtime (D09), the paid-plan fill -
+  autoscale, read-only, disk-full and recovery on Pro (D10) - and the grow
+  steps from a 2 GB volume (D11). Root reference:
   COMPUTE-DISK.md.
 - `rls-policy-cost` - the cost of an RLS policy: whether `(select auth.uid())`
   hoists (InitPlan, access-control-neutral), what an index does to that win,
