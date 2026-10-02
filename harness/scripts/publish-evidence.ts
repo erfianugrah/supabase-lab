@@ -15,7 +15,7 @@
  * Redaction is by shape, not by a list: any 20-lowercase-letter token (the
  * project ref shape), `<ref>.supabase.co` and `db.<ref>.supabase.co`, the
  * `aws-N-<region>.pooler.supabase.com` hosts, and anything that looks like an
- * email. The gitignore carves experiments/<name>/out/ out of the global out/
+ * email; plus, by literal, the publishing vantage's own public address. The gitignore carves experiments/<name>/out/ out of the global out/
  * rule (the literal patterns are in .gitignore; a star-slash here would close
  * this comment).
  */
@@ -24,8 +24,20 @@ import { basename, join, resolve } from "node:path";
 import { renderFacts } from "../src/facts";
 import type { RunArtifact } from "../src/types";
 
-export function redact(text: string): string {
-  return text
+export function redact(text: string, vantage: string[] = [], other: string[] = []): string {
+  let out = text;
+  // Literal addresses, matched whole so 192.0.2.4 does not eat the front of
+  // 192.0.2.44: the vantage's own egress IP, and any other address the
+  // operator names (a project's add-on IPv4, a pooler's address as Postgres
+  // sees it). By literal, not by shape: artifacts carry documentation-range
+  // addresses as deliberate test inputs.
+  const sub = (a: string, label: string) => {
+    const esc = a.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    out = out.replace(new RegExp(`(?<![0-9a-fA-F.:])${esc}(?![0-9a-fA-F.:]*[0-9a-fA-F])`, "g"), label);
+  };
+  for (const a of vantage.filter(Boolean)) sub(a, "<vantage-ip>");
+  for (const a of other.filter(Boolean)) sub(a, "<addr>");
+  return out
     .replace(/\bdb\.[a-z]{20}\.supabase\.co\b/g, "db.<ref>.supabase.co")
     .replace(/\b[a-z]{20}\.supabase\.co\b/g, "<ref>.supabase.co")
     .replace(/\baws-\d-[a-z0-9-]+\.pooler\.supabase\.com\b/g, "<pooler-host>")
@@ -56,9 +68,29 @@ if (import.meta.main) {
   await main(src, expDir, only);
 }
 
+/**
+ * This vantage's public addresses, asked of Cloudflare's trace endpoint at
+ * publish time. Postgres names the client in hba refusals and
+ * `inet_client_addr()`, so an artifact from a direct connection carries the
+ * egress IP of whoever ran it. PVLAB_REDACT_ADDRS (comma-separated) names
+ * further addresses to replace with `<addr>`.
+ */
+async function vantageAddresses(): Promise<string[]> {
+  const out: string[] = [];
+  for (const host of ["1.1.1.1", "[2606:4700:4700::1111]"]) {
+    const t = await fetch(`https://${host}/cdn-cgi/trace`, { signal: AbortSignal.timeout(5000) }).then((r) => r.text()).catch(() => "");
+    const ip = /^ip=(.+)$/m.exec(t)?.[1]?.trim();
+    if (ip) out.push(ip);
+  }
+  return out;
+}
+
 async function main(src: string, expDir: string, only: string[] | undefined): Promise<void> {
   const raw = await Bun.file(src).text();
-  const redacted = redact(raw);
+  const addrs = await vantageAddresses();
+  if (!addrs.length) console.error("warning: could not learn this vantage's public address; set PVLAB_REDACT_ADDRS");
+  const other = (process.env.PVLAB_REDACT_ADDRS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  const redacted = redact(raw, addrs, other);
   const run = JSON.parse(redacted) as RunArtifact;
   if (only?.length) {
     const lower = only.map((o) => o.toLowerCase());
