@@ -72,3 +72,24 @@ describe("redact removes every identifier class from a published artifact", () =
     expect(out).toContain("-- date: 2026-09-08T05:40:26.577Z");
   });
 });
+
+// The vantage's own egress address reached four tls-surface artifacts on
+// 2026-10-02 (Postgres names the client in hba refusals and
+// inet_client_addr()). Addresses are redacted by literal, not by shape:
+// other artifacts deliberately carry documentation-range addresses as test
+// inputs (x-forwarded-for=203.0.113.9), and a shape rule would erase them.
+describe("redact removes the addresses it is told to, and only those", () => {
+  test("a listed IPv4 literal becomes <vantage-ip>", () => {
+    expect(redact('no pg_hba.conf entry for host "192.0.2.44", user "postgres"', ["192.0.2.44"])).toBe('no pg_hba.conf entry for host "<vantage-ip>", user "postgres"');
+  });
+  test("a listed literal is matched whole, not as a prefix of a longer address", () => {
+    expect(redact("192.0.2.4 and 192.0.2.44", ["192.0.2.4"])).toBe("<vantage-ip> and 192.0.2.44");
+  });
+  test("operator-named addresses become <addr>, IPv6 included", () => {
+    expect(redact("from 2001:db8::7 and 198.51.100.20 via 192.0.2.44", ["192.0.2.44"], ["2001:db8::7", "198.51.100.20"])).toBe("from <addr> and <addr> via <vantage-ip>");
+  });
+  test("unlisted addresses and version strings are left alone", () => {
+    const s = "x-forwarded-for=203.0.113.9 image supabase-postgres-17.6.1.171 pinned to 1.1.1.1";
+    expect(redact(s, ["192.0.2.44"])).toBe(s);
+  });
+});
