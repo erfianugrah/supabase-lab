@@ -14,8 +14,12 @@
 export interface OutboundTarget {
   id: string;
   url: string;
-  /** What a verifying modern client does. */
-  expect: "connect" | "refuse";
+  /**
+   * What a verifying modern client does; "info" where clients legitimately
+   * differ (revocation: most do not enforce it - curl on the vantage connects),
+   * so the row is recorded but never counted as a mismatch.
+   */
+  expect: "connect" | "refuse" | "info";
 }
 
 export const OUTBOUND: OutboundTarget[] = [
@@ -30,7 +34,7 @@ export const OUTBOUND: OutboundTarget[] = [
   { id: "self_signed", url: "https://self-signed.badssl.com/", expect: "refuse" },
   { id: "untrusted_root", url: "https://untrusted-root.badssl.com/", expect: "refuse" },
   { id: "wrong_host", url: "https://wrong.host.badssl.com/", expect: "refuse" },
-  { id: "revoked", url: "https://revoked.badssl.com/", expect: "refuse" },
+  { id: "revoked", url: "https://revoked.badssl.com/", expect: "info" },
 ];
 
 export interface HowsMySsl {
