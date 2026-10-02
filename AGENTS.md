@@ -1911,6 +1911,12 @@ docs/plans/2026-10-02-bu-attribution.md.
 - Entitlements: `project_scoped_roles` true, roles Owner/Administrator/
   Developer/Read-only/None, `security.audit_logs_days` 366,
   `api.members.roles` false; `x-ratelimit-limit` 120 (BA01).
+- Audit log (BA06, production Team org): the dashboard reads it from
+  `GET /platform/organizations/{slug}/audit` (open-source Studio); a PAT gets
+  `401 JWT could not be decoded` there while `/v1` answers 200. Public types
+  (`AuditLogsResponse_Output`) declare `token_type`, `token_hash`,
+  `token_alias`, `oauth_app_id/name` per actor; the guide lists no export and
+  no drain. Manual backstop only.
 - BA04 (transfer-in) needs a second org on the same control plane; an org
   cannot be deleted on `/v1`, so it waits for a decision. BA05 (restricted
   member, `PVLAB_PAT2`, `PVLAB_PEER_INSCOPE`/`OUTSCOPE`) needs a second user
