@@ -10,12 +10,16 @@
  * zone (split-horizon), so readiness is probed pinned to 1.1.1.1's answer.
  */
 import { $ } from "bun";
+import { existsSync } from "node:fs";
 import { mgmt } from "../../../harness/src/mgmt";
 import type { Ctx } from "../../../harness/src/types";
 import { addons, applyAddon, removeAddon, sleep } from "../../medium-serverless/lib/setup";
 import { curl, publicA } from "./tls";
 
 const KNOTCTL = `${process.env.HOME}/bin/knotctl`;
+
+/** Checked before anything billable happens: without it the add-on is applied and verification waits out its budget. */
+export const hasKnotctl = () => existsSync(KNOTCTL);
 
 interface Cfg {
   status?: string;

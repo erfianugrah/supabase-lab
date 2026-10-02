@@ -10,18 +10,8 @@
  * TL18 removes it, `make destroy` removes it with the project.
  */
 import type { TestModule } from "../../../harness/src/types";
-import { $ } from "bun";
 import { addons, applyAddon, directTarget, pgOnce, sleep } from "../../medium-serverless/lib/setup";
-
-/**
- * A records via a fresh `dig` each poll, not node:dns in this process: on
- * 2026-10-02 the in-process lookup never saw the record on two runs (12- and
- * 20-minute budgets) while `dig` and the next process did. Cause not established.
- */
-async function hasA(host: string): Promise<boolean> {
-  const out = (await $`dig +short ${host} A`.quiet().nothrow()).stdout.toString();
-  return out.split("\n").some((l) => /^\d+\.\d+\.\d+\.\d+$/.test(l.trim()));
-}
+import { hasA } from "../lib/pg";
 
 const mod: TestModule = {
   id: "TL14",
