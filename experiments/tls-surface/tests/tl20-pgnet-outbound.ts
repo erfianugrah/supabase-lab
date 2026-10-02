@@ -61,7 +61,7 @@ const mod: TestModule = {
       const got = verdict(status);
       const ctl = await curl({ url: t.url, maxTimeS: 10 });
       const ctlGot = verdict(ctl.code);
-      if (got !== t.expect) mismatches++;
+      if (t.expect !== "info" && got !== t.expect) mismatches++;
       m[t.id] = status ? `${status}` : `fail: ${err.slice(0, 70)}`;
       m[`${t.id}_control`] = ctl.code ? `${ctl.code}` : `fail: ${ctl.err.slice(0, 50)}`;
       notes.push(`${t.id}: pg_net ${got}${status ? ` ${status}` : ` (${err.slice(0, 80)})`}, expected ${t.expect}, control ${ctlGot}`);

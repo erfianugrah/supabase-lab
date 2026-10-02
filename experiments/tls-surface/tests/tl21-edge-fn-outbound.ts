@@ -76,7 +76,7 @@ const mod: TestModule = {
       for (const t of OUTBOUND) {
         const r = rows.find((x) => x.id === t.id);
         const got = verdict(r?.status ?? 0);
-        if (got !== t.expect) mismatches++;
+        if (t.expect !== "info" && got !== t.expect) mismatches++;
         m[t.id] = r?.status ? `${r.status}` : `fail: ${(r?.err ?? "missing").slice(0, 70)}`;
         notes.push(`${t.id}: ${got}${r?.status ? ` ${r.status}` : ` (${(r?.err ?? "").slice(0, 80)})`}, expected ${t.expect}`);
         if (t.id === "howsmyssl" && r?.status === 200) Object.assign(m, summariseHowsMySsl(r.body ?? ""));

@@ -14,7 +14,7 @@
  * PVLAB_ENDPOINT_CUSTOM_HOST, default tl17.lab.erfi.io.
  */
 import type { TestModule, TestResult } from "../../../harness/src/types";
-import { setupCustomDomain, teardownCustomDomain } from "../lib/custom-domain";
+import { hasKnotctl, setupCustomDomain, teardownCustomDomain } from "../lib/custom-domain";
 import type { Target } from "../lib/tls";
 import { protocolRows } from "./tl01-edge-protocols";
 import { cipherRows } from "./tl02-edge-ciphers";
@@ -32,6 +32,7 @@ const mod: TestModule = {
     const host = ctx.endpoints.custom_host ?? "tl17.lab.erfi.io";
     const anon = ctx.anonKey ?? "";
     const out: TestResult[] = [];
+    if (!hasKnotctl()) return [{ id: "TL17", title: mod.title, status: "skip", detail: "~/bin/knotctl not found - DNS for the hostname cannot be written, so nothing billable was started" }];
     const s = await setupCustomDomain(ctx, host, anon);
     try {
       out.push({ id: "TL17-setup", title: `custom hostname ${host} brought up`, status: s.ready ? "pass" : "fail", detail: s.steps.join(", "), measurements: { ready: s.ready ? "yes" : "no", edge_ip: s.ip } });

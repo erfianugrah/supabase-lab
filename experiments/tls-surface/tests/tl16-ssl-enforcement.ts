@@ -23,7 +23,7 @@ import { mgmt } from "../../../harness/src/mgmt";
 import { sampleDuring } from "../../../harness/src/sampler";
 import type { TestModule, TestResult } from "../../../harness/src/types";
 import { flatten, pgProbe, restProbe, sleep } from "../../medium-serverless/lib/setup";
-import { nodeSession, pgPaths, psql, SELF_SSL_SQL } from "../lib/pg";
+import { isEnforcementRefusal, nodeSession, pgPaths, psql, SELF_SSL_SQL } from "../lib/pg";
 
 const WAIT_MS = 4 * 60_000;
 
@@ -62,11 +62,9 @@ const mod: TestModule = {
           const r = await plaintext();
           for (const [name, res] of Object.entries(r)) {
             if (flips[name] === undefined) lastText[name] = res.ok ? "accepted" : res.err;
-            // Enforcement on: waiting for a REFUSAL - an hba/SSL rejection, not
-            // "Connection refused", which the first run (2026-10-02) showed is
+            // Enforcement on: waiting for the REFUSAL (isEnforcementRefusal), not
             // the restart the switch triggers. Off: waiting for acceptance.
-            const refusal = !res.ok && /pg_hba|no encryption|SSL|ssl/.test(res.err) && !/Connection refused|timeout expired/.test(res.err);
-            if (flips[name] === undefined && (target ? refusal : res.ok)) flips[name] = Math.round((Date.now() - t0) / 1000);
+            if (flips[name] === undefined && (target ? !res.ok && isEnforcementRefusal(res.err) : res.ok)) flips[name] = Math.round((Date.now() - t0) / 1000);
           }
           if (paths.every((p) => flips[p.name] !== undefined)) break;
           await sleep(3000);
