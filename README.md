@@ -98,6 +98,13 @@ facts):
 - `usage-metering` - per-project cost attribution: the estimator against a
   live org, exact per-key gateway metering, the control-plane store,
   idempotent rollups, and invoice-PDF reconciliation.
+- `bu-attribution` - the platform facts behind per-business-unit cost
+  attribution inside one `platform`-plan org, built by the customer on its
+  own control plane: create returns the ref synchronously, the org-scoped
+  listing is the sweep source (paginated), names are mutable, deleted refs
+  leave the listings, branches are unlisted and link to their parent only
+  through the parent's `/branches`. Self-provisioning, no OpenTofu state.
+  Plan: docs/plans/2026-10-02-bu-attribution.md.
 - `compute-disk` - everything about compute sizing and disk across plans:
   per-size pg limits (D01), disk semantics + modification quota (D02/D03),
   the autoscale config surface (D04/D07), the free-org autoscale/read-only
