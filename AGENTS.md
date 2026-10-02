@@ -1886,3 +1886,32 @@ Redacted artifacts: `out/2026-09-30/`. Details: RUNLOG.md.
 
 - ~/.pi/agent/skills/terraform/SKILL.md - tofu conventions used here
 - ~/.pi/agent/skills/supabase/SKILL.md - CLI/pooling behaviour
+
+## experiments/bu-attribution - key facts (2026-10-02, platform-plan org)
+
+What a customer building deterministic per-business-unit cost attribution in
+ONE platform-plan org can build on. The customer builds the system; this
+experiment only measures the platform. Plan and requirements pattern:
+docs/plans/2026-10-02-bu-attribution.md.
+
+- `POST /v1/projects` answers 201 with the ref in the body in ~6 s (the body
+  already reads `ACTIVE_HEALTHY`), so the creating service can record
+  ref -> unit in the same call (BA02a).
+- The sweep source is `GET /v1/organizations/{slug}/projects`: a new ref
+  shows in ~6 s; the body is `{projects, pagination: {count, limit: 100,
+  offset}}`, so page it (BA02b).
+- No creator/tag/label/metadata field on the project list entry or detail
+  (BA02f). Names are mutable (`PATCH` 200, BA02d). A deleted ref is gone from
+  the listings in ~3 s (BA02e).
+- Branches: own ref, absent from both listings, `GET /v1/projects/{branch_ref}`
+  404; the parent link exists only on the parent's
+  `GET /v1/projects/{ref}/branches` entry (`parent_project_ref`).
+  `GET /v1/branches/{id}` returns connection config including `db_pass` and
+  `jwt_secret` - record key names only (BA03).
+- Entitlements: `project_scoped_roles` true, roles Owner/Administrator/
+  Developer/Read-only/None, `security.audit_logs_days` 366,
+  `api.members.roles` false; `x-ratelimit-limit` 120 (BA01).
+- BA04 (transfer-in) needs a second org on the same control plane; an org
+  cannot be deleted on `/v1`, so it waits for a decision. BA05 (restricted
+  member, `PVLAB_PAT2`, `PVLAB_PEER_INSCOPE`/`OUTSCOPE`) needs a second user
+  with a dashboard-assigned role.
