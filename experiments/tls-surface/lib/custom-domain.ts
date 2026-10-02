@@ -10,12 +10,16 @@
  * zone (split-horizon), so readiness is probed pinned to 1.1.1.1's answer.
  */
 import { $ } from "bun";
+import { existsSync } from "node:fs";
 import { mgmt } from "../../../harness/src/mgmt";
 import type { Ctx } from "../../../harness/src/types";
 import { addons, applyAddon, removeAddon, sleep } from "../../medium-serverless/lib/setup";
 import { curl, publicA } from "./tls";
 
 const DNS_TOOL = process.env.PVLAB_DNS_TOOL ?? ""; // DNS update tool path; no default (operator-local)
+
+/** Checked before anything billable happens: without it the add-on is applied and verification waits out its budget. */
+export const hasDnsTool = () => DNS_TOOL !== "" && existsSync(DNS_TOOL);
 
 interface Cfg {
   status?: string;

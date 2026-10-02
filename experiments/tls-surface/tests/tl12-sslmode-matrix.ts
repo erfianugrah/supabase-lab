@@ -3,7 +3,8 @@
  *
  * psql 18, one connection per cell, each running a `pg_stat_ssl` read for
  * its own backend so a successful connection also says what TLS (if any)
- * the hop into Postgres used. Cells:
+ * the hop into Postgres used, and libpq's `\conninfo` says what the client's
+ * own leg negotiated. Cells:
  *
  *   disable / allow / prefer / require   - is plaintext accepted at all,
  *                                          and what does each mode end up on
@@ -26,7 +27,7 @@
 import { $ } from "bun";
 import { rm } from "node:fs/promises";
 import type { TestModule, TestResult } from "../../../harness/src/types";
-import { type PgPath, pgPaths, psql, SELF_SSL_SQL, tlsTarget } from "../lib/pg";
+import { type PgPath, parseConninfo, pgPaths, psql, SELF_SSL_SQL, tlsTarget } from "../lib/pg";
 import { handshake, pemFile } from "../lib/tls";
 
 export interface Cell {
@@ -61,8 +62,13 @@ export async function matrix(p: PgPath, password: string, only?: string[]): Prom
   try {
     for (const c of cells(f.path, ip)) {
       if (only && !only.includes(c.name)) continue;
-      const r = await psql(p, password, c.params, SELF_SSL_SQL);
-      res[c.name] = r.ok ? `ok ${r.out}` : `fail: ${r.err}`;
+      // Both legs per cell: the client's own TLS from libpq (`\conninfo`), and
+      // the backend's pg_stat_ssl row, which through a pooler is the
+      // pooler -> Postgres hop. The first run (2026-10-02) recorded only the
+      // second, so "require: ok false" through Supavisor read as no TLS.
+      const r = await psql(p, password, c.params, ["\\conninfo", SELF_SSL_SQL]);
+      const ci = parseConninfo(r.out);
+      res[c.name] = r.ok ? `ok client=${ci.client} hop=${ci.rest}` : `fail: ${r.err}`;
     }
   } finally {
     await rm(f.dir, { recursive: true, force: true });
