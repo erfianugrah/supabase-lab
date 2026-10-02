@@ -20,6 +20,7 @@ entitlements).
 | BA02 | create returns the ref synchronously; seconds until the sweep sees it; name survives; name is mutable; deleted refs leave the listings; no creator/tag/metadata field on the live project (BA02f) |
 | BA03 | a branch has its own ref; whether the sweep lists it; parent ref readable from the branch |
 | BA04 | transfer into the org keeps the ref and is visible to the sweep (needs `PVLAB_ORG_SOURCE`) |
+| BA06 | read-only: does a PAT reach the dashboard's audit-log route (`/platform/organizations/{slug}/audit`, from the open-source Studio) |
 | BA05 | with a restricted member's token (`PVLAB_PAT2`): can it create projects, which projects it lists and reads (`PVLAB_PEER_INSCOPE` / `PVLAB_PEER_OUTSCOPE`), whether it sees a project created after its role was set. Role assignment is dashboard-only; run once per role |
 
 ## Run
@@ -50,6 +51,16 @@ control plane when the org lives elsewhere.
 | Project name | mutable (`PATCH` 200) - not an attribution record | BA02d |
 | Deleted ref | gone from listings in ~3 s - the map must keep rows | BA02e |
 | Attribution field on the project | none (list and detail key sets recorded) | BA02f |
+| Audit log with a PAT | `GET /platform/organizations/{slug}/audit` answers `401 JWT could not be decoded` while the same PAT gets `200` on `/v1` (production Team org) | BA06 |
 | Branch refs | own ref; absent from both listings; parent link only on the parent's `/branches` list (`parent_project_ref`); `GET /projects/{branch_ref}` 404 | BA03 |
+
+Public sources for the audit backstop (not measured here): the Platform
+Audit Logs guide (dashboard only, no export, no log drain; entries show
+actor and token type) and the open-source Studio, which reads the log from
+`/platform/organizations/{slug}/audit` and types each actor with
+`token_type`, `token_hash`, `token_alias` ("access token alias, as shown in
+the dashboard") and `oauth_app_id`/`oauth_app_name`
+(https://github.com/supabase/supabase/blob/614344149399/packages/api-types/types/platform.d.ts,
+`AuditLogsResponse_Output`).
 
 Full record: RUNLOG.md. Raw artifacts carry project refs and stay off-repo.

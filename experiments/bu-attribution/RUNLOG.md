@@ -42,5 +42,13 @@ Run 2 (BA01-BA03): 8 pass, 0 fail.
   `project_ref` and `parent_project_ref` (matched the parent);
   `GET /projects/{branch_ref}` answers 404.
 
+## 2026-10-02 - BA06 (production Team org)
+
+- BA06-control: `GET /v1/organizations/{slug}` 200 with the PAT.
+- BA06a: `GET /platform/organizations/{slug}/audit` (last hour) with the same
+  PAT: `401 {"message":"JWT could not be decoded"}`. The open-source dashboard
+  calls this route with its login session; a PAT is refused, so the audit
+  read cannot be automated with one.
+
 Not run: BA04 (one org on this control plane; a second would be
 undeletable via the API). BA05 written, waiting on a second user.
