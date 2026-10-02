@@ -50,9 +50,14 @@ org's project list against the map catches anything that took another path.
    data does not carry per ref) are split by a rule in config, not by hand.
 6. **Invariant.** Every month: sum(unit totals) + unattributed + allocated
    pooled lines = invoice total. A mismatch is a pipeline defect.
-7. **Lock the bypass.** No human in a unit holds an org role that can create
+7. **Audit backstop.** Give each unit its own named token or OAuth app;
+   the dashboard audit entry for a create carries the token's alias, hash
+   and OAuth app, so a human can attribute a leftover `unattributed` ref.
+   It is not an automation input: dashboard only, no export, no drain, and
+   a PAT is refused on the dashboard's route (BA06).
+8. **Lock the bypass.** No human in a unit holds an org role that can create
    projects; the sweep catches whatever still gets through.
-8. **Rate budget.** One automation user's Management API budget is shared
+9. **Rate budget.** One automation user's Management API budget is shared
    across all its tokens (rate-limits L01b). On-demand creation across many
    units plus the sweep draw from it; one automation user per unit gives
    each its own budget.
@@ -73,7 +78,7 @@ org's project list against the map catches anything that took another path.
 | Q8 | Branch refs: own ref, sweep-visible, parent linkage readable | BA03 | DONE 2026-10-02 - own ref; not listed; parent only via the parent's `/branches` list |
 | Q9 | Transfer into a platform-plan org: preview, ref kept, sweep-visible | BA04 (needs a second org on the same control plane) | open |
 | Q10 | Which roles can create projects; does a project-scoped member see other units' projects; do org-wide roles cover future projects | Public docs (Access Control guide): Owner and Administrator create projects, Developer and Read-only cannot; a project-scoped member cannot view, access or see other projects in the dashboard; org-level roles cover current and future projects. BA05 would confirm the same on the Management API | answered by docs; BA05 optional |
-| Q11 | Does the org audit log entry for a create name the token or only the user | manual read after BA02 runs | open |
+| Q11 | Does the org audit log entry for a create name the token or only the user | Public: the Platform Audit Logs guide lists actor and token type; the open-source Studio types each actor with `token_type`, `token_hash`, `token_alias` (the token's dashboard name) and `oauth_app_id`/`name`. Dashboard only - no `/v1` path, no export, no drain; BA06 measured a PAT refused on the dashboard route (401) | answered - manual backstop only; name each unit's token |
 | Q12 | Does the platform invoice itemise per ref; which lines stay org-level | M07 against a platform-plan invoice PDF | open |
 
 ---
