@@ -38,6 +38,10 @@ Reference: COMPUTE-DISK.md at repo root. Probes: `.pi/probe-compute-disk.sh D01[
   2026-10-01 entry.
 - D11 (grow steps, 2026-10-01): from 2 GB, 4 and 5 GB rejected on the gp3
   IOPS floor, 6 GB accepted.
+- D12 (spend cap vs manual grow, 2026-10-05): with the spend cap ON, a fresh
+  Pro project's single manual `POST /config/disk` 2 -> 12 GB answered 201
+  and was applied. With D10's 8 -> 12 GB autoscale, neither growth path past
+  the 8 GB baseline was blocked by the cap.
 
 ## Operational notes
 
@@ -48,6 +52,27 @@ Reference: COMPUTE-DISK.md at repo root. Probes: `.pi/probe-compute-disk.sh D01[
 - The first fill round ran a 5-mod disk increase burst without triggering
   the quota; the second round caught the cooldown on the second attempt.
   Recorded as nondeterministic, not a clean pass/fail.
+
+## 2026-10-05 - the spend cap does not gate a manual grow past 8 GB (D12)
+
+The database-size guide says to disable the spend cap for a Pro instance to
+auto-scale beyond the 8 GB disk size limit. D10 had already watched autoscale
+go 8 -> 12 GB on a Pro org with the cap on. D12 asks the manual half on a
+fresh throwaway Micro project in `ap-southeast-1`, same Pro org, cap on
+(stated by the operator as `PVLAB_SPEND_CAP=on`: the Management API does not
+expose the cap).
+
+- Baseline `GET /config/disk`: `gp3 / 2 GB`, as in D10.
+- One `POST /config/disk` with `size_gb: 12` (iops 3000, throughput 125):
+  `201`, empty body; `GET` read 12 GB within the polling window.
+- Reading: on this org the cap gated neither the manual grow nor autoscale
+  past 8 GB. The guide's sentence is the documented position, not the runtime
+  one. Not tested: whether a disk-size overage is later restricted on the
+  billing path (notification, grace, Fair Use), which W21 found is where the
+  cap's consequences ride for other items.
+
+Evidence: run artifact `run-2026-10-05T08-17-21-368Z` (gitignored). Project
+deleted the same run.
 
 ## 2026-10-01 - paid-plan fill: autoscale, read-only, and a full disk (D10, D11)
 
