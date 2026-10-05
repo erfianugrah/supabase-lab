@@ -67,24 +67,40 @@ create policy "profiles: update self" on public.profiles
   using (id = (select auth.uid()))
   with check (id = (select auth.uid()));
 
--- New users get a profile from their app_metadata. A user created without a
--- known department fails at signup (department_id is not null): users are
--- provisioned by the platform team, not self-registered into a department.
-create or replace function private.handle_new_user() returns trigger
+-- Profiles follow app_metadata. A user whose app_metadata names no known
+-- department has no profile, and with no profile every policy above returns
+-- nothing - signed in, but no access - until the platform team sets one.
+-- The trigger fires on update of raw_app_meta_data as well as on insert:
+-- users created through the Auth admin API failed the original insert-only
+-- version with department_id null even though app_metadata was in the
+-- request, so the department arrives after the insert (observed 2026-10-05).
+create or replace function private.sync_profile() returns trigger
 language plpgsql security definer set search_path = '' as $$
+declare
+  dept uuid;
 begin
+  select d.id into dept from public.departments d
+   where d.name = new.raw_app_meta_data ->> 'department';
+  if dept is null then
+    return new;
+  end if;
   insert into public.profiles (id, department_id, role, display_name)
   values (
     new.id,
-    (select d.id from public.departments d where d.name = new.raw_app_meta_data ->> 'department'),
+    dept,
     coalesce(new.raw_app_meta_data ->> 'role', 'employee'),
     coalesce(new.raw_user_meta_data ->> 'display_name', '')
-  );
+  )
+  on conflict (id) do update
+    set department_id = excluded.department_id,
+        role = excluded.role;
   return new;
 end
 $$;
 
 drop trigger if exists on_auth_user_created on auth.users;
-create trigger on_auth_user_created
-  after insert on auth.users
-  for each row execute function private.handle_new_user();
+drop function if exists private.handle_new_user();
+drop trigger if exists on_auth_user_synced on auth.users;
+create trigger on_auth_user_synced
+  after insert or update of raw_app_meta_data on auth.users
+  for each row execute function private.sync_profile();
