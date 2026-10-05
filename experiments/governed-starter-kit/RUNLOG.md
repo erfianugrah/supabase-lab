@@ -1,5 +1,28 @@
 # governed-starter-kit - RUNLOG
 
+## 2026-10-05 - in-app agent and live-segment tooling
+
+- Agent function deployed with the Supabase CLI (`--use-api`); Management
+  API shows it active with `verify_jwt` on, and a call without a JWT returns
+  401.
+- 8 knowledge-base rows embedded with gte-small, all 384 dims, norm 1.0.
+  Same question about Sales spend: the Sales employee's top hit is a Sales row
+  (0.933); the Marketing employee gets no Sales-only rows.
+- K02 11/11 pass through the function's tool layer (the same path the chat
+  loop uses): a write without confirmation writes nothing; the employee's
+  self-approval and a cross-department decision are both refused by the
+  database ("not permitted or not found"); the same-department manager's
+  approval succeeds; forged requester, department and status fields are
+  ignored; 7 of 7 executed calls appear in `agent_audit` as the right user.
+  K01 controls updated for the larger knowledge base; K01 + K02 = 27 pass.
+- Chat loop NOT RUN: no valid Anthropic key was available, so `chat` and
+  `confirm` return 503 `llm_not_configured`.
+- `make live-reset` tested on the live project: 11 agent-style objects
+  (tables, view, sequence, enum, public and private functions, an extra
+  policy, column and index on profiles, one migration-history row) listed,
+  dropped and confirmed gone after the baseline was reapplied; users and
+  profiles kept. No coding-agent run against the live project yet.
+
 ## 2026-10-05 - first run (two micro projects, Team org, ap-southeast-1)
 
 - `make up`: apply created both projects (about 5 s each in tofu, health

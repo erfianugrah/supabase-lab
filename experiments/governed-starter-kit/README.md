@@ -70,6 +70,33 @@ ask for confirmation).
   `make destroy`.
 - Dashboard SSO needs a SAML identity provider configured on the org.
 
-## Not built yet
+## In-app agent
 
-The agent Edge Function and its chat UI.
+`supabase/functions/agent` (deploy with `make fn-deploy`) is an Edge Function
+that acts strictly as the signed-in user: JWT verification on, a client built
+from the caller's token (`withSupabase({ auth: 'user' })` from
+`@supabase/server`), and every tool running through it, so RLS and grants
+decide each outcome. Modes: `tool` (deterministic tool calls), `chat` (Claude
+tool loop), `confirm` (runs a pending write after the user confirms), `embed`
+(gte-small vectors, no table access). Tools: knowledge-base search, list
+requests, create a request, decide a request. Write tools ask for
+confirmation first; every executed call is written to `agent_audit` as the
+caller. The `/assistant` page in the app is the chat UI.
+
+`make kb-embed` replaces the seed's placeholder vectors with gte-small
+embeddings (8 knowledge-base rows: 4 company-wide, 2 per department).
+
+The chat loop needs an Anthropic key as a function secret
+(`supabase secrets set ANTHROPIC_API_KEY=... --project-ref <ref>`). Without
+one, `chat` and `confirm` return 503 `llm_not_configured`; the tool layer and
+K02 work regardless.
+
+## Live segment
+
+A coding agent builds a new app on `kit-live` from a scoped workspace outside
+this repo. `make mcp-config` writes `.mcp.json` and `.codex/config.toml`
+(gitignored) pointing the hosted Supabase MCP server at the live project only;
+`make live-workspace [WORKSPACE=...]` creates the workspace with the guardrail
+instructions from `live/`; `make live-reset [APPLY=1]` returns `kit-live` to
+the baseline between rehearsals, keeping seeded users. Runbook and prompt:
+`docs/LIVE-SEGMENT.md`.
