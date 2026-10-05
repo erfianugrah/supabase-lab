@@ -12,7 +12,9 @@ Team-plan org, rebuilt with `make up` and removed with `make destroy`.
 ## What the kit enforces
 
 - Tenancy by department. Department and role come from `app_metadata`, which
-  only the secret key can write; users cannot move or promote themselves.
+  only the secret key can write; users cannot move or promote themselves. A
+  trigger on insert and on update of `raw_app_meta_data` keeps the profile in
+  step; no known department means no profile and no access.
 - RLS on every table, explicit grants (no reliance on default privileges),
   policies scoped `TO authenticated` with `(select auth.uid())`.
 - Column-level grants: users may update their display name and nothing else
@@ -45,8 +47,9 @@ Next.js on Cloudflare Workers through OpenNext, adapted from an earlier notes
 demo: `@supabase/ssr` clients, email/password sign-in, and a purchase-request
 dashboard (submit; managers approve or reject through
 `decide_purchase_request`). There is no sign-up page and no OAuth button on
-purpose - users are provisioned with a department and role, and the signup
-trigger rejects anyone without one.
+purpose - users are provisioned with a department and role in
+`app_metadata`, and a user without a known department gets no profile, so
+they can sign in but see nothing until the platform team assigns one.
 
 ```bash
 make app-dev                      # local dev against kit-ready
