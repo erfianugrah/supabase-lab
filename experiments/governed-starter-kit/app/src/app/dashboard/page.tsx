@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import RequestsClient, { type PurchaseRequest } from "./requests-client";
 
 // Everything here is read through the signed-in user's session, so RLS decides
@@ -34,7 +35,12 @@ export default async function DashboardPage() {
               {department} - {profile.role}
             </p>
           </div>
-          <p className="text-sm text-muted-foreground">{user.email}</p>
+          <div className="text-right">
+            <p className="text-sm text-muted-foreground">{user.email}</p>
+            <Link href="/assistant" className="text-sm underline">
+              Assistant
+            </Link>
+          </div>
         </div>
         <RequestsClient
           initial={(requests ?? []) as PurchaseRequest[]}

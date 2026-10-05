@@ -21,8 +21,8 @@ APP  := sql/10-app.sql sql/20-agent.sql
 # APP_REF=$(LIVE) after a live build.
 APP_REF ?= $(READY)
 
-.PHONY: init fmt validate apply guard-tok wait-ready schema seed seed-ready pooler probe up destroy \
-	app-env app-dev app-deploy app-delete
+.PHONY: init fmt validate apply guard-tok wait-ready schema seed seed-ready fn-deploy kb-embed pooler probe up destroy \
+	app-env app-dev app-deploy app-delete guard-live mcp-config live-workspace live-reset
 
 init:
 	tofu init
@@ -71,6 +71,17 @@ seed: guard-tok
 seed-ready: guard-tok
 	bun scripts/kit.ts seed $(READY) --app
 
+# In-app agent Edge Function (supabase/functions/agent) on the ready project.
+# --use-api bundles server-side (no Docker); verify_jwt stays at its default
+# (on). The LLM step needs ANTHROPIC_API_KEY as a function secret, set
+# separately: everything else (tool layer, embeddings) works without it.
+fn-deploy: guard-tok
+	supabase functions deploy agent --project-ref $(READY) --workdir . --use-api
+
+# Real gte-small embeddings for kb_chunks, via the function's embed mode.
+kb-embed: guard-tok
+	bun scripts/kit.ts embed $(READY)
+
 # Array response, one entry per database - select the PRIMARY (see
 # pdf-corpus-graph/Makefile).
 pooler:
@@ -106,6 +117,47 @@ app-deploy: app-env
 app-delete:
 	-cd app && wrangler delete starter-kit-app
 
+# --- live segment: a coding agent builds a new app on kit-live ---
+# See docs/LIVE-SEGMENT.md. The MCP server is scoped to the live project with
+# project_ref; refs never go in committed files, so the config is generated.
+MCP_FEATURES := database,debugging,development,docs
+WORKSPACE ?= $(HOME)/kit-live-demo
+
+guard-live:
+	@test -n "$(LIVE)" -a -n "$(READY)" || (echo "no refs - run 'make apply' first"; exit 1)
+	@test "$(LIVE)" != "$(READY)" || (echo "live and ready refs are the same - refusing"; exit 1)
+
+# Writes live/.mcp.json (gitignored) from the committed template.
+mcp-config: guard-live
+	@sed -e 's/<project-ref>/$(LIVE)/' -e 's/features=[a-z,]*/features=$(MCP_FEATURES)/' \
+		live/.mcp.json.example > live/.mcp.json
+	@jq -e '.mcpServers.supabase.url | test("project_ref=$(LIVE)&")' live/.mcp.json >/dev/null \
+		&& echo "live/.mcp.json written (scoped to the live project; features=$(MCP_FEATURES))"
+	@mkdir -p live/.codex && sed -e 's/<project-ref>/$(LIVE)/' -e 's/features=[a-z,]*/features=$(MCP_FEATURES)/' \
+		live/.codex/config.toml.example > live/.codex/config.toml \
+		&& echo "live/.codex/config.toml written (Codex, same scope)"
+
+# The agent's working directory, OUTSIDE this repo: the repo-root AGENTS.md
+# (lab notes, far past an agent's instruction budget), tofu state and the
+# seeded passwords in evidence/ should not be in its view. Fresh git repo so
+# the agent's diff can be shown on screen.
+live-workspace: mcp-config
+	@test ! -e "$(WORKSPACE)" || test -z "$$(ls -A "$(WORKSPACE)")" \
+		|| (echo "$(WORKSPACE) exists and is not empty - remove it or pass WORKSPACE=..."; exit 1)
+	mkdir -p "$(WORKSPACE)/kit"
+	cp live/AGENTS.md live/CLAUDE.md live/.mcp.json "$(WORKSPACE)/"
+	mkdir -p "$(WORKSPACE)/.codex" && cp live/.codex/config.toml "$(WORKSPACE)/.codex/"
+	cp $(BASE) "$(WORKSPACE)/kit/00-baseline.sql"
+	printf '.mcp.json\n.codex/config.toml\n.env*\n!.env.example\nnode_modules/\n.next/\n' > "$(WORKSPACE)/.gitignore"
+	cd "$(WORKSPACE)" && git init -q && git add -A && git commit -q -m "kit workspace" \
+		&& echo "workspace ready: $(WORKSPACE)"
+
+# Back to baseline-only between rehearsals. Lists what it would drop; with
+# APPLY=1 it lists, drops, reapplies sql/00-baseline.sql and re-checks.
+# Never touches the ready project; seeded users and profiles are kept.
+live-reset: guard-tok guard-live
+	bun scripts/live-reset.ts $(LIVE) $(READY) $(if $(APPLY),--apply,)
+
 # Zero to a seeded, tested pair of projects in one command. The app deploy is
 # separate (make app-deploy) because it needs Cloudflare credentials.
 up: guard-tok
@@ -114,6 +166,8 @@ up: guard-tok
 	$(MAKE) wait-ready
 	$(MAKE) schema
 	$(MAKE) seed
+	$(MAKE) fn-deploy
+	$(MAKE) kb-embed
 	$(MAKE) probe
 
 destroy: guard-tok

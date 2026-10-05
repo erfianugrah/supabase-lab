@@ -5,6 +5,9 @@
  *   bun scripts/kit.ts seed <ref> [--app]            departments, users, and
  *                                                    (with --app) example rows
  *   bun scripts/kit.ts env <ref>                     write app/.env.production
+ *   bun scripts/kit.ts embed <ref>                   real gte-small embeddings
+ *                                                    for kb_chunks (needs the
+ *                                                    agent function deployed)
  *
  * Users are created through the Auth admin API so the signup trigger in
  * 00-baseline.sql runs exactly as it would for a real user; department and
@@ -123,7 +126,10 @@ async function seed(ref: string, withApp: boolean): Promise<void> {
   );
 
   // Knowledge-base rows with placeholder embeddings: enough for the RLS
-  // checks. Real embeddings come from the agent's Edge Function (gte-small).
+  // checks. `kit.ts embed` replaces them with real gte-small vectors from the
+  // agent Edge Function. Idempotent per title, so re-seeding an existing
+  // project adds new rows without duplicating old ones. Counts the K01
+  // positive controls rely on: 4 company-wide, 2 Sales, 2 Marketing.
   await sql(
     ref,
     `insert into public.kb_chunks (department_id, title, content, embedding)
@@ -131,13 +137,64 @@ async function seed(ref: string, withApp: boolean): Promise<void> {
             (select array_agg(random()::real) from generate_series(1, 384))::extensions.vector
        from (values
          (null, 'Purchasing limits', 'Requests above 2,000 need a second approver.'),
+         (null, 'Approval routing', 'Purchase requests are approved or rejected by a manager in the requester''s own department. Nobody can approve their own request, and an approved request cannot be reopened.'),
+         (null, 'New vendors', 'Buying from a vendor for the first time needs a completed vendor form and, for software or anything above 5,000, a security review before the request is approved.'),
+         (null, 'Software subscriptions', 'Prefer annual billing for subscriptions the team will keep longer than a year. Seat add-ons go through the same request flow as new tools.'),
          ('Sales', 'Sales events budget', 'Trade show spend is capped per quarter.'),
-         ('Marketing', 'Marketing licences', 'Stock media must use the approved vendors.')
+         ('Sales', 'Sales client entertainment', 'Client meals and events are capped per head per event; attach receipts and the client account name in the justification.'),
+         ('Marketing', 'Marketing licences', 'Stock media must use the approved vendors.'),
+         ('Marketing', 'Marketing agency retainers', 'Agency retainers are reviewed every quarter; a new retainer needs a scope document attached to the request.')
        ) as v(dept, title, content)
        left join public.departments d on d.name = v.dept
-      where not exists (select 1 from public.kb_chunks)`,
+      where not exists (select 1 from public.kb_chunks k where k.title = v.title)`,
   );
   console.log("example rows seeded");
+}
+
+// Replace every knowledge-base embedding with a real gte-small vector. The
+// vectors come from the agent Edge Function's `embed` mode (pure compute, no
+// table access), called as a seeded user; the rows are written here as the
+// table owner through the Management API, because users have no update grant
+// on kb_chunks. Idempotent: re-running rewrites the same vectors.
+async function embedKb(ref: string): Promise<void> {
+  const creds = JSON.parse(readFileSync(`evidence/users-${ref}.json`, "utf8")) as Record<string, string>;
+  const email = Object.keys(creds)[0];
+  if (!email) throw new Error(`no users in evidence/users-${ref}.json - run make seed-ready`);
+  const r = await mgmt("GET", `/projects/${ref}/api-keys?reveal=true`);
+  const pub = ((await r.json()) as { type?: string; api_key?: string }[]).find((k) => k.type === "publishable")?.api_key;
+  if (!pub) throw new Error("no publishable key returned");
+
+  const tok = await fetch(`https://${ref}.supabase.co/auth/v1/token?grant_type=password`, {
+    method: "POST",
+    headers: { apikey: pub, "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password: creds[email] }),
+  });
+  if (!tok.ok) throw new Error(`sign-in as ${email}: http ${tok.status}`);
+  const jwt = ((await tok.json()) as { access_token: string }).access_token;
+
+  const rows = (await sql(ref, "select id, title, content from public.kb_chunks order by title")) as {
+    id: string;
+    title: string;
+    content: string;
+  }[];
+  for (let i = 0; i < rows.length; i += 16) {
+    const batch = rows.slice(i, i + 16);
+    const res = await fetch(`https://${ref}.supabase.co/functions/v1/agent`, {
+      method: "POST",
+      headers: { apikey: pub, Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ mode: "embed", texts: batch.map((b) => `${b.title}. ${b.content}`) }),
+    });
+    if (!res.ok) throw new Error(`embed: http ${res.status} ${(await res.text()).slice(0, 300)}`);
+    const { dims, vectors } = (await res.json()) as { dims: number; vectors: number[][] };
+    if (dims !== 384) throw new Error(`expected 384 dims, got ${dims}`);
+    const values = batch.map((b, j) => `(${lit(b.id)}::uuid, ${lit(JSON.stringify(vectors[j]))})`).join(", ");
+    await sql(
+      ref,
+      `update public.kb_chunks k set embedding = v.e::extensions.vector
+         from (values ${values}) as v(id, e) where k.id = v.id`,
+    );
+  }
+  console.log(`embedded ${rows.length} kb_chunks rows with gte-small`);
 }
 
 // The app's build-time env: NEXT_PUBLIC_* values are inlined by `next build`,
@@ -157,8 +214,9 @@ async function env(ref: string): Promise<void> {
 }
 
 const [cmd, ref, ...rest] = process.argv.slice(2);
-if (!ref) throw new Error("usage: kit.ts <schema|seed|env> <ref> [...]");
+if (!ref) throw new Error("usage: kit.ts <schema|seed|env|embed> <ref> [...]");
 if (cmd === "schema") await schema(ref, rest);
 else if (cmd === "seed") await seed(ref, rest.includes("--app"));
 else if (cmd === "env") await env(ref);
+else if (cmd === "embed") await embedKb(ref);
 else throw new Error(`unknown command ${cmd}`);
