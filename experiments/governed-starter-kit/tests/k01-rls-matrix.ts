@@ -34,7 +34,30 @@ const EMAILS = {
   dave: "dave@example.com",
 };
 
+// The "0 rows from another department" probes pass trivially if the user can
+// see nothing at all, so each is paired with a positive control whose exact
+// count comes from the seed in scripts/kit.ts (Sales: 2 requests, Marketing:
+// 1; knowledge base: 1 company-wide + 1 per department).
 const PROBES: Probe[] = [
+  {
+    name: "positive control: employee sees own department's requests (seed: 2 in Sales)",
+    as: "alice",
+    sql: () => "select count(*) from public.purchase_requests",
+    expect: { ok: true, value: "2" },
+  },
+  {
+    name: "positive control: knowledge base shows company-wide + own department (seed: 2)",
+    as: "carol",
+    sql: () => "select count(*) from public.kb_chunks",
+    expect: { ok: true, value: "2" },
+  },
+  {
+    name: "positive control: vector match returns every row the user can read (2)",
+    as: "carol",
+    sql: () =>
+      "select count(*) from public.match_kb_chunks((select embedding from public.kb_chunks limit 1), 20)",
+    expect: { ok: true, value: "2" },
+  },
   {
     name: "employee sees only own department's requests",
     as: "alice",

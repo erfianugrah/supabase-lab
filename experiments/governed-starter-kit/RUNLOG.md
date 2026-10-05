@@ -1,5 +1,32 @@
 # governed-starter-kit - RUNLOG
 
+## 2026-10-05 - first run (two micro projects, Team org, ap-southeast-1)
+
+- `make up`: apply created both projects (about 5 s each in tofu, health
+  checks passed shortly after); all three SQL files applied cleanly to both,
+  including the trigger on `auth.users` as the `postgres` role.
+- Seed FAILED on the first user: the Auth admin API returned 500 with
+  `null value in column "department_id" of relation "profiles"`. The
+  departments rows existed and the request carried
+  `app_metadata.department`, so the insert trigger ran before the department
+  was in `raw_app_meta_data` - the admin create writes app_metadata after the
+  initial insert. Fix (00-baseline.sql): one trigger on
+  `insert or update of raw_app_meta_data`; no profile is created until the
+  department resolves (signed in, no access), then it is upserted. After the
+  fix every seeded user had the expected department and role.
+- K01: 16/16 pass after adding three positive controls (the original 13 also
+  passed, but their "0 rows from another department" probes would pass for a
+  user who could see nothing). Refusals are for the intended reason: column
+  grants (`permission denied for table profiles` / `purchase_requests`), RLS
+  through `decide_purchase_request` (`not permitted or not found`), and anon
+  blocked by grants on the table and the function.
+- Data API path (publishable key + password sign-in, supabase-js): employee
+  sees own department only, cannot approve; manager of the same department
+  can; an insert lands as `pending` with department and requester from the
+  session.
+- App: `next build` + `next start` against the ready project - `/` and
+  `/login` 200, `/dashboard` unauthenticated redirects to `/login`.
+
 ## 2026-10-05 - scaffold, NOT YET RUN
 
 Tofu (two micro projects in the Team org), kit SQL (00 baseline, 10 example
