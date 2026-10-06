@@ -87,12 +87,20 @@ export async function publicIp(host: string): Promise<string> {
   return lines[lines.length - 1] ?? "";
 }
 
-/** One GET through curl pinned to `ip`; TLS still validates against the hostname. */
-export async function pinnedGet(host: string, ip: string, path: string): Promise<{ status: number; contentType: string; err: string }> {
-  const r = await $`curl -s -o /dev/null -w ${"%{http_code} %{content_type}"} --max-time 15 --resolve ${`${host}:443:${ip}`} ${`https://${host}${path}`}`
+/**
+ * One GET through curl pinned to `ip`; TLS still validates against the
+ * hostname. Redirects are not followed; `location` is where a 3xx points
+ * (curl's resolved redirect_url), empty otherwise.
+ */
+export async function pinnedGet(
+  host: string,
+  ip: string,
+  path: string,
+): Promise<{ status: number; contentType: string; location: string; err: string }> {
+  const r = await $`curl -s -o /dev/null -w ${"%{http_code}\t%{content_type}\t%{redirect_url}"} --max-time 15 --resolve ${`${host}:443:${ip}`} ${`https://${host}${path}`}`
     .quiet()
     .nothrow();
-  const [code, ...ct] = r.stdout.toString().trim().split(" ");
+  const [code = "", ct = "", location = ""] = r.stdout.toString().trim().split("\t");
   const status = Number(code) || 0;
-  return { status, contentType: ct.join(" "), err: status ? "" : r.stderr.toString().trim().slice(-120) || `curl exit ${r.exitCode}` };
+  return { status, contentType: ct, location, err: status ? "" : r.stderr.toString().trim().slice(-120) || `curl exit ${r.exitCode}` };
 }
