@@ -1,0 +1,208 @@
+{
+  "startedAt": "2026-10-06T08:38:35.610Z",
+  "finishedAt": "2026-10-06T08:39:38.846Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "static-hosting",
+  "labCommit": "0d41f1f",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "HS04a",
+      "title": "custom hostname already active",
+      "status": "info",
+      "detail": "status 5_services_reconfigured",
+      "measurements": {
+        "status": "5_services_reconfigured"
+      },
+      "durationMs": 273
+    },
+    {
+      "id": "HS04c",
+      "title": "Custom host active and serving (curl pinned to 1.1.1.1's answer)",
+      "status": "pass",
+      "detail": "reconfigured already active; robots.txt 200 after 0s; storage index.html 200 \"text/plain\"",
+      "measurements": {
+        "active_s": "already active",
+        "serving_after_s": 0,
+        "robots_status": 200,
+        "storage_html_status": 200,
+        "storage_html_ct": "text/plain"
+      },
+      "durationMs": 273
+    },
+    {
+      "id": "HS05-control",
+      "title": "Control: the same build on a plain static server (localhost)",
+      "status": "pass",
+      "detail": "HTTP 200; rendered \"Static hosting probe\"; island hydrated; font applied; api HTTP 200; About -> 200 rendered",
+      "measurements": {
+        "status": 200,
+        "header_type": "text/html; charset=utf-8",
+        "doc_type": "text/html",
+        "rendered": 1,
+        "hydrated": 1,
+        "css_applied": 1,
+        "font_loaded": 1,
+        "api": "HTTP 200",
+        "failed_requests": 0,
+        "console_errors": 0,
+        "about_status": 200,
+        "about_doc_type": "text/html",
+        "about_rendered": 1,
+        "screenshot": "evidence/20261006-163835/screens/hs05-control.png"
+      },
+      "evidence": "{\"failed\":[],\"consoleErrors\":[],\"about\":{\"status\":200,\"docType\":\"text/html\",\"h1\":\"About\",\"url\":\"http://localhost:61891/about/\"}}",
+      "durationMs": 62962
+    },
+    {
+      "id": "HS05-storage-setup",
+      "title": "Upload dist-storage (28 files) to public bucket `astro`",
+      "status": "pass",
+      "measurements": {
+        "bucket": 200,
+        "files": 28,
+        "failed": 0
+      },
+      "durationMs": 62962
+    },
+    {
+      "id": "HS05-storage",
+      "title": "Storage: .../astro/index.html in a browser",
+      "status": "pass",
+      "detail": "HTTP 200; NOT rendered: document.contentType \"text/plain\" (header \"text/plain\") - the visitor sees source text",
+      "measurements": {
+        "status": 200,
+        "header_type": "text/plain",
+        "doc_type": "text/plain",
+        "rendered": 0,
+        "hydrated": 0,
+        "css_applied": 0,
+        "font_loaded": 1,
+        "api": "none",
+        "failed_requests": 0,
+        "console_errors": 0,
+        "about_status": 0,
+        "about_doc_type": "none",
+        "about_rendered": 0,
+        "screenshot": "evidence/20261006-163835/screens/hs05-storage.png"
+      },
+      "evidence": "{\"failed\":[],\"consoleErrors\":[],\"about\":null}",
+      "durationMs": 62962
+    },
+    {
+      "id": "HS05-storage-root",
+      "title": "Storage: .../astro/ (the URL a visitor types) in a browser",
+      "status": "pass",
+      "detail": "HTTP 400; NOT rendered: document.contentType \"application/json\" (header \"application/json; charset=utf-8\") - the visitor sees source text; failed: : HTTP 400",
+      "measurements": {
+        "status": 400,
+        "header_type": "application/json; charset=utf-8",
+        "doc_type": "application/json",
+        "rendered": 0,
+        "hydrated": 0,
+        "css_applied": 0,
+        "font_loaded": 1,
+        "api": "none",
+        "failed_requests": 1,
+        "console_errors": 1,
+        "about_status": 0,
+        "about_doc_type": "none",
+        "about_rendered": 0,
+        "screenshot": "evidence/20261006-163835/screens/hs05-storage-root.png"
+      },
+      "evidence": "{\"failed\":[\": HTTP 400\"],\"consoleErrors\":[\"Failed to load resource: the server responded with a status of 400 ()\"],\"about\":null}",
+      "durationMs": 62962
+    },
+    {
+      "id": "HS05-fn-setup",
+      "title": "Deploy dist-fn as function `pvlab-hs-astro` (files inlined, API path)",
+      "status": "pass",
+      "detail": "deploy HTTP 201; source 538978 B; first GET 200 \"text/plain\"",
+      "measurements": {
+        "deploy_status": 201,
+        "source_bytes": 538978,
+        "first_get": 200
+      },
+      "durationMs": 62962
+    },
+    {
+      "id": "HS05-fn",
+      "title": "Edge Function: mount root in a browser",
+      "status": "pass",
+      "detail": "HTTP 200; NOT rendered: document.contentType \"text/plain\" (header \"text/plain\") - the visitor sees source text",
+      "measurements": {
+        "status": 200,
+        "header_type": "text/plain",
+        "doc_type": "text/plain",
+        "rendered": 0,
+        "hydrated": 0,
+        "css_applied": 0,
+        "font_loaded": 1,
+        "api": "none",
+        "failed_requests": 0,
+        "console_errors": 0,
+        "about_status": 0,
+        "about_doc_type": "none",
+        "about_rendered": 0,
+        "screenshot": "evidence/20261006-163835/screens/hs05-fn.png"
+      },
+      "evidence": "{\"failed\":[],\"consoleErrors\":[],\"about\":null}",
+      "durationMs": 62962
+    },
+    {
+      "id": "HS05-domain-fn",
+      "title": "Edge Function via custom domain (documented exception)",
+      "status": "pass",
+      "detail": "HTTP 200; rendered \"Static hosting probe\"; island hydrated; font applied; api HTTP 200; About -> 200 rendered",
+      "measurements": {
+        "status": 200,
+        "header_type": "text/html; charset=utf-8",
+        "doc_type": "text/html",
+        "rendered": 1,
+        "hydrated": 1,
+        "css_applied": 1,
+        "font_loaded": 1,
+        "api": "HTTP 200",
+        "failed_requests": 0,
+        "console_errors": 0,
+        "about_status": 200,
+        "about_doc_type": "text/html",
+        "about_rendered": 1,
+        "screenshot": "evidence/20261006-163835/screens/hs05-domain-fn.png"
+      },
+      "evidence": "{\"failed\":[],\"consoleErrors\":[],\"about\":{\"status\":200,\"docType\":\"text/html\",\"h1\":\"About\",\"url\":\"https://pvlab.erfi.dev/functions/v1/pvlab-hs-astro/about/\"}}",
+      "durationMs": 62962
+    },
+    {
+      "id": "HS05-domain-storage",
+      "title": "Storage via custom domain (exception documented for Functions only)",
+      "status": "info",
+      "detail": "HTTP 200; NOT rendered: document.contentType \"text/plain\" (header \"text/plain\") - the visitor sees source text",
+      "measurements": {
+        "status": 200,
+        "header_type": "text/plain",
+        "doc_type": "text/plain",
+        "rendered": 0,
+        "hydrated": 0,
+        "css_applied": 0,
+        "font_loaded": 1,
+        "api": "none",
+        "failed_requests": 0,
+        "console_errors": 0,
+        "about_status": 0,
+        "about_doc_type": "none",
+        "about_rendered": 0,
+        "screenshot": "evidence/20261006-163835/screens/hs05-domain-storage.png"
+      },
+      "evidence": "{\"failed\":[],\"consoleErrors\":[],\"about\":null}",
+      "durationMs": 62962
+    }
+  ]
+}
