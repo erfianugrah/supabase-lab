@@ -1918,6 +1918,61 @@ Redacted artifacts: `out/2026-09-30/`. Details: RUNLOG.md.
   (Postgres names the client in hba refusals) and any addresses named in
   `PVLAB_REDACT_ADDRS`; documentation-range addresses stay.
 
+## experiments/static-hosting - key facts (validated 2026-10-06, micro, ap-southeast-1)
+
+One project, no AWS (DNS through the Cloudflare API for the custom-domain
+modules). Can a project host a static site the way Pages/Netlify do? Not on
+the project hostnames; with the custom domain add-on, only under
+`/functions/v1/<slug>/`. Details: RUNLOG.md; artifacts `out/2026-10-06/`.
+
+- **A real Astro build does not render.** The same build on a local Bun static
+  server rendered, hydrated its React island, applied its font and followed a
+  nav link (HS05-control; "font" is the computed font-family, not the file); from a public bucket and from an Edge Function
+  Chromium got `text/plain` and showed the source (HS05-storage, HS05-fn).
+  Screenshots stay in gitignored `evidence/<ts>/screens/`.
+- **Storage has no index document**: bucket root `400 InvalidKey`; `about/`,
+  `about` and a missing path all answer HTTP `400` with `"statusCode":"404"`
+  in the JSON body (HS02a-d). No SPA fallback, no custom 404.
+- **The rewrite covers XHTML and XML too.** Storage and the Edge Function path
+  both served `text/html`, `application/xhtml+xml` and `application/xml` as
+  `text/plain`; `image/svg+xml` kept its type with `Content-Disposition:
+  attachment`; every GET of those four types carried `Content-Security-Policy:
+  default-src 'none'; sandbox` and `nosniff`, the other types neither (HS01,
+  HS03). Uppercase `TEXT/HTML`, no-space
+  `text/html;charset=utf-8`, `<ref>.functions.supabase.co`,
+  `<ref>.storage.supabase.co` and signed URLs all stayed rewritten. On the
+  function, POST and HEAD keep `text/html` (HEAD without the CSP/nosniff
+  headers); neither was sent to Storage.
+- Assets a site hosted elsewhere loads (CSS, JS, WASM, JSON, PNG, web manifest;
+  fonts were not in the fixture set) keep their declared types; `max-age` uploads serve from the CDN
+  (`cf-cache-status` HIT). An overwrite took 47085 ms to reach the public URL
+  (HS02f), per object - there is no atomic deploy.
+- Each host mounts a site under a different base path, so the build is made
+  once per host (`make site`: dist-root, dist-storage, dist-fn via
+  `SITE_BASE`). The function deploy inlines the build as base64 (538978 B of
+  source, API path, 5 MB ceiling).
+- **The custom domain lifts the rewrite for Edge Functions only** (HS05): the
+  Astro build rendered through it at `/functions/v1/<slug>/`; the bucket
+  through the same domain stayed `text/plain`. The gateway has no root route:
+  `/` answers `404 {"error":"requested path is invalid"}` and only
+  `/functions/v1/<slug>/` reaches a function (ad hoc curl, RUNLOG). Build with
+  `SITE_BASE=/functions/v1/<slug>`.
+- `custom-hostname/activate` answered `400` straight after reverify reported
+  `4_origin_setup_completed` (verified at 175 s) and `201` about ten minutes
+  later; cause not established (body not recorded). HS04 retries for 10
+  minutes and logs the body - that version has not run.
+- HS06 is the contrast case: a Cloudflare Worker on an own hostname gives `/`,
+  `308` clean-URL redirects and a real 404 in front of Storage (no custom
+  domain needed) or the function (`308` Location not recorded). Supabase then only holds the files.
+- Harness: runs from source by default (`dist/pvlab` is linux-x64 and HS05
+  drives a local Chromium via `site/browser-check.ts` as a subprocess -
+  `bunx playwright install chromium` once). PAT from the environment, plus the
+  Cloudflare key trio for HS04/HS06/HS07: `sx SUPABASE_ACCESS_TOKEN
+  CLOUDFLARE_API_KEY CLOUDFLARE_EMAIL CLOUDFLARE_ACCOUNT_ID -- make
+  domain-up|front|domain-down DOMAIN=<host> ...`. Run `domain-down` before
+  `destroy`: the DNS records and Workers live on the Cloudflare account, not
+  the project. `PUBLISH_ONLY`, not `ONLY`, narrows `publish-evidence`.
+
 ## Related
 
 - ~/.pi/agent/skills/terraform/SKILL.md - tofu conventions used here
