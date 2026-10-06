@@ -224,6 +224,15 @@ facts):
   load, the client ramp to the published 600 on both poolers, a same-region
   read replica, and a Medium to Large resize per path. Measured 2026-09-30;
   see its RUNLOG.
+- `tls-surface` - one micro project, every TLS surface it exposes, from an
+  IPv4-only vantage: protocol versions, a one-handshake-per-suite cipher
+  enumeration, certificates, SNI/ALPN/HTTP/3/HSTS and port 80 on each HTTPS
+  name (project API, Storage, legacy functions host, Management API, custom
+  domain); a CBC-only client on every service route; protocols, suites, chain
+  and the libpq sslmode matrix on Supavisor, direct 5432 and the dedicated
+  PgBouncer; SSL enforcement on and off (each switch restarts Postgres); and
+  outbound TLS from pg_net and an Edge Function. Built to be re-run and
+  compared with `make diff`. Measured 2026-10-02; see its RUNLOG.
 
 ## Ad-hoc platform probes (no experiment dir)
 
