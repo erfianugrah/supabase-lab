@@ -1,0 +1,97 @@
+# static-hosting - RUNLOG
+
+Can a Supabase project stand in for a static host (Cloudflare Pages,
+Netlify)? One Micro project, ap-southeast-1. Modules HS01-HS03 and HS05; HS05
+deploys a real Astro 7 build (`site/`: Tailwind, a self-hosted font, an SVG
+asset, one React island) and loads it in headless Chromium.
+
+## 2026-10-06 - first run
+
+Artifact: `out/2026-10-06/run-2026-10-06T08-02-24-640Z.json` (+ `.facts.md`).
+One run, n=1 per row. Every probe was browser-shaped (no apikey).
+
+- **The Astro build does not render on either surface.** The control (same
+  build, plain Bun static server on localhost) rendered, hydrated the island,
+  applied the font-family from its CSS and followed the About link (HS05-control). On Storage
+  (`.../object/public/astro/index.html`) and through an Edge Function (mount
+  root) Chromium got `text/plain` and showed the page source (HS05-storage,
+  HS05-fn). The function deploy itself was fine: 201, 538978 B of source with
+  the build inlined.
+- **Storage has no index document.** The bucket root answered HTTP `400` with
+  an 87 B body, `{"statusCode":"400","error":"InvalidKey","message":"Invalid
+  key: ","code":"InvalidKey"}` (the artifact holds the first 60 characters and
+  the byte count; the full text is from the HS05-storage-root screenshot); a directory path (`about/`), an
+  extensionless path (`about`) and a missing path all answered HTTP `400`
+  with a JSON body carrying `"statusCode":"404"` (HS02a-d). No SPA fallback
+  and no custom 404 page; a missing object is a 400 to the client.
+- **The rewrite covers more than `text/html`.** On Storage, `text/html`,
+  `application/xhtml+xml` and `application/xml` were all served `text/plain`;
+  `image/svg+xml` kept its type but came with `Content-Disposition:
+  attachment` (HS01). The Edge Function path did the same for the same four
+  types (HS03). Every GET of those four types on both paths carried
+  `Content-Security-Policy: default-src 'none'; sandbox` and
+  `X-Content-Type-Options: nosniff`. CSS, JS, JSON, WASM, web manifest, PNG and
+  plain text kept their declared types and carried neither header.
+- The rewrite held for `TEXT/HTML` and `text/html;charset=utf-8` set by the
+  handler (HS03-ct-upper, HS03-ct-nosp), on `<ref>.functions.supabase.co`
+  (HS03-fnhost), on `<ref>.storage.supabase.co` (HS01-host) and through a
+  signed URL (HS01-signed). POST to the function kept `text/html` (HS03-post, as EF06a
+  found); HEAD to the function kept `text/html` without the CSP and nosniff
+  headers (HS03-head, no body). Neither was sent to Storage.
+- Caching: an object uploaded with `max-age=3600` was served `public,
+  max-age=3600`, `cf-cache-status` HIT on both GETs (HS02e). After an
+  overwrite, the public URL served the new bytes after 47085 ms (24 polls at
+  2 s, HS02f) - a redeploy is visible per object, not atomically.
+- Not run in this pass: HS05-domain (custom domain; see the next section).
+  The first run scored HS03-head `fail` against a GET-only expectation; the
+  module now records it as info.
+
+## 2026-10-06 - custom domain, Worker front, teardown
+
+Same project, same day. Artifacts in `out/2026-10-06/`:
+`run-2026-10-06T08-38-35-610Z` (HS04, HS05), `run-2026-10-06T08-44-25-913Z`
+(HS06), `run-2026-10-06T08-47-51-699Z` (HS07). DNS for every hostname went
+through the Cloudflare v4 API (lib/cfdns.ts) in zones on the operator's own
+account; the hostnames are deleted.
+
+- **Custom domain on the project (HS04).** A first attempt on a second zone was
+  torn down unused (an earlier HS07 pass, no artifact, 3 records removed; the
+  published HS07 artifact is the final teardown below). On the domain kept, from
+  the run log (gitignored; that run was stopped before writing an artifact): initialize `201` `2_initiated`, the ownership TXT
+  written at 2 s and the `_acme-challenge` TXT at 4 s, verified 175 s into the DNS-and-reverify loop with
+  reverify already reading `4_origin_setup_completed`. `activate` then answered
+  HTTP `400` (body not recorded); the same call by hand about ten minutes later
+  answered `201` with `5_services_reconfigured`. HS04 now retries activate for
+  up to 10 minutes and logs the first refusal's body; that version has not run.
+  The re-run (artifact above) found the hostname active and serving at once.
+- **The custom domain lifts the rewrite for the function and not for Storage
+  (HS05).** The same Astro build loaded through the custom domain at
+  `/functions/v1/pvlab-hs-astro/` rendered, hydrated, applied the font-family
+  from its CSS, called
+  Auth (`api HTTP 200`) and followed About (HS05-domain-fn). The bucket through
+  the same domain was still `text/plain` (HS05-domain-storage). The docs name
+  the exception for Edge Functions only.
+- **There is no root path on a custom domain** (ad hoc curl, no artifact):
+  `/` and `/about/` answered `404 {"error":"requested path is invalid"}`,
+  `/pvlab-hs-astro/` `404`, `/functions/pvlab-hs-astro/` `401`; only
+  `/functions/v1/<slug>/` reached the function. A build made with
+  `SITE_BASE=/functions/v1/site` and deployed as function `site` served `200
+  text/html` at `/functions/v1/site/` and `/functions/v1/site/about/`, and its
+  404 page with a `404` for a missing path. That is the shortest URL a
+  Supabase-only site gets.
+- **A Worker on an own hostname gives the production shape, with or without the
+  custom domain (HS06).** The same Worker script (site/worker/worker.js) in
+  front of Storage, and in front of the function via the custom domain, both
+  rendered at `/` in Chromium with the island hydrated, and both answered
+  `/about` with `308` (Location not recorded) and a missing path with `404 "text/html; charset=utf-8"`.
+  The Worker sets the content-type itself, so in front of Storage it needs no
+  custom domain. This leaves Supabase holding files only; recorded as the
+  contrast case.
+- **Teardown (HS07 + `make destroy`).** Workers (already deleted by hand,
+  `wrangler delete` exit 1 each), custom hostname `DELETE` `200`, 3 DNS records
+  removed with 0 left, add-on `DELETE` `200`; project destroyed (GET `404`). An
+  ad hoc check afterwards (no artifact) found 0 `pvlab` records in either zone, 0 `pvlab` Workers
+  and 0 Worker custom domains.
+- Harness fix: `make publish-evidence` filtered on `ONLY`, which defaults to
+  the battery list, so the first publishes of HS06 and HS07 came out empty and
+  dropped HS04's rows; it now has its own `PUBLISH_ONLY`.
