@@ -1880,7 +1880,11 @@ Redacted artifacts: `out/2026-09-30/`. Details: RUNLOG.md.
   PATCH `persistent: false` first (MS15).
 - Harness: `pg` `Client` needs an `error` handler before its socket is
   destroyed or the whole run dies; `import.meta.dir` in the compiled binary is
-  the bundle; `publish-evidence` does not redact measurement KEYS.
+  the bundle. `publish-evidence` redacts keys and values alike (it runs over
+  the raw JSON text). Until 2026-10-06 its `\b[a-z]{20}\b` let a ref
+  touching `_` through (`2cde058`, work-supabase-lab#10); a dot-joined
+  `postgres.<ref>` was always caught, so the 2026-09-30 key leak most likely
+  had the ref next to `_` or a digit (inferred - the leaked key was not kept).
 
 ## experiments/tls-surface - key facts (validated 2026-10-02, micro, ap-southeast-1, Team org)
 
