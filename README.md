@@ -233,6 +233,15 @@ facts):
   PgBouncer; SSL enforcement on and off (each switch restarts Postgres); and
   outbound TLS from pg_net and an Edge Function. Built to be re-run and
   compared with `make diff`. Measured 2026-10-02; see its RUNLOG.
+- `static-hosting` - can a project stand in for Cloudflare Pages or Netlify?
+  A real Astro build (Tailwind, a self-hosted font, a React island; `site/`)
+  deployed to a public Storage bucket and to an Edge Function and loaded in
+  headless Chromium next to a local static-server control, plus a
+  per-file-type content-type matrix and the Storage site mechanics (index
+  documents, 404s, cache, overwrite visibility). Then the one documented
+  exception - a custom domain, which renders HTML from a function but only
+  under `/functions/v1/<slug>/` - and, as a contrast, a Cloudflare Worker in
+  front. Measured 2026-10-06; see its RUNLOG.
 
 ## Ad-hoc platform probes (no experiment dir)
 
