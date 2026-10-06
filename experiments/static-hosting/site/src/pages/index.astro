@@ -1,0 +1,11 @@
+---
+import Layout from "../components/Layout.astro";
+import Island from "../components/Island";
+---
+<Layout title="pvlab static-hosting">
+  <h1 id="h1" class="text-2xl font-semibold">Static hosting probe</h1>
+  <p class="mt-2 text-neutral-600">
+    An Astro build with Tailwind, a self-hosted font, an SVG asset and one React island.
+  </p>
+  <Island client:load />
+</Layout>

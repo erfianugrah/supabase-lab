@@ -1,0 +1,24 @@
+{
+  "name": "static-hosting-site",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "astro build"
+  },
+  "dependencies": {
+    "@astrojs/react": "7.0.0",
+    "@fontsource/ibm-plex-mono": "5.2.7",
+    "astro": "7.3.5",
+    "react": "19.2.0",
+    "react-dom": "19.2.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "4.3.3",
+    "@types/react": "19.2.0",
+    "@types/react-dom": "19.2.0",
+    "playwright": "1.63.0",
+    "tailwindcss": "4.3.3",
+    "typescript": "5.9.3",
+    "wrangler": "4.147.0"
+  }
+}
