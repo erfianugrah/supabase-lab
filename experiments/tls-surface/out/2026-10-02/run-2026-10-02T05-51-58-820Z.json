@@ -1,0 +1,96 @@
+{
+  "startedAt": "2026-10-02T05:51:58.820Z",
+  "finishedAt": "2026-10-02T05:52:39.021Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "tls-surface",
+  "labCommit": "dcd2e55",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "OpenSSL 3.6.5 29 Sep 2026 (Library: OpenSSL 3.6.5 29 Sep 2026)"
+  },
+  "results": [
+    {
+      "id": "TL16-on",
+      "title": "SSL enforcement on: API call, restart, sampled paths, plaintext refusal per path",
+      "status": "info",
+      "detail": "PUT HTTP 200 in 2537ms appliedSuccessfully=true; postmaster start 2026-10-02 05:26:56.193913+00 -> 2026-10-02 05:52:01.454375+00 (RESTARTED); sampled: shared_5432_tls 3/17 failed, window 13s, rest 0/25 failed; plaintext per path: shared_5432 flipped at 3s (connection to server at \"<pooler-host>\" (<addr>), port 5432 failed: FATAL: (ESSLREQUIRED) SSL connection is required for user: postgres); shared_6543 flipped at 3s (connection to server at \"<pooler-host>\" (<addr>), port 6543 failed: FATAL: (ESSLREQUIRED) SSL connection is required for user: postgres); direct_5432 flipped at 3s (connection to server at \"db.<ref>.supabase.co\" (<addr>), port 5432 failed: FATAL: no pg_hba.conf entry for host \"<vantage-ip>\", user \"postgres\", database \"postgres\", no encryption); dedicated_6543 flipped at 3s (connection to server at \"db.<ref>.supabase.co\" (<addr>), port 6543 failed: FATAL: SSL required)",
+      "measurements": {
+        "put_http": 200,
+        "put_ms": 2537,
+        "applied": "true",
+        "restarted": "yes",
+        "probe_interval_ms": 500,
+        "shared_5432_tls_first_fail_s": 1,
+        "shared_5432_tls_window_s": 13,
+        "shared_5432_tls_mode": "Failed to connect to database: {:error, :econnrefused}",
+        "rest_first_fail_s": "n/a",
+        "rest_window_s": "n/a",
+        "rest_mode": "none",
+        "shared_5432_plaintext_flip_s": 3,
+        "shared_6543_plaintext_flip_s": 3,
+        "direct_5432_plaintext_flip_s": 3,
+        "dedicated_6543_plaintext_flip_s": 3,
+        "shared_5432_plaintext": "connection to server at \"<pooler-host>\" (<addr>), port 5",
+        "shared_6543_plaintext": "connection to server at \"<pooler-host>\" (<addr>), port 6",
+        "direct_5432_plaintext": "connection to server at \"db.<ref>.supabase.co\" (<addr>), port 5432 f",
+        "dedicated_6543_plaintext": "connection to server at \"db.<ref>.supabase.co\" (<addr>), port 6543 f"
+      },
+      "durationMs": 40202
+    },
+    {
+      "id": "TL16-hop",
+      "title": "with enforcement on: pg_stat_ssl for the backend behind each path (pooler -> Postgres hop)",
+      "status": "info",
+      "detail": "shared_5432: true|TLSv1.3|TLS_AES_256_GCM_SHA384; shared_6543: true|TLSv1.3|TLS_AES_256_GCM_SHA384; direct_5432: true|TLSv1.3|TLS_AES_256_GCM_SHA384; dedicated_6543: true|TLSv1.3|TLS_AES_256_GCM_SHA384",
+      "measurements": {
+        "shared_5432_hop": "true|TLSv1.3|TLS_AES_256_GCM_SHA384",
+        "shared_6543_hop": "true|TLSv1.3|TLS_AES_256_GCM_SHA384",
+        "direct_5432_hop": "true|TLSv1.3|TLS_AES_256_GCM_SHA384",
+        "dedicated_6543_hop": "true|TLSv1.3|TLS_AES_256_GCM_SHA384"
+      },
+      "durationMs": 40202
+    },
+    {
+      "id": "TL16-off",
+      "title": "SSL enforcement off: API call, restart, sampled paths, plaintext acceptance per path",
+      "status": "info",
+      "detail": "PUT HTTP 200 in 1455ms appliedSuccessfully=true; postmaster start 2026-10-02 05:52:01.454375+00 -> 2026-10-02 05:52:27.008571+00 (RESTARTED); sampled: shared_5432_tls 1/13 failed, window 1s, rest 0/13 failed; plaintext per path: shared_5432 flipped at 5s (accepted); shared_6543 flipped at 5s (accepted); direct_5432 flipped at 5s (accepted); dedicated_6543 flipped at 5s (accepted)",
+      "measurements": {
+        "put_http": 200,
+        "put_ms": 1455,
+        "applied": "true",
+        "restarted": "yes",
+        "probe_interval_ms": 500,
+        "shared_5432_tls_first_fail_s": 1,
+        "shared_5432_tls_window_s": 1,
+        "shared_5432_tls_mode": "the database system is shutting down",
+        "rest_first_fail_s": "n/a",
+        "rest_window_s": "n/a",
+        "rest_mode": "none",
+        "shared_5432_plaintext_flip_s": 5,
+        "shared_6543_plaintext_flip_s": 5,
+        "direct_5432_plaintext_flip_s": 5,
+        "dedicated_6543_plaintext_flip_s": 5,
+        "shared_5432_plaintext": "accepted",
+        "shared_6543_plaintext": "accepted",
+        "direct_5432_plaintext": "accepted",
+        "dedicated_6543_plaintext": "accepted"
+      },
+      "durationMs": 40202
+    },
+    {
+      "id": "TL16-restore",
+      "title": "restored the setting found at start",
+      "status": "info",
+      "detail": "initial database enforcement = false",
+      "measurements": {
+        "initial": "false"
+      },
+      "durationMs": 40202
+    }
+  ]
+}
