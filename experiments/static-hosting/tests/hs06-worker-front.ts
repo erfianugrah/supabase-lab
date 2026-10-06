@@ -16,8 +16,9 @@
  *                  Worker in front of Storage (no Supabase custom domain)
  *   HS06-fn        https://<PVLAB_ENDPOINT_SITE_FN>/ in Chromium - the Worker in
  *                  front of the function via PVLAB_ENDPOINT_CUSTOM_DOMAIN
- *   HS06-paths     per host: /about -> 308 /about/, a miss -> 404 with the
- *                  site's 404 page (curl pinned to 1.1.1.1's answer)
+ *   HS06-paths     per host: /about -> 308 whose Location is /about/ (recorded
+ *                  since 2026-10-06; the first run kept only the status), a miss
+ *                  -> 404 with the site's 404 page (curl pinned to 1.1.1.1's answer)
  *
  * Both browser rows are expected to render. The function row is also the
  * check on whether the custom domain still does anything once a Worker is in
@@ -123,9 +124,12 @@ const mod: TestModule = {
       out.push({
         id: `${id}-paths`,
         title: `${host}: clean URL redirect and 404 page`,
-        status: about.status === 308 && miss.status === 404 && /text\/html/.test(miss.contentType) ? "pass" : "fail",
-        detail: `/about -> ${about.status}; /no/such/page -> ${miss.status} "${miss.contentType}"`,
-        measurements: { about: about.status, miss: miss.status, miss_ct: miss.contentType || "none" },
+        status:
+          about.status === 308 && new URL(about.location || "x:").pathname === "/about/" && miss.status === 404 && /text\/html/.test(miss.contentType)
+            ? "pass"
+            : "fail",
+        detail: `/about -> ${about.status} ${about.location || "(no Location)"}; /no/such/page -> ${miss.status} "${miss.contentType}"`,
+        measurements: { about: about.status, about_location: about.location || "none", miss: miss.status, miss_ct: miss.contentType || "none" },
       });
     }
     return out;
