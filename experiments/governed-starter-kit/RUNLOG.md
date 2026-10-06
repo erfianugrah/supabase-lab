@@ -1,5 +1,41 @@
 # governed-starter-kit - RUNLOG
 
+## 2026-10-06 - rebuild and first live-segment rehearsal
+
+- `make up` from an empty state recreated both projects; K01 + K02 = 27 pass,
+  0 fail (chat still `llm_not_configured`). On macOS the probe step fails
+  because `harness` compiles `pvlab` for linux-x64 only; the same run through
+  `bun harness/src/run.ts` gave the result above. The local `secrets.tfvars`
+  had the token line as a quoted placeholder, which beats `TF_VAR_` and made
+  `tofu apply` reject the saved plan; commenting it out fixed it.
+- `make live-reset` (dry run) on the live project: nothing beyond the
+  baseline.
+- Rehearsal: the docs/LIVE-SEGMENT.md prompt, pasted unchanged into an
+  interactive Claude Code session (Sonnet 5.5) in the workspace, with
+  `--strict-mcp-config` so the scoped server was the only MCP server. The
+  pre-run check ("what are the kit rules for a new table?") restated the
+  guardrails without tool calls. Wall clock from prompt to a running dev
+  server: about 5 min 40 s (targets total 14 min).
+  - Schema: 4 migrations in about 2 min, both advisors after each; only
+    "unused index" findings on the new indexes, reported as expected.
+  - All four trap moments handled in the database: update grant on `status`
+    only, behind a manager-only policy; a trigger owns approver, timestamps
+    and legal transitions; department and requester from defaults, pinned by
+    `with check`, plus a composite FK so a loan cannot reference another
+    department's item; self-approval refused by a check constraint; one
+    approved loan per item as a partial unique index.
+  - Prove-the-rules: 39 assertions as alice and bob in a rolled-back
+    transaction, all as expected except one invalid probe (alice reading
+    `auth.users`, permission denied). Self-approval surfaces as a raw
+    check-constraint error rather than a readable message.
+  - App: sign-up, password reset and tutorial files removed; `/auth/sign-up`
+    and `/` redirect to `/auth/login` (307); `.env.local` holds only the URL
+    and publishable key and is gitignored.
+  - Session-level noise: the operator's user-scope Claude Code hooks blocked
+    `npm` (the agent switched to `bun run`) and the user-scope instructions
+    leaked into the agent's narration. A stage session should run under a
+    clean Claude Code profile.
+
 ## 2026-10-05 - in-app agent and live-segment tooling
 
 - Agent function deployed with the Supabase CLI (`--use-api`); Management
