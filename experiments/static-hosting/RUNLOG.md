@@ -95,3 +95,29 @@ account; the hostnames are deleted.
 - Harness fix: `make publish-evidence` filtered on `ONLY`, which defaults to
   the battery list, so the first publishes of HS06 and HS07 came out empty and
   dropped HS04's rows; it now has its own `PUBLISH_ONLY`.
+
+## 2026-10-06 - re-run after the HS04/HS06 changes (work-supabase-lab#24)
+
+A second project, provisioned, run and destroyed 17:11-17:15 local time.
+Artifacts in `out/2026-10-06/`: `run-2026-10-06T09-12-38-952Z` (HS04, HS05),
+`run-2026-10-06T09-14-57-937Z` (HS06), `run-2026-10-06T09-15-29-285Z` (HS07).
+Same custom hostname as the earlier pass.
+
+- **The activate 400 did not reproduce (HS04).** initialize `201`
+  `2_initiated`; only the ownership TXT was asked for this time (no
+  `_acme-challenge` record), verified after 67 s; the first `activate` answered
+  `201` and the status read `5_services_reconfigured` at once. The retry branch
+  added after the first pass was not exercised. One success after one failure
+  does not settle the cause. The hostname had been active on another project
+  earlier the same day, which may explain the missing ACME record (not checked).
+- **HS06 now records the redirect target:** `/about` -> `308` to
+  `https://<host>/about/` on both Worker hostnames; a missing path -> `404`
+  `text/html; charset=utf-8`.
+- HS05 repeated the first pass on the new project: control, custom-domain
+  function rendered; Storage, function on the project hostname and Storage on
+  the custom domain `text/plain`; bucket root `400`. Function source 539014 B
+  (the build carries the new project's URL and anon key).
+- Teardown: Workers deleted (`wrangler delete` exit 0 each), custom hostname
+  `DELETE` `200`, 2 DNS records removed with 0 left, add-on `DELETE` `200`,
+  `make destroy`. Re-read afterwards (ad hoc, no artifact): project GET `404`,
+  0 `pvlab` records, Workers and Worker domains.
