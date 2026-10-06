@@ -1955,14 +1955,17 @@ the project hostnames; with the custom domain add-on, only under
   Astro build rendered through it at `/functions/v1/<slug>/`; the bucket
   through the same domain stayed `text/plain`. The gateway has no root route:
   `/` answers `404 {"error":"requested path is invalid"}` and only
-  `/functions/v1/<slug>/` reaches a function (ad hoc curl, RUNLOG). Build with
+  `/functions/v1/<slug>/` reaches a function (`/<slug>/` `404`,
+  `/functions/<slug>/` `401`; HS05-domain-paths). Build with
   `SITE_BASE=/functions/v1/<slug>`.
 - `custom-hostname/activate` answered `400` straight after reverify reported
   `4_origin_setup_completed` (verified at 175 s) and `201` about ten minutes
-  later; cause not established (body not recorded). The re-run the same day
-  (same hostname, new project) verified in 67 s with no `_acme-challenge`
-  record and the first activate answered `201`, so the retry HS04 now carries
-  is still unexercised.
+  later; cause not established (body not recorded). Three later cycles the
+  same day (same hostname, fresh projects) verified in 67 s, 24 s and 66 s and
+  got `201` on the first call. The retry (`lib/activate.ts`) is unit-tested
+  (`make unit`) and has not fired live. HS04 creates its own probe fixture
+  (`ensureSite`) - before that, `make domain-up` on a fresh project probed a
+  missing object.
 - HS06 is the contrast case: a Cloudflare Worker on an own hostname gives `/`,
   `308` clean-URL redirects and a real 404 in front of Storage (no custom
   domain needed) or the function (`/about` -> `308` to `/about/`, recorded
