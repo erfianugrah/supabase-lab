@@ -41,7 +41,9 @@ export function redact(text: string, vantage: string[] = [], other: string[] = [
     .replace(/\bdb\.[a-z]{20}\.supabase\.co\b/g, "db.<ref>.supabase.co")
     .replace(/\b[a-z]{20}\.supabase\.co\b/g, "<ref>.supabase.co")
     .replace(/\baws-\d-[a-z0-9-]+\.pooler\.supabase\.com\b/g, "<pooler-host>")
-    .replace(/\b[a-z]{20}\b/g, "<ref>")
+    // Bounded on letters and digits, not `\b`: `_` is a word character, so
+    // `\b` let `postgres_<ref>` and `<ref>_ok` through (work-supabase-lab#10).
+    .replace(/(?<![A-Za-z0-9])[a-z]{20}(?![A-Za-z0-9])/g, "<ref>")
     .replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, "<email>")
     // The platform appends its own provenance comment to statements it runs on
     // your behalf, and it names the acting credential: `-- user: pat:<digits>`

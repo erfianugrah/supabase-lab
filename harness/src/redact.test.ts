@@ -35,6 +35,23 @@ const CASES: { name: string; input: string; expected: string }[] = [
     input: "aws-0-ap-southeast-1.pooler.supabase.com:5432",
     expected: "<pooler-host>:5432",
   },
+  // work-supabase-lab#10: `\b` treats `_` as a word character, so a ref joined
+  // with underscores passed through - in a measurement key and in a value.
+  {
+    name: "project ref after an underscore (measurement key)",
+    input: '{"postgres_abcdefghijklmnopqrst":1}',
+    expected: '{"postgres_<ref>":1}',
+  },
+  {
+    name: "project ref before an underscore (value)",
+    input: '{"user":"abcdefghijklmnopqrst_ok"}',
+    expected: '{"user":"<ref>_ok"}',
+  },
+  {
+    name: "a 21-letter lowercase word is not a ref",
+    input: "abcdefghijklmnopqrstu stays",
+    expected: "abcdefghijklmnopqrstu stays",
+  },
   {
     name: "email address",
     input: "actor somebody@example.org logged in",
