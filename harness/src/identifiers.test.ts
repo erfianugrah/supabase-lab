@@ -33,7 +33,9 @@ const ALLOW = new Set<string>([
   "aaaaaaaaaaaaaaaaaaaa",
 ]);
 
-const REF = /\b[a-z]{20}\b/g;
+// Bounded on letters and digits, not `\b`: `_` is a word character, so `\b`
+// missed `postgres_<ref>`-style keys (work-supabase-lab#10).
+const REF = /(?<![A-Za-z0-9])[a-z]{20}(?![A-Za-z0-9])/g;
 /**
  * Credential identifiers the PLATFORM writes into its own output, which no
  * hand-written redaction list anticipated. The Management API appends a
