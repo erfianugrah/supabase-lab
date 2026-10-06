@@ -11,7 +11,7 @@ TS := $(shell date +%Y%m%d-%H%M%S)
 # function), so all of them are destructive. HS05 needs `make site` first.
 ALL := HS01,HS02,HS03,HS05
 
-.PHONY: init validate apply site probe domain-up front domain-down probe-bg publish-evidence destroy
+.PHONY: init validate apply unit site probe domain-up front domain-down probe-bg publish-evidence destroy
 
 init:
 	tofu init
@@ -24,6 +24,10 @@ apply:
 	tofu plan $(VARS) -out=tfplan
 	tofu apply tfplan
 	@echo "project_ref = $$(tofu output -raw project_ref)"
+
+# Pure logic under the modules (activate retry). No network, no credential.
+unit:
+	@cd $(ROOT) && bun test experiments/static-hosting/lib
 
 # The Astro site, built once per host: each mounts it under a different base
 # path. The island calls the project's Auth health endpoint with the anon key,
