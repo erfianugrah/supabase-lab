@@ -90,17 +90,20 @@ export async function publicIp(host: string): Promise<string> {
 /**
  * One GET through curl pinned to `ip`; TLS still validates against the
  * hostname. Redirects are not followed; `location` is where a 3xx points
- * (curl's resolved redirect_url), empty otherwise.
+ * (curl's resolved redirect_url), empty otherwise. `cfCache` is the
+ * cf-cache-status header: a run on 2026-10-06 got 200 for an object its own
+ * project never uploaded, and nothing recorded whether the edge served it
+ * from cache.
  */
 export async function pinnedGet(
   host: string,
   ip: string,
   path: string,
-): Promise<{ status: number; contentType: string; location: string; err: string }> {
-  const r = await $`curl -s -o /dev/null -w ${"%{http_code}\t%{content_type}\t%{redirect_url}"} --max-time 15 --resolve ${`${host}:443:${ip}`} ${`https://${host}${path}`}`
+): Promise<{ status: number; contentType: string; location: string; cfCache: string; err: string }> {
+  const r = await $`curl -s -o /dev/null -w ${"%{http_code}\t%{content_type}\t%{redirect_url}\t%header{cf-cache-status}"} --max-time 15 --resolve ${`${host}:443:${ip}`} ${`https://${host}${path}`}`
     .quiet()
     .nothrow();
-  const [code = "", ct = "", location = ""] = r.stdout.toString().trim().split("\t");
+  const [code = "", ct = "", location = "", cfCache = ""] = r.stdout.toString().trim().split("\t");
   const status = Number(code) || 0;
-  return { status, contentType: ct, location, err: status ? "" : r.stderr.toString().trim().slice(-120) || `curl exit ${r.exitCode}` };
+  return { status, contentType: ct, location, cfCache, err: status ? "" : r.stderr.toString().trim().slice(-120) || `curl exit ${r.exitCode}` };
 }

@@ -27,6 +27,9 @@
  *                        it up). Expected to render. Skipped without a domain.
  *   HS05-domain-storage  the bucket through the same custom domain. The docs
  *                        name the exception for Functions only; info.
+ *   HS05-domain-paths    which custom-domain paths reach the function (curl,
+ *                        pinned): `/`, `/about/`, `/<slug>/`, `/functions/<slug>/`,
+ *                        `/functions/v1/<slug>/`. Pass = only the last serves.
  *   The browser is pinned to 1.1.1.1's answer for the custom name.
  *
  * Supabase rows pass when the page does NOT render, matching the docs (Storage
@@ -46,7 +49,7 @@ import { mkdir } from "node:fs/promises";
 import type { Ctx, TestModule, TestResult } from "../../../harness/src/types";
 import { functionPresent } from "../../../harness/src/platform";
 import { browserCheck, row } from "../lib/browser";
-import { publicIp } from "../lib/cfdns";
+import { pinnedGet, publicIp } from "../lib/cfdns";
 import {
   type FileTable,
   deleteFileServer,
@@ -156,6 +159,23 @@ const mod: TestModule = {
             const r = row(id, title, await browserCheck(`https://${domain}${path}`, shot, pin), expectRender, shot);
             if (id === "HS05-domain-storage") r.status = "info";
             out.push(r);
+          }
+          // Which paths on the custom domain reach the function at all. The
+          // first pass answered this with ad hoc curl; a row keeps it in the
+          // artifact. Pass = only the documented /functions/v1/<slug>/ serves.
+          if (ip) {
+            const paths = ["/", "/about/", `/${SLUG}/`, `/functions/${SLUG}/`, `/functions/v1/${SLUG}/`];
+            const got = await Promise.all(paths.map((p) => pinnedGet(domain, ip, p)));
+            const m: Record<string, string | number> = {};
+            paths.forEach((p, i) => (m[`path ${p.replace(SLUG, "<slug>")}`] = `${got[i]!.status} ${got[i]!.contentType || "none"}`));
+            const onlyDocumented = got.every((g, i) => (i === paths.length - 1 ? g.status === 200 : g.status !== 200));
+            out.push({
+              id: "HS05-domain-paths",
+              title: "Custom domain: only /functions/v1/<slug>/ reaches the function",
+              status: onlyDocumented ? "pass" : "fail",
+              detail: paths.map((p, i) => `${p.replace(SLUG, "<slug>")} -> ${got[i]!.status}`).join("; "),
+              measurements: m,
+            });
           }
         } else {
           out.push({ id: "HS05-domain", title: "Custom domain", status: "skip", detail: "no PVLAB_ENDPOINT_CUSTOM_DOMAIN (HS04 brings one up)" });

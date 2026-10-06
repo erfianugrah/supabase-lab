@@ -25,7 +25,9 @@
  */
 import { mgmt } from "../../../harness/src/mgmt";
 import type { Ctx, TestModule, TestResult } from "../../../harness/src/types";
+import { type ActivateOutcome, activateWithRetry } from "../lib/activate";
 import { cfAvailable, pinnedGet, publicIp, upsertRecord, zoneId } from "../lib/cfdns";
+import { ensureSite } from "../lib/site";
 
 const VERIFY_MAX_MS = 20 * 60_000;
 const ACTIVATE_MAX_MS = 10 * 60_000;
@@ -64,6 +66,7 @@ const mod: TestModule = {
     const cur = await mgmt(ctx, "GET", `/projects/${ctx.ref}/custom-hostname`);
     const curCfg = (cur.json ?? {}) as HostnameCfg;
     let activeS: number | string = "already active";
+    let activation: ActivateOutcome | undefined;
     if (curCfg.custom_hostname === host && (curCfg.status ?? "") >= "5_services_reconfigured") {
       out.push({ id: "HS04a", title: "custom hostname already active", status: "info", detail: `status ${curCfg.status}`, measurements: { status: curCfg.status ?? "" } });
     } else {
@@ -138,13 +141,11 @@ const mod: TestModule = {
         st = (((await mgmt(ctx, "GET", `/projects/${ctx.ref}/custom-hostname`)).json ?? {}) as HostnameCfg).status ?? "";
       }
       const origin4S = Math.round((Date.now() - t2) / 1000);
-      let act = await mgmt(ctx, "POST", `/projects/${ctx.ref}/custom-hostname/activate`);
-      const firstActivate = `HTTP ${act.status}${act.status >= 300 ? ` ${act.text.slice(0, 300)}` : ""}`;
-      for (let i = 0; i < 15 && act.status >= 300; i++) {
-        await Bun.sleep(40_000);
-        act = await mgmt(ctx, "POST", `/projects/${ctx.ref}/custom-hostname/activate`);
-      }
-      ctx.log(`HS04 origin setup after ${origin4S}s; first activate ${firstActivate}; last activate HTTP ${act.status}`);
+      activation = await activateWithRetry(
+        () => mgmt(ctx, "POST", `/projects/${ctx.ref}/custom-hostname/activate`),
+        (ms) => Bun.sleep(ms),
+      );
+      ctx.log(`HS04 origin setup after ${origin4S}s; first activate ${activation.first}; ${activation.attempts} attempt(s), last HTTP ${activation.lastStatus}`);
       activeS = "never";
       while (Date.now() - t2 < ACTIVATE_MAX_MS) {
         const g = await mgmt(ctx, "GET", `/projects/${ctx.ref}/custom-hostname`);
@@ -158,9 +159,17 @@ const mod: TestModule = {
     }
 
     // Serving check: the name answers through the edge, pinned to 1.1.1.1.
+    // The probe object has to exist on THIS project: until 2026-10-06 only HS01
+    // created the `site` bucket, so `make domain-up` (HS04+HS05) on a fresh
+    // project probed a missing object - 400 on one run, and on another a 200
+    // the project could not have served (edge cache of an earlier project's
+    // object is the guess; cf-cache-status was not recorded then).
+    await ensureSite(ctx);
     const t3 = Date.now();
     let ip = await publicIp(host);
-    let probe = ip ? await pinnedGet(host, ip, "/storage/v1/object/public/site/robots.txt") : { status: 0, contentType: "", err: "no A via 1.1.1.1" };
+    let probe = ip
+      ? await pinnedGet(host, ip, "/storage/v1/object/public/site/robots.txt")
+      : { status: 0, contentType: "", location: "", cfCache: "", err: "no A via 1.1.1.1" };
     while (probe.status !== 200 && Date.now() - t3 < 6 * 60_000) {
       await Bun.sleep(10_000);
       ip = await publicIp(host);
@@ -171,8 +180,11 @@ const mod: TestModule = {
       id: "HS04c",
       title: "Custom host active and serving (curl pinned to 1.1.1.1's answer)",
       status: probe.status === 200 ? "pass" : "fail",
-      detail: `reconfigured ${activeS}${typeof activeS === "number" ? "s" : ""}; robots.txt ${probe.status || probe.err} after ${Math.round((Date.now() - t3) / 1000)}s; storage index.html ${html.status} "${html.contentType}"`,
-      measurements: { active_s: activeS, serving_after_s: Math.round((Date.now() - t3) / 1000), robots_status: probe.status, storage_html_status: html.status, storage_html_ct: html.contentType || "none" },
+      detail: `${activation ? `activate ${activation.first} (${activation.attempts} attempt(s), last ${activation.lastStatus}); ` : ""}reconfigured ${activeS}${typeof activeS === "number" ? "s" : ""}; robots.txt ${probe.status || probe.err} after ${Math.round((Date.now() - t3) / 1000)}s; storage index.html ${html.status} "${html.contentType}"`,
+      measurements: {
+        first_activate: activation?.first ?? "not called (already active)",
+        activate_attempts: activation?.attempts ?? 0,
+        active_s: activeS, serving_after_s: Math.round((Date.now() - t3) / 1000), robots_status: probe.status, robots_cf_cache: probe.cfCache || "none", storage_html_status: html.status, storage_html_ct: html.contentType || "none" },
     });
     return out;
   },

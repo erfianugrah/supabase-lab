@@ -121,3 +121,38 @@ Same custom hostname as the earlier pass.
   `DELETE` `200`, 2 DNS records removed with 0 left, add-on `DELETE` `200`,
   `make destroy`. Re-read afterwards (ad hoc, no artifact): project GET `404`,
   0 `pvlab` records, Workers and Worker domains.
+
+## 2026-10-06 - third and fourth cycles: path probes as a row, harness fixes
+
+Two more fresh projects, 17:30-17:40 and 17:41-17:45 local time, same custom
+hostname. Artifacts in `out/2026-10-06/`: third cycle
+`run-2026-10-06T09-31-42-515Z` (HS04, HS05), `run-2026-10-06T09-39-26-623Z`
+(HS06), `run-2026-10-06T09-39-58-061Z` (HS07); fourth cycle
+`run-2026-10-06T09-42-19-998Z`, `run-2026-10-06T09-44-41-585Z`,
+`run-2026-10-06T09-45-25-682Z`.
+
+- **The custom-domain path claims are now a module row (HS05-domain-paths),**
+  in both cycles: `/` `404`, `/about/` `404`, `/<slug>/` `404`,
+  `/functions/<slug>/` `401`, `/functions/v1/<slug>/` `200`. The first pass had
+  these from ad hoc curl only.
+- **activate answered `201` on the first call in both cycles** (verified after
+  24 s and 66 s, one TXT asked for each time). Across the day: one `400`
+  (first pass, body not recorded), then three first-call `201`s. The retry
+  branch is covered by unit tests (`lib/activate.test.ts`, `make unit`); it has
+  not fired live. HS04c now records `first_activate` and `activate_attempts`.
+- **HS04c failed in the third cycle on a harness bug:** its serving probe reads
+  `robots.txt` from the `site` bucket, which only HS01 created, and `make
+  domain-up` runs HS04 and HS05 on a fresh project - `400` after 369 s. HS04
+  now creates the fixture first; the fourth cycle answered `200` after 1 s with
+  `cf-cache-status` `MISS`. The second cycle's HS04c `200` (fresh project, no
+  `site` bucket) is therefore unexplained: an edge-cached copy of the first
+  cycle's object through the same hostname fits, and cache status was not
+  recorded then.
+- **`font_loaded` is now informative:** a loaded `IBM Plex Mono` FontFace, `1`
+  on the rendered pages (HS05-control, HS05-domain-fn) and `0` on the
+  `text/plain` ones. Before the fix it read `1` everywhere
+  (`document.fonts.check()` is true when no face is declared).
+- Teardown after each cycle: Workers deleted (exit 0), custom hostname `DELETE`
+  `200`, 2 DNS records removed with 0 left, add-on `DELETE` `200`,
+  `make destroy`. Ad hoc re-read after the fourth: no lab project on the
+  account, no `pvlab` hostname resolving.

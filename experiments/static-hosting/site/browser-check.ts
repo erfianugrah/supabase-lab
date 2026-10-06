@@ -43,7 +43,12 @@ try {
     .catch(() => null);
   const api = await page.locator("#api-state").first().textContent({ timeout: 5_000 }).catch(() => null);
   const font = await page.evaluate(() => getComputedStyle(document.body).fontFamily).catch(() => "");
-  const fontLoaded = await page.evaluate(() => document.fonts.check('16px "IBM Plex Mono"')).catch(() => false);
+  // A FontFace for the family that actually finished loading. document.fonts.check()
+  // was used first and reads true when no such face is declared at all, so it
+  // reported 1 on the text/plain pages (review of 2026-10-06).
+  const fontLoaded = await page
+    .evaluate(() => [...document.fonts].some((f) => f.family.replace(/["']/g, "") === "IBM Plex Mono" && f.status === "loaded"))
+    .catch(() => false);
   if (shot) await page.screenshot({ path: shot, fullPage: false }).catch(() => undefined);
 
   // Follow the nav link the way a visitor would.
