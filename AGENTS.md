@@ -1882,6 +1882,42 @@ Redacted artifacts: `out/2026-09-30/`. Details: RUNLOG.md.
   destroyed or the whole run dies; `import.meta.dir` in the compiled binary is
   the bundle; `publish-evidence` does not redact measurement KEYS.
 
+## experiments/tls-surface - key facts (validated 2026-10-02, micro, ap-southeast-1, Team org)
+
+- HTTP edge, every project name and `api.supabase.com`: TLS 1.0/1.1 refused
+  (alert 70), 1.2/1.3 accepted; no SNI refused (alert 40); ECDSA + RSA
+  leaves, 90-day lifetime; HSTS preload. `<ref>.supabase.co`,
+  `<ref>.functions.supabase.co`, the custom domain and `api.supabase.com`
+  accept 10 TLS 1.2 suites, four of them CBC (ECDHE-{ECDSA,RSA}-AES128-SHA256
+  and -AES256-SHA384). `<ref>.storage.supabase.co` accepts 20, 12 CBC,
+  including SHA-1 CBC and six static-RSA suites, and does not redirect port
+  80 (cleartext gateway 404 on `/auth/v1/health`; the Storage route probed,
+  `/storage/v1/version`, hangs after the client has sent its `apikey`).
+  TL02 (per suite) and TL05 (per route) are columns, so `make diff` between
+  two `make probe` runs shows any change.
+- Postgres TLS 1.2 suites: Supavisor 6 (0 CBC), dedicated PgBouncer 6543 20
+  (12 CBC), direct 5432 40 (22 CBC; `ssl_ciphers='HIGH:MEDIUM:+3DES:!aNULL'`;
+  3DES not testable from an OpenSSL 3.6.5 client). PG17 direct TLS works on
+  direct 5432 and the dedicated PgBouncer 6543, not on Supavisor. One private
+  CA (Supabase Root 2021 CA, to 2031-04-26, sent in the chain); the
+  direct-DB leaf runs to 2031-10-01, past its root.
+- With SSL enforcement off (default) Supavisor's hop into Postgres is
+  plaintext (`pg_stat_ssl.ssl=false`); PgBouncer's is TLS 1.3. Enforcement on
+  makes every hop TLS and refuses plaintext within seconds, with a different
+  message per path. Every enforcement switch, on or off, restarts Postgres,
+  and switching on once refused a TLS client on Supavisor for 4 s (hba "no
+  encryption" on the pooler's still-plaintext hop).
+- Outbound: pg_net 0.20.4 refuses TLS < 1.2 and expired, self-signed,
+  untrusted-root and wrong-host certificates, reaches CBC-only servers, and
+  refused the revoked-cert host for a cause not established. An Edge Function
+  cannot reach a CBC-only server and connects to the revoked-cert host
+  (revocation not enforced; one host tested).
+- Harness: TL14's in-process `node:dns` never saw the IPv4 add-on's A record
+  (12- and 20-minute budgets) while `dig` did - poll with `dig`.
+  `publish-evidence` redacts the publishing vantage's public IP by literal
+  (Postgres names the client in hba refusals) and any addresses named in
+  `PVLAB_REDACT_ADDRS`; documentation-range addresses stay.
+
 ## Related
 
 - ~/.pi/agent/skills/terraform/SKILL.md - tofu conventions used here
