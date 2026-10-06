@@ -1,0 +1,109 @@
+{
+  "startedAt": "2026-10-06T09:14:57.937Z",
+  "finishedAt": "2026-10-06T09:15:28.395Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "static-hosting",
+  "labCommit": "8dd9fd1",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "HS06-setup",
+      "title": "Origins (bucket astro-root, function pvlab-hs-root) and both Workers deployed",
+      "status": "pass",
+      "detail": "bucket 200, 28 files (0 failed); function deploy 201 first GET 200; worker storage exit 0; worker fn exit 0",
+      "measurements": {
+        "bucket": 200,
+        "files": 28,
+        "upload_failed": 0,
+        "fn_deploy": 201,
+        "fn_first_get": 200,
+        "worker_storage_exit": 0,
+        "worker_fn_exit": 0
+      },
+      "durationMs": 30457
+    },
+    {
+      "id": "HS06-storage",
+      "title": "Worker -> Storage, root URL in a browser",
+      "status": "pass",
+      "detail": "HTTP 200; rendered \"Static hosting probe\"; island hydrated; font applied; api HTTP 200; About -> 200 rendered",
+      "measurements": {
+        "status": 200,
+        "header_type": "text/html; charset=utf-8",
+        "doc_type": "text/html",
+        "rendered": 1,
+        "hydrated": 1,
+        "css_applied": 1,
+        "font_loaded": 1,
+        "api": "HTTP 200",
+        "failed_requests": 0,
+        "console_errors": 0,
+        "about_status": 200,
+        "about_doc_type": "text/html",
+        "about_rendered": 1,
+        "screenshot": "evidence/20261006-171457/screens/hs06-storage.png",
+        "serving_after_s": 0
+      },
+      "evidence": "{\"failed\":[],\"consoleErrors\":[],\"about\":{\"status\":200,\"docType\":\"text/html\",\"h1\":\"About\",\"url\":\"https://pvlab-site.erfi.dev/about/\"}}",
+      "durationMs": 30457
+    },
+    {
+      "id": "HS06-storage-paths",
+      "title": "pvlab-site.erfi.dev: clean URL redirect and 404 page",
+      "status": "pass",
+      "detail": "/about -> 308 https://pvlab-site.erfi.dev/about/; /no/such/page -> 404 \"text/html; charset=utf-8\"",
+      "measurements": {
+        "about": 308,
+        "about_location": "https://pvlab-site.erfi.dev/about/",
+        "miss": 404,
+        "miss_ct": "text/html; charset=utf-8"
+      },
+      "durationMs": 30457
+    },
+    {
+      "id": "HS06-fn",
+      "title": "Worker -> function via custom domain, root URL in a browser",
+      "status": "pass",
+      "detail": "HTTP 200; rendered \"Static hosting probe\"; island hydrated; font applied; api HTTP 200; About -> 200 rendered",
+      "measurements": {
+        "status": 200,
+        "header_type": "text/html; charset=utf-8",
+        "doc_type": "text/html",
+        "rendered": 1,
+        "hydrated": 1,
+        "css_applied": 1,
+        "font_loaded": 1,
+        "api": "HTTP 200",
+        "failed_requests": 0,
+        "console_errors": 0,
+        "about_status": 200,
+        "about_doc_type": "text/html",
+        "about_rendered": 1,
+        "screenshot": "evidence/20261006-171457/screens/hs06-fn.png",
+        "serving_after_s": 0
+      },
+      "evidence": "{\"failed\":[],\"consoleErrors\":[],\"about\":{\"status\":200,\"docType\":\"text/html\",\"h1\":\"About\",\"url\":\"https://pvlab-fn.erfi.dev/about/\"}}",
+      "durationMs": 30457
+    },
+    {
+      "id": "HS06-fn-paths",
+      "title": "pvlab-fn.erfi.dev: clean URL redirect and 404 page",
+      "status": "pass",
+      "detail": "/about -> 308 https://pvlab-fn.erfi.dev/about/; /no/such/page -> 404 \"text/html; charset=utf-8\"",
+      "measurements": {
+        "about": 308,
+        "about_location": "https://pvlab-fn.erfi.dev/about/",
+        "miss": 404,
+        "miss_ct": "text/html; charset=utf-8"
+      },
+      "durationMs": 30457
+    }
+  ]
+}
