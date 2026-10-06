@@ -1959,11 +1959,14 @@ the project hostnames; with the custom domain add-on, only under
   `SITE_BASE=/functions/v1/<slug>`.
 - `custom-hostname/activate` answered `400` straight after reverify reported
   `4_origin_setup_completed` (verified at 175 s) and `201` about ten minutes
-  later; cause not established (body not recorded). HS04 retries for 10
-  minutes and logs the body - that version has not run.
+  later; cause not established (body not recorded). The re-run the same day
+  (same hostname, new project) verified in 67 s with no `_acme-challenge`
+  record and the first activate answered `201`, so the retry HS04 now carries
+  is still unexercised.
 - HS06 is the contrast case: a Cloudflare Worker on an own hostname gives `/`,
   `308` clean-URL redirects and a real 404 in front of Storage (no custom
-  domain needed) or the function (`308` Location not recorded). Supabase then only holds the files.
+  domain needed) or the function (`/about` -> `308` to `/about/`, recorded
+  from the re-run on). Supabase then only holds the files.
 - Harness: runs from source by default (`dist/pvlab` is linux-x64 and HS05
   drives a local Chromium via `site/browser-check.ts` as a subprocess -
   `bunx playwright install chromium` once). PAT from the environment, plus the
