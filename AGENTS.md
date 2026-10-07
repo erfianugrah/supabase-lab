@@ -1950,9 +1950,21 @@ README.md, RUNLOG.md and docs/.
   16.4.0 + OpenNext 1.20.9 500s every page, `cacheComponents: true` hangs.
   `make live-app-prep` pins next 16.3.8 and drops it. `create-next-app -e`
   needs the unauthenticated GitHub API (60/h per IP): pre-scaffold.
-- **Wrangler**: the vault `CLOUDFLARE_TOKEN` fails Workers calls with 10000;
-  the email + global key pair works but reaches every account, so a
-  Workers-only token is needed before an agent holds it on stage.
+- **Wrangler**: the vault `CLOUDFLARE_TOKEN` fails Workers calls with 10000.
+  For an agent use `sx CLOUDFLARE_API_TOKEN=CLOUDFLARE_STAGE_WORKERS_TOKEN
+  CLOUDFLARE_ACCOUNT_ID --`: one account, Workers Scripts Write plus Workers
+  KV Storage Read (without KV Read `wrangler delete` removes the Worker, then
+  exits 1 listing KV namespaces). Not yet tried on the OpenNext app's asset
+  upload.
+- **Headless MCP**: the hosted Supabase MCP server takes the PAT as
+  `"headers": {"Authorization": "Bearer ${SUPABASE_ACCESS_TOKEN}"}` in
+  `.mcp.json` (Claude Code expands the variable), so `claude -p` needs no
+  `/mcp` login. `apply_migration`/`execute_sql` with DROP, DELETE, TRUNCATE
+  or an unbounded UPDATE ask for confirmation, which `-p` cannot give: the
+  call returns `{"status":"cancelled"}`.
+- **The in-app agent needs a Console API key** (or Bedrock/Vertex). A
+  claude.ai subscription login may not be used inside a product
+  (https://code.claude.com/docs/en/legal-and-compliance).
 - **`make new-app`**: separate `supabase_project.app` for_each fed by the
   gitignored `apps.auto.tfvars`; every plan is jq-checked for exactly one
   create/delete. 15-16 s request to ready.
