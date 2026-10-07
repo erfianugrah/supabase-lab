@@ -2075,7 +2075,8 @@ docs/plans/2026-10-02-bu-attribution.md.
   (`AuditLogsResponse_Output`) declare `token_type`, `token_hash`,
   `token_alias`, `oauth_app_id/name` per actor; the guide lists no export and
   no drain. Security review only - not an attribution input (2026-10-07).
-- Role assignment on the Management API is Enterprise-only: v2
+- Role assignment on the Management API is Enterprise-only by default per the
+  spec (not measured on an org with the entitlement enabled): v2
   `PATCH /v2/organizations/{slug}/members/{user_id}/roles` and
   `POST /v2/organizations/{slug}/members/invitations` carry
   `x-allowed-plans: ["Enterprise"]`; v1 has only `GET .../members`. On the

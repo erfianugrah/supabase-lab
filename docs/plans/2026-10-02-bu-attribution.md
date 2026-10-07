@@ -63,7 +63,7 @@ org's project list against the map catches anything that took another path.
    then closing the gap in the map.
 8. **Lock the bypass.** No human in a unit holds an org role that can create
    projects; the sweep catches whatever still gets through. Role assignment
-   on the Management API is Enterprise-only: v2 has
+   on the Management API is Enterprise-only by default per the spec: v2 has
    `PATCH /v2/organizations/{slug}/members/{user_id}/roles` and
    `POST /v2/organizations/{slug}/members/invitations`, both with
    `x-allowed-plans: ["Enterprise"]` (v2 OpenAPI, read 2026-10-07); v1 has

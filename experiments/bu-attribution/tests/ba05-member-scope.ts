@@ -6,7 +6,7 @@
  * provisioning path, and that a project-scoped member cannot see other
  * units' projects. Role assignment has no Management API surface on this
  * plan (`api.members.roles: false`; the v2 role endpoints are
- * Enterprise-only), so the operator assigns the role in the
+ * Enterprise-only by default per the spec), so the operator assigns the role in the
  * dashboard and this module measures it with the MEMBER's token.
  *
  * Inputs:
