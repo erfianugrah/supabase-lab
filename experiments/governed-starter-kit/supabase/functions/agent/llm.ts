@@ -29,9 +29,16 @@ export class LlmError extends Error {
   }
 }
 
+/**
+ * One Messages API call, retried on 429/529/5xx, never past `deadline` (epoch
+ * ms). The Edge Runtime cuts a request that sends nothing for 150 s (504
+ * IDLE_TIMEOUT, edge-resilience W13), and this function answers in one
+ * response, so the caller sets a deadline well inside that.
+ */
 export async function callClaude(
   apiKey: string,
   req: { system: string; tools: unknown[]; messages: Msg[] },
+  deadline: number,
 ): Promise<ClaudeResponse> {
   const body = JSON.stringify({
     model: MODEL,
@@ -43,22 +50,35 @@ export async function callClaude(
     messages: req.messages,
   });
   for (let attempt = 0; ; attempt++) {
-    const r = await fetch(URL, {
-      method: "POST",
-      headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-        "anthropic-beta": "server-side-fallback-2026-07-01",
-        "content-type": "application/json",
-      },
-      body,
-    });
+    const left = deadline - Date.now();
+    if (left < 1000) throw new LlmError(504, "timed out waiting for the model");
+    let r: Response;
+    try {
+      r = await fetch(URL, {
+        method: "POST",
+        headers: {
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+          "anthropic-beta": "server-side-fallback-2026-07-01",
+          "content-type": "application/json",
+        },
+        body,
+        signal: AbortSignal.timeout(left),
+      });
+    } catch (e) {
+      const name = (e as Error).name;
+      if (name === "TimeoutError" || name === "AbortError") throw new LlmError(504, "timed out waiting for the model");
+      throw new LlmError(502, `could not reach the model API: ${(e as Error).message}`);
+    }
     if (r.ok) return (await r.json()) as ClaudeResponse;
     const text = await r.text();
     // Retry rate limits, overload and 5xx; everything else is the caller's problem.
     if (attempt < 2 && (r.status === 429 || r.status === 529 || r.status >= 500)) {
-      await new Promise((res) => setTimeout(res, 1000 * (attempt + 1)));
-      continue;
+      const wait = Math.min(Number(r.headers.get("retry-after")) * 1000 || 1000 * (attempt + 1), 10_000);
+      if (Date.now() + wait < deadline - 5000) {
+        await new Promise((res) => setTimeout(res, wait));
+        continue;
+      }
     }
     let msg = text.slice(0, 300);
     try {

@@ -1,10 +1,12 @@
 # Live segment: a coding agent builds an app on the kit
 
-A coding agent, connected to `kit-live` through the Supabase MCP server and
-reading the kit's guardrails, builds a small internal app on top of the
-baseline (departments, profiles, private helpers). The audience watches it
-go from an empty workspace to a running app, and sees where the guardrails
-stopped the usual mistakes.
+The platform team turns a request into a guarded backend in under a
+minute, then a coding agent, connected to `kit-live` through the Supabase
+MCP server and reading the kit's guardrails, builds a small internal app on
+top of the baseline (departments, profiles, private helpers) and deploys it
+to a public URL. The audience watches it go from a request to a running
+environment, not a localhost demo, and sees where the guardrails stopped the
+usual mistakes.
 
 `kit-ready` is never touched by this segment; it is the fallback.
 
@@ -16,6 +18,8 @@ stopped the usual mistakes.
 | MCP config | `live/.mcp.json.example` -> `make mcp-config` -> `live/.mcp.json` (gitignored) | Hosted MCP server scoped to the live project |
 | Workspace | `make live-workspace` -> `~/kit-live-demo` (default `WORKSPACE`) | The agent's working directory, outside this repo |
 | Reset | `make live-reset [APPLY=1]` | Back to baseline-only, users kept |
+| Self-service backend | `make new-app NAME=<slug>` / `make remove-app NAME=<slug>` | One more guarded project in the same org, baseline applied and checked |
+| Deploy | `make live-app-prep` (setup), then the agent's `npm run deploy` in `web/`; `make live-app-deploy` / `make live-app-delete` | The agent's app on Cloudflare Workers (`kit-live-app.<subdomain>.workers.dev`) |
 
 ### MCP server
 
@@ -100,21 +104,55 @@ the explicit scoped config above instead of the plugin for this segment.
 
 ```bash
 cd experiments/governed-starter-kit
-export TOK_CMD='secretctl exec keyfile:$HOME/.supabase/access-token --as SUPABASE_ACCESS_TOKEN --'
+export TOK_CMD='sx SUPABASE_ACCESS_TOKEN --'   # any way of putting a live PAT in the env
 
 eval "$TOK_CMD make live-reset"            # read the plan
 eval "$TOK_CMD make live-reset APPLY=1"    # drop, reapply baseline, re-check
 rm -rf ~/kit-live-demo && make live-workspace
 cd ~/kit-live-demo
-# optional, saves 1-2 min and a network dependency on stage:
-npx create-next-app@latest web -e with-supabase
+npx create-next-app@latest web -e with-supabase   # about 35 s
 git add -A && git commit -m "scaffold"
+cd - && make live-app-prep                        # OpenNext adapter, about 20 s
+cd ~/kit-live-demo && git add -A && git commit -m "deploy setup"
 ```
 
-Then start the agent in `~/kit-live-demo`, authenticate the MCP server, and
-check that it lists the `supabase` tools and that the instructions loaded
-(ask it "what are the kit rules for a new table?"). Quit, and start a fresh
-session for the run.
+Pre-scaffold, do not leave it to the agent: `create-next-app -e` looks the
+example up through the unauthenticated GitHub API (60 requests an hour per
+IP), and on 2026-10-07 it failed with "Could not locate an example named
+with-supabase" until the limit reset - on conference wifi that limit is
+shared with the room. `make live-app-prep` (Makefile, "deploy + provisioning")
+makes `web/` deployable as the Worker `kit-live-app`; the comment above it
+lists the three changes and why each was needed.
+
+Then start the agent in `~/kit-live-demo` with Cloudflare credentials in its
+environment, for step 5, through `make stage-agent`:
+
+```bash
+make stage-agent DRY=1                     # print the command, launch nothing
+sx CLOUDFLARE_API_TOKEN=<vault item> CLOUDFLARE_ACCOUNT_ID -- make stage-agent
+```
+
+`scripts/stage-agent.sh` runs Claude Code with none of the operator's
+user-scope config: `CLAUDE_CONFIG_DIR` points at an isolated directory
+(`STAGE_CLAUDE_HOME`, default `~/.claude-stage`; the Claude Code docs say
+settings, session history and plugins move with it,
+https://code.claude.com/docs/en/settings), `--setting-sources project,local`
+skips user settings and memory, and `--strict-mcp-config` limits MCP to the
+workspace `.mcp.json`. It does not use `--bare`, which would stop CLAUDE.md
+discovery and so the guardrails. The 2026-10-06 rehearsal needed this: the
+operator's hooks blocked `npm` and their instructions leaked into the
+narration. The isolated directory starts logged out; run `/login` in it once
+at T-30. Not yet verified in a live session: that no user-scope CLAUDE.md
+reaches the stage agent (ask it what instructions it loaded).
+
+Use a token limited to Workers Scripts edit on the one account. The
+verification run used the account's email + global key pair instead
+(`CLOUDFLARE_EMAIL`, `CLOUDFLARE_API_KEY`), which wrangler also accepts; it
+reaches everything in every account the login has, so do not give it to an
+agent on stage. A Workers-only token was not tested. Authenticate the MCP
+server, check that it lists the `supabase` tools and that the instructions
+loaded (ask it "what are the kit rules for a new table?"). Quit, and start a
+fresh session the same way for the run.
 
 Off screen: open `evidence/users-<live ref>.json` for the seeded passwords.
 Users: alice (Sales, employee), bob (Sales, manager), carol (Marketing,
@@ -123,6 +161,44 @@ employee), dave (Marketing, manager), all `@example.com`.
 Starter scaffold: `npx create-next-app@latest <dir> -e with-supabase`
 (https://supabase.com/docs/guides/getting-started/quickstarts/nextjs). It
 ships a sign-up page; the guardrails tell the agent to remove it.
+
+## Opener: the platform team provisions a backend (1 min)
+
+A platform team turns a request for a backend into a guarded project. Show
+that side first, in the kit repo terminal:
+
+```bash
+eval "$TOK_CMD make new-app NAME=demo1" \
+  | sed -E 's/[a-z]{20}/<ref>/g; s/(sb_publishable_)[A-Za-z0-9_-]+/\1.../'
+```
+
+What happens, in order, and what to say over it:
+
+1. The request lands in `apps.auto.tfvars` (the app list tofu reads on
+   every plan); `supabase_project.app` in `supabase.tf` has one project per
+   entry, same Team org, region and size as the kit projects.
+2. A saved plan, checked before anything is applied: it must be exactly one
+   create of `supabase_project.app["demo1"]`. Anything else, a change to
+   `kit-live` or `kit-ready` included, aborts and restores the list. The
+   screen shows one line, `plan: create supabase_project.app["demo1"]`.
+3. Apply, then health (db, rest, auth), then the kit baseline
+   (`sql/00-baseline.sql`), then a check that every `public` table has RLS
+   on (`baseline: RLS on 2/2 public tables`).
+4. The URL and publishable key the requesting team needs, and the elapsed
+   time.
+
+Measured 2026-10-07, two runs (Team org, micro, ap-southeast-1), each with
+a `PLAN=1` stop to read the plan: plan 2 s, apply 5-6 s, healthy on the
+first poll both times, baseline and RLS check 3 s; 15-16 s from request to
+ready including the plan read. Two samples on one day; rehearse it on the
+day, and if it takes minutes, start it before the framing and come back to
+it.
+
+The coding agent still builds on `kit-live`, whose MCP auth and seeded users
+were set up before the session; `demo1` is the same baseline on a project
+nobody has touched, which is the point of the opener. Remove it in the
+teardown. `PLAN=1` stops after the checked plan if you want to show the full
+`tofu show` output before applying.
 
 ## The prompt
 
@@ -162,6 +238,13 @@ Do it in this order:
    with approve/reject and "mark returned". Use the project URL and
    publishable key from the MCP server in web/.env.local.
 4. Run it with `npm run dev` and tell me the URL.
+5. Deploy it: web/ is already set up for Cloudflare Workers (wrangler.jsonc,
+   Worker name kit-live-app). Stop the dev server, run `npm run deploy` in
+   web/, then curl the workers.dev URL it prints: the login page must answer
+   200 and the protected page must redirect to login when signed out. Tell me
+   the URL and the status codes. The build reads the project URL and
+   publishable key from web/.env.local; put nothing else in the bundle, and
+   do not create any other Cloudflare resource.
 
 Keep each migration small and explain each policy in one line as you go.
 ```
@@ -192,6 +275,14 @@ Schema (names may differ):
 App: sign-in, equipment list with availability, request form, manager
 queue. alice and bob in two browser windows; carol sees no Sales rows.
 
+Deploy: one `npm run deploy` (OpenNext build, then `wrangler deploy`), about
+30 s measured on the bare scaffold (2026-10-07, three runs, 26-30 s); the
+agent's app adds pages, so expect a little more. On the scaffold pointed at
+`kit-live`, the deployed URL answered `/` 200, `/auth/login` 200,
+`/protected` 307 to `/auth/login` signed out, and 200 with the user's email
+after signing in as alice and as carol. On stage, repeat the alice and bob
+sign-ins on the agent's pages at the public URL.
+
 ## Trap moments to point out
 
 1. The writable status column. The common first draft grants `update` on
@@ -210,17 +301,27 @@ queue. alice and bob in two browser windows; carol sees no Sales rows.
 4. Advisor findings. If the first migration leaves an unindexed foreign key
    or an unwrapped `auth.uid()`, the advisors flag it and the agent fixes it
    in a follow-up migration. Show that loop rather than hiding it.
+5. What ships to the browser. `NEXT_PUBLIC_*` values are inlined into the
+   client bundle at build time, so anything the agent puts there is public.
+   The URL and publishable key are meant to be (RLS is what protects the
+   data); a secret key, or a server-only value given a `NEXT_PUBLIC_` name
+   to make an error go away, would ship to every visitor. The opposite
+   mistake breaks the app instead: putting the URL and key only in Worker
+   secrets (`wrangler secret put`) leaves the browser bundle without them.
+   Look at `web/.env.local` off screen before step 5.
 
 ## Timing targets
 
 | Step | Target | Cut-off |
 |---|---|---|
+| Opener: `make new-app` | 1 min | 2 min |
 | Framing, show AGENTS.md and the scoped MCP URL | 1 min | 2 min |
 | Schema migrations + advisors | 4 min | 7 min |
 | Prove-the-rules step | 2 min | 4 min |
 | App (pre-scaffolded) | 5 min | 8 min |
 | Run it, sign in as alice and bob | 2 min | 3 min |
-| Total | 14 min | 20 min |
+| Deploy, sign in on the public URL | 2 min | 4 min |
+| Total, with the opener | 17 min | 26 min |
 
 These are targets to rehearse against, not measurements. Past a cut-off, or
 on any MCP auth or network failure, switch to the fallback.
@@ -231,7 +332,15 @@ on any MCP auth or network failure, switch to the fallback.
    after `make live-reset APPLY=1`).
 2. Or the finished example on `kit-ready`: `make app-dev` (purchase requests,
    same guardrails), and walk through `sql/10-app.sql` as "what the agent
-   produces".
+   produces". `make app-deploy` before the session puts it on workers.dev
+   too (`starter-kit-app`; measured 2026-10-07: `/login` 200, `/dashboard`
+   307 to `/login` signed out, and after sign-in the seeded rows for the
+   user's department only).
+3. Deploy step only: if the agent's deploy fails or stalls past its
+   cut-off, run `make live-app-deploy` in the kit terminal (the same
+   `npm run deploy`, with your credentials). If the opener's apply fails,
+   say what it would have printed and move on: `kit-live` is the same
+   baseline on a project made the same way.
 
 ## What to show on screen
 
@@ -243,6 +352,10 @@ on any MCP auth or network failure, switch to the fallback.
 - The dashboard for `kit-live`: tables with RLS enabled, the policy list.
 - Two browser windows (alice, bob) and the refused action.
 - `git diff` in the workspace at the end.
+- The opener's output: the one `plan:` line, `baseline: RLS on 2/2 public
+  tables`, and the elapsed time.
+- The deploy: the workers.dev URL from step 5 opened in a browser, signed
+  in as alice - the same app, now not on localhost.
 
 Never show `evidence/`, `.env.local`, the dashboard API keys page, or the
 terminal while a token is in scope.
@@ -250,9 +363,17 @@ terminal while a token is in scope.
 ## After the segment
 
 ```bash
+make live-app-delete                         # the agent's Worker (wrangler auth in env)
+make app-delete                              # starter-kit-app, if you deployed the fallback
+eval "$TOK_CMD make remove-app NAME=demo1"   # the opener's project and its data
 eval "$TOK_CMD make live-reset APPLY=1"
 rm -rf ~/kit-live-demo
 ```
+
+`live-app-delete` deletes by name, so it works after the workspace is gone;
+both Workers are workers.dev only, no DNS or custom domain to remove.
+`remove-app` runs the same checked plan as `new-app`, which must be exactly
+one delete. `make apps` lists any app backends still in state.
 
 The reset drops everything in `public` and `private` beyond the baseline,
 extra policies, columns, constraints, indexes and triggers on the baseline
