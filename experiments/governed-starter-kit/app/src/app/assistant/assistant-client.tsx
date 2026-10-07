@@ -32,6 +32,7 @@ interface AgentTurn {
   events: ToolEvent[]
   reply?: string
   pending?: Pending
+  error?: string
 }
 
 type LogItem =
@@ -52,7 +53,8 @@ export default function AssistantClient() {
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
 
-  const invoke = async (body: Record<string, unknown>) => {
+  // Returns false when the call failed and the transcript was not advanced.
+  const invoke = async (body: Record<string, unknown>): Promise<boolean> => {
     setBusy(true)
     const { data, error } = await supabase.functions.invoke<AgentTurn>('agent', { body })
     setBusy(false)
@@ -63,16 +65,18 @@ export default function AssistantClient() {
         if (j?.error) text = j.error
       }
       setLog((l) => [...l, { kind: 'error', text }])
-      return
+      return false
     }
-    if (!data) return
+    if (!data) return false
     setMessages(data.messages)
     setPending(data.pending ?? null)
     setLog((l) => [
       ...l,
       ...data.events.map((event): LogItem => ({ kind: 'tool', event })),
       ...(data.reply ? [{ kind: 'assistant' as const, text: data.reply }] : []),
+      ...(data.error ? [{ kind: 'error' as const, text: data.error }] : []),
     ])
+    return true
   }
 
   const send = async (e: React.FormEvent) => {
@@ -88,7 +92,9 @@ export default function AssistantClient() {
     if (!pending) return
     const p = pending
     setPending(null)
-    await invoke({ mode: 'confirm', messages, pending: p, approve })
+    // A failed confirm ran nothing (the function only fails before the write),
+    // so put the card back and let the user retry or cancel.
+    if (!(await invoke({ mode: 'confirm', messages, pending: p, approve }))) setPending(p)
   }
 
   return (

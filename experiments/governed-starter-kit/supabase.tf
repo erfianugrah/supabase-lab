@@ -22,3 +22,22 @@ resource "supabase_project" "kit" {
   region            = var.region
   instance_size     = var.instance_size
 }
+
+# Self-service backends: one more guarded project per requested app, same org,
+# region and size as the pair above. `make new-app NAME=<slug>` adds the slug
+# to apps.auto.tfvars (gitignored, read automatically by tofu) and applies;
+# `make remove-app NAME=<slug>` takes it out again. Because the request list
+# lives in a var-file every plan reads, a plain `make apply` keeps these
+# projects instead of planning to destroy them. A separate resource rather
+# than more keys in var.projects, so the app list never feeds the for_each
+# that holds kit-live and kit-ready; the Makefile also refuses any app plan
+# that touches anything but the one app.
+resource "supabase_project" "app" {
+  for_each = var.extra_apps
+
+  organization_id   = var.supabase_org_id
+  name              = "kit-app-${each.key}"
+  database_password = var.db_password
+  region            = var.region
+  instance_size     = var.instance_size
+}

@@ -81,6 +81,15 @@ seems to need a change there, stop and explain why.
   `set search_path = ''` for a multi-column state change, so RLS still
   decides who may do it. Raise an error when it updates zero rows rather than
   returning success.
+- Where a business rule produces an error a user will see (a manager cannot
+  approve their own request, a limit is exceeded), do not rely on a bare
+  `check` constraint: the user gets a raw constraint-violation message.
+  Enforce it in a `SECURITY INVOKER` function or trigger that does
+  `raise exception '<plain message>' using errcode = '<code>'`, with an
+  explicit errcode (a standard name such as `check_violation`, or a custom
+  5-character code). Keep the constraint as a backstop if you like. The UI
+  shows that message, not a generic failure. `decide_purchase_request` in
+  `sql/10-app.sql` shows the shape (yours should also set the errcode).
 - If something genuinely needs `SECURITY DEFINER`, put it in `private`, set
   `search_path = ''`, revoke execute from `public` and `anon`, and say why in
   the migration.
