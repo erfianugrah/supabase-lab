@@ -1922,6 +1922,39 @@ Redacted artifacts: `out/2026-09-30/`. Details: RUNLOG.md.
   (Postgres names the client in hba refusals) and any addresses named in
   `PVLAB_REDACT_ADDRS`; documentation-range addresses stay.
 
+## experiments/governed-starter-kit - key facts (validated 2026-10-07, micro, ap-southeast-1, Team org)
+
+Two projects (`kit-live` baseline only, `kit-ready` baseline + example app +
+agent + webhook) plus any `make new-app` backends. Details: the experiment's
+README.md, RUNLOG.md and docs/.
+
+- **PAT**: the `~/.supabase/access-token` keyfile returns 401 since
+  2026-10-07; run every target under `sx SUPABASE_ACCESS_TOKEN --`.
+- **`make probe` on macOS** runs `bun harness/src/run.ts` (the compiled
+  `pvlab` is linux-x64 only). K01-K04 share the seeded users and rows: do not
+  run two probes at once (a concurrent K02 row made K01.01 count 4 instead
+  of 2).
+- **K03 (agent chat) skips until an Anthropic key is a function secret**
+  (`make fn-secret ANTHROPIC_ITEM=<vault item>`); it has never run against a
+  model.
+- **The `with-supabase` scaffold does not run on Workers as generated**: next
+  16.4.0 + OpenNext 1.20.9 500s every page, `cacheComponents: true` hangs.
+  `make live-app-prep` pins next 16.3.8 and drops it. `create-next-app -e`
+  needs the unauthenticated GitHub API (60/h per IP): pre-scaffold.
+- **Wrangler**: the vault `CLOUDFLARE_TOKEN` fails Workers calls with 10000;
+  the email + global key pair works but reaches every account, so a
+  Workers-only token is needed before an agent holds it on stage.
+- **`make new-app`**: separate `supabase_project.app` for_each fed by the
+  gitignored `apps.auto.tfvars`; every plan is jq-checked for exactly one
+  create/delete. 15-16 s request to ready.
+- **pg_net**: `postgres` cannot revoke PUBLIC execute on `net.*` (owned by
+  supabase_admin). Delivery is at most once.
+- **Dashboard Read-only role** (`supabase_read_only_user`) has BYPASSRLS and
+  `pg_read_all_data`: it sees every department's rows.
+- **Troubleshooting faults**: 400k `activity_events` rows hit the 8 s
+  `authenticated` statement timeout, so the seed is 100k. pg_stat_statements
+  has no entry for a statement that errors; the logs endpoint does.
+
 ## experiments/static-hosting - key facts (validated 2026-10-06, micro, ap-southeast-1)
 
 One project, no AWS (DNS through the Cloudflare API for the custom-domain

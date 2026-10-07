@@ -242,6 +242,14 @@ facts):
   exception - a custom domain, which renders HTML from a function but only
   under `/functions/v1/<slug>/` - and, as a contrast, a Cloudflare Worker in
   front. Measured 2026-10-06; see its RUNLOG.
+- `governed-starter-kit` - a starter kit for internal apps built on Supabase
+  by teams that are not database specialists, with the guardrails owned by a
+  platform team: department tenancy from `app_metadata`, RLS and column
+  grants on every table, an in-app agent that runs as the signed-in user,
+  a decision webhook, a coding agent building and deploying an app on a
+  scoped MCP server, self-service project provisioning, and a reversible
+  troubleshooting segment. Two Team-org projects, rebuilt with `make up`.
+  Measured 2026-10-05 to 2026-10-07; see its README and RUNLOG.
 
 ## Ad-hoc platform probes (no experiment dir)
 
