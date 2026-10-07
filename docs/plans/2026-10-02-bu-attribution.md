@@ -5,6 +5,10 @@ deterministic, self-service per-business-unit cost attribution inside a
 single `platform`-plan organization, and write the requirements pattern they
 implement on their own control plane.
 
+**Status (2026-10-08):** Tasks 1, 2 and 6 done; Q1-Q8, Q10, Q11 and Q13
+answered. Open: Q9 (Task 3, second org), Q12 (Task 5, invoice), Q14 (Task 5b,
+scoped token on production), optional BA05 run (Task 4).
+
 **Scope boundary:** the operator builds the attribution system. This lab
 supplies the measured platform facts the pattern rests on, and the pattern
 itself as requirements. No gateway, ledger service or poller is built here;
@@ -98,7 +102,7 @@ org's project list against the map catches anything that took another path.
 | Q10 | Which roles can create projects; does a project-scoped member see other units' projects; do org-wide roles cover future projects | Public docs (Access Control guide): Owner and Administrator create projects, Developer and Read-only cannot; a project-scoped member cannot view, access or see other projects in the dashboard; org-level roles cover current and future projects. BA05 would confirm the same on the Management API | answered by docs; BA05 optional |
 | Q11 | Does the org audit log entry for a create name the token or only the user | Public: the Platform Audit Logs guide lists actor and token type; the open-source Studio types each actor with `token_type`, `token_hash`, `token_alias` (the token's dashboard name) and `oauth_app_id`/`name`. Dashboard only - no `/v1` path, no export, no drain; BA06 measured a PAT refused on the dashboard route (401) | answered - security review only, not an attribution input (step 7 revised 2026-10-07) |
 | Q12 | Does the platform invoice itemise per ref; which lines stay org-level | M07 against a platform-plan invoice PDF | open |
-| Q13 | Can the provisioning service assign member roles as it creates a project | BA01a (`api.members.roles` false); v1 OpenAPI: GET only; v2 OpenAPI (read 2026-10-07): role PATCH and invitations POST, both `x-allowed-plans: ["Enterprise"]` | answered - not on this org (entitlement false); Enterprise-only on v2, unmeasured |
+| Q13 | Can the provisioning service assign member roles as it creates a project | BA01a (`api.members.roles` false); v1 OpenAPI: GET only; v2 OpenAPI (read 2026-10-07): role PATCH and invitations POST, both `x-allowed-plans: ["Enterprise"]` | answered - not on this org (entitlement false); Enterprise-only by default on v2 (per-org entitlement), unmeasured |
 | Q14 | Does an org-scoped PAT create projects, reach projects created after it was issued, and share the user's rate budget | Scoped PATs are public (Personal Access Tokens guide); s2z-wake measured an org-scoped PAT on staging only (`GET /v1/projects` returns `[]`); L01b measured the cumulative budget with classic PATs | open |
 
 ---
@@ -146,5 +150,7 @@ unit from `parent_project_ref`; names are hints, never the record.
 
 ### Task 6: write-up
 
-- [ ] Requirements pattern above, updated with measured answers, as a
-      lexicanum section or guide alongside per-project cost attribution.
+- [x] Requirements pattern above, updated with measured answers, as a
+      lexicanum section: "One org, many business units" in the per-project
+      cost attribution guide (steps 7/8 and Q13/Q14 carried there
+      2026-10-07). Re-sync it when Q9, Q12 or Q14 closes.

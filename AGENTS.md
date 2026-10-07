@@ -2083,6 +2083,11 @@ docs/plans/2026-10-02-bu-attribution.md.
   platform-plan org `api.members.roles` reads false (BA01a), so an org admin
   assigns roles in the dashboard, where a project-scoped invite names one
   project.
+- Credential for the write path: a scoped PAT limited to the one org with
+  Organization Projects (Read-write) per the public Personal Access Tokens
+  guide; classic tokens reach every org the user belongs to. Unmeasured on
+  production (Q14, Task 5b); an org-scoped staging PAT gets `[]` from
+  `GET /v1/projects` (s2z-wake), so sweep the org listing.
 - BA04 (transfer-in) needs a second org on the same control plane; an org
   cannot be deleted on `/v1`, so it waits for a decision. BA05 (restricted
   member, `PVLAB_PAT2`, `PVLAB_PEER_INSCOPE`/`OUTSCOPE`) needs a second user
