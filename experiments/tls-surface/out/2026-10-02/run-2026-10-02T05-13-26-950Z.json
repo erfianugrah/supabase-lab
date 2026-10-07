@@ -5,7 +5,7 @@
   "region": "ap-southeast-1",
   "ref": "<ref>",
   "experiment": "tls-surface",
-  "labCommit": "4578c50",
+  "labCommit": "5fd3267",
   "toolVersions": {
     "bun": "1.3.14",
     "psql": "psql (PostgreSQL) 18.6",
