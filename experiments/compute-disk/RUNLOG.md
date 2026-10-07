@@ -80,8 +80,8 @@ deleted the same run.
 
 ## 2026-10-01 - paid-plan fill: autoscale, read-only, and a full disk (D10, D11)
 
-Prompted by a customer-facing draft that stated the paid-plan read-only and
-import rules as fact while the lab only had them from the docs. Pro org,
+The lab had the paid-plan read-only and import rules from the docs only;
+this run measures them. Pro org,
 throwaway Micro projects in `ap-southeast-1`, each deleted the same day. Three
 fill runs (module D10, harness plus curl replay for the parts the first module
 version did not cover) and one curl replay of the grow steps (D11).
@@ -157,8 +157,8 @@ redacted record.
 
 ## 2026-09-23 - the disk write accepts autoscale fields and silently discards them
 
-Prompted by a customer asking whether the Advanced Disk Settings cap can be set
-programmatically, so that automatic growth cannot bill them without approval.
+Question: can the Advanced Disk Settings cap be set programmatically, so that
+automatic growth cannot add to the bill without approval?
 Curl replay against a throwaway nano project on a platform-plan org, STAGING
 control plane, created and deleted for the run.
 

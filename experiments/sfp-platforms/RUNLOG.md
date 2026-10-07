@@ -115,7 +115,7 @@ Deltas the diff surfaced:
 
 ## 2026-09-03 - Pro AND Team orgs, restore surface: S03 + S11 per org, plus a curl replay
 
-Prompted by a customer report of three refusals on the backups routes. S03 and
+Question: which backups routes refuse, and on which plans? S03 and
 S11 ran through `.pi/probe-sfp-platforms.sh` on the Pro org and again on the
 Team org (four artifacts under `evidence/20260903-restore-gate/{pro,team}/`,
 all four PROBE PASS; S03b `restore_point_status=400`, S11b
