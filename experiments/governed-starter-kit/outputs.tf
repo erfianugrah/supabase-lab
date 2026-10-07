@@ -9,3 +9,8 @@ output "ready_ref" {
 output "region" {
   value = var.region
 }
+
+# slug -> project ref for the self-service app backends (make new-app).
+output "app_refs" {
+  value = { for k, p in supabase_project.app : k => p.id }
+}
