@@ -23,7 +23,7 @@ Checked against the live docs and pricing page on 2026-10-07.
 | Org MFA enforcement | Pro, Team and Enterprise | https://supabase.com/docs/guides/platform/mfa/org-mfa-enforcement ("MFA enforcement is only available on the Pro, Team and Enterprise plans") |
 | Platform audit logs | Team and Enterprise | https://supabase.com/docs/guides/security/platform-audit-logs ("only available on the Team and Enterprise plans"); pricing "Platform Audit Logs" row |
 | Audit log drains | NOT CONFIRMED - the audit-logs page links to them without naming a plan; project log drains are Pro, Team and Enterprise | https://supabase.com/docs/guides/security/platform-audit-logs, https://supabase.com/docs/guides/telemetry/log-drains |
-| Member role management by API | No plan: the public Management API has no write operation for members | https://api.supabase.com/api/v1-json (see below) |
+| Member role management by API | Enterprise only: v2 role and invitation writes carry `x-allowed-plans: ["Enterprise"]`; v1 has no member write | https://api.supabase.com/api/v2-json, https://api.supabase.com/api/v1-json (see below) |
 
 SSO note: the pricing page is inconsistent. The Team plan card lists "SSO
 for Supabase Dashboard", while the comparison table's "SSO" row (under
@@ -103,15 +103,17 @@ Consequences worth saying out loud:
 
 ## One-time setup for the lab org (manual)
 
-The public Management API cannot do this. Re-checked 2026-10-07 against
-the published OpenAPI document (https://api.supabase.com/api/v1-json, 169
-operations): the only membership operation is
-`GET /v1/organizations/{slug}/members`; org-level writes are organization
-creation and project claim only; the `database/jit/invite` endpoints are
-database access, not org membership. This matches the earlier F05 finding,
-and it does not depend on the plan - the API has no member write on any
-plan. (The README's "no Management API for member roles on Pro or Team" is
-correct but narrower than the fact.)
+The public Management API cannot do this on Pro or Team. Re-checked
+2026-10-07 against the published OpenAPI documents. In v1
+(https://api.supabase.com/api/v1-json, 169 operations) the only membership
+operation is `GET /v1/organizations/{slug}/members`; org-level writes are
+organization creation and project claim only; the `database/jit/invite`
+endpoints are database access, not org membership. v2
+(https://api.supabase.com/api/v2-json) adds
+`PATCH /v2/organizations/{slug}/members/{user_id}/roles` and
+`POST /v2/organizations/{slug}/members/invitations`, both with
+`x-allowed-plans: ["Enterprise"]`. Not measured on an Enterprise org. The
+README's "no Management API for member roles on Pro or Team" stands.
 
 - [ ] Owner account has MFA enrolled (two authenticator apps, per the docs)
       before anything else in this list.

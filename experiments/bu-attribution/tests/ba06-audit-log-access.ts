@@ -1,8 +1,9 @@
 /**
  * BA06 - can a PAT read the organization audit log? (read-only)
  *
- * The audit log is the manual backstop for a ref the sweep cannot
- * attribute: per the Platform Audit Logs guide each entry carries the actor
+ * The audit log records who created a project, for security review; it is
+ * not an attribution input (plan step 7, revised 2026-10-07). Per the
+ * Platform Audit Logs guide each entry carries the actor
  * and token type, and the open-source dashboard (apps/studio,
  * organization-audit-logs-query.ts) reads it from
  * `GET /platform/organizations/{slug}/audit` with a response type

@@ -10,6 +10,10 @@
  * That is a claim with a short half-life, in the direction that matters: if
  * Supabase ships token scoping, the guide's "mitigations are operational
  * rather than technical" advice becomes wrong, and the failure is silent.
+ *
+ * 2026-10-07: it happened. Scoped tokens shipped as a dashboard feature
+ * (Personal Access Tokens guide), with no `/v1` scoping endpoint, so this
+ * module still passes. A pass now means only "no scoping endpoint on /v1".
  * This turns "we probed it once in August" into a rerunnable check.
  *
  * A control is required and is the whole reason this is a test rather than a

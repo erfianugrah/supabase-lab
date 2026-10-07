@@ -34,8 +34,8 @@ plus the S3-pulled suite-out tarball.
   `integrations:aws_private_link` (per-org override; section hidden
   entirely when false) THEN entitlement `security.private_link`
   (dimmed + "Upgrade to Team" prompt when missing). Pricing data says
-  team:true but the entitlement is granted server-side. Needs an
-  internal ask to grant both for the org - or a support ticket. Docs
+  team:true but the entitlement is granted server-side. Needs Supabase
+  to grant both for the org, via a support ticket. Docs
   and the 2026-01-27 launch blog both claim "available today for Team",
   no allowlist mentioned.
 - Region note from Studio source: eu-central-2 is excluded from

@@ -31,7 +31,7 @@ and F02/F03 still run.
 | F02c | signing key algorithms and statuses | "new projects sign with ES256, HS256 demoted" |
 | F02d | does health report per service | the "poll this, not project status" advice |
 | F02e | Postgres major on a new project | "the current platform default major" |
-| F03 | is a PAT still unscoped | "there is no token-scoping surface to reach for" |
+| F03 | is there a token-scoping endpoint on `/v1` | "there is no token-scoping surface to reach for" (superseded 2026-10-07, see below) |
 
 Most results are `info`, not `pass`: there is no correct value for a price or
 an entitlement, so asserting one would manufacture a failure every time the
@@ -44,6 +44,15 @@ also describes a dead token, a wrong base URL, or an outage; without
 `/organizations` and `/profile` returning 200 in the SAME run, the negative
 result is uninterpretable, and the test reports `skip` rather than a
 confident wrong `pass`.
+
+2026-10-07: F03's `pass` no longer means "a PAT cannot be scoped". The
+Personal Access Tokens guide
+(https://supabase.com/docs/guides/platform/personal-access-tokens) now
+documents scoped tokens, created in the dashboard and limited to chosen
+organizations, projects and permissions; classic tokens carry a "Legacy"
+badge. F03 probes `/v1` for a scoping endpoint and still measures only that.
+A scoped token has not been measured on production (s2z-wake measured an
+org-scoped PAT on staging; bu-attribution Q14 is open).
 
 ## Runs
 

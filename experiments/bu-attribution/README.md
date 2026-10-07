@@ -44,7 +44,7 @@ control plane when the org lives elsewhere.
 |---|---|---|
 | Project-scoped roles on the platform plan | enabled; roles Owner, Administrator, Developer, Read-only, None | BA01a |
 | Org audit log retention | 366 days | BA01a |
-| Member/role management on the API | none (`api.members.roles` false) | BA01a |
+| Member/role management on the API | not on this org (`api.members.roles` false); the v2 role and invitation endpoints are Enterprise-only (`x-allowed-plans`, v2 OpenAPI read 2026-10-07) | BA01a |
 | Management API rate limit | 120 per window (`x-ratelimit-limit`) | BA01b |
 | Create returns the ref | 201 in ~6 s, ref in the body | BA02a |
 | Sweep source | `GET /organizations/{slug}/projects`: new ref visible in ~6 s; paginated, limit 100 | BA02b |
@@ -54,7 +54,9 @@ control plane when the org lives elsewhere.
 | Audit log with a PAT | `GET /platform/organizations/{slug}/audit` answers `401 JWT could not be decoded` while the same PAT gets `200` on `/v1` (production Team org) | BA06 |
 | Branch refs | own ref; absent from both listings; parent link only on the parent's `/branches` list (`parent_project_ref`); `GET /projects/{branch_ref}` 404 | BA03 |
 
-Public sources for the audit backstop (not measured here): the Platform
+The audit log is not an attribution source (see the plan, step 7); it
+records who created what for security review. Public sources for it (not
+measured here): the Platform
 Audit Logs guide (dashboard only, no export, no log drain; entries show
 actor and token type) and the open-source Studio, which reads the log from
 `/platform/organizations/{slug}/audit` and types each actor with

@@ -595,7 +595,10 @@ each user's auth rows". Findings and artifacts in RUNLOG.md; out/2026-09-25/.
   features were listed on each of a Free, Pro and Team org that day.
 - F03's live-token control is not optional. 404 on every scope candidate also
   describes a dead token or an outage; without the control returning 200 in the
-  same run, the negative result is a `skip`, not a `pass`.
+  same run, the negative result is a `skip`, not a `pass`. F03 measures only
+  the absence of a scoping endpoint on `/v1`: scoped PATs exist as a
+  dashboard feature (Personal Access Tokens guide, read 2026-10-07), so never
+  cite F03 as "a PAT cannot be scoped".
 - Org slugs are a precondition (`make probe ORGS=a,b`), not a resource: the
   provider has no organization resource and plan changes are a billing action.
 
@@ -875,8 +878,8 @@ result-id -> module-id mapping.
 - Autoscale config readable-but-empty AND unmodifiable on the public v1 API -
   on both Pro AND Team orgs, GET /config/disk/autoscale answers 200 with
   `growth_percent`/`min_increment_gb`/`max_size_gb` all null, mutation verbs
-  all 404 (D04/D07). "Unreadable" was the earlier wording and it leaked into a
-  customer draft as "cannot be read": the route exists and answers.
+  all 404 (D04/D07). "Unreadable" was the earlier wording and it is wrong: the route exists
+  and answers.
 - Disk quota enforced as `429 Database disk can only be modified once per
   four hours. Last modified at <UTC>` - contradicts the doc's "4 within
   24h" text; enforcement nondeterministic across runs (D03).
@@ -2071,7 +2074,14 @@ docs/plans/2026-10-02-bu-attribution.md.
   `401 JWT could not be decoded` there while `/v1` answers 200. Public types
   (`AuditLogsResponse_Output`) declare `token_type`, `token_hash`,
   `token_alias`, `oauth_app_id/name` per actor; the guide lists no export and
-  no drain. Manual backstop only.
+  no drain. Security review only - not an attribution input (2026-10-07).
+- Role assignment on the Management API is Enterprise-only: v2
+  `PATCH /v2/organizations/{slug}/members/{user_id}/roles` and
+  `POST /v2/organizations/{slug}/members/invitations` carry
+  `x-allowed-plans: ["Enterprise"]`; v1 has only `GET .../members`. On the
+  platform-plan org `api.members.roles` reads false (BA01a), so an org admin
+  assigns roles in the dashboard, where a project-scoped invite names one
+  project.
 - BA04 (transfer-in) needs a second org on the same control plane; an org
   cannot be deleted on `/v1`, so it waits for a decision. BA05 (restricted
   member, `PVLAB_PAT2`, `PVLAB_PEER_INSCOPE`/`OUTSCOPE`) needs a second user
