@@ -23,6 +23,18 @@ variable "projects" {
   }
 }
 
+# Extra app backends requested through `make new-app NAME=<slug>`. Written to
+# apps.auto.tfvars by the Makefile; empty by default.
+variable "extra_apps" {
+  type    = set(string)
+  default = []
+
+  validation {
+    condition     = alltrue([for n in var.extra_apps : can(regex("^[a-z][a-z0-9-]{0,19}$", n))])
+    error_message = "extra_apps entries must be lowercase slugs: a letter, then up to 19 of a-z, 0-9, -."
+  }
+}
+
 variable "region" {
   type    = string
   default = "ap-southeast-1"
