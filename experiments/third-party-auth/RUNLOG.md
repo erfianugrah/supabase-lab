@@ -25,9 +25,9 @@ self-hosted-auth keygen uses; no `jose` dependency. Registration is
 ## Why this experiment exists
 
 Three earlier results (auth rate limits, Edge Function concurrency,
-concurrency, auth.users migration locks) and then asked whether using their own
-SDK or an external IdP changes any of it. Two claims went into the reply that
-this experiment proves rather than asserts:
+auth.users migration locks) leave one question: does using your own SDK or an
+external IdP change any of them? Two claims answer it, and this experiment
+proves them rather than asserting them:
 
 - Under third-party auth the rate-limit section mostly falls away for sign-in
   (TPA04), and RLS reads the provider's claims (TPA02).

@@ -65,12 +65,15 @@ ask for confirmation).
 
 ## Manual steps tofu cannot do
 
-- Org member and role assignment (project-scoped Developer, Read-only) has no
-  Management API write on any plan (measured in `supabase-org-topology`;
-  re-checked against the OpenAPI spec on 2026-10-07, where the only
-  membership operation is `GET /v1/organizations/{slug}/members`), so invite
-  members and set roles in the dashboard. They are not removed by
-  `make destroy`. Walkthrough and plan tiers: `docs/ACCESS-CONTROL.md`.
+- Org member and role assignment (project-scoped Developer, Read-only): v1
+  has only `GET /v1/organizations/{slug}/members`, and in the v2 OpenAPI
+  document (https://api.supabase.com/api/v2-json, read 2026-11-13) the role
+  write (`PATCH .../members/{user_id}/roles`) and the invitation writes
+  (`POST` and `DELETE .../members/invitations`) carry
+  `x-allowed-plans: ["Team","Enterprise"]` (`["Enterprise"]` when read on
+  2026-10-07). The kit does not call them, so invite members and set roles in
+  the dashboard. They are not removed by `make destroy`. Walkthrough and plan
+  tiers: `docs/ACCESS-CONTROL.md`.
 - Dashboard SSO needs a SAML identity provider configured on the org.
 
 ## In-app agent

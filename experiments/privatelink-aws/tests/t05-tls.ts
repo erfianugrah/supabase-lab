@@ -2,7 +2,7 @@
  * T05/T06/T04 - TLS behaviour through the endpoint.
  *
  * The design under test is verify-full via a private hosted zone, so this
- * this proves that plus the fallbacks, and keeps the negative control: the
+ * proves that plus the fallbacks, and keeps the negative control: the
  * endpoint IP is not in the certificate, and verify-full against it must fail.
  *
  * The CA chain is extracted from the endpoint itself (openssl STARTTLS). That
