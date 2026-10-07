@@ -12,7 +12,7 @@ toggle writes the same `db_schema` field. Neither run held the API off for longe
 than 120 s, so neither could see a recovery that grows with the length of the
 outage.
 
-Both runs below ran from an uncommitted tree on top of lab commit a1b10ea (the
+Both runs below ran from an uncommitted tree on top of lab commit 0b1b830 (the
 facts files record that commit, which does not contain this experiment). The
 module code is the commit that adds this RUNLOG; it includes run 2's DA05
 pre-enable check and the DA02L SQL time filter, which neither run executed in

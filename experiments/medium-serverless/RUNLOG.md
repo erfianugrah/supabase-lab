@@ -501,7 +501,7 @@ MS07.
   `postgres.<ref>` carried the ref into `out/` and was scrubbed by hand.
   Correction 2026-10-06: the redactor already ran over keys (the whole JSON
   text). Its `\b[a-z]{20}\b` missed a ref touching `_`, which is the likelier
-  shape of this key; fixed in `2cde058`, with unit cases.
+  shape of this key; fixed in `b4d1083`, with unit cases.
   MS01d now names the tenant user generically.
 - `logs.all` is gone (410); `harness/src/platform.ts` says so and points at
   the unified `logs` table.

@@ -34,7 +34,7 @@ Three runs against one project pair, all on 2026-09-25:
 | 02:55 | S00-S04, the committed session-carry code except that S01 lacked `makeRoom` | `out/2026-09-25/run-2026-09-25T02-55-19-040Z.json` |
 | 02:56 | S01 only, with `makeRoom`, with the xorg peer | `out/2026-09-25/run-2026-09-25T02-56-35-467Z.json` |
 
-The `labCommit` both artifacts record (61f2dc2) predates this experiment: the
+The `labCommit` both artifacts record (2096dfe) predates this experiment: the
 session-carry code was uncommitted when they ran, and the commit that adds it
 is the pin.
 
