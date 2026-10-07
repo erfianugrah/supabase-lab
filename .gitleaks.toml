@@ -31,6 +31,6 @@ regexes = [
   '''pat:1234567''',
   # The RFC 6455 client handshake nonce (a random 16-byte base64 value) is
   # not a credential; medium-serverless MS13 carried one as a literal at
-  # a5e8b65 and generic-api-key matches it on shape. Later runs compute it.
+  # 1de7be3 and generic-api-key matches it on shape. Later runs compute it.
   '''Sec-WebSocket-Key: [A-Za-z0-9+/=]{24}''',
 ]
