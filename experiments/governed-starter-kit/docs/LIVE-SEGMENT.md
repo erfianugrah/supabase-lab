@@ -142,8 +142,12 @@ workspace `.mcp.json`. It does not use `--bare`, which would stop CLAUDE.md
 discovery and so the guardrails. The 2026-10-06 rehearsal needed this: the
 operator's hooks blocked `npm` and their instructions leaked into the
 narration. The isolated directory starts logged out; run `/login` in it once
-at T-30. Not yet verified in a live session: that no user-scope CLAUDE.md
-reaches the stage agent (ask it what instructions it loaded).
+at T-30. Checked in a live session on 2026-10-07 (Claude Code 2.1.285,
+operator with a user-scope CLAUDE.md, hooks and skills): `/context` listed
+no memory files, `/hooks` showed 0 hooks configured, `/skills` found no
+user or project skills. Run the same three at T-30. The session runs
+whatever model managed settings pin (Sonnet 5.5 on that day), and
+auto-memory is on, writing under the isolated directory.
 
 The vault item `CLOUDFLARE_STAGE_WORKERS_TOKEN` is the API token
 `kit-stage-workers`: one account, two permission groups, Workers Scripts

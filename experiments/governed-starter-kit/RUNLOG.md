@@ -19,6 +19,13 @@
   account id in the environment; 403 on DNS, zone settings, R2, members.
   Needed Workers KV Storage Read as well as Scripts Write. NOT RUN: the
   OpenNext app deploy with it.
+- `scripts/stage-agent.sh` in a live session (stub workspace, after
+  `/login` in `~/.claude-stage`): `/context` no memory files, `/hooks` 0
+  configured, `/skills` no user or project skills; model Sonnet 5.5 from
+  managed settings. The `/memory` menu still names `~/.claude/CLAUDE.md` as
+  the user edit target, which suggests `--setting-sources project,local`
+  rather than `CLAUDE_CONFIG_DIR` keeps it out (inferred; the flags were not
+  tested separately).
 - Chat loop still NOT RUN: needs a Console API key; a claude.ai subscription
   login is not permitted inside a product.
 - `make destroy` equivalent: plan read (2 to destroy, only the two kit
