@@ -23,7 +23,7 @@ Checked against the live docs and pricing page on 2026-10-07.
 | Org MFA enforcement | Pro, Team and Enterprise | https://supabase.com/docs/guides/platform/mfa/org-mfa-enforcement ("MFA enforcement is only available on the Pro, Team and Enterprise plans") |
 | Platform audit logs | Team and Enterprise | https://supabase.com/docs/guides/security/platform-audit-logs ("only available on the Team and Enterprise plans"); pricing "Platform Audit Logs" row |
 | Audit log drains | NOT CONFIRMED - the audit-logs page links to them without naming a plan; project log drains are Pro, Team and Enterprise | https://supabase.com/docs/guides/security/platform-audit-logs, https://supabase.com/docs/guides/telemetry/log-drains |
-| Member role management by API | Enterprise only: v2 role and invitation writes carry `x-allowed-plans: ["Enterprise"]`; v1 has no member write | https://api.supabase.com/api/v2-json, https://api.supabase.com/api/v1-json (see below) |
+| Member role management by API | Enterprise only per the spec (not measured on an org with the entitlement enabled): v2 role and invitation writes carry `x-allowed-plans: ["Enterprise"]`; v1 has no member write | https://api.supabase.com/api/v2-json, https://api.supabase.com/api/v1-json (see below) |
 
 SSO note: the pricing page is inconsistent. The Team plan card lists "SSO
 for Supabase Dashboard", while the comparison table's "SSO" row (under
