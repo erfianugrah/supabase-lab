@@ -87,7 +87,16 @@ platform behaviour or writing it into docs
 - No secrets in `.tf`/`experiment.tfvars`; sensitive vars marked `sensitive`.
 - Nothing account- or engagement-specific in this repo; it is built to be public.
   Evidence gets generalised: no org names, no account IDs, no project
-  refs, no internal ticket IDs, no named individuals.
+  refs, no internal ticket IDs, no named individuals. Also no provenance:
+  do not write that someone asked for an experiment or describe their
+  setup, stack or findings; state the platform question. History has been rewritten with git filter-repo more than once
+  (see the 2026-09-07 identifier sweep below), most recently on 2026-10-07,
+  so commit ids cited from before 2026-10-07 do not resolve. In-repo and
+  lexicanum citations were remapped; a local map of old to new ids is
+  `.git/filter-repo-2026-10-07-commit-map` (not pushed). Four evidence
+  stamps (28009bd, 60e7194, 7fe4809, 9125b00, all 2026-09-07/08) name
+  commits that survived only on a pre-rewrite backup branch, deleted
+  2026-10-07; they have no current equivalent.
 - A module that runs gets its RUNLOG line the same day. T27 ran on 2026-08-07
   and the RUNLOG said "NOT YET RUN" until 2026-09-03, while two published
   pages cited it. Anything a page cites from gitignored `evidence/` needs a
@@ -1882,7 +1891,7 @@ Redacted artifacts: `out/2026-09-30/`. Details: RUNLOG.md.
   destroyed or the whole run dies; `import.meta.dir` in the compiled binary is
   the bundle. `publish-evidence` redacts keys and values alike (it runs over
   the raw JSON text). Until 2026-10-06 its `\b[a-z]{20}\b` let a ref
-  touching `_` through (`2cde058`, work-supabase-lab#10); a dot-joined
+  touching `_` through (`b4d1083`, work-supabase-lab#10); a dot-joined
   `postgres.<ref>` was always caught, so the 2026-09-30 key leak most likely
   had the ref next to `_` or a digit (inferred - the leaked key was not kept).
 

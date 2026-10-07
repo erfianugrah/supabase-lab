@@ -8,7 +8,7 @@ Project A is connected with Working directory `apps/a`, project B with
 `apps/b`; Automatic branching on for both; Branch limit raised from the
 form's default of 3 to 10 before GB01 so the cap could not hide a preview.
 
-All runs 2026-09-23. `2bad035` in the artifacts is the repository HEAD at run
+All runs 2026-09-23. `825b941` in the artifacts is the repository HEAD at run
 time, which does not contain this experiment; the module revisions are the ones
 this directory was first committed with, except where Run 1 says otherwise.
 Redacted artifacts and facts tables: `out/2026-09-23/`.
@@ -164,7 +164,7 @@ dashboard with the same working directories, "Supabase changes only" on and
 Branch limit 10. GB00 at 03:27:26 read both connections on the same
 repository, `apps/a` and `apps/b`, changes only true, automatic branching
 true and limit=10 on both (`run-2026-09-23T03-27-26-360Z.*`). The artifacts
-record lab commit `2ebb438`; the GB04-GB06 modules ran from the working tree
+record lab commit `7774b95`; the GB04-GB06 modules ran from the working tree
 and are the revisions committed next.
 
 ### Run 5 - 03:27 UTC - GB04, kinds of file under supabase/
@@ -247,7 +247,7 @@ source), so the toggle was on for both.
 
 Two new Micro projects on the Pro org (`make apply`), a new private probe
 repository, A connected on `apps/a` and B on `apps/b`, "Supabase changes
-only" on for both. GB07 ran from lab commit `e77720e`.
+only" on for both. GB07 ran from lab commit `7d2e747`.
 
 ### Run 8 - GB07, where a preview's secrets come from
 
