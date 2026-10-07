@@ -33,4 +33,8 @@ regexes = [
   # not a credential; medium-serverless MS13 carried one as a literal at
   # 1de7be3 and generic-api-key matches it on shape. Later runs compute it.
   '''Sec-WebSocket-Key: [A-Za-z0-9+/=]{24}''',
+  # governed-starter-kit K04 stores a deliberately wrong webhook secret to
+  # prove a 401 from the sink does not undo the decision; generic-api-key
+  # matches the literal on shape.
+  '''put_integration_secret\('webhook_sink_secret', 'k04-wrong-secret'\)''',
 ]

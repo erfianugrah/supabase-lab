@@ -129,7 +129,7 @@ environment, for step 5, through `make stage-agent`:
 
 ```bash
 make stage-agent DRY=1                     # print the command, launch nothing
-sx CLOUDFLARE_API_TOKEN=<vault item> CLOUDFLARE_ACCOUNT_ID -- make stage-agent
+sx CLOUDFLARE_API_TOKEN=CLOUDFLARE_STAGE_WORKERS_TOKEN CLOUDFLARE_ACCOUNT_ID -- make stage-agent
 ```
 
 `scripts/stage-agent.sh` runs Claude Code with none of the operator's
@@ -145,11 +145,24 @@ narration. The isolated directory starts logged out; run `/login` in it once
 at T-30. Not yet verified in a live session: that no user-scope CLAUDE.md
 reaches the stage agent (ask it what instructions it loaded).
 
-Use a token limited to Workers Scripts edit on the one account. The
-verification run used the account's email + global key pair instead
-(`CLOUDFLARE_EMAIL`, `CLOUDFLARE_API_KEY`), which wrangler also accepts; it
-reaches everything in every account the login has, so do not give it to an
-agent on stage. A Workers-only token was not tested. Authenticate the MCP
+The vault item `CLOUDFLARE_STAGE_WORKERS_TOKEN` is the API token
+`kit-stage-workers`: one account, two permission groups, Workers Scripts
+Write and Workers KV Storage Read. Scripts Write covers upload, the
+workers.dev subdomain and delete
+(https://developers.cloudflare.com/api/resources/workers/subresources/scripts/methods/update/).
+KV Read is there because `wrangler delete` removes the script and then lists
+the account's KV namespaces; without it the Worker is gone but wrangler exits
+1 with "Authentication error [code: 10000]". Tested 2026-10-07 with wrangler
+4.148.0 and only the token and account id in the environment, on a
+hello-world Worker: `wrangler deploy` exited 0 and the workers.dev URL
+returned 200, `wrangler delete --force` exited 0 ("Successfully deleted") and
+the URL returned 404. The same token got 403 on DNS records, zone settings,
+R2 buckets, account members, `/user` and `/memberships`; it can still list
+the account's zones and their metadata. Not yet tested with it: the
+`kit-live-app` deploy, which uploads static assets. The earlier verification
+run used the account's email + global key pair (`CLOUDFLARE_EMAIL`,
+`CLOUDFLARE_API_KEY`), which reaches everything in every account the login
+has; do not give it to an agent on stage. Authenticate the MCP
 server, check that it lists the `supabase` tools and that the instructions
 loaded (ask it "what are the kit rules for a new table?"). Quit, and start a
 fresh session the same way for the run.
