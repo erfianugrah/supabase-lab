@@ -1,5 +1,29 @@
 # governed-starter-kit - RUNLOG
 
+## 2026-10-07 (later) - agent rehearsal of the troubleshooting segment, stage token, teardown
+
+- Troubleshooting prompt run headless (`claude -p`, Claude Code 2.1.285,
+  `claude-sonnet-5-5`) against the injected faults on the ready project:
+  both faults found from advisors, `query_logs` and pg_stat_statements in
+  46.5 s / 15 turns; the summary fix applied, the indexes-and-policy
+  migration came back `{"status":"cancelled"}` (the MCP server's
+  destructive-SQL confirmation, which `-p` cannot answer). One follow-up
+  applied it with `alter policy` (15.9 s). Feed 2366-4343 ms -> 38-88 ms,
+  summary 400 -> 200. Details: docs/OBSERVABILITY.md, "Rehearsal with a
+  coding agent". Faults cleared; inventory identical to the snapshot.
+- The same flags (`--setting-sources project,local --strict-mcp-config`)
+  answered "None. No CLAUDE.md files were loaded" when asked what it loaded,
+  with a user-scope CLAUDE.md present. The model's own account, not a trace.
+- Cloudflare token `kit-stage-workers` (vault `CLOUDFLARE_STAGE_WORKERS_TOKEN`):
+  hello-world Worker deploy 0 / 200, delete 0 / 404 with only the token and
+  account id in the environment; 403 on DNS, zone settings, R2, members.
+  Needed Workers KV Storage Read as well as Scripts Write. NOT RUN: the
+  OpenNext app deploy with it.
+- Chat loop still NOT RUN: needs a Console API key; a claude.ai subscription
+  login is not permitted inside a product.
+- `make destroy` equivalent: plan read (2 to destroy, only the two kit
+  projects), applied; state empty, no kit projects left in the org.
+
 ## 2026-10-07 - demo gaps: chat hardening, deploy, provisioning, webhook, troubleshooting
 
 Rebuilt from empty state first (`tofu plan` read, then applied; the
