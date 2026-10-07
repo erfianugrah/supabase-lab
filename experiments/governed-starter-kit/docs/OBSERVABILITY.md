@@ -230,6 +230,106 @@ objects), 0 rows in `supabase_migrations.schema_migrations` (the snapshot
 had 0), no advisor findings on fault objects. The clean check 90 s later
 found no fault objects, no statements and no log lines since the clear.
 
+## Rehearsal with a coding agent (2026-10-07)
+
+One headless run of the prompt above, verbatim, after `make fault-inject`
+and `make fault-check`. Claude Code 2.1.285 in an empty directory outside
+the repo, `claude -p` with `--mcp-config .mcp.json --strict-mcp-config
+--setting-sources project,local --allowedTools "mcp__supabase__*" Read Write
+Edit --permission-mode dontAsk --output-format json`. The model was
+`claude-sonnet-5-5` (from `modelUsage`). The `.mcp.json` is the one
+`make fault-workspace` writes plus
+`"headers": {"Authorization": "Bearer ${SUPABASE_ACCESS_TOKEN}"}`: the MCP
+docs give a PAT header for non-interactive clients, and Claude Code expands
+`${VAR}` in `headers`, so the token is never in the file and no `/mcp`
+login is needed. The server listed `apply_migration`, `execute_sql`,
+`get_advisors`, `list_extensions`, `list_migrations`, `list_tables`,
+`query_logs` and `search_docs`; no `get_logs`.
+
+Asked to list the instruction files it loaded, the same command answered
+"None. No CLAUDE.md files were loaded", with a user-scope `CLAUDE.md` in
+place. That is the model's own account, not a trace.
+
+What it did, 46.5 s and 15 turns:
+
+- `get_advisors` (performance and security), `list_tables`, one
+  `query_logs` on `postgres_logs` (found `division by zero`; it did not
+  query `edge_logs`, so the slow path's timings came from elsewhere),
+  `pg_stat_statements` (feed statement, 10 calls, mean 3128 ms).
+- Read the policy, indexes and `private` helpers; the first try failed with
+  `42725 operator is not unique: text || "char"` and the retry worked.
+- `EXPLAIN (ANALYZE, BUFFERS)` as alice and bob with `set local role
+  authenticated` and `request.jwt.claims`, rolled back: sequential scan
+  plus top-N sort, 1621 ms / 151k buffers and 2405 ms / 301k buffers, the
+  helpers in the per-row filter. Called `activity_summary()` as alice:
+  `22012`.
+- Two `apply_migration` calls in the same turn. The summary fix applied.
+  The indexes-and-policy migration came back `{"status":"cancelled"}`.
+
+It did not stop to show the evidence before changing anything, as the
+prompt asks; in `-p` mode there is no one to stop for, and the evidence came
+in the final message next to the change.
+
+The cancel is the MCP server's confirmation step: `apply_migration` and
+`execute_sql` with DROP, DELETE, TRUNCATE or UPDATE without WHERE ask the
+client to confirm through an elicitation form
+(`packages/mcp-server-supabase/src/tools/database-operation-tools.ts`), and
+the headless client did not confirm. The agent reported the migration as
+not applied and asked before retrying. One follow-up in the same session
+(`--resume`), saying the cancel was the confirmation and asking for the same
+change without a DROP, finished it in 15.9 s and 6 turns: `alter policy ...
+using (...)` instead of drop and create, which the server does not treat as
+destructive. On stage the interactive client should show the confirmation
+instead; that path was not rehearsed here, so expect a prompt to accept at
+the `drop policy` step.
+
+Totals: 19 tool calls (11 `execute_sql`, 3 `apply_migration`, 2
+`get_advisors`, 1 each `list_tables`, `query_logs`, tool search), about
+65 s of agent time, no files written to the workspace.
+
+What it applied:
+
+```sql
+create index activity_events_created_at_idx on public.activity_events (created_at desc);
+create index activity_events_actor_id_created_at_idx on public.activity_events (actor_id, created_at desc);
+create index activity_events_department_id_created_at_idx on public.activity_events (department_id, created_at desc);
+alter policy "activity: own or manager of department" on public.activity_events
+  using (actor_id = (select auth.uid())
+         or ((select private.is_manager()) and department_id = (select private.my_department())));
+analyze public.activity_events;
+
+-- activity_summary(): the divisor wrapped in nullif(..., 0); nothing else changed
+```
+
+Against "What a good fix looks like": both causes found from advisors, logs
+and query statistics; the policy means the same thing (it checked, rolled
+back: alice sees 25,000 rows, none of them someone else's; bob 50,000, all
+in his department); the division is fixed in the function, not the app.
+The foreign-key indexes are composite with `created_at desc`, which still
+covers both foreign keys. It also flagged, without changing it, that the
+rate's numerator counts approvals over all time while the denominator is
+the last seven days.
+
+Timings (its own `EXPLAIN` before and after, then `make fault-check` and
+`make fault-traffic ROUNDS=3` for the Data API):
+
+| Measure | Before | After |
+|---|---|---|
+| `EXPLAIN ANALYZE` feed, alice (agent) | 1621 ms | 1.1 ms |
+| `EXPLAIN ANALYZE` feed, bob (agent) | 2405 ms | 1.6 ms |
+| `make fault-timing`, alice / bob | 1023-1140 ms / 1948-1982 ms | not re-run |
+| Data API feed, alice | 200 in 2366-2543 ms | 200 in 38-88 ms |
+| Data API feed, bob | 200 in 3647-4343 ms | 200 in 39-72 ms |
+| Data API summary, alice | 400 in 938-1186 ms | 200 in 53-80 ms |
+| Data API summary, bob | 400 in 1410-2907 ms | 200 in 61-72 ms |
+
+Advisors after the fix: one `unused_index` (INFO) on
+`activity_events_actor_id_created_at_idx`, nothing else on the fault
+objects. `make fault-clear` then removed the two migration rows the agent
+added and reported the inventory identical to the pre-inject snapshot (64
+objects); the clean check after it found no fault objects, statements or
+log lines.
+
 ## Fallback
 
 - Agent stalls or the MCP auth fails: apply the fix above by hand in the
