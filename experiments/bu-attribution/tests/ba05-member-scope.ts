@@ -4,8 +4,9 @@
  * The single-org pattern relies on two things the entitlements read (BA01a)
  * cannot prove: that a unit's people cannot create projects outside the
  * provisioning path, and that a project-scoped member cannot see other
- * units' projects. Role assignment has no Management API surface
- * (`api.members.roles: false`), so the operator assigns the role in the
+ * units' projects. Role assignment has no Management API surface on this
+ * plan (`api.members.roles: false`; the v2 role endpoints are
+ * Enterprise-only), so the operator assigns the role in the
  * dashboard and this module measures it with the MEMBER's token.
  *
  * Inputs:

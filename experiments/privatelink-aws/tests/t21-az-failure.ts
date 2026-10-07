@@ -5,8 +5,8 @@
  * both, so the question is whether a client actually fails over. That is a
  * CLIENT-STACK property, not a platform one: libpq tries every address a
  * hostname resolves to, while Node's default resolution hands the driver a
- * single address. Both are measured here, because the customer's runtime is
- * node-postgres in Lambda but their tooling is psql.
+ * single address. Both are measured here, because a deployment can run
+ * node-postgres in Lambda while its tooling is psql.
  *
  * Method: blackhole ONE ENI address with a NACL rule (security groups cannot
  * express deny), then probe from INSIDE the VPC - via the Lambda for node-pg
