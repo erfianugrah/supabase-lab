@@ -3,7 +3,7 @@
  * project, no PAT. Every module in this experiment measures the same way, so
  * the measuring lives here once.
  *
- * Measurement rules, each one learned from a way the first scratch run could
+ * Measurement rules, each one closing a way a naive measurement could
  * have lied:
  *
  * - Cumulative statistics (pg_stat_user_tables, pg_stat_wal) are flushed

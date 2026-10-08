@@ -5,8 +5,7 @@ state. See README.md for the question and the method; this file is the
 per-run record. Every module figure below is pasted from the published
 artifacts in `out/2026-10-08/` (`make facts` renders the newest evidence/ run,
 of which out/ is the redacted copy); figures marked manual (VM spec, JIT
-check, checkpoint_completion_target, superseded and scratch runs) are not in
-an artifact.
+check, checkpoint_completion_target, superseded run) are not in an artifact.
 
 ## RW01-RW06 - first published run (2026-10-08)
 
@@ -299,8 +298,3 @@ reading that fits, not a measurement.
 - `wal_compression` on (off on all three servers here).
 - The cause of the ON CONFLICT execution-time gap between the Alpine images
   and the Supabase image.
-- The scratch run before this experiment (2026-10-08, earlier the same day; a
-  one-off, not a module; manual: PG 15, 100,000 identical rows, 28.5 MB and
-  5.8 MB of WAL) was not part of this record; its WAL figures fall
-  between this run's two regimes for that size (RW02 40021870 and 13027115
-  bytes, RW05 30363218 and 5400000, both pg17) and are not cited.
