@@ -1,5 +1,190 @@
 # governed-starter-kit - RUNLOG
 
+## 2026-10-09 - BFF demo identifiers changed
+
+Identifiers changed to `fanout-api` / `fanout_cache` and the names below;
+behaviour, mock delays, Cache-Control values and checks are unchanged:
+
+- Edge Function `fanout-api` (`supabase/functions/fanout-api/`);
+  `upstream-mock` unchanged.
+- Upstream endpoints `profile`, `feed`, `inbox`, `stats` (`profile`
+  max-age 300 and `feed` max-age 60 are cacheable; `inbox` and `stats` are
+  no-store). Demo knobs `slow=stats` and `fail=feed`.
+- Response `screen: "main"`.
+- `private.fanout_cache`, RPCs `fanout_cache_get` / `fanout_cache_put`,
+  policy `fanout_cache: own rows`, `sql/50-fanout.sql`.
+- Env `FANOUT_UPSTREAM_TIMEOUT_MS`.
+- `tests/k05-fanout-api.ts` (id K05 unchanged); `lib/bff-checks.ts` export
+  `callFanout()`. Make targets `bff-test`, `bff-local`, `bff-deploy`
+  unchanged. The previous names are in git history.
+
+The two 2026-10-08 BFF entries below use the current identifiers; their
+numbers are as recorded on 2026-10-08.
+
+Re-run with the renamed code, 2026-10-09 (Supabase CLI 2.120.0):
+
+- `make bff-test`: 11 of 11 pass, 291 ms.
+- `make bff-local`: 8 of 8 pass; L02-L05 wall medians 271 / 142 / 814 /
+  198 ms (server 265 / 135 / 806 / 192). Artifact
+  `evidence/bff-local-2026-10-08T22-17-22-400Z.json` (gitignored).
+- Hosted, ready project: `make bff-deploy` (SQL, both functions, secrets
+  check passed), then the previously named function deleted with `supabase functions
+  delete`, and the previously named cache table and both cache RPCs
+  dropped with a one-off SQL file through
+  `scripts/kit.ts schema` (not committed). Afterwards the project lists
+  `agent`, `webhook-sink`, `upstream-mock`, `fanout-api`, and only the
+  `fanout_cache_*` RPCs.
+- Warm-up: one K05 run, discarded. Its first call after the deploy answered
+  http 502 in 3086 ms (the cold-start 502 again, third time), then 8 of 8.
+- K05, two runs after the warm-up: 8 pass, 0 fail, 0 skip each; first call
+  http 200 in 622 and 635 ms. Per-check medians over 5 requests (wall ms /
+  server `total_ms`), run 1 and run 2:
+  - all four upstreams, cache bypassed (`refresh=1`): 644 / 416 and
+    653 / 459.
+  - next call with profile and feed from the cache: 459 / 254 and
+    563 / 281; cache read 53 and 59 ms.
+  - `slow=stats` past the 800 ms per-call timeout: 1073 / 852 and
+    1076 / 855, stats cut at 802 and 801 ms, partial.
+  - `fail=feed`: 542 / 332 and 574 / 337, partial.
+  - L06-L08 equivalents passed: all-failed 502, second user never served the
+    first user's rows, `fanout_cache_put` as a user 403 `42501`, `private`
+    schema 406 `PGRST106`.
+  Artifacts `evidence/20261009-061934/` and `evidence/20261009-061954/`
+  (warm-up `evidence/20261009-061907/`; gitignored).
+
+## 2026-10-08 (later) - BFF fanout-api: first hosted run
+
+`make up` rebuilt both projects (micro, ap-southeast-1, Team org) and the
+existing probe matrix gave 35 pass, 0 fail, 2 skip (K03: no model key; K05:
+fanout-api not yet deployed). `make bff-deploy` then applied
+`sql/50-fanout.sql`, deployed `upstream-mock` and `fanout-api` with
+`--use-api`, and set the two upstream secrets; the secrets list check
+passed. Supabase CLI 2.120.0. Vantage: the operator's machine (`--where
+local`), so wall times include the client round trip to the region.
+
+- K05 (`make probe ONLY="--only K05"`), three runs: 8 pass, 0 fail, 0 skip
+  each time. Per-check medians over 5 requests, runs 1 and 2 (wall ms /
+  server `total_ms`):
+  - all four upstreams, cache bypassed (`refresh=1`): 705 / 469 and
+    662 / 459. Per-upstream times 182-381 ms against configured mock delays
+    of 60-250 ms, so each hop from `fanout-api` to `upstream-mock` through
+    the public functions URL adds roughly 100-130 ms (inferred from the
+    difference; not measured separately).
+  - next call with profile and feed from the cache: 525 / 311 and
+    489 / 277; cache read through PostgREST 89 and 66 ms (4 ms locally).
+  - `slow=stats` past the 800 ms per-call timeout: 1120 / 903 and
+    1071 / 870, stats cut at 801-802 ms, partial.
+  - `fail=feed`: 659 / 406 and 581 / 355, partial.
+  - all upstreams failing: http 502 with the per-upstream report; a second
+    user never received the first user's cached rows; `fanout_cache_put`
+    as a user 403 `42501`, `private` schema 406 `PGRST106`.
+- Cold start, reproduced twice: the first `fanout-api` call after a deploy
+  answered http 502 (3314 ms, then 4203 ms after a redeploy); every later
+  call passed. Likely cause (inferred, not confirmed from the 502 body or
+  function logs): the four parallel calls each hit a cold `upstream-mock`
+  isolate and all exceeded the 800 ms per-call timeout, which is the
+  all-failed path. Run 2 without a redeploy had a first call of http 200 in
+  639 ms. For a live demo, make one warm-up call after deploying.
+- Not measured: hosted latency from any vantage other than the operator's
+  machine; behaviour under concurrent load; upstreams that are not Edge
+  Functions. Artifacts `evidence/20261008-2025*/` and
+  `evidence/20261008-202628/` (gitignored).
+
+## 2026-10-08 - agent chat loop local runner - built, model run pending
+
+Added `make agent-local ENV_FILE=<path>` (`scripts/agent-local.ts`): K03's
+chat checks on a throwaway local stack. Verified only with a dummy key
+(an `ANTHROPIC_API_KEY` value that is not a key) and with an env file
+holding no key. No chat scenario has run against a model yet, locally or
+hosted.
+
+- Code: K03's scenarios moved unchanged into `lib/agent-chat-checks.ts`,
+  which `tests/k03-agent-chat.ts` and the local runner both call. One
+  behaviour change: a first chat call answering `llm_error` (rejected key,
+  unreachable API, timeout) now gives one K03 FAIL `BLOCKED: ...` with the
+  reason, instead of eight failures with the same cause. The local-stack
+  helpers moved out of `scripts/bff-local.ts` into `lib/local-stack.ts`, and
+  the seed data out of `scripts/kit.ts` into `lib/seed.ts` (same SQL text).
+  `functions serve` output now goes through one fd: with two `Bun.file`
+  handles, stdout and stderr overwrote each other in `functions-serve.log`.
+- Dummy key, 5 runs (Supabase CLI 2.120.0; the serve log reports
+  `supabase-edge-runtime-1.77.4`; images already pulled): E01 and T01-T06
+  pass; K03 FAIL `BLOCKED: the model call failed, so no chat scenario ran
+  (http 502 llm_error: The assistant could not answer: the model API
+  rejected the configured key.)`, exit 1, about 36 s end to end.
+  `supabase start` 24640-25418 ms; agent ready 2259-3247 ms after serve.
+  First run: `embed_8_ms` 3143, tool calls 6-24 ms (T02-T05), `gate_ms`
+  293. T06: alice's top `search_kb` hit was `Sales client entertainment`,
+  carol's 5 hits were company/Marketing only. Artifacts
+  `evidence/agent-local-2026-10-08T10-1*.json` (gitignored).
+- Env file without the key: same seven pass, K03 SKIP (503
+  `llm_not_configured`), exit 0.
+- Leak checks with the dummy key: no match for the key in the console
+  output, `evidence/`, or the workdir including `functions-serve.log` (it
+  logs `llm error 401 API key is invalid.`). During the run the key is in
+  the `supabase_edge_runtime_kit-agent-local` container's `Config.Env` (1
+  entry); after the run no `kit-agent-local` container is left, and after a
+  `KEEP=1` run the four kept containers had no matching entry.
+- Ctrl-C after seeding: `SIGINT: stopping`, stack stopped, exit 130, no
+  `functions serve` process or container left. Ran beside a `KEEP=1`
+  bff-local stack (5442x) without a clash; `make bff-local` on the shared
+  lib still passes 8 of 8.
+- Pending: the real-key run (`make agent-local ENV_FILE=...`), then K03
+  against `kit-ready`.
+
+## 2026-10-08 - BFF fanout-api demo - local only, NOT YET RUN LIVE
+
+Added `supabase/functions/fanout-api` (one app request, four upstream calls
+in parallel, per-call timeout, partial results, per-user cache),
+`supabase/functions/upstream-mock`, `sql/50-fanout.sql` (cache in
+`private.fanout_cache`), `lib/bff-checks.ts` (checks shared by K05 and the
+local run), `tests/k05-fanout-api.ts`, `scripts/bff-local.ts`, and the
+`bff-test` / `bff-local` / `bff-deploy` targets. Nothing deployed: `make
+bff-deploy` and K05 against a project have not been run.
+
+- `make bff-test`: 11 of 11 Deno unit tests pass (`--no-remote --no-npm`,
+  fake fetch that honours the AbortSignal, in-memory cache), 295 ms.
+- `make bff-local` on a local stack (Supabase CLI 2.120.0, Docker; db, auth,
+  rest and kong only, `supabase functions serve` for the functions; ports
+  shifted to 5442x): 8 of 8 checks pass, artifact
+  `evidence/bff-local-2026-10-08T09-59-19-565Z.json` (gitignored). Mock
+  delays (the defaults in `upstream-mock/index.ts`): profile 250 ms, feed
+  180 ms, inbox 120 ms, stats 60 ms; per-call timeout 800 ms; 5 requests
+  per timed row, client wall time measured on the same host as the stack.
+
+| Check | Result (last request) | Wall ms, median (min-max) | Server `total_ms` median |
+|---|---|---|---|
+| L02 all upstreams ok, cache read skipped (`refresh=1`) | 4 of 4 upstream ok, `partial: false` | 273 (270-276) | 266 |
+| L03 next call, cache hit | profile + feed from cache, inbox + stats live; cache read median 4 ms | 143 (136-158) | 136 |
+| L04 stats slow (3 s) | stats `timeout` at 804 ms, other 3 ok, `partial: true`, http 200 | 815 (813-817) | 807 |
+| L05 feed forced 503 | feed `error` http 503, other 3 ok, `partial: true`, http 200 | 199 (194-204) | 192 |
+
+  L01: no token and a tampered signature both 401 at the gateway. L06: all
+  four forced to fail -> http 502 with the per-upstream report. L07: a
+  second user's first call was a cache miss, and both the response
+  `user_id` and the profile's `user_id` were that user's. L08: `fanout_cache_put` as a user -> 403 `42501`; the
+  `private` schema through the Data API -> 406 `PGRST106`;
+  `fanout_cache_get` returned the caller's 2 rows (feed, profile).
+- Cold start in that run: the first `fanout-api` call took 2246 ms
+  (isolate boot plus the npm imports); `supabase start` took 24864 ms with
+  images already pulled.
+- Negative control (scratch script, same stack, not committed): with the
+  cache policy changed to `using (true)` and insert/update/execute granted to
+  `authenticated`, L07 and L08 failed (the second user's profile came from
+  the cache carrying another user's id; the user's own `fanout_cache_put` returned 200 and
+  `fanout_cache_get` returned 8 rows), the other six still passed. Restored
+  by reapplying `sql/50-fanout.sql`.
+- Manual pass with curl and a session minted through the Auth admin API plus
+  password sign-in on the same stack (an earlier stack run, same code):
+  `refresh=1` 267 ms server / 0.273 s curl; next call cache hit 150 ms /
+  0.158 s; `slow=stats` 808 ms / 0.815 s with stats `timeout`;
+  `fail=feed` 195 ms / 0.206 s. A `Server-Timing` header carries the same
+  per-upstream figures.
+- Not settled locally: function-to-function latency on the platform (the
+  hosted `fanout-api` reaches the mock through the public functions URL;
+  locally it goes through kong inside Docker), the cache round trip through
+  hosted PostgREST, and cold starts on the platform.
+
 ## 2026-10-07 (later) - agent rehearsal of the troubleshooting segment, stage token, teardown
 
 - Troubleshooting prompt run headless (`claude -p`, Claude Code 2.1.285,
