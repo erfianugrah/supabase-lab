@@ -1948,7 +1948,10 @@ README.md, RUNLOG.md and docs/.
   of 2).
 - **K03 (agent chat) skips until an Anthropic key is a function secret**
   (`make fn-secret ANTHROPIC_ITEM=<vault item>`); it has never run against a
-  model.
+  model. `make agent-local ENV_FILE=<path>` runs the same checks
+  (`lib/agent-chat-checks.ts`) on a local stack (5452x) with the key from a
+  dotenv file the runner never reads; verified 2026-10-08 with a dummy key
+  only (tool and embed checks pass, K03 reports `BLOCKED` with the reason).
 - **The `with-supabase` scaffold does not run on Workers as generated**: next
   16.4.0 + OpenNext 1.20.9 500s every page, `cacheComponents: true` hangs.
   `make live-app-prep` pins next 16.3.8 and drops it. `create-next-app -e`
@@ -1975,6 +1978,12 @@ README.md, RUNLOG.md and docs/.
   supabase_admin). Delivery is at most once.
 - **Dashboard Read-only role** (`supabase_read_only_user`) has BYPASSRLS and
   `pg_read_all_data`: it sees every department's rows.
+- **BFF demo (`channel-api` + `upstream-mock`, 2026-10-08, local only)**:
+  `make bff-local` runs `lib/bff-checks.ts` on a throwaway local stack
+  (ports 5442x, so it does not clash with a default local stack); K05 runs
+  the same checks against a deployed project and skips when `channel-api`
+  is not deployed. The cache is a Postgres table, not an isolate map, because
+  hosted functions run many isolates. Never run live yet.
 - **Troubleshooting faults**: 400k `activity_events` rows hit the 8 s
   `authenticated` statement timeout, so the seed is 100k. pg_stat_statements
   has no entry for a statement that errors; the logs endpoint does.
