@@ -164,11 +164,11 @@ Queues for guaranteed delivery. Setting a `SLACK_WEBHOOK_URL` function secret
 makes the sink also post each decision to Slack. K04 tests the path end to
 end.
 
-## BFF demo: channel API
+## BFF demo: fan-out API
 
 A backend-for-frontend for one app screen. The app sends one request to
-`supabase/functions/channel-api`; the function calls four upstream endpoints
-(`profile`, `orders`, `offers`, `points`) in parallel and returns one JSON
+`supabase/functions/fanout-api`; the function calls four upstream endpoints
+(`profile`, `feed`, `inbox`, `stats`) in parallel and returns one JSON
 document with the data, a per-upstream report (status, source, ms) and a
 `partial` flag. `supabase/functions/upstream-mock` stands in for the
 upstream integration layer, with a configurable delay per endpoint and
@@ -179,19 +179,19 @@ forced failure or slowness per call.
   key (`UPSTREAM_API_KEY`) and is deployed with `--no-verify-jwt`, since
   its caller is the function rather than a user.
 - Timeouts: one `AbortController` per upstream call
-  (`CHANNEL_UPSTREAM_TIMEOUT_MS`, default 800). A late or failed upstream is
+  (`FANOUT_UPSTREAM_TIMEOUT_MS`, default 800). A late or failed upstream is
   `null` in `data`, has its reason in `upstreams`, and sets
   `partial: true`; the response is 200 while anything came back, 502 when
   nothing did. No retries.
 - Cache: what the upstream marks `Cache-Control: max-age=N` (the mock does
-  this for `profile` and `offers`) is stored for N seconds per user in
-  `private.channel_cache` (`sql/50-channel.sql`). Reads run as the user
-  through `channel_cache_get` with RLS; writes go through
-  `channel_cache_put`, which only service_role may execute, so a user cannot
+  this for `profile` and `feed`) is stored for N seconds per user in
+  `private.fanout_cache` (`sql/50-fanout.sql`). Reads run as the user
+  through `fanout_cache_get` with RLS; writes go through
+  `fanout_cache_put`, which only service_role may execute, so a user cannot
   plant data in the cache. Postgres rather than an in-memory map because
   hosted functions run many isolates, so a per-isolate map would miss
   unpredictably; the SQL file has the trade-off.
-- Demo knobs: `?slow=points`, `?fail=offers` (comma lists), `?refresh=1`
+- Demo knobs: `?slow=stats`, `?fail=feed` (comma lists), `?refresh=1`
   (skip the cache read). They steer the mock only; remove them in front of
   a real upstream.
 
@@ -206,7 +206,10 @@ sx SUPABASE_ACCESS_TOKEN -- make probe ONLY="--only K05"    # same checks, deplo
 upstreams ok, a cache hit on the next call, one upstream slow past the
 timeout, one failing, all failing, a second user never served the first
 user's cached data, and the cache closed to Data API writes. Local timings are
-in RUNLOG.md (2026-10-08). The deployed path has not been run yet.
+in RUNLOG.md (2026-10-08). The deployed path passed K05 8/8 on three runs the
+same day; the first call after a deploy answered 502 on both fresh deploys
+(cold upstream past the 800 ms per-call timeout, inferred), so make one
+warm-up call before showing it.
 
 ## Troubleshooting segment
 

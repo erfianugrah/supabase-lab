@@ -1,5 +1,5 @@
 /**
- * The BFF demo's end-to-end checks, shared by K05 (tests/k05-channel-api.ts,
+ * The BFF demo's end-to-end checks, shared by K05 (tests/k05-fanout-api.ts,
  * a deployed project) and scripts/bff-local.ts (a local Docker stack), so the
  * local run exercises exactly the assertions the hosted run will.
  *
@@ -43,7 +43,7 @@ interface Upstream {
   error?: string;
 }
 
-type Endpoint = "profile" | "orders" | "offers" | "points";
+type Endpoint = "profile" | "feed" | "inbox" | "stats";
 
 export interface Agg {
   screen: string;
@@ -64,11 +64,11 @@ export interface Call {
   body: Agg;
 }
 
-export async function channel(t: Pick<BffTarget, "functionsUrl" | "publishableKey">, jwt: string | null, query = ""): Promise<Call> {
+export async function callFanout(t: Pick<BffTarget, "functionsUrl" | "publishableKey">, jwt: string | null, query = ""): Promise<Call> {
   const headers: Record<string, string> = { apikey: t.publishableKey };
   if (jwt) headers.Authorization = `Bearer ${jwt}`;
   const t0 = performance.now();
-  const r = await fetch(`${t.functionsUrl}/channel-api${query ? `?${query}` : ""}`, { headers });
+  const r = await fetch(`${t.functionsUrl}/fanout-api${query ? `?${query}` : ""}`, { headers });
   const text = await r.text();
   const wall = Math.round(performance.now() - t0);
   let body: Agg;
@@ -110,13 +110,13 @@ export async function bffChecks(t: BffTarget): Promise<BffCheck[]> {
     out.push({ n, title, pass, detail, ...(measurements ? { measurements } : {}) });
   const reps = async (jwt: string, query: string) => {
     const calls: Call[] = [];
-    for (let i = 0; i < t.reps; i++) calls.push(await channel(t, jwt, query));
+    for (let i = 0; i < t.reps; i++) calls.push(await callFanout(t, jwt, query));
     return calls;
   };
 
   // 1. No user token, or a tampered one: refused before the function runs.
-  const anon = await channel(t, null);
-  const forged = await channel(t, `${t.a.jwt.slice(0, -4)}AAAA`);
+  const anon = await callFanout(t, null);
+  const forged = await callFanout(t, `${t.a.jwt.slice(0, -4)}AAAA`);
   add(1, "no JWT or a tampered JWT is refused", anon.status === 401 && forged.status === 401, `no token http ${anon.status}; tampered signature http ${forged.status}`);
 
   // 2. All upstreams ok with the cache read skipped (refresh=1): four live calls.
@@ -136,66 +136,66 @@ export async function bffChecks(t: BffTarget): Promise<BffCheck[]> {
     timing(cold),
   );
 
-  // 3. Same request without refresh: profile and offers (the mock sends
-  //    max-age) come from the cache; orders and points (no-store) are live.
+  // 3. Same request without refresh: profile and feed (the mock sends
+  //    max-age) come from the cache; inbox and stats (no-store) are live.
   const warm = await reps(t.a.jwt, "");
   add(
     3,
-    `cache hit on the next call: profile + offers from cache, orders + points live, x${t.reps}`,
+    `cache hit on the next call: profile + feed from cache, inbox + stats live, x${t.reps}`,
     warm.every(
       (c) =>
         c.status === 200 &&
         c.body.partial === false &&
         c.body.cache.read === "hit" &&
         c.body.upstreams.profile.source === "cache" &&
-        c.body.upstreams.offers.source === "cache" &&
-        c.body.upstreams.orders.source === "upstream" &&
-        c.body.upstreams.points.source === "upstream",
+        c.body.upstreams.feed.source === "cache" &&
+        c.body.upstreams.inbox.source === "upstream" &&
+        c.body.upstreams.stats.source === "upstream",
     ),
     `last: ${src(last(warm))}; cache read ${last(warm).body.cache.read_ms} ms`,
     { ...timing(warm), cache_read_ms_median: median(warm.map((c) => c.body.cache.read_ms)) },
   );
 
   // 4. One upstream slower than the per-call timeout: partial, and on time.
-  const slow = await reps(t.a.jwt, "slow=points");
+  const slow = await reps(t.a.jwt, "slow=stats");
   const tmo = last(slow).body.timeout_ms;
   add(
     4,
-    `points slow (3 s) past the ${tmo} ms per-call timeout: partial, the rest returned, x${t.reps}`,
+    `stats slow (3 s) past the ${tmo} ms per-call timeout: partial, the rest returned, x${t.reps}`,
     slow.every(
       (c) =>
         c.status === 200 &&
         c.body.partial === true &&
-        c.body.upstreams.points.status === "timeout" &&
-        c.body.data.points === null &&
-        ok(c, ["profile", "orders", "offers"]) &&
-        c.body.upstreams.points.ms >= c.body.timeout_ms &&
+        c.body.upstreams.stats.status === "timeout" &&
+        c.body.data.stats === null &&
+        ok(c, ["profile", "feed", "inbox"]) &&
+        c.body.upstreams.stats.ms >= c.body.timeout_ms &&
         c.body.total_ms < c.body.timeout_ms + 500,
     ),
     `last: ${src(last(slow))}; total ${last(slow).body.total_ms} ms`,
-    { ...timing(slow), timeout_ms: tmo, points_ms_median: median(slow.map((c) => c.body.upstreams.points.ms)) },
+    { ...timing(slow), timeout_ms: tmo, stats_ms_median: median(slow.map((c) => c.body.upstreams.stats.ms)) },
   );
 
   // 5. One upstream failing: partial, the error reported for that upstream.
-  const fail = await reps(t.a.jwt, "fail=offers");
+  const fail = await reps(t.a.jwt, "fail=feed");
   add(
     5,
-    `offers failing (503): partial, the rest returned, x${t.reps}`,
+    `feed failing (503): partial, the rest returned, x${t.reps}`,
     fail.every(
       (c) =>
         c.status === 200 &&
         c.body.partial === true &&
-        c.body.upstreams.offers.status === "error" &&
-        c.body.upstreams.offers.http === 503 &&
-        c.body.data.offers === null &&
-        ok(c, ["profile", "orders", "points"]),
+        c.body.upstreams.feed.status === "error" &&
+        c.body.upstreams.feed.http === 503 &&
+        c.body.data.feed === null &&
+        ok(c, ["profile", "inbox", "stats"]),
     ),
     `last: ${src(last(fail))}; total ${last(fail).body.total_ms} ms`,
     timing(fail),
   );
 
   // 6. Everything failing: 502, same JSON shape.
-  const all = await channel(t, t.a.jwt, "fail=profile,orders,offers,points");
+  const all = await callFanout(t, t.a.jwt, "fail=profile,feed,inbox,stats");
   add(
     6,
     "every upstream failing: http 502 with the per-upstream report",
@@ -206,7 +206,7 @@ export async function bffChecks(t: BffTarget): Promise<BffCheck[]> {
   // 7. User b never gets user a's cached data. Checked on the data itself
   //    (the profile carries the user id it was generated for), so it holds
   //    whether b's own cache is cold or warm from an earlier run.
-  const bCall = await channel(t, t.b.jwt, "");
+  const bCall = await callFanout(t, t.b.jwt, "");
   add(
     7,
     "a second user gets their own data, never the first user's cached rows",
@@ -225,23 +225,23 @@ export async function bffChecks(t: BffTarget): Promise<BffCheck[]> {
         ...((init.headers as Record<string, string>) ?? {}),
       },
     });
-  const put = await rest("rpc/channel_cache_put", {
+  const put = await rest("rpc/fanout_cache_put", {
     method: "POST",
-    body: JSON.stringify({ p_user: t.a.id, p_entries: [{ endpoint: "points", body: { balance: 999999 }, ttl_s: 3600 }] }),
+    body: JSON.stringify({ p_user: t.a.id, p_entries: [{ endpoint: "stats", body: { count: 999999 }, ttl_s: 3600 }] }),
   });
   const putBody = (await put.text()).slice(0, 200);
-  const table = await rest("channel_cache?select=*", { headers: { "Accept-Profile": "private" } });
+  const table = await rest("fanout_cache?select=*", { headers: { "Accept-Profile": "private" } });
   const tableBody = (await table.text()).slice(0, 200);
-  const own = await rest("rpc/channel_cache_get", { method: "POST", body: JSON.stringify({ p_endpoints: ["profile", "orders", "offers", "points"] }) });
+  const own = await rest("rpc/fanout_cache_get", { method: "POST", body: JSON.stringify({ p_endpoints: ["profile", "feed", "inbox", "stats"] }) });
   const ownRows = own.ok ? ((await own.json()) as { endpoint: string }[]) : [];
   const ownList = ownRows.map((r) => r.endpoint).sort().join(",");
   const code = (s: string) => s.match(/"code":"[^"]+"/)?.[0] ?? s.slice(0, 80);
-  // b cached profile + offers in step 7, so a leak through the read RPC
+  // b cached profile + feed in step 7, so a leak through the read RPC
   // would show each endpoint twice.
   add(
     8,
     "the cache is service_role-write only, not exposed as a table, and the read RPC returns only the caller's rows",
-    put.status >= 400 && putBody.includes("42501") && table.status >= 400 && own.status === 200 && ownList === "offers,profile",
+    put.status >= 400 && putBody.includes("42501") && table.status >= 400 && own.status === 200 && ownList === "feed,profile",
     `put as user http ${put.status} (${code(putBody)}); private table http ${table.status} (${code(tableBody)}); own rows via get: ${ownList || "none"}`,
   );
 

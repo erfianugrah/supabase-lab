@@ -1,5 +1,5 @@
 /**
- * The channel API's fan-out, with no Supabase or network dependency of its
+ * The fan-out API's fan-out, with no Supabase or network dependency of its
  * own: fetch, the clock and the cache are passed in, so fanout.test.ts runs
  * it offline.
  *
@@ -17,7 +17,7 @@
  * decide what is cacheable - the system that owns the data does.
  */
 
-export const ENDPOINTS = ["profile", "orders", "offers", "points"] as const;
+export const ENDPOINTS = ["profile", "feed", "inbox", "stats"] as const;
 export type Endpoint = (typeof ENDPOINTS)[number];
 
 /** Upper bound on any TTL the upstream asks for. */
@@ -94,7 +94,7 @@ export function cacheTtl(header: string | null): number {
   return Math.min(Number(m[1]), MAX_TTL_S);
 }
 
-/** `?fail=offers,points&slow=orders&refresh=1` -> Controls. Unknown names are ignored. */
+/** `?fail=feed,stats&slow=inbox&refresh=1` -> Controls. Unknown names are ignored. */
 export function parseControls(params: URLSearchParams): Controls {
   const set = (name: string) =>
     new Set(

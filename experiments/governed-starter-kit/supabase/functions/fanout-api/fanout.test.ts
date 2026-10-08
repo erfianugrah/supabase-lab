@@ -1,5 +1,5 @@
 /**
- * Offline tests for the channel API fan-out: `make bff-test`
+ * Offline tests for the fan-out API fan-out: `make bff-test`
  * (deno test --no-remote). No imports beyond fanout.ts, so nothing is
  * downloaded; fetch is a fake that honours the AbortSignal the way the real
  * one does, and the cache is an in-memory Map.
@@ -96,9 +96,9 @@ Deno.test("cacheTtl reads max-age and honours no-store / no-cache", () => {
 });
 
 Deno.test("parseControls keeps known endpoints only", () => {
-  const c = parseControls(new URLSearchParams("fail=offers,bogus&slow=points&refresh=1"));
-  eq([...c.fail], ["offers"], "fail");
-  eq([...c.slow], ["points"], "slow");
+  const c = parseControls(new URLSearchParams("fail=feed,bogus&slow=stats&refresh=1"));
+  eq([...c.fail], ["feed"], "fail");
+  eq([...c.slow], ["stats"], "slow");
   eq(c.refresh, true, "refresh");
 });
 
@@ -106,56 +106,56 @@ Deno.test("all upstreams ok: parallel, not partial, headers sent", async () => {
   const seen: URL[] = [];
   const sent: Headers[] = [];
   const t0 = Date.now();
-  const r = await fanOut(base({ fetch: fakeFetch({ profile: { delayMs: 60 }, orders: { delayMs: 60 }, offers: { delayMs: 60 }, points: { delayMs: 60 } }, seen, sent) }));
+  const r = await fanOut(base({ fetch: fakeFetch({ profile: { delayMs: 60 }, feed: { delayMs: 60 }, inbox: { delayMs: 60 }, stats: { delayMs: 60 } }, seen, sent) }));
   const wall = Date.now() - t0;
   eq(r.partial, false, "partial");
-  eq(Object.keys(r.data), ["profile", "orders", "offers", "points"], "keys");
-  for (const e of ["profile", "orders", "offers", "points"] as Endpoint[]) {
+  eq(Object.keys(r.data), ["profile", "feed", "inbox", "stats"], "keys");
+  for (const e of ["profile", "feed", "inbox", "stats"] as Endpoint[]) {
     eq(r.upstreams[e].status, "ok", `${e} status`);
     eq((r.data[e] as { endpoint: string }).endpoint, e, `${e} body`);
   }
   // Four 60 ms calls in parallel finish well under their 240 ms sum.
   assert(wall < 200, `wall ${wall} ms suggests the calls ran in series`);
-  eq(seen.map((u) => u.pathname).sort(), ["/upstream-mock/offers", "/upstream-mock/orders", "/upstream-mock/points", "/upstream-mock/profile"], "paths");
+  eq(seen.map((u) => u.pathname).sort(), ["/upstream-mock/feed", "/upstream-mock/inbox", "/upstream-mock/profile", "/upstream-mock/stats"], "paths");
   eq(sent.map((h) => `${h.get("x-api-key")}/${h.get("x-user-id")}`), ["k/u1", "k/u1", "k/u1", "k/u1"], "api key and user id on every call");
 });
 
 Deno.test("one slow upstream is cut at the timeout, the rest are returned (partial)", async () => {
   const t0 = Date.now();
-  const r = await fanOut(base({ timeoutMs: 100, fetch: fakeFetch({ points: { delayMs: 2000 } }) }));
+  const r = await fanOut(base({ timeoutMs: 100, fetch: fakeFetch({ stats: { delayMs: 2000 } }) }));
   const wall = Date.now() - t0;
   eq(r.partial, true, "partial");
-  eq(r.upstreams.points.status, "timeout", "points status");
-  eq(r.data.points, null, "points data");
+  eq(r.upstreams.stats.status, "timeout", "stats status");
+  eq(r.data.stats, null, "stats data");
   eq(r.upstreams.profile.status, "ok", "profile ok");
-  assert(r.upstreams.points.ms >= 95 && r.upstreams.points.ms < 400, `points ms ${r.upstreams.points.ms}`);
+  assert(r.upstreams.stats.ms >= 95 && r.upstreams.stats.ms < 400, `stats ms ${r.upstreams.stats.ms}`);
   assert(wall < 400, `wall ${wall} ms: the slow call was not aborted`);
 });
 
 Deno.test("http error, network error and non-JSON body each degrade to partial", async () => {
   const r = await fanOut(base({
     fetch: fakeFetch({
-      offers: { status: 503, body: { error: "down" } },
-      orders: { netError: true },
-      points: { raw: "<html>gateway</html>" },
+      feed: { status: 503, body: { error: "down" } },
+      inbox: { netError: true },
+      stats: { raw: "<html>gateway</html>" },
     }),
   }));
   eq(r.partial, true, "partial");
-  eq(r.upstreams.offers.status, "error", "offers");
-  eq(r.upstreams.offers.http, 503, "offers http");
-  eq(r.upstreams.orders.status, "error", "orders");
-  assert(String(r.upstreams.orders.error).includes("connection refused"), "orders error text");
-  eq(r.upstreams.points.error, "upstream body is not JSON", "points");
+  eq(r.upstreams.feed.status, "error", "feed");
+  eq(r.upstreams.feed.http, 503, "feed http");
+  eq(r.upstreams.inbox.status, "error", "inbox");
+  assert(String(r.upstreams.inbox.error).includes("connection refused"), "inbox error text");
+  eq(r.upstreams.stats.error, "upstream body is not JSON", "stats");
   eq(r.upstreams.profile.status, "ok", "profile still ok");
-  eq(r.data.offers, null, "offers data");
+  eq(r.data.feed, null, "feed data");
 });
 
 Deno.test("demo controls are forwarded as mode=fail / mode=slow", async () => {
   const seen: URL[] = [];
-  await fanOut(base({ controls: parseControls(new URLSearchParams("fail=offers&slow=points")), fetch: fakeFetch({}, seen) }));
+  await fanOut(base({ controls: parseControls(new URLSearchParams("fail=feed&slow=stats")), fetch: fakeFetch({}, seen) }));
   const mode = (e: string) => seen.find((u) => u.pathname.endsWith(`/${e}`))?.searchParams.get("mode") ?? null;
-  eq(mode("offers"), "fail", "offers");
-  eq(mode("points"), "slow", "points");
+  eq(mode("feed"), "fail", "feed");
+  eq(mode("stats"), "slow", "stats");
   eq(mode("profile"), null, "profile");
 });
 
@@ -163,28 +163,28 @@ Deno.test("cacheable responses are stored and served on the next call", async ()
   const cache = new MemCache();
   const routes: Partial<Record<Endpoint, Route>> = {
     profile: { cacheControl: "private, max-age=300" },
-    offers: { cacheControl: "private, max-age=60" },
-    orders: { cacheControl: "no-store" },
+    feed: { cacheControl: "private, max-age=60" },
+    inbox: { cacheControl: "no-store" },
   };
   const first = await fanOut(base({ cache, fetch: fakeFetch(routes) }));
   eq(first.cache.read, "miss", "first read");
   eq(first.cache.write, "ok", "first write");
-  eq(cache.puts[0].map((w) => `${w.endpoint}:${w.ttl_s}`).sort(), ["offers:60", "profile:300"], "stored");
+  eq(cache.puts[0].map((w) => `${w.endpoint}:${w.ttl_s}`).sort(), ["feed:60", "profile:300"], "stored");
 
   const seen: URL[] = [];
   const second = await fanOut(base({ cache, fetch: fakeFetch(routes, seen) }));
   eq(second.cache.read, "hit", "second read");
   eq(second.upstreams.profile.source, "cache", "profile from cache");
-  eq(second.upstreams.offers.source, "cache", "offers from cache");
-  eq(second.upstreams.orders.source, "upstream", "orders live");
-  eq(seen.map((u) => u.pathname.split("/").pop()).sort(), ["orders", "points"], "only uncacheable endpoints called");
+  eq(second.upstreams.feed.source, "cache", "feed from cache");
+  eq(second.upstreams.inbox.source, "upstream", "inbox live");
+  eq(seen.map((u) => u.pathname.split("/").pop()).sort(), ["inbox", "stats"], "only uncacheable endpoints called");
   eq(second.partial, false, "not partial");
   eq(second.cache.write, "none", "nothing new to store");
 });
 
 Deno.test("refresh=1 and forced fail/slow bypass the cache read", async () => {
   const cache = new MemCache();
-  const routes: Partial<Record<Endpoint, Route>> = { profile: { cacheControl: "max-age=300" }, offers: { cacheControl: "max-age=300" } };
+  const routes: Partial<Record<Endpoint, Route>> = { profile: { cacheControl: "max-age=300" }, feed: { cacheControl: "max-age=300" } };
   await fanOut(base({ cache, fetch: fakeFetch(routes) }));
 
   const r1 = await fanOut(base({ cache, controls: parseControls(new URLSearchParams("refresh=1")), fetch: fakeFetch(routes) }));
@@ -192,9 +192,9 @@ Deno.test("refresh=1 and forced fail/slow bypass the cache read", async () => {
   eq(r1.upstreams.profile.source, "upstream", "profile live on refresh");
 
   const seen: URL[] = [];
-  const r2 = await fanOut(base({ cache, controls: parseControls(new URLSearchParams("fail=offers")), fetch: fakeFetch({ ...routes, offers: { status: 500 } }, seen) }));
+  const r2 = await fanOut(base({ cache, controls: parseControls(new URLSearchParams("fail=feed")), fetch: fakeFetch({ ...routes, feed: { status: 500 } }, seen) }));
   eq(r2.upstreams.profile.source, "cache", "profile still cached");
-  eq(r2.upstreams.offers.status, "error", "offers forced failure is not masked by the cache");
+  eq(r2.upstreams.feed.status, "error", "feed forced failure is not masked by the cache");
   eq(r2.partial, true, "partial");
 });
 
@@ -216,7 +216,7 @@ Deno.test("a broken cache costs latency, not the response", async () => {
 });
 
 Deno.test("every upstream down: partial, all data null", async () => {
-  const r = await fanOut(base({ timeoutMs: 50, fetch: fakeFetch({ profile: { status: 502 }, orders: { status: 502 }, offers: { delayMs: 1000 }, points: { netError: true } }) }));
+  const r = await fanOut(base({ timeoutMs: 50, fetch: fakeFetch({ profile: { status: 502 }, feed: { delayMs: 1000 }, inbox: { status: 502 }, stats: { netError: true } }) }));
   eq(r.partial, true, "partial");
   eq(Object.values(r.data), [null, null, null, null], "data");
   eq(Object.values(r.upstreams).every((u) => u.status !== "ok"), true, "no ok");

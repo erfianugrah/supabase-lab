@@ -1978,12 +1978,15 @@ README.md, RUNLOG.md and docs/.
   supabase_admin). Delivery is at most once.
 - **Dashboard Read-only role** (`supabase_read_only_user`) has BYPASSRLS and
   `pg_read_all_data`: it sees every department's rows.
-- **BFF demo (`channel-api` + `upstream-mock`, 2026-10-08, local only)**:
+- **BFF demo (`fanout-api` + `upstream-mock`, 2026-10-08, local and hosted)**:
   `make bff-local` runs `lib/bff-checks.ts` on a throwaway local stack
   (ports 5442x, so it does not clash with a default local stack); K05 runs
-  the same checks against a deployed project and skips when `channel-api`
+  the same checks against a deployed project and skips when `fanout-api`
   is not deployed. The cache is a Postgres table, not an isolate map, because
-  hosted functions run many isolates. Never run live yet.
+  hosted functions run many isolates. Hosted K05 8/8 on three runs
+  (2026-10-08); the first call after a deploy answered 502 twice (cold
+  `upstream-mock` past the 800 ms per-call timeout, inferred), so make one
+  warm-up call before a demo.
 - **Troubleshooting faults**: 400k `activity_events` rows hit the 8 s
   `authenticated` statement timeout, so the seed is 100k. pg_stat_statements
   has no entry for a statement that errors; the logs endpoint does.
