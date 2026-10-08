@@ -16,7 +16,7 @@ behaviour, mock delays, Cache-Control values and checks are unchanged:
 - Env `FANOUT_UPSTREAM_TIMEOUT_MS`.
 - `tests/k05-fanout-api.ts` (id K05 unchanged); `lib/bff-checks.ts` export
   `callFanout()`. Make targets `bff-test`, `bff-local`, `bff-deploy`
-  unchanged. The previous names are in git history.
+  unchanged.
 
 The two 2026-10-08 BFF entries below use the current identifiers; their
 numbers are as recorded on 2026-10-08.

@@ -67,10 +67,9 @@ Artifacts: `out/2026-08-25/` (raw run dirs stay local under `evidence/`).
   a real sha256 (the old `hash_not_implemented` stub is gone). Platform-arm
   confirmation pending.
 
-## 2026-08-25 - platform arm: S07 + S08 + S14 (non-default control plane via SUPABASE_MGMT_BASE_URL / SUPABASE_API_HOST_SUFFIX env)
+## 2026-08-25 - platform arm: S07 + S08 + S14
 
-Raw artifacts kept off-repo (internal control plane); statuses and findings
-recorded here.
+Raw artifacts kept off-repo; statuses and findings recorded here.
 
 - S07: baseline setup `400 "Read replicas require a minimum size of small"` -
   IDENTICAL to the Pro-org message, which retroactively explains the
@@ -92,7 +91,7 @@ recorded here.
 
 Control-arm artifact + status diff: `out/2026-08-25/ab-control-run.json` +
 `out/2026-08-25/AB-DIFF.tsv` (raw run dirs stay local under `evidence/`). Platform-arm raw artifacts kept
-off-repo (internal control plane); every platform reading matched the
+off-repo; every platform reading matched the
 2026-08-24 battery.
 
 Deltas the diff surfaced:
