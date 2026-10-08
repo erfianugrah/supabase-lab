@@ -2104,3 +2104,36 @@ docs/plans/2026-10-02-bu-attribution.md.
   cannot be deleted on `/v1`, so it waits for a decision. BA05 (restricted
   member, `PVLAB_PAT2`, `PVLAB_PEER_INSCOPE`/`OUTSCOPE`) needs a second user
   with a dashboard-assigned role.
+
+## experiments/redundant-writes - key facts (validated 2026-10-08, local only)
+
+Three containers (`postgres:15-alpine` 15.19, `postgres:17-alpine` 17.11,
+the supabase CLI 2.120.0 image `public.ecr.aws/supabase/postgres:17.11.0.004`),
+no managed project. `make all` runs RW01-RW06 and publishes to `out/<date>/`.
+Numbers: `RUNLOG.md`, artifacts `out/2026-10-08/`.
+
+- A plain upsert or UPDATE of unchanged rows writes a new version of every
+  row; `DO UPDATE ... WHERE (...) IS DISTINCT FROM (...)` and
+  `suppress_redundant_updates_trigger()` stop the versions and dead tuples but
+  still lock every row (54 bytes of WAL per row with no full-page images,
+  plus an FPI per page on the first touch after a checkpoint). Only filtering
+  before the write (WHERE guard on UPDATE, anti-join before ON CONFLICT,
+  guarded MERGE) wrote 0 bytes on an identical batch.
+- Measure row versions by xmin/xmax inside the statement's transaction, WAL
+  with EXPLAIN (ANALYZE, WAL) or `pg_current_wal_insert_lsn()`, and VACUUM's
+  WAL from VACUUM (VERBOSE). `pg_current_wal_lsn()` is the WRITE position and
+  read 0 bytes for a VACUUM that removed 10,000 dead tuples; a post-commit
+  seq scan can prune the dead versions before the VACUUM you meant to measure
+  (reasoned from opportunistic page pruning, not measured here), so count
+  inside the transaction.
+- `n_live_tup` read double the row count when a sub-second insert and a
+  VACUUM (ANALYZE) ran on one connection (RW06, 35 of 36 reps), 0 after
+  `pg_stat_reset()` and after a SIGKILL, and only post-reset inserts after
+  that. `reltuples` stayed at its last VACUUM/ANALYZE value through all of it.
+- `pg_stat_force_next_flush()` exists on 15.19 and 17.11 (to_regproc) but is
+  not on the PG 17 statistics docs page; disconnecting also flushes.
+- The Alpine images ran every 1,000,000-row ON CONFLICT case 2.95x to 6.45x
+  slower than the Supabase image (derived from the RUNLOG medians) with the
+  same WAL; cause not isolated (musl vs glibc untested, JIT ruled out).
+- `drop_caches` in the Docker VM does not drop the macOS cache under it; a
+  "cold" read here is not a disk read.
