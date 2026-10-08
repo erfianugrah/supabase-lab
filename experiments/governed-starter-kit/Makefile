@@ -441,23 +441,23 @@ fault-workspace: guard-live
 stage-agent:
 	scripts/stage-agent.sh $(if $(DRY),--dry-run,) "$(WORKSPACE)"
 
-# --- BFF demo: channel-api + upstream-mock ---
+# --- BFF demo: fanout-api + upstream-mock ---
 # One app request -> four upstream calls in parallel, per-call timeout,
-# partial results, per-user cache in Postgres (sql/50-channel.sql). README,
-# "BFF demo: channel API". Not part of `make up`.
+# partial results, per-user cache in Postgres (sql/50-fanout.sql). README,
+# "BFF demo: fan-out API". Not part of `make up`.
 #
 # bff-test: offline Deno unit tests for the fan-out (no network, no Docker).
 # bff-local: the end-to-end checks on a throwaway local stack in Docker
 #   (scripts/bff-local.ts; KEEP=1 leaves it running, BFF_LOCAL_DIR moves it).
 # bff-deploy: SQL + both functions + their secrets on the ready project. The
-#   mock is deployed with --no-verify-jwt (its caller is channel-api, which
-#   sends a shared key); channel-api keeps JWT verification on. A fresh
+#   mock is deployed with --no-verify-jwt (its caller is fanout-api, which
+#   sends a shared key); fanout-api keeps JWT verification on. A fresh
 #   UPSTREAM_API_KEY goes to the function secrets from stdin, never argv.
 #   Run as  sx SUPABASE_ACCESS_TOKEN -- make bff-deploy
 #   then    sx SUPABASE_ACCESS_TOKEN -- make probe ONLY="--only K05"
 .PHONY: bff-test bff-local bff-deploy
 bff-test:
-	cd supabase/functions/channel-api && deno test --no-remote --no-npm fanout.test.ts
+	cd supabase/functions/fanout-api && deno test --no-remote --no-npm fanout.test.ts
 
 bff-local:
 	bun scripts/bff-local.ts
@@ -477,9 +477,9 @@ agent-local:
 
 bff-deploy: guard-tok
 	@test -n "$(READY)" || (echo "no ready_ref - run 'make apply' first"; exit 1)
-	bun scripts/kit.ts schema $(READY) sql/50-channel.sql
+	bun scripts/kit.ts schema $(READY) sql/50-fanout.sql
 	supabase functions deploy upstream-mock --project-ref $(READY) --workdir . --use-api --no-verify-jwt
-	supabase functions deploy channel-api --project-ref $(READY) --workdir . --use-api
+	supabase functions deploy fanout-api --project-ref $(READY) --workdir . --use-api
 	@sh -c 'set -e; k=$$(openssl rand -hex 32); \
 		printf "UPSTREAM_API_KEY=%s\nUPSTREAM_BASE_URL=https://%s.supabase.co/functions/v1/upstream-mock\n" "$$k" "$$0" \
 		  | supabase secrets set --env-file /dev/stdin --project-ref "$$0" >/dev/null' $(READY)

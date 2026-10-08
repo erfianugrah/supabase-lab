@@ -1,36 +1,36 @@
 /**
- * upstream-mock: stands in for the upstream integration layer the channel API
+ * upstream-mock: stands in for the upstream integration layer the fan-out API
  * fans out to. Four read endpoints, each returning a small JSON document for
  * the user named in x-user-id, after a configurable delay:
  *
  *   GET /upstream-mock/profile   Cache-Control: private, max-age=300
- *   GET /upstream-mock/orders    Cache-Control: no-store
- *   GET /upstream-mock/offers    Cache-Control: private, max-age=60
- *   GET /upstream-mock/points    Cache-Control: no-store
+ *   GET /upstream-mock/feed      Cache-Control: private, max-age=60
+ *   GET /upstream-mock/inbox     Cache-Control: no-store
+ *   GET /upstream-mock/stats     Cache-Control: no-store
  *
  * Query parameters (all optional):
  *   latency_ms=<n>    delay before answering (default per endpoint, below)
  *   mode=ok           normal answer (default)
  *   mode=fail         503 after the delay, like an upstream outage
  *   mode=slow         answers after slow_ms instead (default 3000), long past
- *                     the channel API's per-call timeout
+ *                     the fan-out API's per-call timeout
  *
  * Auth is a shared key in x-api-key, compared in constant time, the way an
  * API gateway in front of a real integration layer would check a client: the
- * caller is the channel API, not a user, so it is deployed with
+ * caller is the fan-out API, not a user, so it is deployed with
  * --no-verify-jwt. It fails closed - no UPSTREAM_API_KEY secret, no answers.
  * Data is generated from the user id, so nothing here reads the database.
  */
 
 // The cacheable endpoints are the slow ones by default, so a cache hit shows
-// up in the screen's latency (bounded by orders then) and not only in the
+// up in the screen's latency (bounded by inbox then) and not only in the
 // upstream call count.
-const DEFAULT_LATENCY_MS: Record<string, number> = { profile: 250, orders: 120, offers: 180, points: 60 };
+const DEFAULT_LATENCY_MS: Record<string, number> = { profile: 250, feed: 180, inbox: 120, stats: 60 };
 const CACHE_CONTROL: Record<string, string> = {
   profile: "private, max-age=300",
-  orders: "no-store",
-  offers: "private, max-age=60",
-  points: "no-store",
+  feed: "private, max-age=60",
+  inbox: "no-store",
+  stats: "no-store",
 };
 const MAX_DELAY_MS = 10_000;
 const DEFAULT_SLOW_MS = 3_000;
@@ -63,19 +63,19 @@ function payload(endpoint: string, userId: string): unknown {
   const generatedAt = new Date().toISOString();
   switch (endpoint) {
     case "profile":
-      return { user_id: userId, display_name: `Member ${s("n") % 10000}`, tier: ["standard", "silver", "gold"][s("t") % 3], locale: "en", generated_at: generatedAt };
-    case "orders":
+      return { user_id: userId, display_name: `User ${s("n") % 10000}`, theme: ["light", "dark", "system"][s("t") % 3], locale: "en", generated_at: generatedAt };
+    case "feed":
       return {
-        items: [1, 2].map((i) => ({ id: `ord-${s(`o${i}`) % 100000}`, status: ["confirmed", "pending", "completed"][s(`s${i}`) % 3], total: (s(`a${i}`) % 50000) / 100 })),
+        items: [1, 2, 3].map((i) => ({ id: `item-${s(`f${i}`) % 1000}`, title: `Item ${i}`, score: s(`d${i}`) % 100 })),
         generated_at: generatedAt,
       };
-    case "offers":
+    case "inbox":
       return {
-        items: [1, 2, 3].map((i) => ({ id: `off-${s(`f${i}`) % 1000}`, title: `Offer ${i}`, discount_pct: 5 + (s(`d${i}`) % 20) })),
+        items: [1, 2].map((i) => ({ id: `msg-${s(`o${i}`) % 100000}`, status: ["unread", "read", "archived"][s(`s${i}`) % 3], subject: `Message ${i}` })),
         generated_at: generatedAt,
       };
-    case "points":
-      return { balance: s("p") % 100000, expiring_next_30d: s("e") % 500, generated_at: generatedAt };
+    case "stats":
+      return { count: s("p") % 100000, recent_7d: s("e") % 500, generated_at: generatedAt };
     default:
       return null;
   }
@@ -105,7 +105,7 @@ Deno.serve(async (req) => {
     ? intParam(url.searchParams.get("slow_ms"), DEFAULT_SLOW_MS)
     : intParam(url.searchParams.get("latency_ms"), DEFAULT_LATENCY_MS[endpoint]);
 
-  // A caller that gives up (the channel API's timeout) aborts req.signal;
+  // A caller that gives up (the fan-out API's timeout) aborts req.signal;
   // stop waiting then instead of holding the isolate for the full delay.
   await new Promise<void>((resolve) => {
     const t = setTimeout(resolve, delay);

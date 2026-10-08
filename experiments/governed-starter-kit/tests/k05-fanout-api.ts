@@ -1,8 +1,8 @@
 /**
- * K05 - the channel API (backend-for-frontend demo) fans one app request out
+ * K05 - the fan-out API (backend-for-frontend demo) fans one app request out
  * to four upstream endpoints and degrades instead of failing.
  *
- * Drives the deployed `channel-api` Edge Function over HTTPS with real user
+ * Drives the deployed `fanout-api` Edge Function over HTTPS with real user
  * JWTs (password sign-in with the publishable key), against the deployed
  * `upstream-mock` (`make bff-deploy`). The checks themselves are
  * lib/bff-checks.ts, the same ones `make bff-local` runs against a local
@@ -12,7 +12,7 @@
  * 502; a second user never gets the first user's cached data; the cache
  * cannot be written or read as a table through the Data API.
  *
- * Self-skips with a reason when there is no project ref or when channel-api
+ * Self-skips with a reason when there is no project ref or when fanout-api
  * is not deployed on it (the BFF demo is not part of `make up`).
  *
  * Needs: make bff-deploy, the seed (alice and carol from
@@ -21,7 +21,7 @@
 import { readFileSync } from "node:fs";
 import type { Ctx, TestModule, TestResult } from "../../../harness/src/types";
 import { mgmt } from "../../../harness/src/mgmt";
-import { bffChecks, channel, type Session } from "../lib/bff-checks";
+import { bffChecks, callFanout, type Session } from "../lib/bff-checks";
 
 const REPS = 5;
 
@@ -46,7 +46,7 @@ async function signIn(ctx: Ctx, pub: string, email: string, password: string): P
 
 const mod: TestModule = {
   id: "K05",
-  title: "channel API (BFF): parallel fan-out to four upstreams, per-call timeout, partial results, per-user cache",
+  title: "fan-out API (BFF): parallel fan-out to four upstreams, per-call timeout, partial results, per-user cache",
   where: "local",
   requires: ["pat"],
   async run(ctx: Ctx): Promise<TestResult[]> {
@@ -80,10 +80,10 @@ const mod: TestModule = {
       reps: REPS,
     };
     // Not deployed is a skip (the demo is opt-in); deployed but unconfigured is a fail.
-    const probe = await channel(target, a.jwt, "refresh=1");
-    if (probe.status === 404) return skip("channel-api is not deployed on this project (make bff-deploy)");
+    const probe = await callFanout(target, a.jwt, "refresh=1");
+    if (probe.status === 404) return skip("fanout-api is not deployed on this project (make bff-deploy)");
     if (probe.status === 503 && probe.body.code === "upstream_not_configured") {
-      return [{ id: "K05", title: this.title, status: "fail", detail: "channel-api deployed but UPSTREAM_BASE_URL / UPSTREAM_API_KEY unset (make bff-deploy sets them)" }];
+      return [{ id: "K05", title: this.title, status: "fail", detail: "fanout-api deployed but UPSTREAM_BASE_URL / UPSTREAM_API_KEY unset (make bff-deploy sets them)" }];
     }
     ctx.log(`first call http ${probe.status} in ${probe.wall_ms} ms (cold start included)`);
 
