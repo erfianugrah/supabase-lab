@@ -11,14 +11,9 @@ when it uses a plain `INSERT ... ON CONFLICT (id) DO UPDATE`: Postgres writes
 a new row version whether or not any column changed. That is WAL, dirty pages
 the checkpointer has to write back, a dead tuple per row for vacuum to remove,
 and index entries when the update cannot be HOT. The question is which of
-those writes a guard removes on a database with a disk IO budget, and which
-guard removes all of them.
-
-A scratch run on PG 15 before this experiment existed (100,000 identical rows)
-found the plain upsert rewrote every row and the `WHERE ... IS DISTINCT FROM`
-guard on the `DO UPDATE` wrote no new versions but still wrote WAL. This
-experiment repeats that on reusable infrastructure, adds sizes, versions and
-guard patterns, and records where the remaining WAL comes from.
+those writes a guard removes, and which guard removes all of them. This
+experiment measures that across sizes, versions and guard patterns, and
+records where the remaining WAL comes from.
 
 ## Method
 
@@ -27,7 +22,7 @@ Three throwaway containers, no managed project, no PAT, no tofu state
 
 | target | image | why |
 |---|---|---|
-| `pg15` | `postgres:15-alpine` (15.19), pinned by digest | the version of the scratch run |
+| `pg15` | `postgres:15-alpine` (15.19), pinned by digest | an older supported major |
 | `pg17` | `postgres:17-alpine` (17.11), pinned by digest | current major |
 | `supabase` | `public.ecr.aws/supabase/postgres:17.11.0.004`, pinned by digest | the Postgres image supabase CLI 2.120.0 starts for `supabase start` (tag read from the CLI binary), run standalone the way `checkpointer-reset` runs `supabase/postgres` |
 
