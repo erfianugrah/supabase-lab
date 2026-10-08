@@ -440,3 +440,51 @@ fault-workspace: guard-live
 .PHONY: stage-agent
 stage-agent:
 	scripts/stage-agent.sh $(if $(DRY),--dry-run,) "$(WORKSPACE)"
+
+# --- BFF demo: channel-api + upstream-mock ---
+# One app request -> four upstream calls in parallel, per-call timeout,
+# partial results, per-user cache in Postgres (sql/50-channel.sql). README,
+# "BFF demo: channel API". Not part of `make up`.
+#
+# bff-test: offline Deno unit tests for the fan-out (no network, no Docker).
+# bff-local: the end-to-end checks on a throwaway local stack in Docker
+#   (scripts/bff-local.ts; KEEP=1 leaves it running, BFF_LOCAL_DIR moves it).
+# bff-deploy: SQL + both functions + their secrets on the ready project. The
+#   mock is deployed with --no-verify-jwt (its caller is channel-api, which
+#   sends a shared key); channel-api keeps JWT verification on. A fresh
+#   UPSTREAM_API_KEY goes to the function secrets from stdin, never argv.
+#   Run as  sx SUPABASE_ACCESS_TOKEN -- make bff-deploy
+#   then    sx SUPABASE_ACCESS_TOKEN -- make probe ONLY="--only K05"
+.PHONY: bff-test bff-local bff-deploy
+bff-test:
+	cd supabase/functions/channel-api && deno test --no-remote --no-npm fanout.test.ts
+
+bff-local:
+	bun scripts/bff-local.ts
+
+# --- Agent chat loop, locally ---
+# agent-local: the K03 chat checks (lib/agent-chat-checks.ts) plus embed and
+#   tool-mode checks on a throwaway local stack in Docker
+#   (scripts/agent-local.ts; ports 5452x, project id kit-agent-local, so it
+#   runs beside bff-local; KEEP=1 leaves it running, AGENT_LOCAL_DIR moves it).
+#   ENV_FILE is required: a dotenv file holding ANTHROPIC_API_KEY. Its path
+#   goes only to `supabase functions serve --env-file`; nothing reads or
+#   prints its contents. Every chat call is a live model call.
+.PHONY: agent-local
+agent-local:
+	@test -n "$(ENV_FILE)" || (echo "ENV_FILE=<path> is required: a dotenv file holding ANTHROPIC_API_KEY (passed to supabase functions serve --env-file, never read or printed)"; exit 2)
+	bun scripts/agent-local.ts "$(ENV_FILE)"
+
+bff-deploy: guard-tok
+	@test -n "$(READY)" || (echo "no ready_ref - run 'make apply' first"; exit 1)
+	bun scripts/kit.ts schema $(READY) sql/50-channel.sql
+	supabase functions deploy upstream-mock --project-ref $(READY) --workdir . --use-api --no-verify-jwt
+	supabase functions deploy channel-api --project-ref $(READY) --workdir . --use-api
+	@sh -c 'set -e; k=$$(openssl rand -hex 32); \
+		printf "UPSTREAM_API_KEY=%s\nUPSTREAM_BASE_URL=https://%s.supabase.co/functions/v1/upstream-mock\n" "$$k" "$$0" \
+		  | supabase secrets set --env-file /dev/stdin --project-ref "$$0" >/dev/null' $(READY)
+	@curl -s -H "Authorization: Bearer $$SUPABASE_ACCESS_TOKEN" \
+		"https://api.supabase.com/v1/projects/$(READY)/secrets" \
+		| jq -e '[.[].name] | contains(["UPSTREAM_API_KEY", "UPSTREAM_BASE_URL"])' >/dev/null \
+		&& echo "UPSTREAM_API_KEY and UPSTREAM_BASE_URL set on the ready project" \
+		|| (echo "upstream secrets not listed after set"; exit 1)

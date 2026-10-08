@@ -33,7 +33,7 @@ Team-plan org, rebuilt with `make up` and removed with `make destroy`.
 # live PAT in the env; secrets.tfvars holds a placeholder. Prefix each with
 # `sx SUPABASE_ACCESS_TOKEN --` (the old ~/.supabase/access-token keyfile is revoked).
 make up        # init, apply, wait-ready, schema, seed, fn-deploy, integrations, kb-embed, probe
-make probe     # re-run K01-K04 against kit-ready (macOS runs the harness from source)
+make probe     # re-run K01-K05 against kit-ready (macOS runs the harness from source; K05 skips until make bff-deploy)
 make destroy   # remove the projects
 ```
 
@@ -100,6 +100,29 @@ through the user's own message) skips with that reason. Model calls in one
 request stop after 120 s, inside the runtime's 150 s idle limit; if the model
 fails after a confirmed write, the reply still reports the write.
 
+### Agent chat locally
+
+```bash
+make agent-local ENV_FILE=/path/to/anthropic.env   # file holds ANTHROPIC_API_KEY=...
+```
+
+Runs K03's chat checks (`lib/agent-chat-checks.ts`, shared with K03) on a
+throwaway local stack in Docker: ports 5452x and project id
+`kit-agent-local`, so it runs beside `make bff-local` (5442x) or a default
+local stack. It applies `sql/00`, `10` and `20` (not the integrations file),
+seeds the kit users the way `make seed` does (`lib/seed.ts`; passwords in
+`evidence/users-agent-local.json`), serves only the `agent` function,
+embeds the KB rows with gte-small through `embed` mode, runs six tool-mode
+checks that need no model (T01-T06), then the eight K03 scenarios, writes
+`evidence/agent-local-<ts>.json` and stops the stack. `ENV_FILE` is
+required; its path goes only to `supabase functions serve --env-file`, and
+nothing reads or prints its contents. While the function is served, the key
+is in the local edge-runtime container's environment (`docker inspect`
+shows it); that container is gone when the run ends, Ctrl-C included.
+Without the key in the file K03 reports skip; with a rejected key it
+reports one FAIL, `BLOCKED: the model call failed`, with the reason.
+Checks 1-8 make live model calls (up to about 2 minutes each).
+
 ## Live segment
 
 A coding agent builds a new app on `kit-live` from a scoped workspace outside
@@ -140,6 +163,50 @@ decision. Delivery is at most once (pg_net does not retry); use Supabase
 Queues for guaranteed delivery. Setting a `SLACK_WEBHOOK_URL` function secret
 makes the sink also post each decision to Slack. K04 tests the path end to
 end.
+
+## BFF demo: channel API
+
+A backend-for-frontend for one app screen. The app sends one request to
+`supabase/functions/channel-api`; the function calls four upstream endpoints
+(`profile`, `orders`, `offers`, `points`) in parallel and returns one JSON
+document with the data, a per-upstream report (status, source, ms) and a
+`partial` flag. `supabase/functions/upstream-mock` stands in for the
+upstream integration layer, with a configurable delay per endpoint and
+forced failure or slowness per call.
+
+- Auth: JWT verification on, `withSupabase({ auth: 'user' })`; the user id
+  sent upstream comes from the verified claims. The mock checks a shared
+  key (`UPSTREAM_API_KEY`) and is deployed with `--no-verify-jwt`, since
+  its caller is the function rather than a user.
+- Timeouts: one `AbortController` per upstream call
+  (`CHANNEL_UPSTREAM_TIMEOUT_MS`, default 800). A late or failed upstream is
+  `null` in `data`, has its reason in `upstreams`, and sets
+  `partial: true`; the response is 200 while anything came back, 502 when
+  nothing did. No retries.
+- Cache: what the upstream marks `Cache-Control: max-age=N` (the mock does
+  this for `profile` and `offers`) is stored for N seconds per user in
+  `private.channel_cache` (`sql/50-channel.sql`). Reads run as the user
+  through `channel_cache_get` with RLS; writes go through
+  `channel_cache_put`, which only service_role may execute, so a user cannot
+  plant data in the cache. Postgres rather than an in-memory map because
+  hosted functions run many isolates, so a per-isolate map would miss
+  unpredictably; the SQL file has the trade-off.
+- Demo knobs: `?slow=points`, `?fail=offers` (comma lists), `?refresh=1`
+  (skip the cache read). They steer the mock only; remove them in front of
+  a real upstream.
+
+```bash
+make bff-test     # offline Deno unit tests for the fan-out logic
+make bff-local    # local Docker stack: start, SQL, two users, functions serve, checks, stop
+sx SUPABASE_ACCESS_TOKEN -- make bff-deploy                 # SQL, both functions, secrets
+sx SUPABASE_ACCESS_TOKEN -- make probe ONLY="--only K05"    # same checks, deployed
+```
+
+`make bff-local` and K05 run the same checks (`lib/bff-checks.ts`): all
+upstreams ok, a cache hit on the next call, one upstream slow past the
+timeout, one failing, all failing, a second user never served the first
+user's cached data, and the cache closed to Data API writes. Local timings are
+in RUNLOG.md (2026-10-08). The deployed path has not been run yet.
 
 ## Troubleshooting segment
 

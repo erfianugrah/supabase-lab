@@ -17,18 +17,11 @@
  * The PAT comes from SUPABASE_ACCESS_TOKEN in the environment.
  */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { DEPARTMENTS_SQL, KB_SQL, kbText, newPassword, REQUESTS_SQL, USERS } from "../lib/seed";
 
 const API = "https://api.supabase.com/v1";
 const TOK = process.env.SUPABASE_ACCESS_TOKEN ?? "";
 if (!TOK) throw new Error("no SUPABASE_ACCESS_TOKEN in the environment");
-
-const DEPARTMENTS = ["Sales", "Marketing"];
-const USERS = [
-  { email: "alice@example.com", name: "Alice", department: "Sales", role: "employee" },
-  { email: "bob@example.com", name: "Bob", department: "Sales", role: "manager" },
-  { email: "carol@example.com", name: "Carol", department: "Marketing", role: "employee" },
-  { email: "dave@example.com", name: "Dave", department: "Marketing", role: "manager" },
-];
 
 async function mgmt(method: string, path: string, body?: unknown): Promise<Response> {
   return fetch(`${API}${path}`, {
@@ -71,16 +64,12 @@ async function schema(ref: string, files: string[]): Promise<void> {
 }
 
 async function seed(ref: string, withApp: boolean): Promise<void> {
-  await sql(
-    ref,
-    `insert into public.departments (name) values ${DEPARTMENTS.map((d) => `(${lit(d)})`).join(", ")}
-     on conflict (name) do nothing`,
-  );
+  await sql(ref, DEPARTMENTS_SQL);
 
   const key = await secretKey(ref);
   const creds: Record<string, string> = {};
   for (const u of USERS) {
-    const password = `${crypto.randomUUID()}Aa1!`;
+    const password = newPassword();
     const r = await fetch(`https://${ref}.supabase.co/auth/v1/admin/users`, {
       method: "POST",
       headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
@@ -110,44 +99,9 @@ async function seed(ref: string, withApp: boolean): Promise<void> {
 
   if (!withApp) return;
 
-  // Example rows, inserted as postgres (the table owner) with explicit ids.
-  await sql(
-    ref,
-    `insert into public.purchase_requests (department_id, requester_id, item, vendor, amount, justification)
-     select p.department_id, p.id, v.item, v.vendor, v.amount, v.why
-       from public.profiles p
-       join auth.users u on u.id = p.id
-       join (values
-         ('alice@example.com', 'Conference booth kit', 'Acme Displays', 1800.00, 'Trade show next quarter'),
-         ('alice@example.com', 'CRM seat add-on', 'Acme Software', 240.00, 'New hire'),
-         ('carol@example.com', 'Stock photo licence', 'Acme Media', 420.00, 'Campaign assets')
-       ) as v(email, item, vendor, amount, why) on v.email = u.email
-      where not exists (select 1 from public.purchase_requests)`,
-  );
-
-  // Knowledge-base rows with placeholder embeddings: enough for the RLS
-  // checks. `kit.ts embed` replaces them with real gte-small vectors from the
-  // agent Edge Function. Idempotent per title, so re-seeding an existing
-  // project adds new rows without duplicating old ones. Counts the K01
-  // positive controls rely on: 4 company-wide, 2 Sales, 2 Marketing.
-  await sql(
-    ref,
-    `insert into public.kb_chunks (department_id, title, content, embedding)
-     select d.id, v.title, v.content,
-            (select array_agg(random()::real) from generate_series(1, 384))::extensions.vector
-       from (values
-         (null, 'Purchasing limits', 'Requests above 2,000 need a second approver.'),
-         (null, 'Approval routing', 'Purchase requests are approved or rejected by a manager in the requester''s own department. Nobody can approve their own request, and an approved request cannot be reopened.'),
-         (null, 'New vendors', 'Buying from a vendor for the first time needs a completed vendor form and, for software or anything above 5,000, a security review before the request is approved.'),
-         (null, 'Software subscriptions', 'Prefer annual billing for subscriptions the team will keep longer than a year. Seat add-ons go through the same request flow as new tools.'),
-         ('Sales', 'Sales events budget', 'Trade show spend is capped per quarter.'),
-         ('Sales', 'Sales client entertainment', 'Client meals and events are capped per head per event; attach receipts and the client account name in the justification.'),
-         ('Marketing', 'Marketing licences', 'Stock media must use the approved vendors.'),
-         ('Marketing', 'Marketing agency retainers', 'Agency retainers are reviewed every quarter; a new retainer needs a scope document attached to the request.')
-       ) as v(dept, title, content)
-       left join public.departments d on d.name = v.dept
-      where not exists (select 1 from public.kb_chunks k where k.title = v.title)`,
-  );
+  // Example rows and knowledge-base rows (placeholder vectors): lib/seed.ts.
+  await sql(ref, REQUESTS_SQL);
+  await sql(ref, KB_SQL);
   console.log("example rows seeded");
 }
 
@@ -182,7 +136,7 @@ async function embedKb(ref: string): Promise<void> {
     const res = await fetch(`https://${ref}.supabase.co/functions/v1/agent`, {
       method: "POST",
       headers: { apikey: pub, Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ mode: "embed", texts: batch.map((b) => `${b.title}. ${b.content}`) }),
+      body: JSON.stringify({ mode: "embed", texts: batch.map((b) => kbText(b.title, b.content)) }),
     });
     if (!res.ok) throw new Error(`embed: http ${res.status} ${(await res.text()).slice(0, 300)}`);
     const { dims, vectors } = (await res.json()) as { dims: number; vectors: number[][] };

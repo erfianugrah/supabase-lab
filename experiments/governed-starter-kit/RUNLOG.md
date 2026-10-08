@@ -1,5 +1,100 @@
 # governed-starter-kit - RUNLOG
 
+## 2026-10-08 - agent chat loop local runner - built, model run pending
+
+Added `make agent-local ENV_FILE=<path>` (`scripts/agent-local.ts`): K03's
+chat checks on a throwaway local stack. Verified only with a dummy key
+(an `ANTHROPIC_API_KEY` value that is not a key) and with an env file
+holding no key. No chat scenario has run against a model yet, locally or
+hosted.
+
+- Code: K03's scenarios moved unchanged into `lib/agent-chat-checks.ts`,
+  which `tests/k03-agent-chat.ts` and the local runner both call. One
+  behaviour change: a first chat call answering `llm_error` (rejected key,
+  unreachable API, timeout) now gives one K03 FAIL `BLOCKED: ...` with the
+  reason, instead of eight failures with the same cause. The local-stack
+  helpers moved out of `scripts/bff-local.ts` into `lib/local-stack.ts`, and
+  the seed data out of `scripts/kit.ts` into `lib/seed.ts` (same SQL text).
+  `functions serve` output now goes through one fd: with two `Bun.file`
+  handles, stdout and stderr overwrote each other in `functions-serve.log`.
+- Dummy key, 5 runs (Supabase CLI 2.120.0; the serve log reports
+  `supabase-edge-runtime-1.77.4`; images already pulled): E01 and T01-T06
+  pass; K03 FAIL `BLOCKED: the model call failed, so no chat scenario ran
+  (http 502 llm_error: The assistant could not answer: the model API
+  rejected the configured key.)`, exit 1, about 36 s end to end.
+  `supabase start` 24640-25418 ms; agent ready 2259-3247 ms after serve.
+  First run: `embed_8_ms` 3143, tool calls 6-24 ms (T02-T05), `gate_ms`
+  293. T06: alice's top `search_kb` hit was `Sales client entertainment`,
+  carol's 5 hits were company/Marketing only. Artifacts
+  `evidence/agent-local-2026-10-08T10-1*.json` (gitignored).
+- Env file without the key: same seven pass, K03 SKIP (503
+  `llm_not_configured`), exit 0.
+- Leak checks with the dummy key: no match for the key in the console
+  output, `evidence/`, or the workdir including `functions-serve.log` (it
+  logs `llm error 401 API key is invalid.`). During the run the key is in
+  the `supabase_edge_runtime_kit-agent-local` container's `Config.Env` (1
+  entry); after the run no `kit-agent-local` container is left, and after a
+  `KEEP=1` run the four kept containers had no matching entry.
+- Ctrl-C after seeding: `SIGINT: stopping`, stack stopped, exit 130, no
+  `functions serve` process or container left. Ran beside a `KEEP=1`
+  bff-local stack (5442x) without a clash; `make bff-local` on the shared
+  lib still passes 8 of 8.
+- Pending: the real-key run (`make agent-local ENV_FILE=...`), then K03
+  against `kit-ready`.
+
+## 2026-10-08 - BFF channel-api demo - local only, NOT YET RUN LIVE
+
+Added `supabase/functions/channel-api` (one app request, four upstream calls
+in parallel, per-call timeout, partial results, per-user cache),
+`supabase/functions/upstream-mock`, `sql/50-channel.sql` (cache in
+`private.channel_cache`), `lib/bff-checks.ts` (checks shared by K05 and the
+local run), `tests/k05-channel-api.ts`, `scripts/bff-local.ts`, and the
+`bff-test` / `bff-local` / `bff-deploy` targets. Nothing deployed: `make
+bff-deploy` and K05 against a project have not been run.
+
+- `make bff-test`: 11 of 11 Deno unit tests pass (`--no-remote --no-npm`,
+  fake fetch that honours the AbortSignal, in-memory cache), 295 ms.
+- `make bff-local` on a local stack (Supabase CLI 2.120.0, Docker; db, auth,
+  rest and kong only, `supabase functions serve` for the functions; ports
+  shifted to 5442x): 8 of 8 checks pass, artifact
+  `evidence/bff-local-2026-10-08T09-59-19-565Z.json` (gitignored). Mock
+  delays (the defaults in `upstream-mock/index.ts`): profile 250 ms, offers
+  180 ms, orders 120 ms, points 60 ms; per-call timeout 800 ms; 5 requests
+  per timed row, client wall time measured on the same host as the stack.
+
+| Check | Result (last request) | Wall ms, median (min-max) | Server `total_ms` median |
+|---|---|---|---|
+| L02 all upstreams ok, cache read skipped (`refresh=1`) | 4 of 4 upstream ok, `partial: false` | 273 (270-276) | 266 |
+| L03 next call, cache hit | profile + offers from cache, orders + points live; cache read median 4 ms | 143 (136-158) | 136 |
+| L04 points slow (3 s) | points `timeout` at 804 ms, other 3 ok, `partial: true`, http 200 | 815 (813-817) | 807 |
+| L05 offers forced 503 | offers `error` http 503, other 3 ok, `partial: true`, http 200 | 199 (194-204) | 192 |
+
+  L01: no token and a tampered signature both 401 at the gateway. L06: all
+  four forced to fail -> http 502 with the per-upstream report. L07: a
+  second user's first call was a cache miss, and both the response
+  `user_id` and the profile's `user_id` were that user's. L08: `channel_cache_put` as a user -> 403 `42501`; the
+  `private` schema through the Data API -> 406 `PGRST106`;
+  `channel_cache_get` returned the caller's 2 rows (offers, profile).
+- Cold start in that run: the first `channel-api` call took 2246 ms
+  (isolate boot plus the npm imports); `supabase start` took 24864 ms with
+  images already pulled.
+- Negative control (scratch script, same stack, not committed): with the
+  cache policy changed to `using (true)` and insert/update/execute granted to
+  `authenticated`, L07 and L08 failed (the second user's profile came from
+  the cache carrying another user's id; the user's own `channel_cache_put` returned 200 and
+  `channel_cache_get` returned 8 rows), the other six still passed. Restored
+  by reapplying `sql/50-channel.sql`.
+- Manual pass with curl and a session minted through the Auth admin API plus
+  password sign-in on the same stack (an earlier stack run, same code):
+  `refresh=1` 267 ms server / 0.273 s curl; next call cache hit 150 ms /
+  0.158 s; `slow=points` 808 ms / 0.815 s with points `timeout`;
+  `fail=offers` 195 ms / 0.206 s. A `Server-Timing` header carries the same
+  per-upstream figures.
+- Not settled locally: function-to-function latency on the platform (the
+  hosted `channel-api` reaches the mock through the public functions URL;
+  locally it goes through kong inside Docker), the cache round trip through
+  hosted PostgREST, and cold starts on the platform.
+
 ## 2026-10-07 (later) - agent rehearsal of the troubleshooting segment, stage token, teardown
 
 - Troubleshooting prompt run headless (`claude -p`, Claude Code 2.1.285,
