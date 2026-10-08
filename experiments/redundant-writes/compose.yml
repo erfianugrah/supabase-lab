@@ -1,0 +1,80 @@
+# Three throwaway Postgres servers for one question: how much write work does
+# an upsert or UPDATE of rows that did not change cost, and how much of it does
+# each guard pattern remove? See README.md.
+#
+# Images are pinned by digest (resolved from the floating tags on 2026-10-08,
+# `docker image inspect --format '{{index .RepoDigests 0}}'`), so a re-run
+# measures the same server build:
+#   postgres:15-alpine -> PG_VERSION=15.19
+#   postgres:17-alpine -> PG_VERSION=17.11
+#   public.ecr.aws/supabase/postgres:17.11.0.004 -> the Postgres image the
+#     supabase CLI 2.120.0 starts for `supabase start` (the tag is embedded in
+#     the CLI binary). It runs here as a standalone container rather than
+#     through `supabase start`, the same way experiments/checkpointer-reset
+#     runs supabase/postgres, so the rig needs no CLI project and no other
+#     service.
+#
+# Ports are loopback-only. Nothing here is a real credential: the one password
+# lives in .env (gitignored), written by `make local-up`, deleted by
+# `make local-down`.
+name: pvlab-redundant-writes
+
+services:
+  pg15:
+    container_name: pvlab-redundant-writes-pg15
+    image: postgres:15-alpine@sha256:f7d23353e1b15400d22ebe31189f4d314b87a4c129cc400c8c2d8d4ca127bf81
+    restart: "no"
+    ports:
+      - "127.0.0.1:45441:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 2s
+      timeout: 3s
+      retries: 40
+    environment:
+      POSTGRES_PASSWORD: ${PVLAB_LOCAL_DB_PASSWORD}
+      POSTGRES_DB: postgres
+
+  pg17:
+    container_name: pvlab-redundant-writes-pg17
+    image: postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24
+    restart: "no"
+    ports:
+      - "127.0.0.1:45442:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 2s
+      timeout: 3s
+      retries: 40
+    environment:
+      POSTGRES_PASSWORD: ${PVLAB_LOCAL_DB_PASSWORD}
+      POSTGRES_DB: postgres
+
+  supabase:
+    container_name: pvlab-redundant-writes-supabase
+    image: public.ecr.aws/supabase/postgres:17.11.0.004@sha256:06ddc7962e11ab0f4f0334fd05671e97c30ea202f6e6a7113800bd3d6e416108
+    restart: "no"
+    ports:
+      - "127.0.0.1:45443:5432"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres", "-h", "localhost"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+    environment:
+      POSTGRES_HOST: /var/run/postgresql
+      PGPORT: "5432"
+      POSTGRES_PORT: "5432"
+      PGPASSWORD: ${PVLAB_LOCAL_DB_PASSWORD}
+      POSTGRES_PASSWORD: ${PVLAB_LOCAL_DB_PASSWORD}
+      PGDATABASE: postgres
+      POSTGRES_DB: postgres
+      JWT_EXP: "3600"
+    command:
+      [
+        "postgres",
+        "-c",
+        "config_file=/etc/postgresql/postgresql.conf",
+        "-c",
+        "log_min_messages=fatal",
+      ]
