@@ -52,6 +52,12 @@ facts):
   and whether `pg_stat_checkpointer.stats_reset` survives. Its RUNLOG.md
   has the SIGKILL-during-checkpoint table across 17.4, 17.11 and 18.6
   (version-dependent).
+- `redundant-writes` - local-only rig (no OpenTofu): what an upsert or UPDATE
+  of unchanged rows writes (row versions, WAL, full-page images, dead tuples,
+  VACUUM) on PG 15, PG 17 and the supabase CLI's Postgres image, how much each
+  guard removes (`IS DISTINCT FROM` on DO UPDATE, pre-filtered batch, guarded
+  MERGE, `suppress_redundant_updates_trigger()`), and `count(*)` vs
+  `reltuples` vs `n_live_tup` across a stats reset, a crash and a load.
 - `platform-facts` - not a behaviour test; harvests per-project facts
   (pg_settings, extensions, versions) for reference.
 - `residency-facts` - the data-residency doc's claims as measured modules:
