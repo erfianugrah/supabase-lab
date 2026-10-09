@@ -1,5 +1,45 @@
 # governed-starter-kit - RUNLOG
 
+## 2026-10-09 (night) - torn down again; deploys move to erfi.dev custom domains
+
+- Full teardown at the operator's request: destroy plan of exactly the two
+  kit projects, applied; state empty; no `kit-*` projects listed.
+- Custom-domain test on a hello-world Worker named `kit-live-app` with
+  `routes: [{ pattern: "kit-live.erfi.dev", custom_domain: true }]`,
+  wrangler 4.149.0, deployed with the stage token (Workers Scripts Write +
+  Workers KV Storage Read, 403 on DNS records): the deploy attached the
+  custom domain itself, and `https://kit-live.erfi.dev` answered 200 within
+  about 10 s; the docs site on the apex still 200. With `workers_dev:
+  false` the workers.dev URL answered 404. `wrangler delete --name
+  kit-live-app --force` removed the Worker and the custom domain (account
+  domain list empty, hostname 530 right after); read with operator
+  credentials afterwards, the zone held no DNS record and no certificate
+  pack for the hostname.
+- So custom domains are an account-level Workers resource: the stage token
+  can attach a Worker to a hostname on any zone in the account. Taking over
+  a hostname already in use was not tested. Documented in LIVE-SEGMENT.md
+  with the mitigation (approvals on; a separate Cloudflare account for a
+  stricter setup).
+- Changed: `live-app-prep` writes `workers_dev: false` and a custom-domain
+  route for `LIVE_HOST` (default `kit-live.erfi.dev`) into the agent's
+  `wrangler.jsonc`; `app/wrangler.jsonc` serves `starter-kit.erfi.dev`;
+  both delete targets use `--name ... --force`; the stage prompt's step 5
+  curls `https://kit-live.erfi.dev`. Not yet run through a full rebuild and
+  rehearsal.
+- Demo credentials now reach the stage agent: `make live-workspace` copies
+  `evidence/users-<live ref>.json` to the workspace's `kit/demo-users.json`
+  (gitignored there; the target stops if the file is missing), the
+  guardrails allow the agent to sign in with them and print them, never
+  to write them into code, env files, the bundle or a commit, and prompt
+  step 5 ends with an Auth API sign-in as alice and bob and a printed table
+  of the demo users. `live-workspace` now stages the workspace and leaves
+  the commit to the operator (the in-target commit failed on signing every
+  time). Tested with dummy refs and a fake users file: the file lands in
+  `kit/`, is ignored, the rest is staged.
+- Kept the demo industry-neutral: no customer names or industry-shaped
+  data anywhere in the kit, this repo's history, the docs site or the
+  dotfiles (searched); names registered with the confidential-write guard.
+
 ## 2026-10-09 (late) - rebuilt from nothing, everything end to end again
 
 - `make up` from an empty state: 91 s (two projects, schema, seed, agent and
