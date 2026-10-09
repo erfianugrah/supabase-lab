@@ -68,6 +68,20 @@ App UI (`app/`, local dev server against the ready project):
   remain.
 - The reply renders as plain text, so the model's Markdown shows on screen
   as literal `**` and `- ` markers.
+- Fixed the same day. `/assistant` renders replies with react-markdown
+  10.1.0 limited to `p`, `strong`, `em`, `ul`, `ol`, `li`, `code`, `br`
+  (`unwrapDisallowed`, `skipHtml`): links keep their text and lose the
+  target, images are dropped (a rendered image URL is fetched, which can
+  carry data out), raw HTML is dropped. `bun test src/app/assistant`: 4
+  pass, hostile links, `javascript:` URLs, image URLs and raw
+  `<img>`/`<script>`/`<a>` never reach the markup. Test files are excluded
+  from the app's tsconfig (`bun:test` has no types there); `next build`
+  passes. The agent's model-error message now carries the API's reason:
+  two inputs the API rejects (a whitespace-only and an empty text block)
+  answered 502 with "the model call failed (400: messages: text content
+  blocks must ...)". After `make fn-deploy` the headless walk passed 7 of
+  7 again, with no `**` in the reply text on screen; K03 was not re-run (the
+  agent change touches only the error message). Test row deleted again.
 - `next dev` (16.3.8) writes `app/AGENTS.md` and `app/CLAUDE.md` on every
   start; both are now in `app/.gitignore`.
 
