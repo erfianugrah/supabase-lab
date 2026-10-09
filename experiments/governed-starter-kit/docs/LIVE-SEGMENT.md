@@ -116,6 +116,11 @@ cd - && make live-app-prep                        # OpenNext adapter, about 20 s
 cd ~/kit-live-demo && git add -A && git commit -m "deploy setup"
 ```
 
+With commit signing on a hardware key, the commit inside `make
+live-workspace` can fail unattended (2026-10-09: files staged, no commit);
+commit the workspace by hand once, after `live-app-prep`, before starting
+the agent. Measured 2026-10-09: scaffold 26 s, `live-app-prep` 23 s.
+
 Pre-scaffold, do not leave it to the agent: `create-next-app -e` looks the
 example up through the unauthenticated GitHub API (60 requests an hour per
 IP), and on 2026-10-07 it failed with "Could not locate an example named
@@ -145,9 +150,20 @@ narration. The isolated directory starts logged out; run `/login` in it once
 at T-30. Checked in a live session on 2026-10-07 (Claude Code 2.1.285,
 operator with a user-scope CLAUDE.md, hooks and skills): `/context` listed
 no memory files, `/hooks` showed 0 hooks configured, `/skills` found no
-user or project skills. Run the same three at T-30. The session runs
-whatever model managed settings pin (Sonnet 5.5 on that day), and
-auto-memory is on, writing under the isolated directory.
+user or project skills. That check ran in a directory outside `$HOME`. In
+the 2026-10-09 rehearsal (2.1.286), with the workspace at
+`~/kit-live-demo`, `/context` showed 3 memory files: the operator's
+`~/.claude/CLAUDE.md` had loaded as Project memory, because Claude Code reads
+`CLAUDE.md` and `.claude/CLAUDE.md` in every ancestor of the working
+directory, and `$HOME` is an ancestor; `CLAUDE_CONFIG_DIR` and
+`--setting-sources` do not stop that. The script now passes
+`claudeMdExcludes` (via `--settings`) for every ancestor's instruction files;
+re-checked the same day, the session loads exactly the workspace's
+`CLAUDE.md` and `AGENTS.md`. Run `/context`, `/hooks` and `/skills` at T-30:
+expect 2 memory files (those two), 0 hooks, and only Claude Code's bundled
+skills (15 on 2.1.286, none of the operator's). The session runs whatever
+model managed settings pin (Sonnet 5.5 on both days), and auto-memory is on,
+writing under the isolated directory.
 
 The vault item `CLOUDFLARE_STAGE_WORKERS_TOKEN` is the API token
 `kit-stage-workers`: one account, two permission groups, Workers Scripts
@@ -162,8 +178,10 @@ hello-world Worker: `wrangler deploy` exited 0 and the workers.dev URL
 returned 200, `wrangler delete --force` exited 0 ("Successfully deleted") and
 the URL returned 404. The same token got 403 on DNS records, zone settings,
 R2 buckets, account members, `/user` and `/memberships`; it can still list
-the account's zones and their metadata. Not yet tested with it: the
-`kit-live-app` deploy, which uploads static assets. The earlier verification
+the account's zones and their metadata. The `kit-live-app` deploy, which
+uploads static assets, ran with it in the 2026-10-09 rehearsal (the agent's
+`npm run deploy`), and `wrangler delete --name kit-live-app --force` (4.149.0)
+removed it afterwards; the URL then returned 404. The earlier verification
 run used the account's email + global key pair (`CLOUDFLARE_EMAIL`,
 `CLOUDFLARE_API_KEY`), which reaches everything in every account the login
 has; do not give it to an agent on stage. Authenticate the MCP
@@ -342,6 +360,14 @@ sign-ins on the agent's pages at the public URL.
 
 These are targets to rehearse against, not measurements. Past a cut-off, or
 on any MCP auth or network failure, switch to the fallback.
+
+One rehearsal, 2026-10-09 (Sonnet 5.5, tool approvals on, timestamps from
+the session transcript): opener 8 s; schema, three migrations and advisors
+after each 1 min 34 s; prove-the-rules 36 s (23 checks, rolled back); app
+to a running dev server 1 min; deploy and curl checks 40 s; prompt to final
+report 4 min 20 s. The agent does not sign in (it has no passwords), so the
+alice and bob sign-ins stay with the operator. The run was faster than the
+targets by a wide margin; one sample, so keep the targets.
 
 ## Fallback
 
