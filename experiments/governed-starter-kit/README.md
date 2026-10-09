@@ -98,7 +98,10 @@ regardless, and K03 (the chat loop: confirmation-gated writes, outcomes
 checked in the database, prompt injection through a knowledge-base row and
 through the user's own message) skips with that reason. Model calls in one
 request stop after 120 s, inside the runtime's 150 s idle limit; if the model
-fails after a confirmed write, the reply still reports the write.
+fails after a confirmed write, the reply still reports the write. K03 first
+ran against a model (`claude-opus-5-5`) on 2026-10-09: 8 of 8 in 68 s
+(RUNLOG). A key whose account is out of credit answers 400, which the
+`/assistant` page shows as "the model call failed (400)".
 
 ### Agent chat locally
 
@@ -206,10 +209,12 @@ sx SUPABASE_ACCESS_TOKEN -- make probe ONLY="--only K05"    # same checks, deplo
 upstreams ok, a cache hit on the next call, one upstream slow past the
 timeout, one failing, all failing, a second user never served the first
 user's cached data, and the cache closed to Data API writes. Local timings are
-in RUNLOG.md (2026-10-08). The deployed path passed K05 8/8 on three runs the
-same day; the first call after a deploy answered 502 on both fresh deploys
-(cold upstream past the 800 ms per-call timeout, inferred), so make one
-warm-up call before showing it.
+in RUNLOG.md (2026-10-08). The deployed path passed K05 8/8 on every hosted
+run 2026-10-08/09. The first call after each of four fresh deploys answered
+502: the function's own all-failed response, all four upstreams cut at the
+800 ms timeout (body read 2026-10-09), while the same functions idle for
+hours without a redeploy answered the first call 200. Make one warm-up call
+after a deploy before showing it.
 
 ## Troubleshooting segment
 
