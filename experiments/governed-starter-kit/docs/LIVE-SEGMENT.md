@@ -365,9 +365,11 @@ One rehearsal, 2026-10-09 (Sonnet 5.5, tool approvals on, timestamps from
 the session transcript): opener 8 s; schema, three migrations and advisors
 after each 1 min 34 s; prove-the-rules 36 s (23 checks, rolled back); app
 to a running dev server 1 min; deploy and curl checks 40 s; prompt to final
-report 4 min 20 s. The agent does not sign in (it has no passwords), so the
-alice and bob sign-ins stay with the operator. The run was faster than the
-targets by a wide margin; one sample, so keep the targets.
+report 4 min 20 s. A second rehearsal the same day, after a full rebuild,
+took about 5 min with five smaller migrations and a different (equally
+sound) design. The agent does not sign in (it has no passwords), so the
+alice and bob sign-ins stay with the operator. Both runs were faster than
+the targets by a wide margin; two samples on one day, so keep the targets.
 
 ## Fallback
 
