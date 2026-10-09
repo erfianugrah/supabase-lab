@@ -55,7 +55,7 @@ they can sign in but see nothing until the platform team assigns one.
 ```bash
 make app-dev                      # local dev against kit-ready
 make app-dev APP_REF=<live ref>   # or against kit-live after a live build
-make app-deploy                   # workers.dev, needs wrangler auth
+make app-deploy                   # https://starter-kit.erfi.dev, needs wrangler auth
 ```
 
 `make app-env` writes `app/.env.production` (gitignored) with the project URL
@@ -154,7 +154,7 @@ then the URL and publishable key - 15-16 s in two runs on 2026-10-07. The
 request list is `apps.auto.tfvars` (gitignored), so `make apply` and
 `make destroy` include the apps; `make remove-app NAME=<slug>` deletes one
 through the same check, `make apps` lists them, and `PLAN=1` stops after the
-plan. Deploys go to Cloudflare Workers (workers.dev only): `make app-deploy`
+plan. Deploys go to Cloudflare Workers at erfi.dev custom domains (workers.dev off): `make app-deploy`
 for the example app, and for a `create-next-app -e with-supabase` app
 `make live-app-prep` (OpenNext adapter, next pinned to 16.3.8, no
 cacheComponents - both broke on Workers) then `npm run deploy`;

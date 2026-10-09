@@ -19,7 +19,7 @@ usual mistakes.
 | Workspace | `make live-workspace` -> `~/kit-live-demo` (default `WORKSPACE`) | The agent's working directory, outside this repo |
 | Reset | `make live-reset [APPLY=1]` | Back to baseline-only, users kept |
 | Self-service backend | `make new-app NAME=<slug>` / `make remove-app NAME=<slug>` | One more guarded project in the same org, baseline applied and checked |
-| Deploy | `make live-app-prep` (setup), then the agent's `npm run deploy` in `web/`; `make live-app-deploy` / `make live-app-delete` | The agent's app on Cloudflare Workers (`kit-live-app.<subdomain>.workers.dev`) |
+| Deploy | `make live-app-prep` (setup), then the agent's `npm run deploy` in `web/`; `make live-app-deploy` / `make live-app-delete` | The agent's app on Cloudflare Workers at `https://kit-live.erfi.dev` (Worker custom domain, workers.dev off) |
 
 ### MCP server
 
@@ -73,7 +73,7 @@ AGENTS.md from the git root down to the cwd, 32 KiB combined by default
   common agent, per its docs) would fill the budget with it and never reach
   `live/AGENTS.md`. Not measured; derived from the documented root-to-cwd
   concatenation.
-- `terraform.tfstate` and `evidence/users-*.json` (seeded passwords) sit in
+- `terraform.tfstate` and `evidence/users-*.json` (seeded passwords for both projects) sit in
   this experiment directory; the agent has no reason to see them.
 - A fresh git repo lets you show the agent's diff on screen.
 
@@ -189,7 +189,10 @@ server, check that it lists the `supabase` tools and that the instructions
 loaded (ask it "what are the kit rules for a new table?"). Quit, and start a
 fresh session the same way for the run.
 
-Off screen: open `evidence/users-<live ref>.json` for the seeded passwords.
+`make live-workspace` copies the live project's seeded users into the
+workspace as `kit/demo-users.json` (gitignored there). The agent prints them
+at the end of the run (prompt step 5): throwaway accounts on a demo project,
+shown on purpose, and dead after `make destroy`.
 Users: alice (Sales, employee), bob (Sales, manager), carol (Marketing,
 employee), dave (Marketing, manager), all `@example.com`.
 
@@ -274,12 +277,16 @@ Do it in this order:
    publishable key from the MCP server in web/.env.local.
 4. Run it with `npm run dev` and tell me the URL.
 5. Deploy it: web/ is already set up for Cloudflare Workers (wrangler.jsonc,
-   Worker name kit-live-app). Stop the dev server, run `npm run deploy` in
-   web/, then curl the workers.dev URL it prints: the login page must answer
+   Worker name kit-live-app, served at https://kit-live.erfi.dev). Stop the
+   dev server, run `npm run deploy` in web/, then curl
+   https://kit-live.erfi.dev: the login page must answer
    200 and the protected page must redirect to login when signed out. Tell me
    the URL and the status codes. The build reads the project URL and
    publishable key from web/.env.local; put nothing else in the bundle, and
-   do not create any other Cloudflare resource.
+   do not create any other Cloudflare resource. Finally, sign in through the
+   Auth API as alice and as bob to confirm both accounts work, and print the
+   demo users from kit/demo-users.json as a table (email, department, role,
+   password) so I can sign in on stage.
 
 Keep each migration small and explain each policy in one line as you go.
 ```
@@ -367,8 +374,8 @@ after each 1 min 34 s; prove-the-rules 36 s (23 checks, rolled back); app
 to a running dev server 1 min; deploy and curl checks 40 s; prompt to final
 report 4 min 20 s. A second rehearsal the same day, after a full rebuild,
 took about 5 min with five smaller migrations and a different (equally
-sound) design. The agent does not sign in (it has no passwords), so the
-alice and bob sign-ins stay with the operator. Both runs were faster than
+sound) design. In those two runs the agent had no passwords and could not sign in; it now
+gets `kit/demo-users.json` and prints the table at the end of step 5. Both runs were faster than
 the targets by a wide margin; two samples on one day, so keep the targets.
 
 ## Fallback
@@ -377,8 +384,8 @@ the targets by a wide margin; two samples on one day, so keep the targets.
    after `make live-reset APPLY=1`).
 2. Or the finished example on `kit-ready`: `make app-dev` (purchase requests,
    same guardrails), and walk through `sql/10-app.sql` as "what the agent
-   produces". `make app-deploy` before the session puts it on workers.dev
-   too (`starter-kit-app`; measured 2026-10-07: `/login` 200, `/dashboard`
+   produces". `make app-deploy` before the session puts it on
+   `https://starter-kit.erfi.dev` (`starter-kit-app`; measured on workers.dev 2026-10-07: `/login` 200, `/dashboard`
    307 to `/login` signed out, and after sign-in the seeded rows for the
    user's department only).
 3. Deploy step only: if the agent's deploy fails or stalls past its
@@ -399,10 +406,10 @@ the targets by a wide margin; two samples on one day, so keep the targets.
 - `git diff` in the workspace at the end.
 - The opener's output: the one `plan:` line, `baseline: RLS on 2/2 public
   tables`, and the elapsed time.
-- The deploy: the workers.dev URL from step 5 opened in a browser, signed
+- The deploy: https://kit-live.erfi.dev from step 5 opened in a browser, signed
   in as alice - the same app, now not on localhost.
 
-Never show `evidence/`, `.env.local`, the dashboard API keys page, or the
+Never show `evidence/` (it also holds the fallback project's users), `.env.local`, the dashboard API keys page, or the
 terminal while a token is in scope.
 
 ## After the segment
@@ -415,8 +422,16 @@ eval "$TOK_CMD make live-reset APPLY=1"
 rm -rf ~/kit-live-demo
 ```
 
-`live-app-delete` deletes by name, so it works after the workspace is gone;
-both Workers are workers.dev only, no DNS or custom domain to remove.
+`live-app-delete` deletes by name, so it works after the workspace is gone.
+Both Workers serve at erfi.dev custom domains (`kit-live.erfi.dev`,
+`starter-kit.erfi.dev`) with workers.dev off. Deleting a Worker removes its
+custom domain; checked 2026-10-09 on a test Worker: no DNS record or
+certificate left behind. The custom domain needs no DNS permission on the
+token: Workers Scripts Write attached it (an account-level Workers
+resource). The flip side: that token can attach a Worker to a hostname on
+any zone in the account, so keep the stage agent's tool approvals on and
+watch its `wrangler.jsonc`; for a stricter setup, run the demo Workers in a
+Cloudflare account that holds no other zones.
 `remove-app` runs the same checked plan as `new-app`, which must be exactly
 one delete. `make apps` lists any app backends still in state.
 
