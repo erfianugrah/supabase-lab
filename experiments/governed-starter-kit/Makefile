@@ -157,6 +157,7 @@ live-workspace: mcp-config
 	cp live/AGENTS.md live/CLAUDE.md live/.mcp.json "$(WORKSPACE)/"
 	mkdir -p "$(WORKSPACE)/.codex" && cp live/.codex/config.toml "$(WORKSPACE)/.codex/"
 	cp $(BASE) "$(WORKSPACE)/kit/00-baseline.sql"
+	cp sql/10-app.sql "$(WORKSPACE)/kit/10-app.sql"
 	printf '.mcp.json\n.codex/config.toml\n.env*\n!.env.example\nnode_modules/\n.next/\n' > "$(WORKSPACE)/.gitignore"
 	cd "$(WORKSPACE)" && git init -q && git add -A && git commit -q -m "kit workspace" \
 		&& echo "workspace ready: $(WORKSPACE)"
