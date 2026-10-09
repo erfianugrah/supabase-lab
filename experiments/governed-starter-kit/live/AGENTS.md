@@ -30,6 +30,13 @@ it breaks instead of working around it.
   `(select private.is_manager())`.
 - Users are provisioned by the platform team with `department` and `role`
   in `app_metadata`. There is no sign-up.
+- Demo users: `kit/demo-users.json` maps each seeded user's email to their
+  password. They are throwaway accounts on a demo project, shown on purpose:
+  use them to sign in when you check your work (the Auth API's password
+  grant with the publishable key, or the app), and print them as a table
+  (email, department, role, password) when asked; read department and role
+  from `profiles`. Never put a password in code, migrations, env files, the
+  app bundle or a commit.
 
 Do not alter, drop or add policies, columns, triggers or grants on
 `departments`, `profiles`, `auth.*` or the `private` helpers. If the app
