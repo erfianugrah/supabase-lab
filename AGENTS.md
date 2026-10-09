@@ -1947,8 +1947,11 @@ README.md, RUNLOG.md and docs/.
   run two probes at once (a concurrent K02 row made K01.01 count 4 instead
   of 2).
 - **K03 (agent chat) skips until an Anthropic key is a function secret**
-  (`make fn-secret ANTHROPIC_ITEM=<vault item>`); it has never run against a
-  model. `make agent-local ENV_FILE=<path>` runs the same checks
+  (`make fn-secret ANTHROPIC_ITEM=<vault item>`). First run against a model
+  2026-10-09: 8 of 8 hosted with `claude-opus-5-5` (wording checks needed no
+  change); the run used the key's remaining credit, after which the API
+  answers 400 "credit balance is too low" and the `/assistant` page shows
+  only "the model call failed (400)". `make agent-local ENV_FILE=<path>` runs the same checks
   (`lib/agent-chat-checks.ts`) on a local stack (5452x) with the key from a
   dotenv file the runner never reads; verified 2026-10-08 with a dummy key
   only (tool and embed checks pass, K03 reports `BLOCKED` with the reason).
@@ -1983,10 +1986,11 @@ README.md, RUNLOG.md and docs/.
   (ports 5442x, so it does not clash with a default local stack); K05 runs
   the same checks against a deployed project and skips when `fanout-api`
   is not deployed. The cache is a Postgres table, not an isolate map, because
-  hosted functions run many isolates. Hosted K05 8/8 on three runs
-  (2026-10-08); the first call after a deploy answered 502 twice (cold
-  `upstream-mock` past the 800 ms per-call timeout, inferred), so make one
-  warm-up call before a demo.
+  hosted functions run many isolates. Hosted K05 8/8 on every run
+  2026-10-08/09. The first call after each fresh deploy answers 502 (four of
+  four): the function's own all-failed body, all four upstreams `timeout` at
+  ~801 ms (read 2026-10-09); idle-for-hours without a redeploy answered 200.
+  Make one warm-up call after a deploy before a demo.
 - **Troubleshooting faults**: 400k `activity_events` rows hit the 8 s
   `authenticated` statement timeout, so the seed is 100k. pg_stat_statements
   has no entry for a statement that errors; the logs endpoint does.

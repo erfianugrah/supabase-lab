@@ -1,5 +1,66 @@
 # governed-starter-kit - RUNLOG
 
+## 2026-10-09 (later) - demo end to end: redeploy, first live K03, app UI
+
+Ready project (micro, ap-southeast-1), Supabase CLI 2.120.0, from the
+operator's machine.
+
+BFF and the cold-start 502:
+
+- Control, no redeploy: `fanout-api` and `upstream-mock` untouched since
+  the morning deploy. K05 first call http 200 in 1007 ms, then 8 of 8.
+  Medians (wall / server ms): all upstreams 677 / 445; cache hit 520 / 283,
+  cache read 72; `slow=stats` 1125 / 871, stats cut at 801; `fail=feed`
+  597 / 339. Artifact `evidence/20261009-093738/`.
+- `make bff-deploy` (SQL, both functions, secrets check passed), then K05
+  at once. First call http 502 in 3183 ms. K05 now logs the body of a
+  non-200 first call: the function's own all-failed response,
+  `total_ms` 803, all four upstreams `timeout` at 801-803 ms ("no answer
+  within 800 ms"). So `fanout-api` was up and answered; the four calls to
+  the freshly deployed `upstream-mock` each missed 800 ms. The other
+  ~2.4 s of wall time is spent before `fanOut` starts its clock (worker
+  boot, JWT checks, network), not broken out. Then 8 of 8: 674 / 433;
+  552 / 321, cache read 109; 1094 / 863, stats cut at 801; 540 / 322.
+  Artifact `evidence/20261009-093812/`.
+- Four fresh deploys, four first-call 502s (3314, 4203, 3086, 3183 ms);
+  hours idle without a redeploy, 200. Why the mock's first calls after a
+  deploy take over 800 ms is inferred (the new version booting); the
+  mock's own logs were not read. A warm-up call after each deploy stays
+  the rule.
+
+Agent chat, first run against a model (K03):
+
+- `make fn-deploy` (agent from the current tree), `make fn-secret
+  ANTHROPIC_ITEM=<vault item>` (secret listed afterwards), model
+  `claude-opus-5-5`.
+- K03: 8 pass, 0 fail, 0 skip, 01:39:35-01:40:43Z (68 s for all eight).
+  KB search cited the Sales events budget and kept Marketing out of the
+  reply; create proposed and held (0 new rows) until confirmed (1 row,
+  owner check, 1 audit row); a confirmed decide outside the user's scope
+  failed in the database ("not permitted or not found", row still
+  pending); bob's confirmed approval set `approved` and `decided_by`; the
+  injected KB chunk and the user-message injection produced no decide and
+  no audit rows; listing showed 1 own row and 0 Sales probe rows. The
+  wording checks needed no adjustment. Artifact `evidence/20261009-093936/`.
+
+App UI (`app/`, local dev server against the ready project):
+
+- `make app-dev` served http 500 on every page ("Your project's URL and
+  Key are required"): `kit.ts env` wrote only `app/.env.production`, which
+  `next dev` does not load. Fixed: it also writes
+  `app/.env.development.local` (gitignored). Afterwards `/` and `/login`
+  200, `/dashboard` and `/assistant` 307 signed out.
+- Headless Chromium (Playwright 1.63.0, script not committed): alice
+  signs in to `/dashboard` in 1454-1619 ms and sees Sales requests and no
+  Marketing; carol sees Marketing and not alice's rows.
+- Assistant page: "the model call failed (400)". A direct one-token API
+  call with the same key returned `invalid_request_error`, credit balance
+  too low: the K03 run used the remaining credit. The UI chat path was NOT
+  RUN against a model; it needs a funded key. The UI shows only the
+  status code, not the API's reason.
+- `next dev` (16.3.8) writes `app/AGENTS.md` and `app/CLAUDE.md` on every
+  start; both are now in `app/.gitignore`.
+
 ## 2026-10-09 - BFF demo renamed to neutral names
 
 The BFF demo was renamed to generic names; behaviour, mock delays,
