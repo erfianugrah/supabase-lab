@@ -1949,9 +1949,11 @@ README.md, RUNLOG.md and docs/.
 - **K03 (agent chat) skips until an Anthropic key is a function secret**
   (`make fn-secret ANTHROPIC_ITEM=<vault item>`). First run against a model
   2026-10-09: 8 of 8 hosted with `claude-opus-5-5` (wording checks needed no
-  change); the run used the key's remaining credit, after which the API
-  answers 400 "credit balance is too low" and the `/assistant` page shows
-  only "the model call failed (400)". `make agent-local ENV_FILE=<path>` runs the same checks
+  change); the run used the key's remaining credit (API then answers 400
+  "credit balance is too low"; the page now shows that reason). `/assistant`
+  renders replies as Markdown without links, images or raw HTML (replies can
+  quote untrusted KB text); `bun test src/app/assistant` in `app/` holds the
+  hostile cases. `make agent-local ENV_FILE=<path>` runs the same checks
   (`lib/agent-chat-checks.ts`) on a local stack (5452x) with the key from a
   dotenv file the runner never reads; verified 2026-10-08 with a dummy key
   only (tool and embed checks pass, K03 reports `BLOCKED` with the reason).

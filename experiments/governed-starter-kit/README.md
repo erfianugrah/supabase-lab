@@ -100,8 +100,12 @@ through the user's own message) skips with that reason. Model calls in one
 request stop after 120 s, inside the runtime's 150 s idle limit; if the model
 fails after a confirmed write, the reply still reports the write. K03 first
 ran against a model (`claude-opus-5-5`) on 2026-10-09: 8 of 8 in 68 s
-(RUNLOG). A key whose account is out of credit answers 400, which the
-`/assistant` page shows as "the model call failed (400)".
+(RUNLOG). A failed model call shows the API's reason on the `/assistant`
+page, e.g. "the model call failed (400: Your credit balance is too low...)".
+Replies render as Markdown limited to paragraphs, emphasis, lists and inline
+code: no links, images or raw HTML, since a reply can quote untrusted
+knowledge-base text (`app/src/app/assistant/reply-markdown.tsx`; `bun test
+src/app/assistant` in `app/` runs the hostile cases).
 
 ### Agent chat locally
 
