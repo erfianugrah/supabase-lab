@@ -140,7 +140,10 @@ instructions from `live/`; `make live-reset [APPLY=1]` returns `kit-live` to
 the baseline between rehearsals, keeping seeded users. Runbook and prompt:
 `docs/LIVE-SEGMENT.md`.
 `make stage-agent` starts Claude Code in the workspace without the operator's
-user-scope settings, memory, hooks or MCP servers (`scripts/stage-agent.sh`).
+user-scope settings, memory, hooks or MCP servers (`scripts/stage-agent.sh`),
+and excludes instruction files in the workspace's ancestor directories, which
+otherwise load the operator's `~/.claude/CLAUDE.md` when the workspace is
+under `$HOME` (seen in the 2026-10-09 rehearsal).
 
 ## Self-service backends and deploys
 

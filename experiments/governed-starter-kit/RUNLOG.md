@@ -1,5 +1,67 @@
 # governed-starter-kit - RUNLOG
 
+## 2026-10-09 (evening) - live-segment rehearsal, then full teardown
+
+Setup per `docs/LIVE-SEGMENT.md`: `make live-reset` found nothing beyond the
+baseline (users=4, profiles=4, departments=2); `make live-workspace`,
+scaffold 26 s, `make live-app-prep` 23 s (next 16.3.8). The commit inside
+`live-workspace` failed on signing; committed by hand.
+
+Opener: `make new-app NAME=demo1`: `plan: create
+supabase_project.app["demo1"]`, healthy, baseline applied, RLS on 2/2,
+request to ready 8 s.
+
+Stage agent (`make stage-agent`, Claude Code 2.1.286, Sonnet 5.5, scoped
+MCP, tool approvals on), prompt as in the runbook. From the transcript:
+three migrations (equipment; loans with column grants and a partial unique
+index on approved loans; SECURITY INVOKER triggers and `decide_loan` /
+`return_loan`, a `security_invoker` view for availability), advisors after
+each with no new findings; 23 rolled-back checks as alice, bob and dave;
+sign-up and password-reset pages removed; `web/.env.local` held only the URL
+and publishable key; the agent scanned its own bundle, found
+`startsWith("sb_secret_")` library code and no key (confirmed separately:
+0 key-shaped tokens); deployed `kit-live-app`, `/auth/login` 200,
+`/protected` 307 signed out. 4 min 20 s from prompt to report.
+
+Checked from outside the agent:
+
+- Schema read through the Management API: RLS on both tables; policies `TO
+  authenticated` only; `authenticated` holds column INSERT on the loan's
+  item and dates and column UPDATE on `status` only; no table-wide
+  insert/update; anon has no grants.
+- API as the seeded users, 16 checks, all as required: alice cannot add
+  equipment (403), cannot insert with `status` or `department_id` (403
+  42501), her PATCH of `status` changes 0 rows, `requester_id` update 403,
+  `decide_loan` refused; dave neither sees nor decides a Sales loan; bob
+  approves alice's request (`decided_by` set), the item shows unavailable,
+  a second request on it is refused ("This item is currently out on loan"),
+  bob's own request cannot be approved by RPC or PATCH ("You cannot approve
+  your own request"), return makes the item available, anon reads nothing
+  (401). The agent's status for a new loan is `pending`. `decide_loan`
+  answers "not found or not allowed" with http 500 (SQLSTATE P0002), a
+  cosmetic flaw.
+- Deployed URL, headless: alice, bob and carol sign in to `/protected`;
+  alice sees Sales items and no approve control; bob gets Add, Retire and
+  the queue, which offers Approve on his own request (the database refuses
+  it); carol sees no Sales rows; `/auth/sign-up` 404.
+
+Isolation finding: `/context` in the stage session showed 3 memory files.
+The operator's `~/.claude/CLAUDE.md` had loaded as Project memory: the
+workspace sat under `$HOME`, and Claude Code reads `.claude/CLAUDE.md` in
+every ancestor directory regardless of `CLAUDE_CONFIG_DIR` and
+`--setting-sources`. No trace of it in the agent's narration or files
+(searched). Fixed in `scripts/stage-agent.sh` with `claudeMdExcludes` for
+all ancestors; a non-interactive run of the script afterwards loaded only
+the workspace `CLAUDE.md` and `AGENTS.md`. The 15 skills listed are Claude
+Code's bundled ones.
+
+Teardown, everything: `wrangler delete --name kit-live-app --force` with
+the stage token (URL 404 afterwards), `make remove-app NAME=demo1`, then the
+destroy plan (`supabase_project.kit["live"]` and `["ready"]`, 2 to destroy)
+applied in 3 s; `tofu state list` empty; the Management API lists no `kit-*`
+projects. The workspace was moved off `~` (not committed anywhere). To use
+the kit again: `make up`, then the steps in this RUNLOG.
+
 ## 2026-10-09 (later) - demo end to end: redeploy, first live K03, app UI
 
 Ready project (micro, ap-southeast-1), Supabase CLI 2.120.0, from the
