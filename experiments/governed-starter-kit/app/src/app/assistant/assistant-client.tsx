@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { FunctionsHttpError } from '@supabase/supabase-js'
 import { useState } from 'react'
+import { ReplyMarkdown } from './reply-markdown'
 
 // Transcript as the Messages API sees it. The function returns it with every
 // reply and we send it back unchanged on the next turn; it holds no identity -
@@ -111,16 +112,19 @@ export default function AssistantClient() {
               {item.event.tool}({JSON.stringify(item.event.input)}) -{' '}
               <span className={item.event.status === 'error' ? 'text-red-600' : ''}>{describe(item.event)}</span>
             </div>
+          ) : item.kind === 'assistant' ? (
+            <div
+              key={i}
+              data-kind="assistant"
+              className="text-sm space-y-2 [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-5 [&_ol]:pl-5 [&_code]:font-mono [&_code]:text-xs"
+            >
+              <ReplyMarkdown text={item.text} />
+            </div>
           ) : (
             <div
               key={i}
-              className={
-                item.kind === 'user'
-                  ? 'text-sm font-medium'
-                  : item.kind === 'error'
-                    ? 'text-sm text-red-600'
-                    : 'text-sm whitespace-pre-wrap'
-              }
+              data-kind={item.kind}
+              className={item.kind === 'user' ? 'text-sm font-medium' : 'text-sm text-red-600'}
             >
               {item.kind === 'user' ? '> ' : ''}
               {item.text}
