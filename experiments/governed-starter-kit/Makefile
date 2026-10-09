@@ -389,7 +389,8 @@ live-app-prep:
 		'}' > wrangler.jsonc \
 		&& printf '%s\n' 'import { defineCloudflareConfig } from "@opennextjs/cloudflare";' '' \
 			'export default defineCloudflareConfig({});' > open-next.config.ts \
-		&& sed -i.orig '/cacheComponents: true,/d' next.config.ts && rm -f next.config.ts.orig
+		&& sed -i.orig '/cacheComponents: true,/d' next.config.ts && rm -f next.config.ts.orig \
+		&& printf '\n# agent files `next dev` writes on every start\n/AGENTS.md\n/CLAUDE.md\n' >> .gitignore
 	@cd "$(LIVE_WEB)" && ! grep -q cacheComponents next.config.ts \
 		&& grep -q '"name": "$(LIVE_WORKER)"' wrangler.jsonc \
 		&& grep -q '"pattern": "$(LIVE_HOST)"' wrangler.jsonc \
