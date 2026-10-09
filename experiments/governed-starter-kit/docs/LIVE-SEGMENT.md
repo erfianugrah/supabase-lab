@@ -425,8 +425,13 @@ rm -rf ~/kit-live-demo
 `live-app-delete` deletes by name, so it works after the workspace is gone.
 Both Workers serve at erfi.dev custom domains (`kit-live.erfi.dev`,
 `starter-kit.erfi.dev`) with workers.dev off. Deleting a Worker removes its
-custom domain; checked 2026-10-09 on a test Worker: no DNS record or
-certificate left behind. The custom domain needs no DNS permission on the
+custom domain and its DNS record at once; the per-hostname certificate
+pack Cloudflare issued shows `pending_deletion` and was gone about 15 s later
+(checked 2026-10-09, both hostnames). Do not request a new hostname before
+its first deploy has finished: a lookup before the DNS record exists is
+cached by macOS as "no such host" for up to the zone's negative TTL (1800 s
+on erfi.dev). If it happens, `sudo dscacheutil -flushcache; sudo killall
+-HUP mDNSResponder` in the operator's terminal (not the agent's). The custom domain needs no DNS permission on the
 token: Workers Scripts Write attached it (an account-level Workers
 resource). The flip side: that token can attach a Worker to a hostname on
 any zone in the account, so keep the stage agent's tool approvals on and
