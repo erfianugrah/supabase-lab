@@ -1,12 +1,16 @@
 {
-  // Deployed to <name>.<subdomain>.workers.dev - no custom domain, so
-  // `make destroy` can remove it with `wrangler delete` and nothing else.
-  // The Supabase URL and publishable key are build-time NEXT_PUBLIC_* values
-  // from .env.production, which the Makefile writes from tofu output.
+  // Served at a Worker custom domain, workers.dev off. `wrangler delete`
+  // removes the Worker and its custom domain together (checked 2026-10-09:
+  // no DNS record or certificate left behind), so `make destroy` needs
+  // nothing else. The Supabase URL and publishable key are build-time
+  // NEXT_PUBLIC_* values from .env.production, which the Makefile writes
+  // from tofu output.
   "name": "starter-kit-app",
   "main": ".open-next/worker.js",
   "compatibility_date": "2026-01-01",
   "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "routes": [{ "pattern": "starter-kit.erfi.dev", "custom_domain": true }],
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
