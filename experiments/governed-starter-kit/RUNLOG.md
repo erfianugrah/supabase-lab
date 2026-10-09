@@ -1,5 +1,49 @@
 # governed-starter-kit - RUNLOG
 
+## 2026-10-09 (midnight) - third full run: erfi.dev hostnames, printed demo users, troubleshooting; destroyed
+
+- `make up` 94 s (35 pass, 2 expected skips); model key checked with a
+  one-token call first; `bff-deploy`, `fn-secret`, `make probe` 52 pass, 0
+  fail, 0 skip in 128 s (K05 first call after the deploy 502 in 3505 ms,
+  sixth of six).
+- App walk locally 7 of 7. `make app-deploy` (stage token): 36 s, custom
+  domain `starter-kit.erfi.dev` attached, workers.dev 404; the same walk
+  against `https://starter-kit.erfi.dev` 7 of 7 after a DNS cache flush (a
+  probe sent before the record existed was cached by macOS as no such host;
+  `dig` resolved it, the system resolver did not, for up to the 1800 s
+  negative TTL).
+- Troubleshooting segment: `fault-inject` 6 s; `fault-check` 45 s: the
+  advisors flagged the per-row `auth.<function>()` policy and two unindexed
+  foreign keys, pg_stat_statements showed the feed query at mean=2872.2ms
+  (max=4445.2ms over calls=10), the logs showed the slow GET (p50=2218ms),
+  the RPC's 400s and Postgres `22012` division by zero; `fault-clear`
+  restored the inventory to the 72-object snapshot with no advisor findings
+  left.
+- Live segment: workspace got `kit/demo-users.json` (ignored) and staged
+  files only; the operator committed after `live-app-prep`. Stage session
+  loaded only the workspace `AGENTS.md` and `CLAUDE.md`. Agent run about
+  7 min (migrations 12:20:02-12:21:03, `.env.local` with the URL and
+  publishable key only, deploy started 12:24:41, report 12:25:51). Design:
+  `equipment` / `equipment_loans`, an exclusion constraint on approved
+  loans with overlapping date ranges, invoker triggers with custom
+  errcodes, `decide_loan(loan_id, decision)`. It signed in through the Auth
+  API as each user, repeated its checks over REST, seeded three items per
+  department, and printed the demo-users table. Its attempt to switch off
+  Next's generated `web/AGENTS.md` was denied by the stage session as
+  self-modification; `live-app-prep` now adds both generated files to
+  `web/.gitignore`.
+- Outside checks: `https://kit-live.erfi.dev` `/auth/login` 200,
+  `/protected` 307 to login, workers.dev 404; 16 of 16 API checks with a
+  script adapted to this schema that also fails any refusal caused by a
+  missing function, table or column; alice, bob and carol scoped per
+  department on the public URL; sign-up 404.
+- Destroyed: both Workers (`wrangler delete --force`), custom domains gone,
+  `demo1` removed, destroy plan of exactly the two kit projects applied,
+  state empty, no `kit-*` projects. In the erfi.dev zone: no DNS records for
+  either hostname; the two per-hostname certificate packs showed
+  `pending_deletion` and were gone about 15 s later; the zone's own
+  certificate (apex and wildcard) and the docs site untouched.
+
 ## 2026-10-09 (night) - torn down again; deploys move to erfi.dev custom domains
 
 - Full teardown at the operator's request: destroy plan of exactly the two
