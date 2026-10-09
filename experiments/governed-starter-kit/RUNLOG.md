@@ -36,9 +36,6 @@
   the commit to the operator (the in-target commit failed on signing every
   time). Tested with dummy refs and a fake users file: the file lands in
   `kit/`, is ignored, the rest is staged.
-- Kept the demo industry-neutral: no customer names or industry-shaped
-  data anywhere in the kit, this repo's history, the docs site or the
-  dotfiles (searched); names registered with the confidential-write guard.
 
 ## 2026-10-09 (late) - rebuilt from nothing, everything end to end again
 
