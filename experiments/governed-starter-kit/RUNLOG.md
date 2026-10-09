@@ -1,5 +1,38 @@
 # governed-starter-kit - RUNLOG
 
+## 2026-10-09 (late) - rebuilt from nothing, everything end to end again
+
+- `make up` from an empty state: 91 s (two projects, schema, seed, agent and
+  webhook functions, KB embeddings), its probe 35 pass, 0 fail, 2 skip (K03
+  without a key, K05 not deployed).
+- `make bff-deploy`, `make fn-secret`, then `make probe`: 52 pass, 0 fail,
+  0 skip in 132 s. K05's first call after the deploy: the function's own
+  502 in 3015 ms, all upstreams at the 800 ms timeout (fifth of five fresh
+  deploys). Artifact `evidence/20261009-111031/`.
+- App UI walk (headless, local dev server): 7 of 7; the assistant answered
+  the policy question in 7.9 s. Test row deleted.
+- Live segment, second rehearsal: `live-reset` nothing to drop, scaffold
+  19 s, `live-app-prep` 23 s, opener 10 s request to ready. Stage session
+  loaded only the workspace `AGENTS.md` and `CLAUDE.md` (the ancestor
+  exclude works). Agent (Sonnet 5.5) prompt 11:19:26 to report 11:24:23,
+  about 5 min: five migrations 11:20:46-11:21:42, `.env.local` with the URL
+  and publishable key only, deploy started 11:23:34. Different design from
+  the first rehearsal: employees see only their own loans, availability
+  through `private.item_is_out` (SECURITY DEFINER, `search_path = ''`, in
+  `private`, execute for `authenticated` only) behind a `security_invoker`
+  view, decision columns update-granted but gated by the manager-only
+  policy and invoker triggers.
+- Outside checks: schema as above, RLS on, partial unique index on approved
+  loans; the 16 API checks pass (the attack script was made tolerant of
+  status and column names: this build uses `pending` and `approver_id`);
+  alice, bob and carol on the public URL scoped per department; sign-up 404.
+- The agent reported `live/AGENTS.md` pointing at `sql/10-app.sql`, which
+  the workspace did not have. `make live-workspace` now copies it to
+  `kit/10-app.sql` and the guardrail points there.
+- Cleanup of the rehearsal only (the kit stays up): Worker deleted (404),
+  `demo1` removed, `make live-reset APPLY=1` dropped 9 objects and reapplied
+  the baseline (users=4), workspace moved off `~`.
+
 ## 2026-10-09 (evening) - live-segment rehearsal, then full teardown
 
 Setup per `docs/LIVE-SEGMENT.md`: `make live-reset` found nothing beyond the
