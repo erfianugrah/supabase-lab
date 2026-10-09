@@ -119,12 +119,15 @@ app-dev: app-env
 	cd app && bun install && bun run dev
 
 # Needs wrangler auth (CLOUDFLARE_API_TOKEN + CLOUDFLARE_ACCOUNT_ID, or
-# `wrangler login`). Deploys to workers.dev only - no custom domain to clean up.
+# `wrangler login`). Serves at the custom domain in app/wrangler.jsonc
+# (starter-kit.erfi.dev), workers.dev off; `wrangler delete` removes the
+# Worker and its custom domain (checked 2026-10-09: no DNS record or
+# certificate left behind).
 app-deploy: app-env
 	cd app && bun install && bun run deploy
 
 app-delete:
-	-cd app && wrangler delete starter-kit-app
+	-cd app && wrangler delete --name starter-kit-app --force
 
 # --- live segment: a coding agent builds a new app on kit-live ---
 # See docs/LIVE-SEGMENT.md. The MCP server is scoped to the live project with
@@ -158,9 +161,11 @@ live-workspace: mcp-config
 	mkdir -p "$(WORKSPACE)/.codex" && cp live/.codex/config.toml "$(WORKSPACE)/.codex/"
 	cp $(BASE) "$(WORKSPACE)/kit/00-baseline.sql"
 	cp sql/10-app.sql "$(WORKSPACE)/kit/10-app.sql"
-	printf '.mcp.json\n.codex/config.toml\n.env*\n!.env.example\nnode_modules/\n.next/\n' > "$(WORKSPACE)/.gitignore"
-	cd "$(WORKSPACE)" && git init -q && git add -A && git commit -q -m "kit workspace" \
-		&& echo "workspace ready: $(WORKSPACE)"
+	@if [ -f evidence/users-$(LIVE).json ]; then cp evidence/users-$(LIVE).json "$(WORKSPACE)/kit/demo-users.json" && echo "demo users -> kit/demo-users.json (gitignored; the agent prints them on stage)"; \
+		else echo "no evidence/users-$(LIVE).json - seed the live project first (make seed)"; exit 1; fi
+	printf '.mcp.json\n.codex/config.toml\nkit/demo-users.json\n.env*\n!.env.example\nnode_modules/\n.next/\n' > "$(WORKSPACE)/.gitignore"
+	cd "$(WORKSPACE)" && git init -q && git add -A \
+		&& echo "workspace ready: $(WORKSPACE) (staged; commit it yourself after live-app-prep)"
 
 # Back to baseline-only between rehearsals. Lists what it would drop; with
 # APPLY=1 it lists, drops, reapplies sql/00-baseline.sql and re-checks.
@@ -344,7 +349,10 @@ endif
 
 # The live segment's deploy step (docs/LIVE-SEGMENT.md, prompt step 5): the
 # agent's create-next-app with-supabase scaffold in $(WORKSPACE)/web, on
-# Cloudflare Workers at $(LIVE_WORKER).<subdomain>.workers.dev. Wrangler auth
+# Cloudflare Workers at https://$(LIVE_HOST) (a Worker custom domain;
+# workers.dev off). The stage token (Workers Scripts Write, Workers KV
+# Storage Read) attaches it on deploy: custom domains are an account-level
+# Workers resource, no DNS permission needed (checked 2026-10-09). Wrangler auth
 # from the environment (CLOUDFLARE_API_TOKEN or the email + global key pair,
 # plus CLOUDFLARE_ACCOUNT_ID).
 #
@@ -360,6 +368,7 @@ endif
 # stage is one `npm run deploy`.
 LIVE_WEB    ?= $(WORKSPACE)/web
 LIVE_WORKER ?= kit-live-app
+LIVE_HOST   ?= kit-live.erfi.dev
 LIVE_NEXT   ?= 16.3.8
 
 .PHONY: live-app-prep live-app-deploy live-app-delete
@@ -374,6 +383,8 @@ live-app-prep:
 		'  "main": ".open-next/worker.js",' \
 		'  "compatibility_date": "$(shell date +%Y-%m-%d)",' \
 		'  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],' \
+		'  "workers_dev": false,' \
+		'  "routes": [{ "pattern": "$(LIVE_HOST)", "custom_domain": true }],' \
 		'  "assets": { "directory": ".open-next/assets", "binding": "ASSETS" }' \
 		'}' > wrangler.jsonc \
 		&& printf '%s\n' 'import { defineCloudflareConfig } from "@opennextjs/cloudflare";' '' \
@@ -381,7 +392,8 @@ live-app-prep:
 		&& sed -i.orig '/cacheComponents: true,/d' next.config.ts && rm -f next.config.ts.orig
 	@cd "$(LIVE_WEB)" && ! grep -q cacheComponents next.config.ts \
 		&& grep -q '"name": "$(LIVE_WORKER)"' wrangler.jsonc \
-		&& echo "$(LIVE_WEB) ready to deploy as $(LIVE_WORKER) (commit it in the workspace)"
+		&& grep -q '"pattern": "$(LIVE_HOST)"' wrangler.jsonc \
+		&& echo "$(LIVE_WEB) ready to deploy as $(LIVE_WORKER) at https://$(LIVE_HOST) (commit it in the workspace)"
 
 # The operator's fallback for step 5 - the same command the agent runs.
 live-app-deploy:
@@ -391,7 +403,7 @@ live-app-deploy:
 
 # By name, so it works after the workspace is gone.
 live-app-delete:
-	-wrangler delete $(LIVE_WORKER)
+	-wrangler delete --name $(LIVE_WORKER) --force
 
 # --- observability faults ---
 # Reversible faults on the READY project for the troubleshooting segment
