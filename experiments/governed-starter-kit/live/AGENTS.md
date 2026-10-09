@@ -89,7 +89,8 @@ seems to need a change there, stop and explain why.
   explicit errcode (a standard name such as `check_violation`, or a custom
   5-character code). Keep the constraint as a backstop if you like. The UI
   shows that message, not a generic failure. `decide_purchase_request` in
-  `sql/10-app.sql` shows the shape (yours should also set the errcode).
+  `kit/10-app.sql` (read-only reference, like the baseline) shows the shape
+  (yours should also set the errcode).
 - If something genuinely needs `SECURITY DEFINER`, put it in `private`, set
   `search_path = ''`, revoke execute from `public` and `anon`, and say why in
   the migration.
