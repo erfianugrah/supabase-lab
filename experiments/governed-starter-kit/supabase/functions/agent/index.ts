@@ -114,7 +114,9 @@ function llmMessage(e: LlmError): string {
   if (e.status === 401 || e.status === 403) return "the model API rejected the configured key";
   if (e.status === 504) return "the model took too long to answer";
   if (e.status === 429 || e.status === 529) return "the model API is busy; try again in a moment";
-  return `the model call failed (${e.status})`;
+  // The API's own reason (e.g. "credit balance is too low") says what to fix;
+  // a bare status code did not (2026-10-09). It describes the request, not data.
+  return `the model call failed (${e.status}: ${e.message.slice(0, 200)})`;
 }
 
 async function converse(db: SupabaseClient, messages: Msg[], events: ToolOutcome[]): Promise<Turn> {
