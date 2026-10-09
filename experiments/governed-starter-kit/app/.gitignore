@@ -43,3 +43,7 @@ next-env.d.ts
 # OpenNext / Wrangler build output
 /.open-next/
 /.wrangler/
+
+# agent files `next dev` writes on every start (next 16.3.8)
+/AGENTS.md
+/CLAUDE.md

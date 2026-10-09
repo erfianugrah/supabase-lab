@@ -86,6 +86,8 @@ const mod: TestModule = {
       return [{ id: "K05", title: this.title, status: "fail", detail: "fanout-api deployed but UPSTREAM_BASE_URL / UPSTREAM_API_KEY unset (make bff-deploy sets them)" }];
     }
     ctx.log(`first call http ${probe.status} in ${probe.wall_ms} ms (cold start included)`);
+    // The function's own 502 carries per-upstream reasons; a gateway 502 does not.
+    if (probe.status !== 200) ctx.log(`first call body: ${JSON.stringify(probe.body).slice(0, 1500)}`);
 
     try {
       const checks = await bffChecks(target);
