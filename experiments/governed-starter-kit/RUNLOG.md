@@ -58,6 +58,16 @@ App UI (`app/`, local dev server against the ready project):
   too low: the K03 run used the remaining credit. The UI chat path was NOT
   RUN against a model; it needs a funded key. The UI shows only the
   status code, not the API's reason.
+- Same day, with a new key in the vault item (one-token API call ok, then
+  `make fn-secret`): the headless walk passed 7 of 7. alice to
+  `/dashboard` 2058 ms; a policy question answered from the knowledge base
+  (`search_kb`, 5 results) in 21 s; a purchase request proposed and held
+  behind the Confirm card in 4.4 s; Confirm ran `create_request` in 6.9 s
+  and the row showed on alice's dashboard; carol did not see it. The test
+  row (justification marked `E2E-UI-`) was deleted afterwards; 3 seed rows
+  remain.
+- The reply renders as plain text, so the model's Markdown shows on screen
+  as literal `**` and `- ` markers.
 - `next dev` (16.3.8) writes `app/AGENTS.md` and `app/CLAUDE.md` on every
   start; both are now in `app/.gitignore`.
 
