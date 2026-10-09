@@ -153,18 +153,19 @@ async function embedKb(ref: string): Promise<void> {
 
 // The app's build-time env: NEXT_PUBLIC_* values are inlined by `next build`,
 // so they are written to app/.env.production (gitignored by app/.gitignore)
-// rather than passed at deploy time. Publishable key only - never the secret.
+// rather than passed at deploy time. `next dev` does not read .env.production,
+// so the same values go to app/.env.development.local for `make app-dev`
+// (without it every page 500s, 2026-10-09). Publishable key only - never the secret.
 async function env(ref: string): Promise<void> {
   const r = await mgmt("GET", `/projects/${ref}/api-keys?reveal=true`);
   if (!r.ok) throw new Error(`api-keys http ${r.status}`);
   const keys = (await r.json()) as { type?: string; api_key?: string }[];
   const pub = keys.find((k) => k.type === "publishable")?.api_key;
   if (!pub) throw new Error("no publishable key returned");
-  writeFileSync(
-    "app/.env.production",
-    `NEXT_PUBLIC_SUPABASE_URL=https://${ref}.supabase.co\nNEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${pub}\n`,
-  );
-  console.log(`app/.env.production written for ${ref}`);
+  const body = `NEXT_PUBLIC_SUPABASE_URL=https://${ref}.supabase.co\nNEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${pub}\n`;
+  writeFileSync("app/.env.production", body);
+  writeFileSync("app/.env.development.local", body);
+  console.log(`app/.env.production and app/.env.development.local written for ${ref}`);
 }
 
 const [cmd, ref, ...rest] = process.argv.slice(2);
