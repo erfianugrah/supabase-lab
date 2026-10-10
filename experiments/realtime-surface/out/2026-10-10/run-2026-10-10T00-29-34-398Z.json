@@ -1,0 +1,78 @@
+{
+  "startedAt": "2026-10-10T00:29:34.398Z",
+  "finishedAt": "2026-10-10T00:39:58.559Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "realtime-surface",
+  "labCommit": "70e4244",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "RT01a",
+      "title": "RT01a: setup",
+      "status": "pass",
+      "detail": "supabase-js 2.112.3; first change event after 10870 ms of canary inserts; replica identity d",
+      "measurements": {
+        "first_change_event_ms": 10870,
+        "replica_identity": "d",
+        "supabase_js": "2.112.3"
+      },
+      "durationMs": 181438
+    },
+    {
+      "id": "RT02-setup",
+      "title": "RT02-setup",
+      "status": "pass",
+      "measurements": {
+        "first_change_event_ms": 10748
+      },
+      "durationMs": 160651
+    },
+    {
+      "id": "RT03a",
+      "title": "RT03a: 26 realtime.send messages persisted",
+      "status": "fail",
+      "detail": "realtime.messages rows for the topic 0, distinct inserted_at 0",
+      "measurements": {
+        "persisted": 0,
+        "distinct_inserted_at": 0
+      },
+      "durationMs": 74525
+    },
+    {
+      "id": "RT03b-none",
+      "title": "RT03b: replay since before the first message, limit omitted",
+      "status": "info",
+      "detail": "join CHANNEL_ERROR(MissingPartition: Realtime was unable to find the expected messages partition)>SUBSCRIBED>CLOSED; received 0, replayed 0; first - last -",
+      "measurements": {
+        "subscribe": "CHANNEL_ERROR>SUBSCRIBED>CLOSED",
+        "received": 0,
+        "replayed": 0,
+        "first_i": -1,
+        "last_i": -1,
+        "ascending": 1
+      },
+      "evidence": "CHANNEL_ERROR(MissingPartition: Realtime was unable to find the expected messages partition)>SUBSCRIBED>CLOSED; order []",
+      "durationMs": 74525
+    },
+    {
+      "id": "RT04-setup",
+      "title": "RT04-setup: receivers joined",
+      "status": "fail",
+      "detail": "current supabase-js 2.112.3: CHANNEL_ERROR (MissingPartition: Realtime was unable to find the expected messages partition); old 2.90.0: SUBSCRIBED",
+      "measurements": {
+        "current_version": "2.112.3",
+        "old_version": "2.90.0",
+        "current_join": "CHANNEL_ERROR",
+        "old_join": "SUBSCRIBED"
+      },
+      "durationMs": 207541
+    }
+  ]
+}
