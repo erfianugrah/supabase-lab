@@ -1,0 +1,10 @@
+# SAML on, as the self-hosting guide's steps 2 and 3 do it by hand: the two
+# GOTRUE_SAML_* lines that docker-compose.yml carries commented out. The key
+# value is SAML_PRIVATE_KEY in work/stack/.env, appended by SD06 from a key it
+# generates for the run. Kept as an override so the pinned docker/ tree is
+# never edited.
+services:
+  auth:
+    environment:
+      GOTRUE_SAML_ENABLED: "true"
+      GOTRUE_SAML_PRIVATE_KEY: ${SAML_PRIVATE_KEY}
