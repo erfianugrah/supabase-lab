@@ -110,6 +110,30 @@ probe: guard-tok
 		--experiment governed-starter-kit --out evidence/$(TS)
 	@echo "== evidence/$(TS)/ =="
 
+# --- MCP: K06 (app MCP server block) and K07 (MCP confirmations) ---
+# Both modules provision and delete their OWN throwaway project in the Team
+# org (never kit-live or kit-ready: K07 runs DROP and TRUNCATE), so no tofu
+# state is involved and `make up` is not needed first. They are `destructive`
+# modules, hence --destructive. PROJECT_PREFIX names the projects and is also
+# the guard: a module refuses to touch a project without it. K07 also drives
+# Claude Code (an Elicitation hook answers accept or decline) when MCP_CLAUDE=1.
+#   sx SUPABASE_ACCESS_TOKEN -- make mcp-probe [MCP_CLAUDE=1] [ONLY=K06]
+# PEER_MCP=<ref> re-runs against an existing prefixed project and keeps it.
+COMMA          := ,
+PROJECT_PREFIX ?= kit-mcp-
+ORG_TEAM       ?= $(shell grep -E '^supabase_org_id' $(ROOT)/secrets.tfvars 2>/dev/null | cut -d'"' -f2)
+.PHONY: mcp-probe
+mcp-probe: guard-tok
+	@test -n "$(ORG_TEAM)" || (echo "no Team org slug - set ORG_TEAM=<slug> or fill supabase_org_id in secrets.tfvars"; exit 1)
+	@$(BUILD)
+	@mkdir -p evidence/$(TS)
+	@PVLAB_REF=none PVLAB_ORG_TEAM="$(ORG_TEAM)" PVLAB_PROJECT_PREFIX="$(PROJECT_PREFIX)" \
+	 $(if $(PEER_MCP),PVLAB_PEER_MCP="$(PEER_MCP)",) $(if $(MCP_CLAUDE),PVLAB_K_CLAUDE=1,) \
+	 SUPABASE_ACCESS_TOKEN="$(TOK)" \
+		$(RUNNER) --where local --only $(if $(ONLY),$(ONLY),K06$(COMMA)K07) --destructive \
+		--experiment governed-starter-kit --out evidence/$(TS)
+	@echo "== evidence/$(TS)/ =="
+
 # --- web app (app/, Next.js on Workers via OpenNext) ---
 app-env: guard-tok
 	@test -n "$(APP_REF)" || (echo "no project ref - run 'make apply' first"; exit 1)
