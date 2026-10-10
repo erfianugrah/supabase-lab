@@ -1,0 +1,934 @@
+{
+  "startedAt": "2026-10-10T04:55:54.303Z",
+  "finishedAt": "2026-10-10T05:09:11.995Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "client-retries",
+  "labCommit": "70e4244",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "CR01-control",
+      "title": "CR01-control: provision + direct GET through the proxy",
+      "status": "info",
+      "measurements": {
+        "provision_s": 19,
+        "supabase-js": "2.112.3",
+        "runtime": "bun 1.3.14"
+      },
+      "durationMs": 200098
+    },
+    {
+      "id": "CR01-control-get",
+      "title": "CR01-control-get: pass-through GET returns the seeded rows",
+      "status": "pass",
+      "detail": "attempts=1 wire=1 rc=[-] gaps=[] status=200  54ms",
+      "measurements": {
+        "supabase-js": "2.112.3",
+        "r_attempts": 1,
+        "r_wire": 1,
+        "r_rc": "-",
+        "r_gaps_ms": "-",
+        "r_ok": 1,
+        "r_status": 200,
+        "r_code": "-",
+        "r_elapsed_ms": 54
+      },
+      "durationMs": 200098
+    },
+    {
+      "id": "CR01a1",
+      "title": "CR01a1: GET 503 once then pass",
+      "status": "pass",
+      "detail": "attempts=2 wire=2 rc=[-,1] gaps=[1000] status=200  1081ms",
+      "measurements": {
+        "supabase-js": "2.112.3",
+        "r_attempts": 2,
+        "r_wire": 2,
+        "r_rc": "-,1",
+        "r_gaps_ms": "1000",
+        "r_ok": 1,
+        "r_status": 200,
+        "r_code": "-",
+        "r_elapsed_ms": 1081
+      },
+      "durationMs": 200098
+    },
+    {
+      "id": "CR01a2",
+      "title": "CR01a2: GET 503 always",
+      "status": "pass",
+      "detail": "attempts=4 wire=4 rc=[-,1,2,3] gaps=[1000,2000,4000] status=503 PGRST002 7008ms",
+      "measurements": {
+        "supabase-js": "2.112.3",
+        "r_attempts": 4,
+        "r_wire": 4,
+        "r_rc": "-,1,2,3",
+        "r_gaps_ms": "1000,2000,4000",
+        "r_ok": 0,
+        "r_status": 503,
+        "r_code": "PGRST002",
+        "r_elapsed_ms": 7008
+      },
+      "durationMs": 200098
+    },
+    {
+      "id": "CR01a3",
+      "title": "CR01a3: GET 520 always",
+      "status": "pass",
+      "detail": "attempts=4 wire=4 rc=[-,1,2,3] gaps=[1000,2000,4000] status=520 FAULT 7012ms",
+      "measurements": {
+        "supabase-js": "2.112.3",
+        "r_attempts": 4,
+        "r_wire": 4,
+        "r_rc": "-,1,2,3",
+        "r_gaps_ms": "1000,2000,4000",
+        "r_ok": 0,
+        "r_status": 520,
+        "r_code": "FAULT",
+        "r_elapsed_ms": 7012
+      },
+      "durationMs": 200098
+    },
+    {
+      "id": "CR01a4",
+      "title": "CR01a4: GET answered 525/502/504/500/429/408/521/522/524 is not retried",
+      "status": "pass",
+      "detail": "1 attempt for every status in the list",
+      "measurements": {
+        "s525_attempts": 1,
+        "s525_elapsed_ms": 1,
+        "s502_attempts": 1,
+        "s502_elapsed_ms": 1,
+        "s504_attempts": 1,
+        "s504_elapsed_ms": 1,
+        "s500_attempts": 1,
+        "s500_elapsed_ms": 1,
+        "s429_attempts": 1,
+        "s429_elapsed_ms": 1,
+        "s408_attempts": 1,
+        "s408_elapsed_ms": 1,
+        "s521_attempts": 1,
+        "s521_elapsed_ms": 0,
+        "s522_attempts": 1,
+        "s522_elapsed_ms": 0,
+        "s524_attempts": 1,
+        "s524_elapsed_ms": 0
+      },
+      "durationMs": 200098
+    },
+    {
+      "id": "CR01a5",
+      "title": "CR01a5: GET connection reset always",
+      "status": "pass",
+      "detail": "attempts=4 wire=5 rc=[-,-,1,2,3] gaps=[0,1000,2000,4000] status=0  7016ms",
+      "measurements": {
+        "supabase-js": "2.112.3",
+        "r_attempts": 4,
+        "r_wire": 5,
+        "r_rc": "-,-,1,2,3",
+        "r_gaps_ms": "0,1000,2000,4000",
+        "r_ok": 0,
+        "r_status": 0,
+        "r_code": "-",
+        "r_elapsed_ms": 7016
+      },
+      "durationMs": 200098
+    },
+    {
+      "id": "CR01a6a",
+      "title": "CR01a6a: 503 + Retry-After: 2, then pass",
+      "status": "pass",
+      "detail": "attempts=2 wire=2 rc=[-,1] gaps=[2000] status=200  2049ms",
+      "measurements": {
+        "supabase-js": "2.112.3",
+        "r_attempts": 2,
+        "r_wire": 2,
+        "r_rc": "-,1",
+        "r_gaps_ms": "2000",
+        "r_ok": 1,
+        "r_status": 200,
+        "r_code": "-",
+        "r_elapsed_ms": 2049
+      },
+      "durationMs": 200098
+    },
+    {
+      "id": "CR01a6b",
+      "title": "CR01a6b: 503 + Retry-After: 0, then pass",
+      "status": "pass",
+      "detail": "attempts=2 wire=2 rc=[-,1] gaps=[0] status=200  64ms",
+      "measurements": {
+        "supabase-js": "2.112.3",
+        "r_attempts": 2,
+        "r_wire": 2,
+        "r_rc": "-,1",
+        "r_gaps_ms": "0",
+        "r_ok": 1,
+        "r_status": 200,
+        "r_code": "-",
+        "r_elapsed_ms": 64
+      },
+      "durationMs": 200098
+    },
+    {
+      "id": "CR01a6c",
+      "title": "CR01a6c: 503 + Retry-After as an HTTP date, then pass",
+      "status": "pass",
+      "detail": "attempts=2 wire=2 rc=[-,1] gaps=[0] status=200  50ms",
+      "measurements": {
+        "supabase-js": "2.112.3",
+        "r_attempts": 2,
+        "r_wire": 2,
+        "r_rc": "-,1",
+        "r_gaps_ms": "0",
+        "r_ok": 1,
+        "r_status": 200,
+        "r_code": "-",
+        "r_elapsed_ms": 50
+      },
+      "durationMs": 200098
+    },
+    {
+      "id": "CR01a6d",
+      "title": "CR01a6d: 503 + Retry-After: 40 (above the 30 s backoff cap), then pass",
+      "status": "pass",
+      "detail": "attempts=2 wire=2 rc=[-,1] gaps=[40000] status=200  40119ms",
+      "measurements": {
+        "supabase-js": "2.112.3",
+        "r_attempts": 2,
+        "r_wire": 2,
+        "r_rc": "-,1",
+        "r_gaps_ms": "40000",
+        "r_ok": 1,
+        "r_status": 200,
+        "r_code": "-",
+        "r_elapsed_ms": 40119
+      },
+      "durationMs": 200098
+    },
+    {
+      "id": "CR01b1-503",
+      "title": "CR01b1-503: POST insert answered 503",
+      "status": "pass",
+      "detail": "attempts=1 wire=1 rc=[-] gaps=[] status=503 PGRST002 6ms",
+      "measurements": {
+        "supabase-js": "2.112.3",
+        "r_attempts": 1,
+        "r_wire": 1,
+        "r_rc": "-",
+        "r_gaps_ms": "-",
+        "r_ok": 0,
+        "r_status": 503,
+        "r_code": "PGRST002",
+        "r_elapsed_ms": 6
+      },
+      "durationMs": 200099
+    },
+    {
+      "id": "CR01b1-520",
+      "title": "CR01b1-520: POST insert answered 520",
+      "status": "pass",
+      "detail": "attempts=1 wire=1 rc=[-] gaps=[] status=520 FAULT 1ms",
+      "measurements": {
+        "supabase-js": "2.112.3",
+        "r_attempts": 1,
+        "r_wire": 1,
+        "r_rc": "-",
+        "r_gaps_ms": "-",
+        "r_ok": 0,
+        "r_status": 520,
+        "r_code": "FAULT",
+        "r_elapsed_ms": 1
+      },
+      "durationMs": 200099
+    },
+    {
+      "id": "CR01b1-reset",
+      "title": "CR01b1-reset: POST insert answered reset",
+      "status": "pass",
+      "detail": "attempts=1 wire=1 rc=[-] gaps=[] status=0  1ms",
+      "measurements": {
+        "supabase-js": "2.112.3",
+        "r_attempts": 1,
+        "r_wire": 1,
+        "r_rc": "-",
+        "r_gaps_ms": "-",
+        "r_ok": 0,
+        "r_status": 0,
+        "r_code": "-",
+        "r_elapsed_ms": 1
+      },
+      "durationMs": 200099
+    },
+    {
+      "id": "CR01b2-patch",
+      "title": "CR01b2-patch: PATCH answered 503",
+      "status": "pass",
+      "detail": "attempts=1 wire=1 rc=[-] gaps=[] status=503 PGRST002 2ms",
+      "measurements": {
+        "supabase-js": "2.112.3",
+        "r_attempts": 1,
+        "r_wire": 1,
+        "r_rc": "-",
+        "r_gaps_ms": "-",
+        "r_ok": 0,
+        "r_status": 503,
+        "r_code": "PGRST002",
+        "r_elapsed_ms": 2
+      },
+      "durationMs": 200099
+    },
+    {
+      "id": "CR01b2-delete",
+      "title": "CR01b2-delete: DELETE answered 503",
+      "status": "pass",
+      "detail": "attempts=1 wire=1 rc=[-] gaps=[] status=503 PGRST002 1ms",
+      "measurements": {
+        "supabase-js": "2.112.3",
+        "r_attempts": 1,
+        "r_wire": 1,
+        "r_rc": "-",
+        "r_gaps_ms": "-",
+        "r_ok": 0,
+        "r_status": 503,
+        "r_code": "PGRST002",
+        "r_elapsed_ms": 1
+      },
+      "durationMs": 200099
+    },
+    {
+      "id": "CR01b2-upsert",
+      "title": "CR01b2-upsert: upsert (POST) answered 503",
+      "status": "pass",
+      "detail": "attempts=1 wire=1 rc=[-] gaps=[] status=503 PGRST002 1ms",
+      "measurements": {
+        "supabase-js": "2.112.3",
+        "r_attempts": 1,
+        "r_wire": 1,
+        "r_rc": "-",
+        "r_gaps_ms": "-",
+        "r_ok": 0,
+        "r_status": 503,
+        "r_code": "PGRST002",
+        "r_elapsed_ms": 1
+      },
+      "durationMs": 200099
+    },
+    {
+      "id": "CR01b3-rpc-post",
+      "title": "CR01b3-rpc-post: rpc() default (POST) answered 503",
+      "status": "pass",
+      "detail": "attempts=1 wire=1 rc=[-] gaps=[] status=503 PGRST002 1ms",
+      "measurements": {
+        "supabase-js": "2.112.3",
+        "r_attempts": 1,
+        "r_wire": 1,
+        "r_rc": "-",
+        "r_gaps_ms": "-",
+        "r_ok": 0,
+        "r_status": 503,
+        "r_code": "PGRST002",
+        "r_elapsed_ms": 1
+      },
+      "durationMs": 200099
+    },
+    {
+      "id": "CR01b3-rpc-get",
+      "title": "CR01b3-rpc-get: rpc() with get:true answered 503",
+      "status": "pass",
+      "detail": "attempts=4 wire=4 rc=[-,1,2,3] gaps=[1000,2000,4000] status=503 PGRST002 7011ms",
+      "measurements": {
+        "supabase-js": "2.112.3",
+        "r_attempts": 4,
+        "r_wire": 4,
+        "r_rc": "-,1,2,3",
+        "r_gaps_ms": "1000,2000,4000",
+        "r_ok": 0,
+        "r_status": 503,
+        "r_code": "PGRST002",
+        "r_elapsed_ms": 7011
+      },
+      "durationMs": 200099
+    },
+    {
+      "id": "CR01b3-head",
+      "title": "CR01b3-head: select head:true count (HEAD) answered 503",
+      "status": "pass",
+      "detail": "attempts=4 wire=4 rc=[-,1,2,3] gaps=[1000,2000,4000] status=503 error 7012ms",
+      "measurements": {
+        "supabase-js": "2.112.3",
+        "r_attempts": 4,
+        "r_wire": 4,
+        "r_rc": "-,1,2,3",
+        "r_gaps_ms": "1000,2000,4000",
+        "r_ok": 0,
+        "r_status": 503,
+        "r_code": "error",
+        "r_elapsed_ms": 7012
+      },
+      "durationMs": 200099
+    },
+    {
+      "id": "CR01c1",
+      "title": "CR01c1: .retry(false) on the query, 503 always",
+      "status": "pass",
+      "detail": "attempts=1 wire=1 rc=[-] gaps=[] status=503 PGRST002 1ms",
+      "measurements": {
+        "supabase-js": "2.112.3",
+        "r_attempts": 1,
+        "r_wire": 1,
+        "r_rc": "-",
+        "r_gaps_ms": "-",
+        "r_ok": 0,
+        "r_status": 503,
+        "r_code": "PGRST002",
+        "r_elapsed_ms": 1
+      },
+      "durationMs": 200099
+    },
+    {
+      "id": "CR01c2",
+      "title": "CR01c2: createClient db.retry=false, 503 always",
+      "status": "pass",
+      "detail": "attempts=1 wire=1 rc=[-] gaps=[] status=503 PGRST002 1ms",
+      "measurements": {
+        "supabase-js": "2.112.3",
+        "r_attempts": 1,
+        "r_wire": 1,
+        "r_rc": "-",
+        "r_gaps_ms": "-",
+        "r_ok": 0,
+        "r_status": 503,
+        "r_code": "PGRST002",
+        "r_elapsed_ms": 1
+      },
+      "durationMs": 200099
+    },
+    {
+      "id": "CR01c3",
+      "title": "CR01c3: createClient db.retryEnabled=false (the changelog's JS option name), 503 always",
+      "status": "info",
+      "detail": "attempts=4 wire=4 rc=[-,1,2,3] gaps=[1000,2000,4000] status=503 PGRST002 7009ms",
+      "measurements": {
+        "supabase-js": "2.112.3",
+        "r_attempts": 4,
+        "r_wire": 4,
+        "r_rc": "-,1,2,3",
+        "r_gaps_ms": "1000,2000,4000",
+        "r_ok": 0,
+        "r_status": 503,
+        "r_code": "PGRST002",
+        "r_elapsed_ms": 7009
+      },
+      "durationMs": 200099
+    },
+    {
+      "id": "CR01c4",
+      "title": "CR01c4: db.retry=false overridden by .retry(true) on the query, 503 always",
+      "status": "info",
+      "detail": "attempts=4 wire=4 rc=[-,1,2,3] gaps=[1000,2000,4000] status=503 PGRST002 7009ms",
+      "measurements": {
+        "supabase-js": "2.112.3",
+        "r_attempts": 4,
+        "r_wire": 4,
+        "r_rc": "-,1,2,3",
+        "r_gaps_ms": "1000,2000,4000",
+        "r_ok": 0,
+        "r_status": 503,
+        "r_code": "PGRST002",
+        "r_elapsed_ms": 7009
+      },
+      "durationMs": 200099
+    },
+    {
+      "id": "CR01d1",
+      "title": "CR01d1: no timeout: GET delayed 3 s",
+      "status": "pass",
+      "detail": "attempts=1 wire=1 rc=[-] gaps=[] status=200  3088ms",
+      "measurements": {
+        "supabase-js": "2.112.3",
+        "r_attempts": 1,
+        "r_wire": 1,
+        "r_rc": "-",
+        "r_gaps_ms": "-",
+        "r_ok": 1,
+        "r_status": 200,
+        "r_code": "-",
+        "r_elapsed_ms": 3088
+      },
+      "durationMs": 200099
+    },
+    {
+      "id": "CR01d2",
+      "title": "CR01d2: no timeout: GET delayed 10 s",
+      "status": "pass",
+      "detail": "attempts=1 wire=1 rc=[-] gaps=[] status=200  10108ms",
+      "measurements": {
+        "supabase-js": "2.112.3",
+        "r_attempts": 1,
+        "r_wire": 1,
+        "r_rc": "-",
+        "r_gaps_ms": "-",
+        "r_ok": 1,
+        "r_status": 200,
+        "r_code": "-",
+        "r_elapsed_ms": 10108
+      },
+      "durationMs": 200099
+    },
+    {
+      "id": "CR01d3",
+      "title": "CR01d3: db.timeout=2000, GET delayed 3 s",
+      "status": "pass",
+      "detail": "attempts=1 wire=1 rc=[-] gaps=[] status=0  2004ms",
+      "measurements": {
+        "supabase-js": "2.112.3",
+        "r_attempts": 1,
+        "r_wire": 1,
+        "r_rc": "-",
+        "r_gaps_ms": "-",
+        "r_ok": 0,
+        "r_status": 0,
+        "r_code": "-",
+        "r_elapsed_ms": 2004
+      },
+      "durationMs": 200099
+    },
+    {
+      "id": "CR01d4",
+      "title": "CR01d4: db.timeout=2000, 503 always (is the timeout per attempt or per call?)",
+      "status": "pass",
+      "detail": "attempts=4 wire=4 rc=[-,1,2,3] gaps=[1000,2000,4000] status=503 PGRST002 7010ms",
+      "measurements": {
+        "supabase-js": "2.112.3",
+        "r_attempts": 4,
+        "r_wire": 4,
+        "r_rc": "-,1,2,3",
+        "r_gaps_ms": "1000,2000,4000",
+        "r_ok": 0,
+        "r_status": 503,
+        "r_code": "PGRST002",
+        "r_elapsed_ms": 7010
+      },
+      "durationMs": 200099
+    },
+    {
+      "id": "CR01d5a",
+      "title": "CR01d5a: .abortSignal(AbortSignal.timeout(5000)) created inline, 503 always (should abort during the 3 s to 7 s backoff)",
+      "status": "pass",
+      "detail": "attempts=4 wire=4 rc=[-,1,2,3] gaps=[1000,2000,4000] status=503 PGRST002 7011ms",
+      "measurements": {
+        "supabase-js": "2.112.3",
+        "r_attempts": 4,
+        "r_wire": 4,
+        "r_rc": "-,1,2,3",
+        "r_gaps_ms": "1000,2000,4000",
+        "r_ok": 0,
+        "r_status": 503,
+        "r_code": "PGRST002",
+        "r_elapsed_ms": 7011
+      },
+      "durationMs": 200099
+    },
+    {
+      "id": "CR01d5b",
+      "title": "CR01d5b: .abortSignal(controller.signal) with setTimeout(abort, 5000), 503 always",
+      "status": "pass",
+      "detail": "attempts=3 wire=3 rc=[-,1,2] gaps=[1000,2000] status=0  5005ms",
+      "measurements": {
+        "supabase-js": "2.112.3",
+        "r_attempts": 3,
+        "r_wire": 3,
+        "r_rc": "-,1,2",
+        "r_gaps_ms": "1000,2000",
+        "r_ok": 0,
+        "r_status": 0,
+        "r_code": "-",
+        "r_elapsed_ms": 5005
+      },
+      "durationMs": 200099
+    },
+    {
+      "id": "CR01d5c",
+      "title": "CR01d5c: AbortSignal.timeout(5000) with an abort listener attached at creation, 503 always",
+      "status": "pass",
+      "detail": "attempts=3 wire=3 rc=[-,1,2] gaps=[1000,2000] status=0  5003ms",
+      "measurements": {
+        "supabase-js": "2.112.3",
+        "r_attempts": 3,
+        "r_wire": 3,
+        "r_rc": "-,1,2",
+        "r_gaps_ms": "1000,2000",
+        "r_ok": 0,
+        "r_status": 0,
+        "r_code": "-",
+        "r_elapsed_ms": 5003
+      },
+      "durationMs": 200099
+    },
+    {
+      "id": "CR01d6",
+      "title": "CR01d6: db.timeout=2000, first attempt 503 then the retry hangs",
+      "status": "pass",
+      "detail": "attempts=2 wire=2 rc=[-,1] gaps=[1000] status=0  3009ms",
+      "measurements": {
+        "supabase-js": "2.112.3",
+        "r_attempts": 2,
+        "r_wire": 2,
+        "r_rc": "-,1",
+        "r_gaps_ms": "1000",
+        "r_ok": 0,
+        "r_status": 0,
+        "r_code": "-",
+        "r_elapsed_ms": 3009
+      },
+      "durationMs": 200099
+    },
+    {
+      "id": "CR01d7",
+      "title": "CR01d7: inline AbortSignal.timeout(3000), first attempt 503, then the retry hangs",
+      "status": "info",
+      "detail": "still pending at 9004 ms, wire=2 (the 3000 ms deadline never ended the call)",
+      "measurements": {
+        "pending_at_9s": 1,
+        "wire": 2,
+        "elapsed_ms": -1
+      },
+      "durationMs": 200099
+    },
+    {
+      "id": "CR01e1",
+      "title": "CR01e1: GET against the real Data-API-off 503 PGRST002",
+      "status": "info",
+      "detail": "attempts=4 rc=[-,1,2,3] gaps=[1700,1800,2000] upstream Retry-After=[0,0,0,0] 503 PGRST002 7252ms",
+      "measurements": {
+        "g_attempts": 4,
+        "g_wire": 4,
+        "g_rc": "-,1,2,3",
+        "g_gaps_ms": "1700,1800,2000",
+        "g_ok": 0,
+        "g_status": 503,
+        "g_code": "PGRST002",
+        "g_elapsed_ms": 7252,
+        "upstream_retry_after": "0,0,0,0",
+        "upstream_answer_ms": "1665,1752,1948,1880"
+      },
+      "durationMs": 200099
+    },
+    {
+      "id": "CR01e2",
+      "title": "CR01e2: POST insert against the real 503 PGRST002",
+      "status": "pass",
+      "detail": "attempts=1 wire=1 503 PGRST002",
+      "measurements": {
+        "p_attempts": 1,
+        "p_wire": 1,
+        "p_rc": "-",
+        "p_gaps_ms": "-",
+        "p_ok": 0,
+        "p_status": 503,
+        "p_code": "PGRST002",
+        "p_elapsed_ms": 951
+      },
+      "durationMs": 200099
+    },
+    {
+      "id": "CR01e3",
+      "title": "CR01e3: GET .retry(false) against the real 503 PGRST002",
+      "status": "pass",
+      "measurements": {
+        "n_attempts": 1,
+        "n_wire": 1,
+        "n_rc": "-",
+        "n_gaps_ms": "-",
+        "n_ok": 0,
+        "n_status": 503,
+        "n_code": "PGRST002",
+        "n_elapsed_ms": 964
+      },
+      "durationMs": 200099
+    },
+    {
+      "id": "CR01e-restore",
+      "title": "CR01e-restore: Data API back",
+      "status": "info",
+      "measurements": {
+        "restore_s": 1,
+        "final_status": 200
+      },
+      "durationMs": 200099
+    },
+    {
+      "id": "CR01f",
+      "title": "CR01f: gateway edge_logs for the real-503 GETs",
+      "status": "info",
+      "detail": "rows=5; default client rows=4 (503,503,503,503); .retry(false) rows=1; rows mentioning retry=0",
+      "measurements": {
+        "edge_rows_total": 5,
+        "edge_rows_default_client": 4,
+        "edge_statuses_default_client": "503,503,503,503",
+        "edge_rows_retry_false": 1,
+        "rows_mentioning_retry": 0,
+        "request_header_attrs_seen": "accept,cf_connecting_ip,cf_ray,user_agent,x_client_info",
+        "waited_s": 22
+      },
+      "durationMs": 200099
+    },
+    {
+      "id": "CR01-teardown",
+      "title": "CR01-teardown: project deleted",
+      "status": "info",
+      "measurements": {
+        "delete_status": 200
+      },
+      "durationMs": 200099
+    },
+    {
+      "id": "CR02-control",
+      "title": "CR02-control: provision",
+      "status": "info",
+      "measurements": {
+        "provision_s": 15,
+        "supabase-js": "2.112.3",
+        "runtime": "bun 1.3.14"
+      },
+      "durationMs": 54159
+    },
+    {
+      "id": "CR02a",
+      "title": "CR02a: baseline default client, first request delayed 10 s",
+      "status": "info",
+      "detail": "10054 ms, wire 1",
+      "measurements": {
+        "elapsed_ms": 10054,
+        "wire": 1,
+        "ok": 1
+      },
+      "durationMs": 54159
+    },
+    {
+      "id": "CR02b",
+      "title": "CR02b: hedge: first request held 10 s before forwarding, hedge at 1500 ms",
+      "status": "pass",
+      "detail": "started=2 winner=2 status=200 1575 ms wire=2",
+      "measurements": {
+        "timeout_ms": 5000,
+        "hedge_after_ms": 1500,
+        "elapsed_ms": 1575,
+        "started": 2,
+        "winner": 2,
+        "status": 200,
+        "ok": 1,
+        "wire": 2,
+        "actions": "pass+10000ms-before,pass",
+        "client_aborted": "1,0"
+      },
+      "durationMs": 54159
+    },
+    {
+      "id": "CR02c",
+      "title": "CR02c: extra attempt: 525 once then pass",
+      "status": "pass",
+      "detail": "started=2 winner=2 status=200 51 ms wire=2",
+      "measurements": {
+        "timeout_ms": 5000,
+        "hedge_after_ms": 1500,
+        "elapsed_ms": 51,
+        "started": 2,
+        "winner": 2,
+        "status": 200,
+        "ok": 1,
+        "wire": 2,
+        "actions": "525,pass",
+        "client_aborted": "0,0"
+      },
+      "durationMs": 54159
+    },
+    {
+      "id": "CR02d",
+      "title": "CR02d: 525 always: attempts and time stay bounded",
+      "status": "pass",
+      "detail": "started=2 winner=2 status=525 1 ms wire=2",
+      "measurements": {
+        "timeout_ms": 5000,
+        "hedge_after_ms": 1500,
+        "elapsed_ms": 1,
+        "started": 2,
+        "winner": 2,
+        "status": 525,
+        "ok": 0,
+        "wire": 2,
+        "actions": "525,525",
+        "client_aborted": "0,0"
+      },
+      "durationMs": 54159
+    },
+    {
+      "id": "CR02e",
+      "title": "CR02e: hang always: the deadline ends the call",
+      "status": "pass",
+      "detail": "started=2 winner=2 status=0 4003 ms wire=2",
+      "measurements": {
+        "timeout_ms": 4000,
+        "hedge_after_ms": 1500,
+        "elapsed_ms": 4003,
+        "started": 2,
+        "winner": 2,
+        "status": 0,
+        "ok": 0,
+        "wire": 2,
+        "actions": "hang,hang",
+        "client_aborted": "1,1"
+      },
+      "durationMs": 54159
+    },
+    {
+      "id": "CR02f1",
+      "title": "CR02f1: built-in retries OFF per attempt, 503 always, deadline 6 s",
+      "status": "pass",
+      "detail": "started=2 winner=2 status=503 4 ms wire=2",
+      "measurements": {
+        "timeout_ms": 6000,
+        "hedge_after_ms": 1500,
+        "elapsed_ms": 4,
+        "started": 2,
+        "winner": 2,
+        "status": 503,
+        "ok": 0,
+        "wire": 2,
+        "actions": "503,503",
+        "client_aborted": "0,0"
+      },
+      "durationMs": 54159
+    },
+    {
+      "id": "CR02f2",
+      "title": "CR02f2: built-in retries LEFT ON per attempt, 503 always, deadline 6 s",
+      "status": "pass",
+      "detail": "started=2 winner=2 status=0 6001 ms wire=6",
+      "measurements": {
+        "timeout_ms": 6000,
+        "hedge_after_ms": 1500,
+        "elapsed_ms": 6001,
+        "started": 2,
+        "winner": 2,
+        "status": 0,
+        "ok": 0,
+        "wire": 6,
+        "actions": "503,503,503,503,503,503",
+        "client_aborted": "0,0,0,0,0,0"
+      },
+      "durationMs": 54159
+    },
+    {
+      "id": "CR02g1",
+      "title": "CR02g1: hedged POST insert (not idempotent), server slow on the first",
+      "status": "info",
+      "detail": "started=2 winner=2; rows with tag g1: 2",
+      "measurements": {
+        "started": 2,
+        "winner": 2,
+        "rows_written": 2,
+        "wire": 2
+      },
+      "durationMs": 54159
+    },
+    {
+      "id": "CR02g2",
+      "title": "CR02g2: hedged upsert on a primary key (idempotent), server slow on the first",
+      "status": "info",
+      "detail": "started=2 winner=2; rows with tag g2: 1",
+      "measurements": {
+        "started": 2,
+        "winner": 2,
+        "rows_written": 1,
+        "wire": 2
+      },
+      "durationMs": 54159
+    },
+    {
+      "id": "CR02h1",
+      "title": "CR02h1: injected 401 PGRST303 once: naive vs refresh-then-retry",
+      "status": "pass",
+      "detail": "naive: status 401 after 1 request; policy: ok=true rest=2 refresh calls=1 new token on retry=true 136 ms",
+      "measurements": {
+        "naive_status": 401,
+        "naive_rest_wire": 1,
+        "policy_ok": 1,
+        "policy_rest_wire": 2,
+        "refresh_calls": 1,
+        "retry_used_new_token": 1,
+        "elapsed_ms": 136
+      },
+      "durationMs": 54159
+    },
+    {
+      "id": "CR02h2",
+      "title": "CR02h2: 401 on every REST request: the policy stops after one refresh and one retry",
+      "status": "pass",
+      "detail": "final status 401, rest=2, refresh calls=1",
+      "measurements": {
+        "final_status": 401,
+        "rest_wire": 2,
+        "refresh_calls": 1
+      },
+      "durationMs": 54159
+    },
+    {
+      "id": "CR02h3",
+      "title": "CR02h3: session revoked server-side, then a 401: the refresh fails and the original 401 is returned",
+      "status": "pass",
+      "detail": "logout HTTP 204; refresh error=refresh_token_not_found; refresh upstream=400; rest=1",
+      "measurements": {
+        "logout_status": 204,
+        "refresh_error": "refresh_token_not_found",
+        "refresh_upstream_status": "400",
+        "rest_wire": 1,
+        "final_status": 401
+      },
+      "durationMs": 54159
+    },
+    {
+      "id": "CR02h4",
+      "title": "CR02h4: real 401 (corrupted access-token signature, valid refresh token): refresh-then-retry recovers",
+      "status": "pass",
+      "detail": "naive status 401 PGRST301; policy ok=true refreshed=true rest=2 refresh calls=1",
+      "measurements": {
+        "naive_status": 401,
+        "naive_code": "PGRST301",
+        "policy_ok": 1,
+        "rest_wire": 2,
+        "refresh_calls": 1
+      },
+      "durationMs": 54159
+    },
+    {
+      "id": "CR02h5",
+      "title": "CR02h5: five parallel requests each get one 401: how many refresh calls reach the Auth server",
+      "status": "info",
+      "detail": "ok 5/5, refresh calls=1, rest wire=10",
+      "measurements": {
+        "ok_of_5": 5,
+        "refresh_calls": 1,
+        "rest_wire": 10
+      },
+      "durationMs": 54159
+    },
+    {
+      "id": "CR02-teardown",
+      "title": "CR02-teardown: project deleted",
+      "status": "info",
+      "measurements": {
+        "delete_status": 200
+      },
+      "durationMs": 54159
+    }
+  ]
+}
