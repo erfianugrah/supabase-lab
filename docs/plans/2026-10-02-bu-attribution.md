@@ -147,6 +147,12 @@ unit from `parent_project_ref`; names are hints, never the record.
       record whether it creates a project, reads a project created after the
       token was issued, and whether its `x-ratelimit-remaining` drops on a
       classic PAT's calls from the same user.
+- Status 2026-10-10: the measurement modules exist (experiments/scoped-pats,
+      SP01-SP10) but the token cannot be created through any API (SP01: no
+      creation operation in the public `/v1` OpenAPI; the dashboard route
+      refuses a PAT). The modules skip until a person creates the tokens in the
+      dashboard and supplies them as `PVLAB_SCOPED_PAT_<ROLE>`; Q14 stays open
+      until that run.
 
 ### Task 6: write-up
 
