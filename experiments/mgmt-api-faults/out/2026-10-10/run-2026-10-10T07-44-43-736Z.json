@@ -1,0 +1,378 @@
+{
+  "startedAt": "2026-10-10T07:44:43.736Z",
+  "finishedAt": "2026-10-10T07:55:02.546Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "mgmt-api-faults",
+  "labCommit": "70e4244",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "MF01a",
+      "title": "MF01a: mgmt() GET on persistent 5xx - attempts per call",
+      "status": "info",
+      "detail": "500: 1 attempt(s), returned status 500; 502: 1 attempt(s), returned status 502; 503: 1 attempt(s), returned status 503; 504: 1 attempt(s), returned status 504",
+      "measurements": {
+        "status_500_returned": 500,
+        "status_500_attempts": 1,
+        "status_502_returned": 502,
+        "status_502_attempts": 1,
+        "status_503_returned": 503,
+        "status_503_attempts": 1,
+        "status_504_returned": 504,
+        "status_504_attempts": 1
+      },
+      "durationMs": 68436
+    },
+    {
+      "id": "MF01b",
+      "title": "MF01b: mgmt() GET after a single transient 500",
+      "status": "info",
+      "detail": "first call returned 500; 1 attempt(s) on the wire (upstream would have answered 200)",
+      "measurements": {
+        "first_call_status": 500,
+        "attempts": 1
+      },
+      "evidence": "1x GET /v1/organizations error-before -> 500",
+      "durationMs": 68436
+    },
+    {
+      "id": "MF01c",
+      "title": "MF01c: functionPresent() through 429 x2 vs 500 x1",
+      "status": "info",
+      "detail": "429 x2 then upstream: 3 attempts, 30144 ms, final status 404; 500 x1 then upstream: 1 attempt(s), 0 ms, status 500, present=false",
+      "measurements": {
+        "r429_attempts": 3,
+        "r429_ms": 30144,
+        "r429_final_status": 404,
+        "r500_attempts": 1,
+        "r500_ms": 0,
+        "r500_status": 500,
+        "r500_present": 0
+      },
+      "durationMs": 68436
+    },
+    {
+      "id": "MF01d",
+      "title": "MF01d: mgmt() GET held 35 s against the 30 s default timeout",
+      "status": "info",
+      "detail": "threw TimeoutError after 30001 ms; 1 attempt(s); proxy row action=delay-before upstream=200",
+      "measurements": {
+        "client_ms": 30001,
+        "attempts": 1,
+        "threw": 1
+      },
+      "evidence": "threw TimeoutError",
+      "durationMs": 68436
+    },
+    {
+      "id": "MF02a",
+      "title": "MF02a: create answer held past the client timeout",
+      "status": "info",
+      "detail": "client threw TimeoutError after 4003 ms; 1 POST attempt(s); upstream status 201; projects with that name afterwards: 1",
+      "measurements": {
+        "client_ms": 4003,
+        "post_attempts": 1,
+        "upstream_status": 201,
+        "orphans": 1
+      },
+      "evidence": "1x POST /v1/projects delay-after -> 201",
+      "durationMs": 27652
+    },
+    {
+      "id": "MF02b",
+      "title": "MF02b: create answered 500 after upstream created the project",
+      "status": "info",
+      "detail": "client got 500; upstream status 201; 1 POST attempt(s); projects with that name: 1",
+      "measurements": {
+        "client_status": 500,
+        "upstream_status": 201,
+        "post_attempts": 1,
+        "orphans": 1
+      },
+      "evidence": "{\"message\":\"injected 500 (after500)\"}",
+      "durationMs": 27652
+    },
+    {
+      "id": "MF02c",
+      "title": "MF02c: second create with the same name and org",
+      "status": "info",
+      "detail": "second POST answered 400; projects with that name now: 1",
+      "measurements": {
+        "second_status": 400,
+        "projects_with_name": 1
+      },
+      "evidence": "{\"message\":\"Project with name \\\"mf-h-b-1791618366420\\\" already exists in your organization.\"}",
+      "durationMs": 27652
+    },
+    {
+      "id": "MF03a",
+      "title": "MF03a: CLI GET on persistent 4xx/5xx - attempts per invocation",
+      "status": "info",
+      "detail": "500: 6 attempts, exit 1, 255 ms, first-to-last attempt 4 ms; 502: 6 attempts, exit 1, 127 ms, first-to-last attempt 4 ms; 503: 6 attempts, exit 1, 129 ms, first-to-last attempt 3 ms; 504: 6 attempts, exit 1, 128 ms, first-to-last attempt 3 ms; 429_retry_after_1: 1 attempts, exit 1, 131 ms, first-to-last attempt 0 ms; 429_no_header: 1 attempts, exit 1, 126 ms, first-to-last attempt 0 ms",
+      "measurements": {
+        "500_attempts": 6,
+        "500_ms": 255,
+        "500_exit": 1,
+        "500_first_to_last_attempt_ms": 4,
+        "502_attempts": 6,
+        "502_ms": 127,
+        "502_exit": 1,
+        "502_first_to_last_attempt_ms": 4,
+        "503_attempts": 6,
+        "503_ms": 129,
+        "503_exit": 1,
+        "503_first_to_last_attempt_ms": 3,
+        "504_attempts": 6,
+        "504_ms": 128,
+        "504_exit": 1,
+        "504_first_to_last_attempt_ms": 3,
+        "429_retry_after_1_attempts": 1,
+        "429_retry_after_1_ms": 131,
+        "429_retry_after_1_exit": 1,
+        "429_retry_after_1_first_to_last_attempt_ms": 0,
+        "429_no_header_attempts": 1,
+        "429_no_header_ms": 126,
+        "429_no_header_exit": 1,
+        "429_no_header_first_to_last_attempt_ms": 0
+      },
+      "durationMs": 373592
+    },
+    {
+      "id": "MF03b",
+      "title": "MF03b: CLI retry budget on GET (500 x5 vs x6 then healthy)",
+      "status": "info",
+      "detail": "500 x5 then healthy: 6 attempts, exit 0; 500 x6 then healthy: 6 attempts, exit 1",
+      "measurements": {
+        "fault_x5_attempts": 6,
+        "fault_x5_exit": 0,
+        "fault_x6_attempts": 6,
+        "fault_x6_exit": 1
+      },
+      "durationMs": 373592
+    },
+    {
+      "id": "MF03c",
+      "title": "MF03c: CLI non-GET verbs on a 500 (and POST on 502/503/504/429) - attempts",
+      "status": "info",
+      "detail": "POST (projects create): 1 attempt(s), exit 1; POST (secrets set): 1 attempt(s), exit 1; PUT (ssl enforcement): 6 attempt(s), exit 1; DELETE (projects delete): 6 attempt(s), exit 1; DELETE (domains delete): 6 attempt(s), exit 1; POST secrets set answered 502: 1 attempt(s); POST secrets set answered 503: 1 attempt(s); POST secrets set answered 504: 1 attempt(s); POST secrets set answered 429: 1 attempt(s)",
+      "measurements": {
+        "POST_projects_create_attempts": 1,
+        "POST_projects_create_exit": 1,
+        "POST_secrets_set_attempts": 1,
+        "POST_secrets_set_exit": 1,
+        "PUT_ssl_enforcement_attempts": 6,
+        "PUT_ssl_enforcement_exit": 1,
+        "DELETE_projects_delete_attempts": 6,
+        "DELETE_projects_delete_exit": 1,
+        "DELETE_domains_delete_attempts": 6,
+        "DELETE_domains_delete_exit": 1,
+        "POST_secrets_set_502_attempts": 1,
+        "POST_secrets_set_503_attempts": 1,
+        "POST_secrets_set_504_attempts": 1,
+        "POST_secrets_set_429_attempts": 1
+      },
+      "durationMs": 373592
+    },
+    {
+      "id": "MF03d",
+      "title": "MF03d: CLI create answered 500 after upstream created the project",
+      "status": "info",
+      "detail": "1 POST attempt(s), CLI exit 1; projects named like the request afterwards: 1",
+      "measurements": {
+        "post_attempts": 1,
+        "cli_exit": 1,
+        "upstream_status": 201,
+        "orphans": 1
+      },
+      "evidence": "{\"_tag\":\"Error\",\"error\":{\"code\":\"ProjectsCreateUnexpectedStatusError\",\"message\":\"Unexpected error creating project: {\\\"message\\\":\\\"injected 500 (post-after)\\\"}\"}}\n ",
+      "durationMs": 373593
+    },
+    {
+      "id": "MF03e",
+      "title": "MF03e: CLI GET held 100 s by the proxy",
+      "status": "info",
+      "detail": "exit 1 after 360220 ms; 6 attempt(s)",
+      "measurements": {
+        "ms": 360220,
+        "exit": 1,
+        "attempts": 6,
+        "second_attempt_offset_s": 60,
+        "killed_by_harness": 0
+      },
+      "evidence": "attempt start offsets (s): 0,60,120,180,240,300\n{\"_tag\":\"Error\",\"error\":{\"code\":\"ProjectsListNetworkError\",\"message\":\"failed to list projects: HttpClientError: Transport: request timed out (GET http://127.0.0.1:18169/v1/projects)\"}}\n ",
+      "durationMs": 373593
+    },
+    {
+      "id": "MF04a",
+      "title": "MF04a: provider create through one 500 (before upstream)",
+      "status": "info",
+      "detail": "apply exit 1 in 925 ms; 1 POST attempt(s); state: 0 resource(s); projects with the name upstream: 0",
+      "measurements": {
+        "exit": 1,
+        "ms": 925,
+        "post_attempts": 1,
+        "state_resources": 0,
+        "upstream_projects": 0
+      },
+      "evidence": "Error: Client Error | with supabase_project.t, | on main.tf line 53, in resource \"supabase_project\" \"t\":\n1x POST /v1/projects error-before -> 500",
+      "durationMs": 149126
+    },
+    {
+      "id": "MF04b",
+      "title": "MF04b: provider create answered 500 after upstream created the project",
+      "status": "info",
+      "detail": "apply exit 1 in 1526 ms; 1 POST attempt(s); state: 0 resource(s); projects with the name upstream: 1",
+      "measurements": {
+        "exit": 1,
+        "ms": 1526,
+        "post_attempts": 1,
+        "state_resources": 0,
+        "upstream_projects": 1
+      },
+      "evidence": "Error: Client Error | with supabase_project.t, | on main.tf line 53, in resource \"supabase_project\" \"t\":\n1x POST /v1/projects error-after -> 500 (upstream 201)",
+      "durationMs": 149126
+    },
+    {
+      "id": "MF04c",
+      "title": "MF04c: re-apply with the orphan present, then after deleting it",
+      "status": "info",
+      "detail": "with orphan: exit 1, 1 POST attempt(s) answered 400, state 0, upstream 1; after deleting orphan: exit 0 in 3468 ms, state 1, upstream 1",
+      "measurements": {
+        "orphan_exit": 1,
+        "orphan_post_upstream_status": 400,
+        "orphan_state_resources": 0,
+        "orphan_upstream_projects": 1,
+        "clean_exit": 0,
+        "clean_ms": 3468,
+        "clean_state_resources": 1,
+        "clean_upstream_projects": 1
+      },
+      "evidence": "Error: Client Error | with supabase_project.t, | on main.tf line 53, in resource \"supabase_project\" \"t\":",
+      "durationMs": 149126
+    },
+    {
+      "id": "MF04d0",
+      "title": "MF04d0: settings create answered 500 before upstream, once (project already in state)",
+      "status": "info",
+      "detail": "apply exit 1; 1 write attempt(s); state after: supabase_project.t; plan afterwards exit 2 (2 = settings still to create)",
+      "measurements": {
+        "exit": 1,
+        "write_attempts": 1,
+        "state_resources": 1,
+        "plan_exit_after": 2
+      },
+      "evidence": "Error: Client Error | with supabase_settings.t[0], | on main.tf line 60, in resource \"supabase_settings\" \"t\":\n2x GET /v1/projects/{ref} forward -> 200\n1x GET /v1/projects/{ref}/api-keys/legacy forward -> 200\n1x GET /v1/projects/{ref}/billing/addons forward -> 200\n1x GET /v1/projects/{ref}/postgrest forward -> 200\n1x GET /v1/projects/{ref}/health forward -> 200\n1x PATCH /v1/projects/{ref}/postgrest error-before -> 500",
+      "durationMs": 149126
+    },
+    {
+      "id": "MF04d0c",
+      "title": "MF04d0c: settings create with no fault (control) - write route and upstream value",
+      "status": "info",
+      "detail": "apply exit 0; write requests: PATCH /v1/projects/{ref}/postgrest; upstream max_rows=1000",
+      "measurements": {
+        "exit": 0,
+        "write_requests": 1,
+        "upstream_max_rows": 1000
+      },
+      "evidence": "2x GET /v1/projects/{ref} forward -> 200\n1x GET /v1/projects/{ref}/api-keys/legacy forward -> 200\n1x GET /v1/projects/{ref}/billing/addons forward -> 200\n1x GET /v1/projects/{ref}/postgrest forward -> 200\n1x GET /v1/projects/{ref}/health forward -> 200\n1x PATCH /v1/projects/{ref}/postgrest forward -> 200",
+      "durationMs": 149126
+    },
+    {
+      "id": "MF04d1",
+      "title": "MF04d1: settings update answered 500 before upstream, once",
+      "status": "info",
+      "detail": "apply exit 1; 1 settings write attempt(s); upstream max_rows=1000 (wanted 500, was 1000); plan afterwards exit 2 (2 = changes pending)",
+      "measurements": {
+        "exit": 1,
+        "settings_write_attempts": 1,
+        "upstream_max_rows": 1000,
+        "plan_exit_after": 2
+      },
+      "evidence": "Error: Client Error | with supabase_settings.t[0], | on main.tf line 60, in resource \"supabase_settings\" \"t\":\n2x GET /v1/projects/{ref} forward -> 200\n1x GET /v1/projects/{ref}/api-keys/legacy forward -> 200\n1x GET /v1/projects/{ref}/billing/addons forward -> 200\n2x GET /v1/projects/{ref}/postgrest forward -> 200\n1x GET /v1/projects/{ref}/health forward -> 200\n1x PATCH /v1/projects/{ref}/postgrest error-before -> 500",
+      "durationMs": 149126
+    },
+    {
+      "id": "MF04d2",
+      "title": "MF04d2: settings update answered 500 AFTER upstream applied it, once",
+      "status": "info",
+      "detail": "apply exit 1; 1 settings write attempt(s); upstream max_rows=250 (wanted 250, was 500); plan afterwards exit 0 (0 = converged, 2 = changes pending)",
+      "measurements": {
+        "exit": 1,
+        "settings_write_attempts": 1,
+        "upstream_max_rows": 250,
+        "plan_exit_after": 0
+      },
+      "evidence": "Error: Client Error | with supabase_settings.t[0], | on main.tf line 60, in resource \"supabase_settings\" \"t\":\n2x GET /v1/projects/{ref} forward -> 200\n1x GET /v1/projects/{ref}/api-keys/legacy forward -> 200\n1x GET /v1/projects/{ref}/billing/addons forward -> 200\n2x GET /v1/projects/{ref}/postgrest forward -> 200\n1x GET /v1/projects/{ref}/health forward -> 200\n1x PATCH /v1/projects/{ref}/postgrest error-after -> 500 (upstream 200)",
+      "durationMs": 149126
+    },
+    {
+      "id": "MF04e",
+      "title": "MF04e: provider reads (plan refresh) through 500, 503, 429 and a 100 s hold",
+      "status": "info",
+      "detail": "500_once: 2 GET attempt(s) on the project, plan exit 0, 1614 ms; 503_always: 4 GET attempt(s) on the project, plan exit 1, 6240 ms (Error: Client Error | with supabase_project.t, | on main.tf line 53, in resource \"supabase_project\" \"t\":); 429_retry_after_1_once: 2 GET attempt(s) on the project, plan exit 0, 1544 ms; hold100_once: 1 GET attempt(s) on the project, plan exit 0, 103298 ms",
+      "measurements": {
+        "500_once_attempts": 2,
+        "500_once_exit": 0,
+        "500_once_ms": 1614,
+        "503_always_attempts": 4,
+        "503_always_exit": 1,
+        "503_always_ms": 6240,
+        "429_retry_after_1_once_attempts": 2,
+        "429_retry_after_1_once_exit": 0,
+        "429_retry_after_1_once_ms": 1544,
+        "hold100_once_attempts": 1,
+        "hold100_once_exit": 0,
+        "hold100_once_ms": 103298
+      },
+      "durationMs": 149126
+    },
+    {
+      "id": "MF04f1",
+      "title": "MF04f1: destroy with DELETE answered 500 before upstream, once",
+      "status": "info",
+      "detail": "destroy exit 1; 1 DELETE attempt(s); state 1 resource(s); upstream projects 1",
+      "measurements": {
+        "exit": 1,
+        "delete_attempts": 1,
+        "state_resources": 1,
+        "upstream_projects": 1
+      },
+      "evidence": "Error: Client Error | Unable to delete project, got status 500: {\"message\":\"injected 500 | (del-before)\"}\n1x GET /v1/projects/{ref} forward -> 200\n1x GET /v1/projects/{ref}/api-keys/legacy forward -> 200\n1x GET /v1/projects/{ref}/billing/addons forward -> 200\n1x GET /v1/projects/{ref}/postgrest forward -> 200\n1x DELETE /v1/projects/{ref} error-before -> 500",
+      "durationMs": 149126
+    },
+    {
+      "id": "MF04f2",
+      "title": "MF04f2: destroy with DELETE answered 500 AFTER upstream accepted it, once",
+      "status": "info",
+      "detail": "destroy exit 1; 1 DELETE attempt(s) (upstream 200); state 1 resource(s); upstream projects 0",
+      "measurements": {
+        "exit": 1,
+        "delete_attempts": 1,
+        "upstream_delete_status": 200,
+        "state_resources": 1,
+        "upstream_projects": 0
+      },
+      "evidence": "Error: Client Error | Unable to delete project, got status 500: {\"message\":\"injected 500 | (del-after)\"}\n1x GET /v1/projects/{ref} forward -> 200\n1x GET /v1/projects/{ref}/api-keys/legacy forward -> 200\n1x GET /v1/projects/{ref}/billing/addons forward -> 200\n1x DELETE /v1/projects/{ref} error-after -> 500 (upstream 200)",
+      "durationMs": 149126
+    },
+    {
+      "id": "MF04f3",
+      "title": "MF04f3: clean destroy against state whose project is already gone upstream",
+      "status": "info",
+      "detail": "destroy exit 0; requests: 2 distinct; state 0 resource(s)",
+      "measurements": {
+        "exit": 0,
+        "state_resources": 0
+      },
+      "evidence": "\n1x GET /v1/projects/{ref} forward -> 404\n1x DELETE /v1/projects/{ref} forward -> 404",
+      "durationMs": 149126
+    }
+  ]
+}
