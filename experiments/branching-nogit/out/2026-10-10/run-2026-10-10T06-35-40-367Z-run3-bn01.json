@@ -1,0 +1,149 @@
+{
+  "startedAt": "2026-10-10T06:35:40.367Z",
+  "finishedAt": "2026-10-10T06:41:42.632Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "branching-nogit",
+  "labCommit": "70e4244",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "BN01a",
+      "title": "BN01a: parent project and baseline table written through the SQL path",
+      "status": "pass",
+      "detail": "create HTTP 201; ACTIVE_HEALTHY; baseline HTTP 201; parent migration history before branching: 0 row(s)",
+      "measurements": {
+        "create_http": 201,
+        "health": "ACTIVE_HEALTHY",
+        "baseline_http": 201,
+        "parent_migrations_before_branch": 0
+      },
+      "durationMs": 362264
+    },
+    {
+      "id": "BN01b",
+      "title": "BN01b: git-less branch: create, healthy, parent schema arrival",
+      "status": "fail",
+      "detail": "create HTTP 201 in 926 ms; healthy after 1 s; baseline table on the branch at healthy: 0; pull step exited after 42 s; baseline table after pull: 0; steps: configure=EXITED,deploy=EXITED,migrate=CREATED,pull=EXITED",
+      "measurements": {
+        "create_http": 201,
+        "create_ms": 926,
+        "persistent": "false",
+        "with_data": "false",
+        "healthy_s": 1,
+        "baseline_on_branch_at_healthy": 0,
+        "pull_exited_s": 42,
+        "baseline_on_branch_after_pull": 0,
+        "branch_migrations_after_pull": "",
+        "parent_migrations_after_branch": "remote_schema"
+      },
+      "durationMs": 362264
+    },
+    {
+      "id": "BN01c",
+      "title": "BN01c: change set written on the branch; branch holds it; parent does not",
+      "status": "fail",
+      "detail": "q column: HTTP 400 Failed to run sql query: ERROR: 42P01: relation \"public.bn_base\" does not exist ; q index: HTTP 400 Failed to run sql query: ERROR: 42P01: relation \"public.bn_base\" does not exist ; branch holds the complete set(s): false; parent holds any before merge: 0",
+      "measurements": {
+        "query_path_ok": "5 of 7",
+        "query_path_insert_http": 201,
+        "branch_migrations_after_writes": "",
+        "branch_q_table": "present",
+        "branch_q_rls": "on",
+        "branch_q_policy": "present",
+        "branch_q_acl_authenticated": "SELECT",
+        "branch_q_acl_anon": "none",
+        "branch_q_function": "present",
+        "branch_q_column": "absent",
+        "branch_q_index": "absent",
+        "parent_has_any_before_merge": 0
+      },
+      "durationMs": 362264
+    },
+    {
+      "id": "BN01d",
+      "title": "BN01d: GET /diff: default, pgdelta=true, pgdelta=false",
+      "status": "info",
+      "detail": "default 935 chars, pgdelta=true 1204 chars, pgdelta=false 935 chars; default identical to pgdelta=false: 1",
+      "measurements": {
+        "default_http": 200,
+        "default_chars": 935,
+        "default_q_table": 1,
+        "default_q_policy": 1,
+        "default_q_function": 1,
+        "default_q_column": 0,
+        "default_q_index": 0,
+        "default_q_revoke_or_grant": 1,
+        "default_pg_net": 1,
+        "default_drop_baseline": 0,
+        "pgdelta_http": 200,
+        "pgdelta_chars": 1204,
+        "pgdelta_q_table": 1,
+        "pgdelta_q_policy": 1,
+        "pgdelta_q_function": 1,
+        "pgdelta_q_column": 0,
+        "pgdelta_q_index": 0,
+        "pgdelta_q_revoke_or_grant": 1,
+        "pgdelta_pg_net": 1,
+        "pgdelta_drop_baseline": 0,
+        "migra_http": 200,
+        "migra_chars": 935,
+        "migra_q_table": 1,
+        "migra_q_policy": 1,
+        "migra_q_function": 1,
+        "migra_q_column": 0,
+        "migra_q_index": 0,
+        "migra_q_revoke_or_grant": 1,
+        "migra_pg_net": 1,
+        "migra_drop_baseline": 0,
+        "default_equals_migra": 1
+      },
+      "evidence": "--- pgdelta=true ---\nset local check_function_bodies = off;\n\ncreate extension \"pg_net\" schema \"extensions\";\n\ncreate table \"public\".\"q_t\" (\n  \"id\"    bigint generated always as identity not null,\n  \"owner\" uuid,\n  \"body\"  text,\n  constraint \"q_t_pkey\" primary key (id)\n);\n\nalter table \"public\".\"q_t\"\n  enable row level security;\n\nrevoke all on table \"public\".\"q_t\" from \"anon\";\n\ncreate or replace function public.q_fn (\n  a integer\n)\n  returns integer\n  language sql\n  immutable\n  AS $function$ select a + 1 $function$;\n\nrevoke all on function \"public\".\"q_fn\"(integer) from \"anon\", \"authenticated\", \"service_role\";\n\ncreate policy \"q_own\" on \"public\".\"q_t\"\n  for select\n  to \"authenticated\"\n  using ((owner = auth.uid()));\n\ncomment on extension \"pg_net\" is 'Async HTTP';\n\ngrant execute on function \"public\".\"q_fn\"(integer) to public, \"postgres\";\n\nrevoke all on table \"public\".\"q_t\" from \"authenticated\";\n\ngrant select on table \"public\".\"q_t\" to \"authenticated\";\n\ngrant delete, insert, maintain, references, select, trigger, truncate, update on table \"public\".\"q_t\" to \"postgres\";\n\nrevoke all on table \"public\".\"q_t\" from \"service_role\";\n\ngrant maintain, references, trigger, truncate on table \"public\".\"q_t\" to \"service_role\";\n\n--- pgdelta=false ---\ncreate extension if not exists \"pg_net\" with schema \"extensions\";\n\n\n  create table \"public\".\"q_t\" (\n    \"id\" bigint generated always as identity not null,\n    \"owner\" uuid,\n    \"body\" text\n      );\n\n\nalter table \"public\".\"q_t\" enable row level security;\n\nCREATE UNIQUE INDEX q_t_pkey ON public.q_t USING btree (id);\n\nalter table \"public\".\"q_t\" add constraint \"q_t_pkey\" PRIMARY KEY using index \"q_t_pkey\";\n\nset check_function_bodies = off;\n\nCREATE OR REPLACE FUNCTION public.q_fn(a integer)\n RETURNS integer\n LANGUAGE sql\n IMMUTABLE\nAS $function$ select a + 1 $function$\n;\n\ngrant select on table \"public\".\"q_t\" to \"authenticated\";\n\ngrant references on table \"public\".\"q_t\" to \"service_role\";\n\ngrant trigger on table \"public\".\"q_t\" to \"service_role\";\n\ngrant truncate on table \"public\".\"q_t\" to \"service_role\";\n\n\n  create policy \"q_own\"\n  on \"public\".\"q_t\"\n  as permissive\n  for select\n  to authenticated\nusing ((owner = auth.uid()));\n\n\n",
+      "durationMs": 362264
+    },
+    {
+      "id": "BN01e",
+      "title": "BN01e: POST /merge, then the parent over a fixed window",
+      "status": "info",
+      "detail": "merge HTTP 201; after 245 s the parent has: q=table absent; parent migration history: remote_schema",
+      "measurements": {
+        "merge_http": 201,
+        "merge_body_ok": "ok",
+        "workflow_run_id_returned": 1,
+        "observed_s": 245,
+        "q_table": "absent",
+        "q_rls": "n/a",
+        "q_policy": "absent",
+        "q_acl_authenticated": "n/a",
+        "q_acl_anon": "n/a",
+        "q_function": "absent",
+        "q_column": "absent",
+        "q_index": "absent",
+        "q_first_seen_s": "never",
+        "merge_run_steps": "clone=EXITED,configure=PAUSED,deploy=EXITED,health=EXITED,migrate=EXITED,pull=EXITED,seed=EXITED",
+        "parent_migrations_after_merge": "remote_schema",
+        "parent_pg_net_extension": 0
+      },
+      "durationMs": 362264
+    },
+    {
+      "id": "BN01f",
+      "title": "BN01f: teardown: branch deleted, parent deleted",
+      "status": "pass",
+      "detail": "branch DELETE 200, gone from the parent's list after 0 s; parent DELETE 200; this scenario's refs still in GET /projects: 0",
+      "measurements": {
+        "branch_delete_http": 200,
+        "branch_gone_s": 0,
+        "parent_delete_http": 200,
+        "refs_left_in_listing": 0
+      },
+      "durationMs": 362264
+    }
+  ]
+}
