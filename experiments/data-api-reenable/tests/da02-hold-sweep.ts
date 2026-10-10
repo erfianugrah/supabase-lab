@@ -16,7 +16,7 @@
  * DESTRUCTIVE: switches the Data API off. Restores the exact baseline config.
  */
 import type { Ctx, TestModule, TestResult } from "../../../harness/src/types.js";
-import { fetchKeys, logsAllQuery } from "../../../harness/src/platform.js";
+import { fetchKeys, logsQuery } from "../../../harness/src/platform.js";
 import {
   APP_PATHS,
   dataApiProbes,
@@ -125,22 +125,32 @@ const mod: TestModule = {
     }
 
     // Server-side view. Log rows land 15-60 s late (edge-resilience W27). The
-    // stream endpoint answers `Table "postgrest_logs" does not exist.`; logs.all
-    // has it (2026-09-24).
+    // `logs.all` endpoint this read used answers 410 since 2026-09-23; the
+    // unified `logs` endpoint carries postgrest_logs as a `source` value
+    // (ClickHouse dialect). The source and timestamp predicate were probed by
+    // hand on a fresh project on 2026-10-10; this module has not been re-run
+    // end to end since the port.
     await Bun.sleep(60_000);
     const hours = Math.min(24, Math.ceil((Date.now() - runStart.getTime()) / 3600_000) + 1);
-    const logs = await logsAllQuery(
+    const logs = await logsQuery(
       ctx,
       // Filter in SQL: `order by ... asc limit` over the whole window returned
       // the OLDEST 1000 rows (earlier runs) and the client-side filter then
       // dropped all of them - DA02L reported 0 lines on 2026-09-24.
-      `select timestamp, event_message from postgrest_logs where timestamp >= timestamp '${runStart.toISOString().replace("T", " ").replace("Z", "")}' order by timestamp asc limit 2000`,
+      `select timestamp, event_message from logs where source = 'postgrest_logs' and timestamp >= toDateTime64('${runStart.toISOString().slice(0, 19).replace("T", " ")}', 6) order by timestamp asc limit 2000`,
       hours,
     );
     const lines = logs.rows
       .map((r) => {
+        // `timestamp` is an ISO string in UTC without a zone suffix on the
+        // unified table (microseconds since epoch on `logs.all`); accept both.
         const ts = Number(r.timestamp);
-        const iso = Number.isFinite(ts) ? new Date(ts / 1000).toISOString() : String(r.timestamp);
+        const raw = String(r.timestamp);
+        const iso = Number.isFinite(ts)
+          ? new Date(ts / 1000).toISOString()
+          : Number.isFinite(Date.parse(`${raw}Z`))
+            ? new Date(`${raw}Z`).toISOString()
+            : raw;
         return `${iso} ${String(r.event_message ?? "").replace(/\s+/g, " ").slice(0, 200)}`;
       })
       .filter((l) => l.slice(0, 24) >= runStart.toISOString());

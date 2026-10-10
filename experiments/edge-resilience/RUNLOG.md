@@ -422,6 +422,11 @@ Battery artifact: out/run-2026-08-17T07-41-07-229Z.{json,md}.
 
 ## W27 - PGRST303 body length through edge_logs, and the Logs Explorer split (2026-09-07, green, module)
 
+(Read path retired: the `logs.all` endpoint and the `unnest(metadata)` SQL
+below answer 410 since 2026-09-23. The 2026-10-10 section at the end of this
+file re-runs W27 on the unified `logs` endpoint; the 2026-09-07 figures are
+history, not a current recipe.)
+
 Question: when PostgREST rejects a JWT with PGRST303, can a reader of
 edge_logs tell "JWT issued at future" from "JWT expired" without the response
 body, and does the byte-count discriminator the body implies survive the API
@@ -531,3 +536,124 @@ comparing `expires_at` to it without the `div` classifies every row as
 expired. Not settled here: whether a project provisioned in an earlier Logs
 Explorer era exposes the same field paths, and the stale-time cache itself
 (that needs a PostgREST build with a one-second skew, out of scope here).
+
+## W27 re-run on the unified logs endpoint, and the other `logs.all` callers (2026-10-10, green, module + hand probes)
+
+Question: FAILURE-MATRIX row 3.1 names edge_logs as the detection surface for
+PGRST303 and splits future-iat from expired on the JWT payload. `logs.all`
+answers 410 since 2026-09-23
+(https://supabase.com/changelog/48235-migration-of-supabase-management-api-logs-all-analytics-endpoint-to-logs-endpoint).
+Does the same detection work on `GET /v1/projects/{ref}/analytics/endpoints/logs`
+(ClickHouse dialect, `source` column, `log_attributes` map)?
+
+Vantage and n: the harness run from source on a developer Mac (Singapore
+egress), one fresh Pro-org project (micro compute, ap-southeast-1, provisioned
+and deleted the same day, one project, nothing else on it), one W27 run, two S18
+runs, hand queries between them. Artifacts (private, `evidence/`, not
+published): W27 `run-2026-10-09T23-38-06-945Z`, S18
+`run-2026-10-09T23-51-38-029Z` and `run-2026-10-09T23-59-00-770Z` (UTC stamps;
+the calendar date here is the local one).
+
+Provenance of the lines below: everything attributed to a module run (W27a-d,
+S18 runs 1 and 2) is in those three artifacts. Lines marked "hand" were read
+from curl-style probes and ad-hoc queries typed against the same project and
+deleted with it; no transcript of them was kept, so they are unrecorded
+observations from one session, not reproducible from `evidence/`. The project
+no longer exists, so they cannot be re-read.
+
+Measured:
+
+- `logs.all` -> HTTP 410, body "The logs.all endpoint has been removed. Use
+  GET /v1/projects/{ref}/analytics/endpoints/logs instead." with the changelog
+  link above (W27b `logs_all_http` 410 is in the artifact; the hand probe the same hour
+  is unrecorded). Hand, unrecorded: response headers `x-ratelimit-limit: 10`
+  and `x-ratelimit-reset: 60` on the unified endpoint.
+- W27a/b/c/d: 5 pass, 0 fail (`W27a`, `W27b`, `W27d`, `W27c`, `W27z`).
+  Wire bytes and log `content_length` agree: future-iat 79, expired 70, valid
+  10; `proxy_status` "PostgREST; error=PGRST303" on both 401s and empty on the
+  200. Rows were queryable 13 s after the request in W27b and 13 s in W27c
+  (46 s and 17 s on 2026-09-07 through `logs.all`; one run each, so the
+  difference is not a trend).
+- The skew read still works. `issued_at` minus the row's own timestamp in
+  seconds: +300 (future), -3900 (expired), 0 (valid; -1 on 2026-09-07 because
+  the timestamp is now an ISO string with millisecond precision and is
+  floored client-side).
+- W27d is new: the incident-window form selects on
+  `log_attributes['response.headers.proxy_status'] = 'PostgREST; error=PGRST303'`
+  and does the split in SQL, `issued_at - toUnixTimestamp(timestamp)` and
+  `expires_at < toUnixTimestamp(timestamp)` over `toInt64OrNull(...)` of the
+  string map values. It returned 2 rows: future `iat_skew_s` 300,
+  `is_expired` 0, content length 79; expired `iat_skew_s` -3900,
+  `is_expired` 1, content length 70. The 2026-09-07 note that the SQL form was
+  untested is closed for this recipe. The module keeps the probe's User-Agent
+  prefix in the predicate. A hand run of the same predicate without it, made
+  earlier on this project against two discovery probes (future and expired
+  tokens, before the module run), returned exactly those two rows (iat skew 300
+  and -3901, content length 79 and 70); that is a hand read with no transcript
+  kept, not a module row.
+- Field names on the unified table (read from `toString(log_attributes)` of
+  the rows; the W27 artifact's evidence fields hold the rows the module read): `request.headers.user_agent`, `request.method`, `request.path`,
+  `request.url`, `request.sb.auth_user`,
+  `request.sb.jwt.authorization.payload.{issued_at,expires_at,subject,role,algorithm,signature_prefix}`,
+  `response.status_code`, `response.headers.{content_length,proxy_status}`.
+  All map values are strings; a key a row lacks reads as the empty string,
+  not null.
+- Differences from the `logs.all` shape that change what a reader sees:
+  `timestamp` is an ISO string in UTC without a zone suffix (was microseconds
+  since epoch); a 42501 row has no `content_length` and no `transfer_encoding`
+  key (the 2026-09-07 read showed `transfer_encoding` "chunked"), so the
+  `proxy_status` selector, not `content_length`, is still the only way to find
+  permission-denied rows. W27c: anon 401, authenticated 403, SQLSTATE 42501 in
+  `proxy_status` for all three requests, unchanged.
+- S18 (`security-lockdown`), same unified endpoint, same project. Run 2
+  (`23-59-00`): 5 pass. A marked REST request found in edge_logs by
+  `log_attributes['request.path']` 13 s later with `cf_connecting_ip` present;
+  a marked Storage request 13 s later by `request.url`; a failed password login
+  found in `auth_logs` (`source = 'auth_logs'`, `event_message` text match) 1 s
+  after the query started and the successful login's auth_event 4 s later;
+  `GET /auth/v1/admin/audit` 200 with 0 entries; 10 failed pooler auths
+  produced 1 ban, removed with `DELETE /network-bans` (200, 0 after). Run 1
+  (`23-51-38`): S18b FAILED ("not found in edge_logs within 264s", rich
+  query, no endpoint error recorded). Hand, unrecorded: a row for the marked
+  request was read about ten minutes later, so it likely existed (the stamp
+  noted, 23:51:38, is the run's start second, not a request time, so this does
+  not show how late the row landed). S18c, 4.5 minutes later in the
+  same run, found its row in 13 s (artifact); S18e saw 0 bans after the same 10 failed
+  auths and only the "password authentication failed" error, where run 2's
+  second distinct error was `ECIRCUITBREAKER`. The cause of run 1's S18b miss
+  is not established: one run, no repeat. Run 2 added a poll count and last
+  response to the not-found message, and did not need it.
+- Hand, unrecorded (no transcript in `evidence/`): probe of the s2z-wake
+  surface entries on the same live project: `logs`
+  with only the window parameters -> 200, 66557 bytes (a default tail of
+  recent rows); `logs.all` with the same query string -> 410, 237 bytes.
+  `postgrest_logs` is a `source` value on the unified table (event messages
+  such as "Schema cache loaded ..." read back with `where source =
+  'postgrest_logs'`, and a `timestamp >= toDateTime64('2026-10-09 23:38:00', 6)`
+  predicate worked). Sources seen on this project in a hand query (one time, not
+  a complete census): pgbouncer_logs, postgrest_logs, auth_logs, postgres_logs,
+  edge_logs, realtime_logs, storage_logs.
+- Hand, unrecorded: the published OpenAPI document still listed
+  `.../analytics/endpoints/logs.all` when fetched on 2026-10-10 (the fetched
+  copy was not kept), so a regenerated s2z-wake surface list would re-add an
+  endpoint that answers 410. Re-fetch before relying on it.
+- Column name: the changelog says to filter by `source_name`; every query in
+  this section uses `where source = ...`, and W27 and S18 run 2 passed with it
+  (artifacts). `source_name` was not tried, so this records that `source` works,
+  not that `source_name` fails.
+
+Not measured: the Z01 parked-project sweep itself (needs a parked project;
+only the two logs entries were probed by hand, awake); the correct-password
+psql step of S18e (no database password was held, the step reports
+"skipped"); whether a project provisioned before the migration returns the
+same attribute keys (this project is a 2026-10-10 provision); the `logs.all`
+-> `logs` mapping for `data-api-reenable` DA02L: the module was ported to
+`logsQuery()` on 2026-10-10 (`source = 'postgrest_logs'` and a
+`toDateTime64(..., 6)` bound; ISO-string timestamp parsing), but only the
+predicate was hand-probed and the parse was checked against a literal, not a
+module run on a project with Data API traffic, so DA02L's line count on the
+unified endpoint is untested; whether the 13 s ingestion lag holds under load (single runs).
+
+The queries the module sent are in the artifact's `evidence` fields and in
+`experiments/edge-resilience/tests/w27-pgrst303-edge-logs.ts` (`richSql`,
+`incidentSql`).

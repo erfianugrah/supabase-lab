@@ -17,17 +17,22 @@
  *                 an `error` field on every failure, so the status code says
  *                 nothing. 10 requests per window. Edge Function console
  *                 output is `source = 'function_logs'`.
- *  - `logsAllQuery()` DEAD since 2026-09-23: `/analytics/endpoints/logs.all`
- *                 answers 410 "The logs.all endpoint has been removed"
- *                 (measured medium-serverless MS05, 2026-09-30; changelog
- *                 48235). Kept so S18/W27 still compile; new modules use
- *                 `logsQuery()` against the unified `logs` table: ClickHouse
- *                 dialect, `where source_name = 'edge_logs'` instead of a
- *                 per-source table, nested fields via
+ *  - The unified `logs` table (ClickHouse dialect) replaced `logs.all`, which
+ *                 answers 410 "The logs.all endpoint has been removed" since
+ *                 2026-09-23 (measured medium-serverless MS05 2026-09-30, and
+ *                 on a fresh Pro project 2026-10-10, edge-resilience W27b;
+ *                 changelog 48235). `logsAllQuery()` is deleted; no caller
+ *                 remains. Filter `where source = 'edge_logs'` (the changelog
+ *                 text says `source_name`; `source` is the column that
+ *                 answered in W27 and S18) instead of a per-source table;
+ *                 `postgrest_logs` is a `source` value too (hand probe,
+ *                 2026-10-10). Nested fields are flat string keys of
  *                 `log_attributes['request.method']` instead of `cross join
- *                 unnest(metadata)`. The 2026-09-03/07 note that `logs.all`
- *                 answered unnest queries the stream endpoint refused is
- *                 history, not guidance.
+ *                 unnest(metadata)`, a key a row lacks reads as '' (not
+ *                 null), `timestamp` is an ISO string in UTC (was
+ *                 microseconds since epoch). The 2026-09-03/07 note that
+ *                 `logs.all` answered unnest queries the stream endpoint
+ *                 refused is history, not guidance.
  *  - `functionPresent()` a deploy is not done on its status or exit code; this
  *                 is the read that says whether the function exists, with a
  *                 retry through the 429 a burst of deploys provokes.
@@ -89,20 +94,7 @@ export interface LogsResult {
  * over 24 hours.
  */
 export async function logsQuery(ctx: Ctx, sqlText: string, windowHours = 3): Promise<LogsResult> {
-  return logsEndpointQuery(ctx, "logs", sqlText, windowHours);
-}
-
-/** The same query against `logs.all`, which answers the unnest queries the stream endpoint refuses. */
-export async function logsAllQuery(ctx: Ctx, sqlText: string, windowHours = 1): Promise<LogsResult> {
-  return logsEndpointQuery(ctx, "logs.all", sqlText, windowHours);
-}
-
-async function logsEndpointQuery(
-  ctx: Ctx,
-  endpoint: "logs" | "logs.all",
-  sqlText: string,
-  windowHours: number,
-): Promise<LogsResult> {
+  const endpoint = "logs";
   const end = new Date();
   const start = new Date(end.getTime() - windowHours * 3600_000);
   const qs =

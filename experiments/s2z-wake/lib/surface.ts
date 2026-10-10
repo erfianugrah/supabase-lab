@@ -77,6 +77,17 @@ export function queryFor(path: string): string {
  */
 export const PARAMLESS_GETS: string[] = [
   "/analytics/endpoints/functions.combined-stats",
+  // The unified logs endpoint answered 200 to the window alone (no `sql`
+  // parameter: a default tail of recent rows, 66557 bytes on a fresh Pro
+  // project, 2026-10-10). `logs.all` answered 200 here until 2026-09-23 and
+  // answered 410 ("The logs.all endpoint has been removed", 237 bytes) on the
+  // same project, yet the published OpenAPI document still listed it. Those
+  // 2026-10-10 figures and the OpenAPI observation are hand probes with no
+  // transcript kept (edge-resilience RUNLOG, 2026-10-10 section); the 410 on
+  // `logs.all` is also in the W27b artifact. So it
+  // stays in the sweep: gen-surface.ts counts every listed operation, and a
+  // 410 that is constant across project states is a reading, not a wake
+  // signal. s2z-wake readings that show `logs.all` at 200 predate 2026-09-23.
   "/analytics/endpoints/logs",
   "/analytics/endpoints/logs.all",
   "/analytics/endpoints/usage.api-counts",
