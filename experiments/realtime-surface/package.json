@@ -1,0 +1,7 @@
+{
+  "name": "realtime-surface-old-sdk",
+  "private": true,
+  "dependencies": {
+    "supabase-js-2-90": "npm:@supabase/supabase-js@2.90.0"
+  }
+}
