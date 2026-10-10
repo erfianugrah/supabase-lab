@@ -1,0 +1,316 @@
+{
+  "startedAt": "2026-10-10T00:54:40.928Z",
+  "finishedAt": "2026-10-10T01:07:50.021Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "edge-runtime-auth",
+  "labCommit": "70e4244",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "ER02-setup",
+      "title": "ER02 setup: project, canary live, RPC twin, vantage",
+      "status": "pass",
+      "detail": "canary answered yes 1s after the first deploy; vantage colo=SIN loc=SG",
+      "measurements": {
+        "vantage": "colo=SIN loc=SG",
+        "project_ready_s": 2,
+        "first_deploy_status": 201,
+        "first_deploy_ms": 952,
+        "supabase_js_version": "2.117.3",
+        "functions_js_version": "2.117.3",
+        "rpc_twin_status": "201/201",
+        "hits_table_status": "201/201"
+      },
+      "durationMs": 789089
+    },
+    {
+      "id": "ER02-c1",
+      "title": "ER02 redeploy cycle 1: build 4d1c07 -> 6b1610",
+      "status": "pass",
+      "detail": "deploy API 201 in 1391ms (function version 2); first new-build answer 975ms after the deploy call returned, last old-build answer 8ms, 0 old-build answers after the first new one",
+      "measurements": {
+        "deploy_status": 201,
+        "deploy_ms": 1391,
+        "function_version": 2,
+        "first_new_ms": 975,
+        "last_old_ms": 8,
+        "mixed_window_ms": 0,
+        "old_after_first_new": 0,
+        "non_200": 0,
+        "samples": 627,
+        "isolates_new": 489,
+        "isolates_old": 1,
+        "observed_until_ms": 30095,
+        "pollers": 4,
+        "pre_deploy_samples": 74,
+        "pre_deploy_builds_seen": 1
+      },
+      "durationMs": 789089
+    },
+    {
+      "id": "ER02-c2",
+      "title": "ER02 redeploy cycle 2: build 6b1610 -> 8c9adf",
+      "status": "pass",
+      "detail": "deploy API 201 in 1703ms (function version 3); first new-build answer 781ms after the deploy call returned, last old-build answer -1ms, 0 old-build answers after the first new one",
+      "measurements": {
+        "deploy_status": 201,
+        "deploy_ms": 1703,
+        "function_version": 3,
+        "first_new_ms": 781,
+        "last_old_ms": -1,
+        "mixed_window_ms": 0,
+        "old_after_first_new": 0,
+        "non_200": 0,
+        "samples": 639,
+        "isolates_new": 501,
+        "isolates_old": 0,
+        "observed_until_ms": 30016,
+        "pollers": 4,
+        "pre_deploy_samples": 105,
+        "pre_deploy_builds_seen": 1
+      },
+      "durationMs": 789089
+    },
+    {
+      "id": "ER02-c3",
+      "title": "ER02 redeploy cycle 3: build 8c9adf -> e1854b",
+      "status": "pass",
+      "detail": "deploy API 201 in 1441ms (function version 4); first new-build answer 976ms after the deploy call returned, last old-build answer -1ms, 0 old-build answers after the first new one",
+      "measurements": {
+        "deploy_status": 201,
+        "deploy_ms": 1441,
+        "function_version": 4,
+        "first_new_ms": 976,
+        "last_old_ms": -1,
+        "mixed_window_ms": 0,
+        "old_after_first_new": 0,
+        "non_200": 0,
+        "samples": 636,
+        "isolates_new": 487,
+        "isolates_old": 0,
+        "observed_until_ms": 30030,
+        "pollers": 4,
+        "pre_deploy_samples": 104,
+        "pre_deploy_builds_seen": 1
+      },
+      "durationMs": 789089
+    },
+    {
+      "id": "ER02-c4",
+      "title": "ER02 redeploy cycle 4: build e1854b -> a8a6aa",
+      "status": "pass",
+      "detail": "deploy API 201 in 1324ms (function version 5); first new-build answer 987ms after the deploy call returned, last old-build answer 2ms, 0 old-build answers after the first new one",
+      "measurements": {
+        "deploy_status": 201,
+        "deploy_ms": 1324,
+        "function_version": 5,
+        "first_new_ms": 987,
+        "last_old_ms": 2,
+        "mixed_window_ms": 0,
+        "old_after_first_new": 0,
+        "non_200": 0,
+        "samples": 618,
+        "isolates_new": 496,
+        "isolates_old": 1,
+        "observed_until_ms": 30016,
+        "pollers": 4,
+        "pre_deploy_samples": 100,
+        "pre_deploy_builds_seen": 1
+      },
+      "durationMs": 789089
+    },
+    {
+      "id": "ER02-c5",
+      "title": "ER02 redeploy cycle 5: build a8a6aa -> b80a49",
+      "status": "pass",
+      "detail": "deploy API 201 in 1558ms (function version 6); first new-build answer 974ms after the deploy call returned, last old-build answer 36ms, 0 old-build answers after the first new one",
+      "measurements": {
+        "deploy_status": 201,
+        "deploy_ms": 1558,
+        "function_version": 6,
+        "first_new_ms": 974,
+        "last_old_ms": 36,
+        "mixed_window_ms": 0,
+        "old_after_first_new": 0,
+        "non_200": 0,
+        "samples": 628,
+        "isolates_new": 490,
+        "isolates_old": 1,
+        "observed_until_ms": 30034,
+        "pollers": 4,
+        "pre_deploy_samples": 105,
+        "pre_deploy_builds_seen": 1
+      },
+      "durationMs": 789089
+    },
+    {
+      "id": "ER02-drift",
+      "title": "ER02 drift summary across redeploy cycles",
+      "status": "pass",
+      "detail": "5 redeploys with 4 concurrent pollers; 0 of 5 cycles served the old build after the first new-build answer",
+      "measurements": {
+        "cycles": 5,
+        "first_new_ms_min": 781,
+        "first_new_ms_max": 987,
+        "first_new_ms_median": 975,
+        "last_old_ms_max": 36,
+        "cycles_with_old_after_new": 0,
+        "non_200_total": 0,
+        "pre_deploy_p95_ms": 109,
+        "first_10s_after_deploy_p95_ms": 240,
+        "first_10s_after_deploy_max_ms": 1035
+      },
+      "durationMs": 789089
+    },
+    {
+      "id": "ER02-retry-503",
+      "title": "ER02 functions.invoke against an injected 503",
+      "status": "info",
+      "detail": "3 trials: client attempts per invoke 1/1/1, rows the function recorded for the request id 1/1/1, error class FunctionsHttpError, HTTP 503",
+      "measurements": {
+        "trials": 3,
+        "client_attempts_each": "1/1/1",
+        "function_recorded_rows_each": "1/1/1",
+        "function_insert_status_each": "201/201/201",
+        "error_class": "FunctionsHttpError",
+        "http_status": 503,
+        "retried": "no",
+        "elapsed_ms_each": "361/156/229"
+      },
+      "durationMs": 789089
+    },
+    {
+      "id": "ER02-retry-503-retry-after",
+      "title": "ER02 functions.invoke against an injected 503 retry-after",
+      "status": "info",
+      "detail": "3 trials: client attempts per invoke 1/1/1, rows the function recorded for the request id 1/1/1, error class FunctionsHttpError, HTTP 503",
+      "measurements": {
+        "trials": 3,
+        "client_attempts_each": "1/1/1",
+        "function_recorded_rows_each": "1/1/1",
+        "function_insert_status_each": "201/201/201",
+        "error_class": "FunctionsHttpError",
+        "http_status": 503,
+        "retried": "no",
+        "elapsed_ms_each": "188/156/135"
+      },
+      "durationMs": 789089
+    },
+    {
+      "id": "ER02-retry-502",
+      "title": "ER02 functions.invoke against an injected 502",
+      "status": "info",
+      "detail": "3 trials: client attempts per invoke 1/1/1, rows the function recorded for the request id 1/1/1, error class FunctionsHttpError, HTTP 502",
+      "measurements": {
+        "trials": 3,
+        "client_attempts_each": "1/1/1",
+        "function_recorded_rows_each": "1/1/1",
+        "function_insert_status_each": "201/201/201",
+        "error_class": "FunctionsHttpError",
+        "http_status": 502,
+        "retried": "no",
+        "elapsed_ms_each": "187/215/176"
+      },
+      "durationMs": 789089
+    },
+    {
+      "id": "ER02-retry-500",
+      "title": "ER02 functions.invoke against an injected 500",
+      "status": "info",
+      "detail": "3 trials: client attempts per invoke 1/1/1, rows the function recorded for the request id 1/1/1, error class FunctionsHttpError, HTTP 500",
+      "measurements": {
+        "trials": 3,
+        "client_attempts_each": "1/1/1",
+        "function_recorded_rows_each": "1/1/1",
+        "function_insert_status_each": "201/201/201",
+        "error_class": "FunctionsHttpError",
+        "http_status": 500,
+        "retried": "no",
+        "elapsed_ms_each": "131/113/154"
+      },
+      "durationMs": 789089
+    },
+    {
+      "id": "ER02-retry-429",
+      "title": "ER02 functions.invoke against an injected 429",
+      "status": "info",
+      "detail": "3 trials: client attempts per invoke 1/1/1, rows the function recorded for the request id 1/1/1, error class FunctionsHttpError, HTTP 429",
+      "measurements": {
+        "trials": 3,
+        "client_attempts_each": "1/1/1",
+        "function_recorded_rows_each": "1/1/1",
+        "function_insert_status_each": "201/201/201",
+        "error_class": "FunctionsHttpError",
+        "http_status": 429,
+        "retried": "no",
+        "elapsed_ms_each": "178/193/157"
+      },
+      "durationMs": 789089
+    },
+    {
+      "id": "ER02-retry-200",
+      "title": "ER02 functions.invoke against an injected 200 (control)",
+      "status": "info",
+      "detail": "3 trials: client attempts per invoke 1/1/1, rows the function recorded for the request id -/-/-, error class none, HTTP 200",
+      "measurements": {
+        "trials": 3,
+        "client_attempts_each": "1/1/1",
+        "function_recorded_rows_each": "-/-/-",
+        "function_insert_status_each": "-/-/-",
+        "error_class": "none",
+        "http_status": 200,
+        "retried": "no",
+        "elapsed_ms_each": "28/65/63"
+      },
+      "durationMs": 789089
+    },
+    {
+      "id": "ER02-lat",
+      "title": "ER02 latency over a 600s window: Edge Function vs RPC twin",
+      "status": "info",
+      "detail": "function p50/p95/p99/max 88/112/146/242 ms over 600 requests; RPC p50/p95 27/44 ms over 600",
+      "measurements": {
+        "window_s": 600,
+        "ef_n": 600,
+        "ef_p50_ms": 88,
+        "ef_p95_ms": 112,
+        "ef_p99_ms": 146,
+        "ef_max_ms": 242,
+        "rpc_n": 600,
+        "rpc_p50_ms": 27,
+        "rpc_p95_ms": 44,
+        "rpc_p99_ms": 68,
+        "rpc_max_ms": 147,
+        "ef_isolates_seen": 543,
+        "ef_answers_from_isolate_under_2s_old": 466,
+        "ef_answers_from_reused_isolate": 134,
+        "ef_young_isolate_p50_ms": 91,
+        "ef_young_isolate_p95_ms": 115,
+        "ef_older_isolate_n": 134,
+        "ef_older_isolate_p50_ms": 61,
+        "ef_older_isolate_p95_ms": 86,
+        "ef_bucket_30s_count": 20,
+        "ef_bucket_p95_median_ms": 110,
+        "ef_bucket_p95_max_ms": 151,
+        "ef_buckets_over_2x_median_p95": 0,
+        "statuses": "ef_200=600 rpc_200=600"
+      },
+      "evidence": "first 60 function answers as isolate-prefix/age_ms/served/latency: bb7d/age5/n1/92ms 4205/age5/n1/90ms e283/age5/n1/88ms d191/age4/n1/90ms bac4/age9799/n2/28ms 8dca/age37533/n3/59ms 6db7/age5/n1/95ms 5c0e/age6/n1/101ms 876d/age25791/n2/58ms 825e/age5/n1/97ms a90c/age42165/n2/81ms efc1/age5/n1/93ms 2a7c/age22501/n2/63ms 8e54/age5/n1/85ms 81d7/age4/n1/87ms ee2c/age30513/n2/58ms 1421/age5/n1/92ms 90ad/age4/n1/99ms d0f3/age4/n1/82ms 16db/age44708/n2/58ms e408/age54201/n2/66ms bdc3/age5/n1/82ms c0df/age4/n1/88ms 8f3c/age4/n1/94ms 1e9e/age5/n1/78ms b859/age49194/n2/54ms b9e1/age4/n1/103ms e5f2/age5/n1/91ms 4395/age32515/n2/70ms 6b55/age55623/n2/57ms 2a8f/age51844/n2/60ms 841b/age62766/n3/61ms 5e57/age5/n1/95ms fd49/age51629/n2/57ms a9e5/age66866/n2/80ms aad0/age57037/n2/61ms d1d7/age5/n1/92ms 4866/age5/n1/94ms c1f3/age4/n1/84ms 5b02/age55692/n2/61ms 905c/age61721/n2/52ms a90c/age73142/n3/57ms 37bd/age49323/n2/58ms 1ffb/age4/n1/92ms c7bc/age4/n1/93ms 6c3b/age48021/n2/68ms a12b/age4/n1/95ms 77c5/age68644/n2/61ms fbe5/age5/n1/88ms 6418/age66401/n2/65ms a57d/age69583/n2/63ms 69dd/age5/n1/102ms 09dc/age5/n1/87ms 253f/age4/n1/93ms 69e8/age5/n1/87ms 0e30/age5/n1/92ms f2e2/age73582/n3/56ms 0f63/age4/n1/93ms 8fe8/age78408/n3/65ms 48a5/age5/n1/99ms",
+      "durationMs": 789089
+    },
+    {
+      "id": "ER02z",
+      "title": "ER02 cleanup: project (er-er02-*)",
+      "status": "info",
+      "detail": "project delete 200",
+      "durationMs": 789089
+    }
+  ]
+}
