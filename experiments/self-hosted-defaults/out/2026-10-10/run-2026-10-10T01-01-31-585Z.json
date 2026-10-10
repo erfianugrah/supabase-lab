@@ -1,0 +1,403 @@
+{
+  "startedAt": "2026-10-10T01:01:31.585Z",
+  "finishedAt": "2026-10-10T01:02:50.570Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "self-hosted-defaults",
+  "labCommit": "70e4244",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "SD01a",
+      "title": "compose model: api-gw on Envoy, nothing Kong",
+      "status": "pass",
+      "detail": "api-gw image envoyproxy/envoy:v1.39.1; 11 services; services or images matching \"kong\": 0",
+      "measurements": {
+        "gateway_service": "api-gw",
+        "gateway_image": "envoyproxy/envoy:v1.39.1",
+        "services_total": 11,
+        "kong_matches": 0,
+        "gateway_published_ports": "[\"8000:8000\"]"
+      },
+      "evidence": "services: api-gw, auth, db, functions, imgproxy, meta, realtime, rest, storage, studio, supavisor",
+      "durationMs": 110
+    },
+    {
+      "id": "SD01b",
+      "title": "running containers: one Envoy gateway, no Kong container",
+      "status": "pass",
+      "detail": "gateway-like containers: supabase-envoy (envoyproxy/envoy:v1.39.1) 0.0.0.0:8000->8000/tcp, [::]:8000->8000/tcp",
+      "measurements": {
+        "gateway_container": "supabase-envoy",
+        "gateway_container_image": "envoyproxy/envoy:v1.39.1",
+        "gateway_container_ports": "0.0.0.0:8000->8000/tcp, [::]:8000->8000/tcp",
+        "kong_containers": 0,
+        "running_total": 11
+      },
+      "durationMs": 110
+    },
+    {
+      "id": "SD01c",
+      "title": "wire: server header, host :8443 and :8001 closed, basic-auth gate at /",
+      "status": "pass",
+      "detail": "GET /auth/v1/health -> 200, server: envoy; TCP 127.0.0.1:8443 refused, :8001 refused; GET / without credentials -> 401, with the dashboard credentials -> 307 (location /project/default)",
+      "measurements": {
+        "server_header": "envoy",
+        "health_status": 200,
+        "tcp_8443": "refused",
+        "tcp_8001": "refused",
+        "root_no_credentials": 401,
+        "root_with_credentials": 307,
+        "root_redirect": "/project/default"
+      },
+      "evidence": "User authentication failed. Missing username and password.",
+      "durationMs": 110
+    },
+    {
+      "id": "SD01d",
+      "title": "network aliases on the Envoy container include envoy and kong",
+      "status": "pass",
+      "detail": "aliases on supabase-envoy: supabase-envoy, api-gw, envoy, kong",
+      "measurements": {
+        "alias_envoy": "yes",
+        "alias_kong": "yes"
+      },
+      "durationMs": 110
+    },
+    {
+      "id": "SD02a",
+      "title": "no key and a made-up sb_secret_ key get Envoy's own 401 on the five protected routes",
+      "status": "pass",
+      "detail": "none: 401/401/401/401/401; made-up sb_secret_: 401/401/401/401/401; body \"Unauthorized\", content-type text/plain, server envoy",
+      "measurements": {
+        "none": "settings 401; openapi 401; pg 401; rls_read 401; rpc_claims 401",
+        "bogus_sb_secret": "settings 401; openapi 401; pg 401; rls_read 401; rpc_claims 401",
+        "storage_route_no_key": "HTTP 400"
+      },
+      "durationMs": 7172
+    },
+    {
+      "id": "SD02b",
+      "title": "status per key kind per route",
+      "status": "pass",
+      "detail": "publishable behaves as legacy anon, secret as legacy service_role, on all six routes' gate decisions",
+      "measurements": {
+        "publishable": "settings 200; openapi 403; pg 403; rls_read 200; rpc_claims 200; storage 200",
+        "secret": "settings 200; openapi 200; pg 200; rls_read 200; rpc_claims 200; storage 200",
+        "legacy_anon": "settings 200; openapi 403; pg 403; rls_read 200; rpc_claims 200; storage 200",
+        "legacy_service": "settings 200; openapi 200; pg 200; rls_read 200; rpc_claims 200; storage 200",
+        "rls_rows_publishable": 0,
+        "rls_rows_secret": 1,
+        "rls_rows_legacy_anon": 0,
+        "rls_rows_legacy_service": 1
+      },
+      "durationMs": 7172
+    },
+    {
+      "id": "SD02c",
+      "title": "PostgREST sees role service_role for the secret key and anon for the publishable key",
+      "status": "pass",
+      "detail": "request.jwt.claims role: secret key -> service_role, publishable key -> anon; RLS-protected table with no policy returned 1 row(s) for the secret key and 0 for the publishable key; claim names seen for the secret key: exp,iat,iss,role",
+      "measurements": {
+        "role_secret_key": "service_role",
+        "role_publishable_key": "anon",
+        "claims_secret_key": "exp,iat,iss,role",
+        "iss_secret_key": "supabase",
+        "opaque_value_in_claims": "no"
+      },
+      "durationMs": 7172
+    },
+    {
+      "id": "SD02d",
+      "title": "utils/add-new-auth-keys.sh edits docker-compose.yml: which lines it uncomments",
+      "status": "info",
+      "detail": "lines differing from the pinned docker-compose.yml: GOTRUE_JWT_KEYS, API_JWT_JWKS, JWT_JWKS, SUPABASE_JWKS",
+      "measurements": {
+        "compose_lines_changed_by_key_script": 4,
+        "compose_keys_uncommented": "GOTRUE_JWT_KEYS,API_JWT_JWKS,JWT_JWKS,SUPABASE_JWKS"
+      },
+      "durationMs": 7172
+    },
+    {
+      "id": "SD03a",
+      "title": "compose model, running image, server_version, version() and PG_VERSION all say 17",
+      "status": "pass",
+      "detail": "model supabase/postgres:17.6.1.136; running supabase/postgres:17.6.1.136; server_version 17.6; PG_VERSION file 17; PostgreSQL 17.6 on aarch64-unknown-linux-gnu, compiled by gcc (GCC) 15.2.0, 64-bit",
+      "measurements": {
+        "compose_db_image": "supabase/postgres:17.6.1.136",
+        "running_db_image": "supabase/postgres:17.6.1.136",
+        "server_version": "17.6",
+        "pg_version_file": "17",
+        "version_line": "PostgreSQL 17.6 on aarch64-unknown-linux-gnu"
+      },
+      "durationMs": 372
+    },
+    {
+      "id": "SD03b",
+      "title": "pg17 override repeats the base tag; pg15 override pins a 15.x tag (files read, 15 not started)",
+      "status": "pass",
+      "detail": "base file supabase/postgres:17.6.1.136; docker-compose.pg17.yml supabase/postgres:17.6.1.136; docker-compose.pg15.yml supabase/postgres:15.8.1.085",
+      "measurements": {
+        "base_tag": "17.6.1.136",
+        "pg17_override_tag": "17.6.1.136",
+        "pg15_override_tag": "15.8.1.085"
+      },
+      "durationMs": 372
+    },
+    {
+      "id": "SD03c",
+      "title": "pg_graphql is not installed on a fresh Postgres 17 stack (available, not created)",
+      "status": "pass",
+      "detail": "pg_extension rows for pg_graphql: 0; pg_available_extensions default_version: 1.5.11; graphql schemas present: graphql,graphql_public; POST /graphql/v1 with the publishable key -> 200 {\"errors\": [{\"message\": \"pg_graphql extension is not enabled.\"}]}",
+      "measurements": {
+        "pg_graphql_installed": "no",
+        "pg_graphql_available_version": "1.5.11",
+        "graphql_schemas_present": "graphql,graphql_public",
+        "graphql_route_status": 200,
+        "graphql_route_body": "{\"errors\": [{\"message\": \"pg_graphql extension is not enabled.\"}]}"
+      },
+      "durationMs": 372
+    },
+    {
+      "id": "SD04a",
+      "title": "container environment names postgres for meta and Studio",
+      "status": "pass",
+      "detail": "meta PG_META_DB_USER=postgres; studio POSTGRES_USER_READ_WRITE=postgres",
+      "measurements": {
+        "meta_db_user": "postgres",
+        "studio_read_write_user": "postgres"
+      },
+      "durationMs": 9227
+    },
+    {
+      "id": "SD04b",
+      "title": "current_user and session_user are postgres through both paths",
+      "status": "pass",
+      "detail": "via /pg/query: HTTP 200, current_user postgres, session_user postgres; via Studio /api/platform/pg-meta: HTTP 200, current_user postgres, session_user postgres",
+      "measurements": {
+        "meta_path_status": 200,
+        "meta_path_current_user": "postgres",
+        "meta_path_session_user": "postgres",
+        "studio_path_status": 200,
+        "studio_path_current_user": "postgres",
+        "studio_path_session_user": "postgres"
+      },
+      "durationMs": 9227
+    },
+    {
+      "id": "SD04c",
+      "title": "pg_stat_activity: the backend running the statement belongs to postgres on both paths",
+      "status": "pass",
+      "detail": "while select pg_sleep(4) ran via /pg/query: postgres/postgres-meta 0.0.0-automated; while select pg_sleep(5) ran via Studio: postgres/postgres-meta 0.0.0-automated (usename/application_name of active backends whose query text contains the marker)",
+      "measurements": {
+        "meta_path_backend": "postgres/postgres-meta 0.0.0-automated",
+        "studio_path_backend": "postgres/postgres-meta 0.0.0-automated"
+      },
+      "durationMs": 9227
+    },
+    {
+      "id": "SD04d",
+      "title": "postgres is not a superuser here; supabase_admin is and other services still use it",
+      "status": "pass",
+      "detail": "rolsuper: postgres false, supabase_admin true; users with live sessions: authenticator, supabase_admin, supabase_storage_admin; supabase_admin application names: (none), cluster_node_realtime@127.0.0.1, cluster_node_supavisor@118efe1814ff, pg_cron scheduler, pg_net 0.20.3, psql, supabase_mt_realtime, supavisor_meta",
+      "measurements": {
+        "postgres_rolsuper": "false",
+        "supabase_admin_rolsuper": "true",
+        "session_users": "authenticator,supabase_admin,supabase_storage_admin",
+        "supabase_admin_apps": "(none),cluster_node_realtime@127.0.0.1,cluster_node_supavisor@118efe1814ff,pg_cron scheduler,pg_net 0.20.3,psql,supabase_mt_realtime,supavisor_meta"
+      },
+      "durationMs": 9227
+    },
+    {
+      "id": "SD05a",
+      "title": "default stack: no analytics, no vector, no Docker-socket mount, Studio logs feature off",
+      "status": "pass",
+      "detail": "model services: api-gw, auth, db, functions, imgproxy, meta, realtime, rest, storage, studio, supavisor; running analytics/vector containers: 0; services mounting the Docker socket: 0; Studio ENABLED_FEATURES_LOGS_ALL=false",
+      "measurements": {
+        "default_services": 11,
+        "default_has_analytics": "no",
+        "default_has_vector": "no",
+        "default_docker_socket_mounters": 0,
+        "studio_logs_flag_default": "false"
+      },
+      "durationMs": 13168
+    },
+    {
+      "id": "SD05b",
+      "title": "with docker-compose.logs.yml: exactly analytics and vector are added, both healthy, Studio flag on",
+      "status": "pass",
+      "detail": "services added by the override: analytics, vector; up exit 0 after 13 s; analytics healthy, vector healthy; Studio ENABLED_FEATURES_LOGS_ALL=true; Docker-socket mounters: vector",
+      "measurements": {
+        "override_adds": "analytics,vector",
+        "up_wall_seconds": 13,
+        "analytics_health": "healthy",
+        "vector_health": "healthy",
+        "studio_logs_flag_with_override": "true",
+        "docker_socket_mounters_with_override": "vector",
+        "analytics_image": "supabase/logflare:1.50.10",
+        "vector_image": "timberio/vector:0.53.0-alpine"
+      },
+      "durationMs": 13168
+    },
+    {
+      "id": "SD05c",
+      "title": "gateway has no analytics route: /analytics/v1/health reaches the dashboard gate",
+      "status": "pass",
+      "detail": "GET /analytics/v1/health with the secret key -> 401, body \"User authentication failed. Missing username and password.\"",
+      "measurements": {
+        "analytics_path_status": 401,
+        "analytics_path_body": "User authentication failed. Missing username and password."
+      },
+      "durationMs": 13168
+    },
+    {
+      "id": "SD06a",
+      "title": "API_EXTERNAL_URL in .env, on the auth container and as GOTRUE_JWT_ISSUER: equal, ending in /auth/v1",
+      "status": "pass",
+      "detail": ".env http://localhost:8000/auth/v1; container API_EXTERNAL_URL http://localhost:8000/auth/v1; GOTRUE_JWT_ISSUER http://localhost:8000/auth/v1; SUPABASE_PUBLIC_URL http://localhost:8000",
+      "measurements": {
+        "api_external_url": "http://localhost:8000/auth/v1",
+        "supabase_public_url": "http://localhost:8000",
+        "jwt_issuer_equals_api_external_url": "yes",
+        "mailer_urlpath_confirmation": "/auth/v1/verify"
+      },
+      "durationMs": 6814
+    },
+    {
+      "id": "SD06b",
+      "title": "access token iss equals API_EXTERNAL_URL; ES256 signature verifies against the gateway's JWKS",
+      "status": "pass",
+      "detail": "admin create -> 200; password grant -> 200; iss http://localhost:8000/auth/v1; header alg ES256, kid present; signature against JWKS key verified",
+      "measurements": {
+        "admin_create_status": 200,
+        "password_grant_status": 200,
+        "token_iss": "http://localhost:8000/auth/v1",
+        "token_alg": "ES256",
+        "token_aud": "authenticated",
+        "jwks_key_count": 1,
+        "es256_signature_verified": "yes"
+      },
+      "durationMs": 6814
+    },
+    {
+      "id": "SD06c",
+      "title": "generate_link: the path of the link Auth would mail",
+      "status": "info",
+      "detail": "generate_link -> 200; action_link path /auth/v1/verify (host localhost:8000); MAILER_URLPATHS_CONFIRMATION is /auth/v1/verify",
+      "measurements": {
+        "generate_link_status": 200,
+        "action_link_path": "/auth/v1/verify",
+        "path_doubles_auth_v1": "no"
+      },
+      "durationMs": 6814
+    },
+    {
+      "id": "SD06d",
+      "title": "SAML default (disabled): /auth/v1/sso/saml/metadata reaches Auth; /sso/saml/metadata does not",
+      "status": "pass",
+      "detail": "GET /auth/v1/sso/saml/metadata -> 404 {\"code\":404,\"error_code\":\"saml_provider_disabled\",\"msg\":\"SAML 2.0 is disabled\"}; GET /sso/saml/metadata -> 401 User authentication failed. Missing username and password.",
+      "measurements": {
+        "prefixed_metadata_status": 404,
+        "prefixed_metadata_error_code": "saml_provider_disabled",
+        "unprefixed_metadata_status": 401,
+        "unprefixed_metadata_body": "User authentication failed. Missing username and password."
+      },
+      "durationMs": 6814
+    },
+    {
+      "id": "SD06e",
+      "title": "SAML on: metadata at /auth/v1/sso/saml/metadata names API_EXTERNAL_URL + /sso/saml/{metadata,acs}",
+      "status": "pass",
+      "detail": "up exit 0; metadata -> 200 application/xml; entityID http://localhost:8000/auth/v1/sso/saml/metadata; ACS Location http://localhost:8000/auth/v1/sso/saml/acs",
+      "measurements": {
+        "metadata_status": 200,
+        "metadata_content_type": "application/xml",
+        "entity_id": "http://localhost:8000/auth/v1/sso/saml/metadata",
+        "acs_location": "http://localhost:8000/auth/v1/sso/saml/acs",
+        "saml_key_bits": 2048
+      },
+      "durationMs": 6814
+    },
+    {
+      "id": "SD06f",
+      "title": "through Envoy: register an IdP with the secret key, POST /auth/v1/sso, ACS reachable without an apikey",
+      "status": "pass",
+      "detail": "register IdP -> 201; POST /auth/v1/sso -> 200, redirect host idp.example.com, SAMLRequest present; POST /auth/v1/sso/saml/acs with no apikey and a garbage SAMLResponse -> 303 (server envoy), location http://localhost:3000?error=...&error_code=validation_failed&error_description=..., body \"\"; IdP deleted afterwards",
+      "measurements": {
+        "register_status": 201,
+        "sso_status": 200,
+        "sso_redirect_host": "idp.example.com",
+        "sso_has_samlrequest": "yes",
+        "acs_no_apikey_status": 303,
+        "acs_no_apikey_location": "http://localhost:3000?error=...&error_code=validation_failed&error_description=...",
+        "acs_no_apikey_body": "",
+        "acs_reached_auth_not_envoy": "yes"
+      },
+      "durationMs": 6814
+    },
+    {
+      "id": "SD07a",
+      "title": "Kong override: Kong container is the gateway and host :8443 accepts",
+      "status": "pass",
+      "detail": "up exit 0 after 7 s; gateway containers: supabase-kong (kong/kong:3.9.3) 0.0.0.0:8000->8000/tcp, [::]:8000->8000/tcp, 0.0.0.0:8443->8443/tcp, [::]:8443->8443/tcp; TCP 8443 accepted; HTTPS 8443 /auth/v1/health -> 200 server kong/3.9.3; plain 8000 -> 200 server kong/3.9.3",
+      "measurements": {
+        "gateway_image_with_override": "kong/kong:3.9.3",
+        "gateway_ports_with_override": "0.0.0.0:8000->8000/tcp, [::]:8000->8000/tcp, 0.0.0.0:8443->8443/tcp, [::]:8443->8443/tcp",
+        "tcp_8443_with_override": "accepted",
+        "https_8443_health_status": 200,
+        "server_header_8443": "kong/3.9.3",
+        "server_header_8000": "kong/3.9.3",
+        "kong_publishable_settings_health": 200,
+        "kong_publishable_openapi": 403,
+        "kong_secret_openapi": 200,
+        "kong_no_key_health": 401,
+        "up_wall_seconds": 7
+      },
+      "durationMs": 20748
+    },
+    {
+      "id": "SD07b",
+      "title": "override removed: Envoy is back, :8443 refused",
+      "status": "pass",
+      "detail": "up exit 0 after 13 s; gateway containers: supabase-envoy (envoyproxy/envoy:v1.39.1); TCP 8443 refused; server header envoy",
+      "measurements": {
+        "gateway_image_restored": "envoyproxy/envoy:v1.39.1",
+        "tcp_8443_restored": "refused",
+        "server_header_restored": "envoy"
+      },
+      "durationMs": 20748
+    },
+    {
+      "id": "SD08a",
+      "title": "keys empty: startup line says legacy mode; publishable and secret sb_ keys get 401; legacy keys still work",
+      "status": "pass",
+      "detail": "up exit 0; Envoy log: \"Envoy running in legacy API key mode (sb_ keys disabled)\"; publishable key: settings 401; openapi 401; secret key: settings 401; openapi 401; legacy anon: settings 200; openapi 403; legacy service_role: settings 200; openapi 200",
+      "measurements": {
+        "envoy_mode_line": "Envoy running in legacy API key mode (sb_ keys disabled)",
+        "publishable_key": "settings 401; openapi 401",
+        "secret_key": "settings 401; openapi 401",
+        "legacy_anon_key": "settings 200; openapi 403",
+        "legacy_service_role_key": "settings 200; openapi 200"
+      },
+      "durationMs": 21373
+    },
+    {
+      "id": "SD08b",
+      "title": ".env restored: startup line says key translation enabled; sb_ keys pass again",
+      "status": "pass",
+      "detail": "up exit 0; Envoy log: \"Envoy sb_ key translation enabled\"; publishable key: settings 200; openapi 403; secret key: settings 200; openapi 200",
+      "measurements": {
+        "envoy_mode_line_restored": "Envoy sb_ key translation enabled",
+        "publishable_key_restored": "settings 200; openapi 403",
+        "secret_key_restored": "settings 200; openapi 200"
+      },
+      "durationMs": 21373
+    }
+  ]
+}
