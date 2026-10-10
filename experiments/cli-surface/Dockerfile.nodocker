@@ -1,0 +1,22 @@
+# A Linux box with the Supabase CLI and NO container engine: no docker or
+# podman binary, no socket. Used by CL20+ to see what `[experimental] stack`
+# does when the only runtime left is the native one.
+FROM debian:bookworm-slim
+ARG CLI_VERSION=2.120.0
+ARG TARGETARCH
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates curl git procps iproute2 postgresql-client zstd xz-utils \
+ && apt-get clean
+RUN set -eux; \
+    case "${TARGETARCH:-$(dpkg --print-architecture)}" in arm64) A=arm64;; amd64) A=amd64;; esac; \
+    base="https://github.com/supabase/cli/releases/download/v${CLI_VERSION}"; \
+    curl -fsSL -o /tmp/cli.tgz "$base/supabase_linux_${A}.tar.gz"; \
+    curl -fsSL -o /tmp/checksums.txt "$base/checksums.txt"; \
+    want=$(awk -v n="supabase_${CLI_VERSION}_linux_${A}.tar.gz" '$2==n {print $1}' /tmp/checksums.txt); \
+    echo "$want  /tmp/cli.tgz" | sha256sum -c -; \
+    tar xzf /tmp/cli.tgz -C /usr/local/bin supabase supabase-go; \
+    rm -f /tmp/cli.tgz /tmp/checksums.txt
+RUN useradd -m -s /bin/bash dev
+USER dev
+WORKDIR /home/dev
+ENV SUPABASE_TELEMETRY_DISABLED=1 DO_NOT_TRACK=1
