@@ -1,0 +1,27 @@
+# Rendered by lib/stack.ts into .run/replicator/base.yaml (gitignored).
+# Double-underscore tokens: source host, the PEM of the CA root the server
+# presents, a per-run tag (data prefix and metadata schema), the pipeline id and
+# optional extra pipeline keys. Passwords and the catalog
+# URL come from APP_* environment variables (see docker-compose.yml).
+destination:
+  ducklake:
+    catalog_url: "placeholder-overridden-by-env"
+    data_path: "s3://ducklake/__TAG__"
+    s3_endpoint: "s3:7070"
+    s3_region: "us-east-1"
+    s3_url_style: "path"
+    s3_use_ssl: false
+    metadata_schema: "__TAG__"
+pipeline:
+  id: __PIPELINE_ID__
+  publication_name: "pl_pub"
+  pg_connection:
+    host: "__SRC_HOST__"
+    port: 5432
+    name: "postgres"
+    username: "__REPL_USER__"
+    tls:
+      enabled: true
+      trusted_root_certs: |
+__ROOT_CERT__
+__PIPELINE_EXTRA__
