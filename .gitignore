@@ -65,3 +65,6 @@ experiments/*/out/*
 # local rig secrets (identity-transfer): generated per `make local-up`,
 # thrown away by `make local-down`. Nothing here is shared with a real project.
 experiments/*/local/.env
+
+# agent worktrees (Claude Code harness)
+.claude/worktrees/

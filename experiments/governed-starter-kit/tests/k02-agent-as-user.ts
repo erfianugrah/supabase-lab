@@ -271,7 +271,7 @@ const mod: TestModule = {
       add(
         9,
         "positive control: alice gets the Sales chunks for the same query, ranked first",
-        aliceHits.body.status === "ok" && ah.length > 0 && sales.has(ah[0].id),
+        aliceHits.body.status === "ok" && ah.length > 0 && sales.has(ah[0]?.id ?? ""),
         `${ah.filter((h) => sales.has(h.id)).length} Sales hits; top: ${ah[0]?.title} (${ah[0]?.similarity?.toFixed(3)})`,
         JSON.stringify(ah.map((h) => [h.title, Number(h.similarity.toFixed(3))])),
       );
