@@ -1,0 +1,15 @@
+// No table is touched: the probe only runs `select 1` through $queryRaw. The
+// model exists so `prisma generate` emits a client. DATABASE_URL is the proxied
+// transaction-pooler URL.
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model PcUnused {
+  id Int @id
+}
