@@ -1,0 +1,12 @@
+{
+  "name": "pc-driver-probe",
+  "private": true,
+  "type": "module",
+  "description": "node-postgres, postgres.js and Prisma 6.19 against a TCP-reset proxy in front of Supavisor. Installed at run time by PC03; node_modules is gitignored.",
+  "dependencies": {
+    "@prisma/client": "6.19.3",
+    "pg": "8.13.1",
+    "postgres": "3.4.5",
+    "prisma": "6.19.3"
+  }
+}
