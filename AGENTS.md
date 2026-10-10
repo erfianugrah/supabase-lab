@@ -185,9 +185,17 @@ Measured (micro, ap-southeast-1; evidence/20260731-175026/REPORT.md):
   targets the public shared pooler.
 - Supavisor transaction mode supports prepared statements now (T11) -
   the old assumption is stale.
-- PostgREST root `/rest/v1/` requires service_role on the current
-  platform; anon probes need a real table (SQL-created tables get anon
-  SELECT via default privileges, no RLS).
+- PostgREST root `/rest/v1/` answers 200 to the legacy service_role key and
+  `sb_secret_` keys only; anon and the publishable key get 401 (DD04,
+  2026-10-10). Anon probes need a real table. SQL-created tables get anon
+  SELECT via default privileges, no RLS: a project created through
+  `POST /v1/projects` on 2026-10-10 still had the legacy default ACL
+  (`arwdDxtm` for anon, authenticated and service_role, DD01a; the v1 create
+  body has no field for the new default, so whether the 2026-05-30 default
+  applies to API-created projects is unseparated from a gradual rollout).
+  After the opt-in `alter default privileges ... revoke`, a new table answers
+  42501 (401 for anon, 403 for service_role) until a GRANT (DD01c). See the
+  data-api-defaults block.
 - Pooler client ceiling on Micro: NOT a reproducible number. PgBouncer
   queues before it refuses; isolated quiet-system probes gave first
   refusal at client 213 (run 6) and 287 (run 7), against a published 200.
@@ -247,8 +255,12 @@ client can poll. See RUNLOG.md; artifacts in `out/2026-09-24/`.
   (DA03) the extra schema and `/graphql/v1` answered `406 PGRST106` about 71 s
   later and stay that way. Its click-to-serve time is unmeasured (DA06 manual drill, not run).
 - Harness gotchas: `PATCH /postgrest` 400s on `db_pool: null` (a fresh project
-  reads null back - omit it); `postgrest_logs` answers only on `logs.all`; new
-  the project created for this run (2026-09-24) did not have `pg_graphql`
+  reads null back - omit it); `postgrest_logs` is a `source` value on the unified
+  `logs` table (`where source = 'postgrest_logs'`, measured 2026-10-10 on a
+  fresh project, edge-resilience RUNLOG), and `logs.all` answers 410 since
+  2026-09-23. DA02L was ported to `logsQuery` on 2026-10-10 and has not been
+  re-run end to end since. The project created for this run (2026-09-24) did
+  not have `pg_graphql`
   enabled, so `/graphql/v1` returned 200 with an errors envelope and is not a
   health signal.
 
@@ -704,15 +716,21 @@ each user's auth rows". Findings and artifacts in RUNLOG.md; out/2026-09-25/.
   future", 70 = "JWT expired"), the `proxy-status` header
   (`PostgREST; error=PGRST303`) and the parsed JWT payload (`issued_at`,
   `expires_at`, `role`, `subject`, `auth_user`) even on the 401, so the
-  future-iat/expired split is issued_at minus the row timestamp in seconds
-  (the module computed it client-side; the SQL form
-  `issued_at - div(timestamp, 1000000)` is untested), with the byte count as
-  cross-check. 42501 bodies are chunked (content_length null,
-  transfer_encoding "chunked") - select on `proxy_status`, not
-  `content_length`. anon -> 401 42501 (key-only or legacy anon JWT),
-  authenticated -> 403 42501, matching S21. Only `logs.all` answers the
-  unnest query; `logs` says `Backend error! Retry your query.` Rows landed
+  future-iat/expired split is issued_at minus the row timestamp in seconds,
+  with the byte count as cross-check. On the unified
+  `/analytics/endpoints/logs` (ClickHouse; `logs.all` is 410 since 2026-09-23)
+  read `log_attributes['response.headers.proxy_status']`,
+  `['response.headers.content_length']` and
+  `['request.sb.jwt.authorization.payload.issued_at'|'expires_at']` (strings;
+  an absent key reads ''). The split is measured in SQL (W27d, 2026-10-10):
+  `toInt64OrNull(issued_at) - toUnixTimestamp(timestamp)` was 300 and -3900,
+  `expires_at < toUnixTimestamp(timestamp)` was 0 and 1. `timestamp` is an ISO
+  UTC string (it was microseconds). A 42501 row has no `transfer_encoding` or
+  `content_length` key on the unified table (the 2026-09-07 read showed
+  "chunked"); select it on `proxy_status`. anon -> 401 42501 (key-only or
+  legacy anon JWT), authenticated -> 403 42501, matching S21. Rows landed
   17-46 s after the request in the published run (51 s in the private first
+  run, 13 s on 2026-10-10, one run).
   run). DDL then probe within 1 s got 404 PGRST205
   (schema cache) - `notify pgrst, 'reload schema'` and poll first.
 - **The spend cap is not a request-path circuit breaker** (W21,
@@ -800,8 +818,9 @@ Extended 2026-08-25 (gate hunt + A/B, see RUNLOG):
   (`jwt_probe()` returning `auth.jwt()`; role + custom claim as templated).
   The api-keys create response redacts `api_key` without `?reveal=true`;
   PostgREST needs a schema-cache reload before a fresh RPC resolves.
-- JIT database access is a real platform differentiator: 200 on platform,
-  500 on Pro. Backup schedule 402 `entitlement_required` on BOTH org classes
+- JIT invite (`POST /database/jit/invite`, S15) is 200 on the platform org
+  and 500 on Pro. The grant route is not broken on Pro: see jit-db-access
+  (`PUT /jit-access`, `PUT /database/jit` -> 200). Backup schedule 402 `entitlement_required` on BOTH org classes
   (the OpenAPI 402 text says Enterprise plan).
 - Disk grow to 8 GB confirmed landed. Disk gp3 IOPS floor blocks a 2->4 GB
   grow. Read-only mode (status + 15 min temporary-disable). Branches: delete
@@ -1207,10 +1226,14 @@ a throwaway probe Worker + two Hyperdrive configs via wrangler (account from
   default); only the GLOBAL form (no IN SCHEMA) does. Exposed schema PATCHed to
   `api` only: service_role loses `public` too (`404 PGRST205`) - project-wide;
   the first exposed schema is the default profile.
-- Logs endpoints: `/analytics/endpoints/logs` (the shared `logsQuery` helper)
-  answered `Backend error! Retry your query.` to every edge_logs/auth_logs LIKE
-  query on 2026-09-03 while `/analytics/endpoints/logs.all` answered the
-  identical SQL (1-hour window). S18 queries logs.all first.
+- Logs endpoint: `/analytics/endpoints/logs` (the shared `logsQuery` helper),
+  ClickHouse dialect, `where source = '<name>'`, nested fields as
+  `log_attributes['request.path']`. `logs.all` is 410 since 2026-09-23 (still
+  listed in the published OpenAPI document on 2026-10-10). The 2026-09-03
+  `Backend error! Retry your query.` on the stream endpoint and S18's
+  "logs.all first" order are history; S18 was ported on 2026-10-10 and passed
+  5 of 5 on its second run (the first run's S18b did not find its row in
+  264 s, cause not established, edge-resilience RUNLOG 2026-10-10).
 - The `pvlab` binary cannot be rebuilt while a probe runs, and a probe killed
   by a caller timeout skips its `finally` (S18 left a user and would have left
   a ban). Run long modules with `make probe-bg` or a background shell, never
@@ -1803,7 +1826,8 @@ Redacted artifacts: `out/2026-09-30/`. Details: RUNLOG.md.
   ClickHouse SQL, filter on `source` (not the changelog's `source_name` - the
   corpus guide `supabase-management-api-logs-endpoint` already records this),
   nested fields via `log_attributes[...]`. The endpoint throttles; one query
-  per 20-30 s held.
+  per 20-30 s held; the endpoint answers 10 requests per 60 s
+  (`x-ratelimit-limit: 10`, `x-ratelimit-reset: 60`, 2026-10-10).
 - **Enabling the IPv4 add-on left `db.<ref>.supabase.co` with no record for
   more than 10 minutes from this resolver** (AAAA withdrawn, A not yet
   visible, `getaddrinfo ENOTFOUND` for 217 samples at 500 ms), then an A at
@@ -1934,7 +1958,7 @@ Redacted artifacts: `out/2026-09-30/`. Details: RUNLOG.md.
   (Postgres names the client in hba refusals) and any addresses named in
   `PVLAB_REDACT_ADDRS`; documentation-range addresses stay.
 
-## experiments/governed-starter-kit - key facts (validated 2026-10-07, micro, ap-southeast-1, Team org)
+## experiments/governed-starter-kit - key facts (validated 2026-10-07; K06 and K07 2026-10-10, micro, ap-southeast-1, Team org)
 
 Two projects (`kit-live` baseline only, `kit-ready` baseline + example app +
 agent + webhook) plus any `make new-app` backends. Details: the experiment's
@@ -1972,7 +1996,8 @@ README.md, RUNLOG.md and docs/.
   `.mcp.json` (Claude Code expands the variable), so `claude -p` needs no
   `/mcp` login. `apply_migration`/`execute_sql` with DROP, DELETE, TRUNCATE
   or an unbounded UPDATE ask for confirmation, which `-p` cannot give: the
-  call returns `{"status":"cancelled"}`.
+  call returns `{"status":"cancelled"}` (repeated once on 2026-10-10); with an
+  Elicitation hook `claude -p` can answer it (K07).
 - **The in-app agent needs a Console API key** (or Bedrock/Vertex). A
   claude.ai subscription login may not be used inside a product
   (https://code.claude.com/docs/en/legal-and-compliance).
@@ -1996,6 +2021,50 @@ README.md, RUNLOG.md and docs/.
 - **Troubleshooting faults**: 400k `activity_events` rows hit the 8 s
   `authenticated` statement timeout, so the seed is 100k. pg_stat_statements
   has no entry for a statement that errors; the logs endpoint does.
+- **App MCP server block (K06, 2026-10-10, new project per run)**: the
+  Select 2026 library block (`https://supabase.com/library/r/mcp.json`, item
+  `mcp`, installed in the kit as `supabase/functions/mcp`) with Supabase
+  Middleware 1.0 (`pipeline`, `withOAuthProtectedResource`) ran on a new
+  project (ES256 in use; deploy with `--use-api --no-verify-jwt`, 5 s).
+  Measured: the unauthenticated call answers 401 `Bearer` with
+  `resource_metadata`; dynamic client registration 201; the headless
+  code flow (PKCE, consent through the API) issued 4 of 4 tokens carrying
+  `client_id`, `aud=authenticated`, `scope=email`, ES256, 3600 s; tools ran as
+  the user (alice 2 of 3 rows, carol 1, no overlap; employee refused,
+  same-department manager approved, other-department manager refused); RLS on
+  `auth.jwt() ->> 'client_id'` isolated client A, client B and a password
+  session (null client_id) from each other. Refused with 401: publishable key,
+  legacy anon JWT, garbage. The scope does not limit the Data API (200 with
+  the same token). The block's `runtimeErrorResult` printed `[object Object]`
+  for a PostgREST error (fixed in the kit copy). Not done: interactive client
+  login, the OAuth Consent block, Workers deploy, a legacy-HS256 user token.
+- **MCP confirmations (K07, 2026-10-10, hosted server `serverInfo` version
+  0.13.0)**: the server speaks a legacy session shape and the 2026-07-28
+  stateless shape; elicitation (`resultType: "input_required"`) is offered
+  only to a request that declares `elicitation.form` in `params._meta` of the
+  2026-07-28 shape. Raw clients with no capability, with a form capability
+  declared at a 2025 `initialize`, and with URL elicitation only ran DROP,
+  TRUNCATE, UPDATE and DELETE without WHERE and `apply_migration` with DROP
+  with no confirmation (20 of 20). A form-capable client was asked for `drop`,
+  `truncate`, `update`/`delete` without `where`, `delete ... where true`,
+  `alter table ... drop column`, a `do` block with `execute 'drop ...'` and a
+  multi-statement string; not for `update ... where true`, an `update` with a
+  `where`, `insert`, `select` or a string literal containing DROP. Decline and
+  cancel ran nothing. `skip_elicitations=<comma list>` is per tool and removes
+  the prompt; wrong case, `all`, an unknown name and a repeated parameter
+  answer HTTP 400. `read_only=true` stops DROP in Postgres (25006). One
+  accepted `requestState` (expires about 120 s later; bound to tool, project
+  and query hash) ran the same query again when replayed. `create_branch`:
+  form clients get a cost message, decline/cancel create nothing; clients
+  without form elicitation on a project-scoped URL cannot create one at all;
+  account-scoped, they use `get_cost`/`confirm_cost` (no human step in the
+  protocol) and can. `reset_branch`, `rebase_branch`, `delete_branch` raised
+  no prompt. Claude Code 2.1.287 declares form and URL elicitation; with an
+  Elicitation hook answering `hookSpecificOutput.action` it declined or
+  accepted (SQL applied only on accept; branch created only on accept); with
+  no hook, `-p` cancels. A hook with the answer nested under `decision`
+  made every run report `cancelled`. Interactive dialog, other clients and
+  `create_project` not run.
 
 ## experiments/static-hosting - key facts (validated 2026-10-06, micro, ap-southeast-1)
 
@@ -2143,3 +2212,1102 @@ Numbers: `RUNLOG.md`, artifacts `out/2026-10-08/`.
   same WAL; cause not isolated (musl vs glibc untested, JIT ruled out).
 - `drop_caches` in the Docker VM does not drop the macOS cache under it; a
   "cold" read here is not a disk read.
+
+## experiments/data-api-defaults - key facts (validated 2026-10-10, one API-created Pro project, Postgres 17.11)
+
+- A project created through `POST /v1/projects` on 2026-10-10 still carried the
+  legacy default privileges: `pg_default_acl` for `postgres` in `public` grants
+  `arwdDxtm` on tables (`anon`, `authenticated`, `service_role`), so a table made
+  in SQL is readable by anon with no GRANT (DD01a, DD01b). The v1 create body has
+  no field for the setting. The 2026-05-30 default in the public notice (github
+  discussion 45329) was therefore not seen on an API-created project; whether
+  that is the creation path or the gradual rollout is not separated. The
+  standing-project re-run after 2026-10-30 is not done. The existing key-facts
+  line "SQL-created tables get anon SELECT via default privileges" holds for this
+  project and is the state the opt-in below ends.
+- After the notice's `alter default privileges for role postgres in schema public
+  revoke select, insert, update, delete on tables from anon, authenticated,
+  service_role` (and the sequences form), a new SQL table answers the Data API
+  with 42501 `permission denied for table <t>` and hint `Grant the required
+  privileges to the current role with: GRANT SELECT ON public.<t> TO anon;`:
+  HTTP 401 for anon and the publishable key, HTTP 403 for service_role and
+  sb_secret_ (hint names `TO service_role`). TRUNCATE, REFERENCES, TRIGGER and
+  MAINTAIN stay in the default ACL (`Dxtm`). A GRANT to anon re-opens the table
+  at once (DD01c, DD01d).
+- pg_graphql is absent on a new project: `/graphql/v1` answers HTTP 200 with
+  `errors: pg_graphql extension is not enabled.` After `create extension
+  pg_graphql` (1.6.2) `__schema` and `__type` answer HTTP 200 with `Unknown
+  field ... on type Query` until `comment on schema public is
+  e'@graphql({"introspection": true})'`; `"introspection": false` refuses them
+  again (DD02). A GraphQL probe must use `{ __typename }` and read the body: the
+  old `{ __schema }` probe read HTTP 200 in all three states.
+- `GET /rest/v1/` OpenAPI spec: anon 401 `Invalid API key` / hint `Only the
+  `service_role` API key can be used for this endpoint.`; publishable 401
+  `Secret API key required`; legacy service_role and sb_secret_ 200 (same
+  swagger 2.0 spec, apikey alone or with Authorization). The notice's text
+  `Access to schema is forbidden` was not seen. `GET
+  /v1/projects/{ref}/database/openapi` with a PAT returns the same path set
+  (DD04). The spec title is the `public` schema comment.
+- As `postgres` (not superuser): `CREATE EXTENSION x VERSION '<v>'` succeeds,
+  warns `only superusers can specify extension versions, ignoring version ...`
+  and installs the default, also for a version that does not exist; the warning
+  is visible on a pooler connection, not in the Management API query response.
+  Every `ALTER EXTENSION ... UPDATE [TO v]` form errored `XX000 pgaudit stack
+  is not empty` with installed equal to default; the real-upgrade path is
+  unmeasured (DD03).
+- Realtime schema as `postgres` on that project: CREATE in the schema, ALTER and
+  DROP of `realtime.messages`, `realtime.topic()` and `schema_migrations` DDL
+  refused (42501); `INSERT`, `UPDATE`, `DELETE` on `realtime.schema_migrations`
+  and `drop trigger tr_check_filters` were ALLOWED, against the changelog's
+  list. Realtime service version not read; policies on `realtime.messages` work
+  (DD03).
+- iap-lockdown: `lib/inventory.ts` GraphQL probe now sends `{ __typename }` and
+  `http()` reports `errors[0].message` or `ok:<type>` as the row code.
+
+## experiments/realtime-surface - key facts (validated 2026-10-10, Pro org, n = 1 per row)
+
+- **Postgres Changes filters and `select` against Postgres's own evaluation**
+  (RT01): 19 filters (AND over two and three columns, two conditions on one
+  column, `like`/`ilike`, `is`, `match`/`imatch`, `isdistinct`, `not.` forms)
+  each delivered exactly the ids that the equivalent SQL predicate selects on
+  the same 8 rows. `select` always added the PK and still delivered an UPDATE
+  event when only an unselected column changed. DELETE under a column filter:
+  0 of 2 matching DELETEs with replica identity default (the PK filter got its
+  1 and the unfiltered subscriber all 4), 2 of 2 with replica identity full.
+  `select` naming a column revoked from the subscribing role, and a filter on
+  it, both left the subscribe callback at `SUBSCRIBED` with 0 events; the only
+  signal is the channel `system` event (`invalid column for select secret`).
+  With no `select`, the revoked column was absent from every payload. 20
+  inserts reached an unfiltered subscriber 20 times and a `team=eq.a`
+  subscriber 10 times; billed message counts are not readable with a PAT.
+- **A fresh project's first change event** arrived about eleven seconds after the
+  subscribe on five of five projects, and on the three runs that recorded it the
+  first canary INSERT was the one not delivered (RT01a, RT02-setup).
+- **Disconnect loss and the heartbeat canary** (RT02): a 30 s client-side gap
+  with 25 rows inserted delivered 0 of 25 on rejoin, on both the client's own
+  reconnect and a manual `disconnect()`/`connect()`; the original channel
+  rejoined by itself. A 2 s heartbeat row with a 6 s staleness rule and a REST
+  backfill on `updated_at > last_seen` recovered all 40 of 40 rows (9 live, 26
+  on the new channel, 5 backfilled, 0 duplicated). Clean close, not a network cut.
+- **Broadcast Replay** (RT03): 26 database-sent messages replayed as the newest 25
+  with `limit` omitted, 26 or 100, no error; `limit: 10` gave the newest 10. A
+  public channel is refused (client-side constructor, and server-side
+  `UnableToReplayMessages`). Client-sent messages (WebSocket and `httpSend`)
+  were not persisted and not replayed. On a fresh project `realtime.messages`
+  had no partition for the day until the first Realtime join; before that a
+  private join answered `MissingPartition` and `realtime.send` persisted nothing.
+- **Binary Broadcast** (RT04): `httpSend(Uint8Array)`, raw `application/octet-stream`
+  and `realtime.send_binary` arrived byte-for-byte as `ArrayBuffer` on the
+  current client and not at all (0 events, no error) on the old client, which
+  still received JSON. A `Uint8Array` over WebSocket `send` arrived as a
+  JSON-encoded object on both; an `ArrayBuffer` arrived binary on the current
+  client only. Private-channel policy applied to binary as to JSON (no select
+  policy: join refused; select-only topic: WebSocket send errored, REST 403,
+  secret API key 202).
+
+## experiments/auth-providers - key facts (AU01-AU04 2026-10-10, self-provisioned throwaway projects)
+
+- Question: how the managed Auth server behaves for custom OIDC providers,
+  passkeys (experimental) and SAML SSO, and what a synthetic sign-in canary can
+  tell apart per method. Self-provisioning, no OpenTofu state: each module
+  creates a `au-*` project (Pro org; AU01 also a Free org) and deletes it
+  in `finally`; AU01/AU03 deploy `worker/issuer.ts` (RS256 OIDC issuer, per-run
+  key) to Cloudflare Workers and delete it; AU02 runs headless Chromium with a
+  CDP virtual authenticator in a Playwright container; AU04 signs SAML
+  Responses with xml-crypto in a bun container. `make probe ONLY=AU0N`.
+- Custom OIDC (AU01): the admin API is `/auth/v1/admin/custom-providers` with the
+  `sb_secret_` key (not in the Management API OpenAPI document). Create resolves
+  the issuer (unresolvable host: 400 `validation_failed`). Quota measured at 3
+  providers per project on BOTH a Pro-org and a Free-org project
+  (`over_custom_provider_quota`); the docs say Pro is unlimited, so whether the
+  3 is a default that can be raised is open. Update is PUT; `provider_type` and
+  `identifier` in the body are ignored with 200, not refused. `pkce_enabled`
+  defaults true and the authorize redirect carries `code_challenge` S256 and
+  `state` but no `nonce`; the client secret is sent by HTTP Basic. No email
+  claim is refused (`unexpected_failure`, "Error getting user email from
+  external provider") until `email_optional=true`, then the user has an empty
+  email. A wrong `aud` is refused in the browser flow with a message that does
+  not mention the audience, and by `signInWithIdToken` with "Unacceptable
+  audience"; `acceptable_client_ids` fixes both. `signInWithIdToken` accepts a
+  `custom:` provider. Claims reach `user_metadata.custom_claims` only through
+  `custom_claims_allowlist`.
+- Passkeys (AU02, supabase-js 2.112.3, headless Chromium, virtual
+  authenticator): disabled default answers 404 `passkey_disabled`. An origin
+  outside `webauthn_rp_origins` is refused by the server
+  (`webauthn_verification_failed`, 400); an `rp_id` that is not a suffix of the
+  page host is refused by the browser (`SecurityError`, no request sent). The
+  config rejects an http origin other than localhost/127.0.0.1 (400). Changing
+  the RP ID leaves the old credential unusable (browser `NotAllowedError`); new
+  enrolment works. Admin list/delete need the secret key (publishable: 401);
+  after delete, sign-in is `webauthn_verification_failed`, not the documented
+  `webauthn_credential_not_found`. Cap: 10 per user (`too_many_passkeys`, 422).
+- Canary (AU03, one workstation to ap-southeast-1): password, `signInWithIdToken`
+  and the OAuth browser flow all answered 200 with latencies in the hundreds of
+  ms or less. Error classes: bad signature, expired and wrong `iss` ID tokens
+  are all "Bad ID token" (one class); wrong `aud`, unknown provider and disabled
+  provider are distinct. With the client unable to reach `/auth/v1` a session
+  keeps working on REST until the access token expires (a `jwt_exp` of 60 s
+  token was still accepted at 8 s and rejected by 38 s after expiry) and
+  supabase-js keeps the session in storage, recovering on unblock. A global
+  sign-out does not stop PostgREST accepting an issued access token before
+  expiry. With the custom issuer deleted, `signInWithIdToken` kept succeeding
+  for the 482 s polled (cached keys; lifetime not bounded), the browser flow
+  failed at the issuer, and password sign-in was unaffected.
+- SAML (AU04): a SAML SSO provider created from metadata XML needs no reachable
+  IdP; a lab-signed Response POSTed to the ACS signs in (`sso:<uuid>` provider),
+  a replay is refused (`saml_relay_state_not_found`), and bad signature,
+  unsigned, wrong audience, expired and wrong recipient are all refused with
+  `validation_failed` whose description is the full Response XML (2-4 kB,
+  indistinguishable by tail). An email outside the provider's `domains` and an
+  IdP-initiated Response (no `InResponseTo`) both signed in.
+- Not covered: Pro limit above 3, real IdPs (Okta/Entra), metadata URL refresh,
+  encrypted assertions, real authenticators and Safari/Firefox, SAML on Free,
+  and any server-side Auth outage (no lever; AU03c/e are client-side or
+  issuer-side).
+- Ops: Pro-org micro projects, minutes each; AU03 runs about 10 minutes
+  (60 s `jwt_exp`, 4 min REST polling, up to 8 min outage series). Worker
+  names `au-iss-*`; `make sweep` lists leftover projects. The new
+  workers.dev hostname was once refused on the first provider create (cause
+  not captured); `createProviderWhenResolvable` waits.
+
+## experiments/observability-surface - key facts (2026-10-10, Pro-plan org)
+
+Self-provisioning (`ob-surface-` projects, ap-southeast-1), no OpenTofu state.
+Modules OB01-OB05; docs claims and measurements are kept apart in RUNLOG.md.
+
+- **supabase-js trace propagation (OB01)**: with the OTel API resolvable at run
+  time, 2.111.0, 2.112.0 and 2.117.3 all attach `traceparent` (never `tracestate`
+  or `baggage` with the default provider) to REST and Edge Function calls made
+  inside a span. A bundle run with no `node_modules` loses it on 2.111.0 only
+  (Bun and esbuild bundles, no warning); 2.112.0 and 2.117.3 kept it in all five
+  packagings. 2.112.0 without the `/tracing` import: no headers plus one
+  warning; unsampled spans: none on 2.112.0, `traceparent` on 2.117.3. The
+  host check passes the client's own base URL (a non-Supabase base URL gets
+  headers on its own host) and any `*.supabase.co` host; `xsupabase.co` and
+  `supabase.co.example.test` get none.
+- **Where the trace id lands (OB01)**: `edge_logs` rows carry it as the
+  `trace_id` attribute (38 of 38 rows have one, the client's value when a header
+  was sent). `function_edge_logs` (0 of 39), `function_logs` (0 of 78) and every
+  other source do not. The function itself receives the client's `traceparent`
+  and prints it only if its own code logs it. An untraced function call still
+  receives a platform `traceparent` (flags 00) and `baggage: sb-request-id`.
+- **Health Check Advisors (OB02)**: `POST /v2/projects/{ref}/advisors/run`
+  fires `log_{data_api,auth,storage,edge_function}_error_rate_high` (level
+  ERROR, category HEALTH) after at least 5 failing 5xx requests in each of two
+  consecutive clock-aligned five-minute buckets. 5 of 100, 5 of 250 and 6 of
+  600 fired; 4 of 100, 3 of 100 (twice), 1 of 5 and a 404-only load did not;
+  the lint text says "at least 10%" but 1% fired. One bucket of failures, or
+  failures in only one of the two buckets, did not fire. Fires 35-66 s after
+  the second bucket closes (30 s polling), the answer is cached about 60 s
+  (`observed_at` steps of 62-64 s at 10 s polling), clears 306-367 s after the
+  last failure. Induce 5xx with `raise sqlstate 'PT500'` (PostgREST), a raising
+  `BEFORE INSERT` trigger on `auth.users` (Auth admin create), a raising
+  `storage.objects` policy function (Storage list), an Edge Function returning
+  500 or throwing.
+- **Logs endpoint ingestion and sources (OB03)**: 36 of 36 marked REST and
+  function requests came back within the 15 s poll interval (max 30 s) in a
+  36-minute window; the 4-minute lag seen once in earlier runs did not recur.
+  Sources on a project: `auth_audit_logs`, `auth_logs`, `edge_logs`,
+  `function_edge_logs`, `function_logs`, `pgbouncer_logs`, `postgres_logs`,
+  `postgrest_logs`, `realtime_logs`, `storage_logs`, `supavisor_logs`. Filter on
+  `source`; `select *` answered a backend error in an exploratory query (not archived), so name the columns. A 300-request
+  burst: 300 rows. `usage.api-requests-count` equalled the project's
+  `edge_logs` row count (341); the platform organization usage route rejects a
+  PAT (401), so logs GB usage is not reachable by token.
+- **Notebooks (OB05)**: `supabase notebooks pull` writes
+  `supabase/notebooks/<name>.json` (keys `description`, `favorite`, `content`;
+  no id in the file); `push` creates by name and updates in place, cell ids
+  survive, a cell without an id gets one; a project notebook missing locally is
+  left alone with `--yes` and a closed stdin (exit 0).
+- **Log drains (OB04)**: `log_drains` entitlement true on Pro, but
+  `GET`/`POST /v2/projects/{ref}/analytics/log-drains` answered 403 "Your
+  organization does not have access to this API" on a Pro and a Team org; the
+  Dashboard route rejects a PAT. Creation is blocked here, so batch size, flush
+  spacing, content-encoding and lag of a drain are unmeasured. The Worker sink
+  (OB04b) is tested and waits for a drain. The v1 API publishes no log-drains route (v2 does). The v2 route
+  refuses these orgs regardless of the entitlement; what grants access was not
+  determined. Missing prerequisite: an org the v2 route accepts, or a drain
+  created in the Dashboard pointed at the sink.
+
+## experiments/edge-runtime-auth - key facts (validated 2026-10-10, Pro org, ap-southeast-1, self-provisioned projects, one per module run)
+
+Self-provisioning: each module creates and deletes its own project (name
+prefix from `ER_PROJECT_PREFIX`), no OpenTofu state. Package under test:
+`@supabase/server` 1.9.1 (pinned in the experiment's own `package.json`, with
+`@supabase/supabase-js` 2.117.3). Run ER01 and ER02 from source:
+`bun harness/src/run.ts --where local --tests experiments/edge-runtime-auth/tests --experiment edge-runtime-auth --only ER01 --destructive`
+after `bun harness/scripts/gen-registry.ts` (the generated registry is used
+when present, so a new module is invisible until it is regenerated).
+
+- **Cloudflare deployment (2026-10-10, new project, `out/2026-10-10/run-2026-10-10T09-28-52-860Z.json`).**
+  The same Worker bundle deployed to workers.dev (wrangler 4.147.0, secrets as
+  Worker secrets) in its three env configurations (`process.env`, overrides,
+  overrides + inline JWKS): 0 of 70 cells differ from the workerd cell of the
+  same configuration, in each configuration; all three are identical to each
+  other. A real user token verified (`200 ran:user`) on all three, including the
+  two that fetch the JWKS at run time. First 200 from the deployed Worker 18 s
+  after the deploy command started. The Worker and the project were deleted
+  (Worker list re-read: 0 `er-` scripts; `GET /v1/projects`: none with the
+  prefix). One account, one colo vantage (SIN on a smoke deploy, not in the
+  artifact), one sequential pass; no rate or cold-start figures. The earlier
+  workerd-only runs stay in the RUNLOG.
+- **ER01, 14 credential presentations x 5 auth modes x 5 targets (Edge Function
+  `verify_jwt` false and true, three workerd Worker configs), plus the three
+  Cloudflare Worker configs in the later run.** On an
+  Edge Function with `verify_jwt` false, 0 of 44 docs-stated cells differed from
+  the package docs; 26 of 70 cells are ones the docs do not state. Workers
+  runtime: same 70 cells in all three env configurations (process.env,
+  overrides, overrides + inline JWKS), and equal to the Edge Function cells
+  except a well-formed unknown `sb_secret_` key, which the Edge Function
+  gateway refuses (`401 Invalid API key`) in every mode including `none`.
+- **`user` mode accepts only a real project-issued ES256 token.** Refused with
+  `INVALID_JWT`: expired, third-party-issuer (registered through third-party
+  auth), unregistered-key, legacy HS256 under the shared secret, and the legacy
+  anon/service_role JWTs. A bad JWT in `['user','secret']` is refused, not
+  downgraded to the secret path. The library accepted a token up to 2.9 s
+  before its `exp` and refused it by 1.4 s after (probes ~4.2 s apart, this
+  machine's clock).
+- **The platform gateway and the library disagree.** With `verify_jwt` true the
+  gateway passed a legacy HS256 token the library refuses, and refused a
+  third-party token (registered issuer; PostgREST answered 200 to it) for the
+  120 s it was polled after registration, and again in the later matrix cell
+  (not timestamped). Not settled: propagation versus rule.
+- **`verify_jwt` true did not block valid `sb_` keys.** A bare publishable key,
+  a bare secret key and the publishable key in both headers reached the handler;
+  the gateway refused a missing credential and a bad bearer (expired,
+  third-party, foreign). The docs' blanket "set `verify_jwt = false` for
+  `publishable`, `secret` or `none`" is stricter than what these cells needed.
+- **A valid user JWT with no `apikey` sent to `secret` or `publishable` mode
+  returns `INVALID_CREDENTIALS`**, the code the docs call a fallback that
+  specific codes have replaced.
+- **Runtime variables on an Edge Function:** `SUPABASE_PUBLISHABLE_KEYS` and
+  `SUPABASE_SECRET_KEYS` (each with one key named `default`), inline
+  `SUPABASE_JWKS` (one ES256 key), `SB_EXECUTION_ID` and
+  `SUPABASE_FUNCTION_SLUG` were set; the singular key variables and
+  `SUPABASE_JWKS_URL` were not.
+- **`jwt_exp` readback is not the setting in force.** After the Management API
+  read back 300, the first sign-in still got a 3600 s token; the second, 10 s
+  later, got 300 s. Poll sign-ins for the lifetime, not the config readback.
+- **ER02: no mixed-version window after a redeploy.** Five redeploys, 4
+  pollers (618 to 639 samples per ~30 s cycle): 0 old-build answers after the first new-build
+  answer, 0 non-200; the last old answer was at most 36 ms and the first new
+  answer 781-987 ms after the deploy call returned (requests issued at the
+  boundary took up to ~1 s; first-10-s p95 240 ms against 109 ms before).
+  Management API deploy path, one function, one region (SIN vantage).
+- **`functions.invoke` (supabase-js 2.117.3) did not retry** an injected 503
+  (with or without `Retry-After`), 502, 500 or 429: 1 client attempt and 1
+  function-side row (a table witness, not an in-memory counter) in each of 3
+  trials per status; error class `FunctionsHttpError`. Not measured: a 503
+  produced by the platform relay, network errors, other client versions.
+- **Latency, 600 s at 1 request/s each:** Edge Function p50 88 / p95 112 / p99 146
+  / max 242 ms (600 answers) against an RPC twin p50 27 / p95 44 / p99 68 / max
+  147 ms. 466 of 600 function answers reported a module-load age under 2 s
+  (`age_ms`; a recent module load, not shown to be a new instance; older-age
+  answers had p50 61 ms). Per-30-s p95 median 110, max 151; 0 of 20 buckets over 2x the
+  median.
+- **Open:** the module counted 543 distinct instance ids over 600 answers while
+  134 answers carried a served count above 1; the instance id is not relied on.
+- **Superseded:** the first ER02 run reported a 3-6 s mixed-version window; it
+  was a time-origin defect in the module, withdrawn (RUNLOG).
+
+## experiments/lifecycle-ops - key facts (validated 2026-10-10, Pro org)
+
+- Status page as a change gate (LO01, `experiments/lifecycle-ops/lib/gate.ts`):
+  `status.supabase.com/api/v2/components.json` carries each of the 18 region
+  names 10 or 11 times (189 components in all, no group or service field), so a
+  lookup by region name must take the worst status over every match.
+  `incidents.json` has no component or region field and `incidents/unresolved.json`
+  answers 404; region scope is read from incident text (title first), and
+  `impact` is ignored because an upgrade suspension and a project-creation
+  degradation were both published as `none`. All 189 components read
+  `operational` on 2026-10-10, so component status has no positive case in the
+  lab yet. `summary.json` lists a 2026-07-02 maintenance still `scheduled`.
+  Replay of the 25-incident feed (1113 h): a restart gate would have refused
+  `ap-southeast-1` (38.5 h in total); heuristic, not ground truth.
+- A create whose response the caller abandoned still creates the project, and
+  an identical re-send is refused with HTTP 400 `Project with name "<name>"
+  already exists in your organization.` (LO04, n=1). Keep the name stable
+  across retries of one logical create; list by name before retrying. Invalid
+  create bodies fail fast and create nothing (LO03a: unknown region 400,
+  unknown org 404, missing name 400, unknown size 400).
+- `ACTIVE_HEALTHY` after a create came back at the first poll twice and at 145 s
+  once (LO03, n=3, 10 s poll); the project that read healthy at the first poll
+  served REST, Auth, Storage, pooler and direct within 5 s (LO05a).
+- Restart envelope, one Micro project, `ap-southeast-1`, n=5 (LO05): REST never
+  failed; Auth 54 s, Storage 58 s, pooler 54 s, direct 50 s at p50 with maxes
+  60, 59, 151 and 56 s; first failure 2 to 3 s after the POST; the control-plane
+  status flipped back to `ACTIVE_HEALTHY` at 40 to 71 s, before the pooler
+  recovered in one run. Windows were about 30 s in runs 1 and 2 and 50 to 60 s
+  in runs 3 to 5. D01 (2026-08-04, n=1) had 75, 78 and 158 s.
+- `POST /restart` right after a create answered HTTP 400 `Project restarts are
+  only allowed ten minutes after the creation process has completed...`
+  (about 70 s after the POST, handed-over project), yet a restart 300 s after
+  the first `ACTIVE_HEALTHY` read was accepted on another project (LO05f). The
+  boundary is unresolved. A second restart sent while `RESTARTING` returned 200
+  (LO05c).
+- Vantage note: on the macOS orchestrator, `dns.lookup` (getaddrinfo) returned
+  ENOTFOUND for an AAAA-only `db.<ref>` host while `dns.resolve6` and a TCP
+  connect to the literal address worked; the direct probe resolves with
+  `resolve6` (`lib/probes.ts`).
+- Retire FAILURE-MATRIX 10.1 `[doc]` for the measured halves (create and
+  restart lifecycle surfaces); capacity-driven failures remain `[doc]`.
+
+## experiments/restore-paths - key facts (2026-10-10, ap-southeast-1, one IPv4-only vantage)
+
+Which restore paths a Pro org can drive through the Management API, and what
+each does to the db password, Storage and the per-path outage. Self-provisioning
+(`rp-*` projects, deleted in `finally`); run from source with bun
+because `harness/dist/pvlab` is a linux-x64 build.
+
+- **Pro has no pause, and `backups/restore` is "unavailable".** `POST /pause`
+  answers `400` "Project is not free-tier" (entitlement `project_pausing` false
+  on the Pro org). `POST database/backups/restore {id}` and `GET
+  .../restore-point` answer `400` "This endpoint is unavailable at the moment" on
+  a fresh Pro project, and the same by a manual call after `pitr_7` was applied
+  (RP01). On this org the in-place restore route that ran is `restore-pitr`.
+- **Restore to a new project (clone) was not run.** The OpenAPI document has no
+  clone path and the create-project body no source field; the Dashboard's
+  clone route answers a PAT `401 Unsupported access token` (RP01d). The
+  entitlements `project_cloning` and `backup.restore_to_new_project` are true on
+  the Pro org, so the feature is entitled but its API path is the Dashboard's.
+  Password and Storage behaviour after a clone are unread.
+- **`restore-pitr` refuses a target past the platform's upper bound and the
+  message names the range** ("Recovery time target must be within range:
+  <earliest> <= t <= <latest>"); a target 19 to 96 s past that bound was
+  accepted on a retry 60 or 121 s later (RP02c, retries every 60 s so the lag is
+  bounded, not resolved). With `pitr_7` just applied, the first read already had
+  `pitr_enabled=true` and a window of 359 or 360 s in 5 of 5 runs.
+- **PITR restore on Small, 10 MB database: back to `ACTIVE_HEALTHY` in 30 s**
+  (10 s polling; n=3), 40 s for a restore to a target after a rotation (control,
+  30 to 41 s, n=5), 81 s for a 574 MB database (n=1). Per path: REST, Auth and
+  Realtime showed no failed 1 s sample; Storage failed for 12 s (8 of 9) with
+  `The operation timed out`; the pooler 5 to 13 s on 10 MB, 41 s at 574 MB.
+- **The current password works after a PITR restore; the replaced one is
+  refused** (9 of 9 clean restores, targets before and after a rotation). The
+  stored verifier is a third value each time, so credentials are set again
+  after the restore (inference from fingerprints, matching the 2026-07-30
+  changelog). The current password was refused for about one 5 s poll between
+  "database answers" and "password works" in 6 of 7 restores observed at that
+  resolution: a short stale window, not a measured duration. A restore target
+  hours or days old was not run.
+- **Storage did not 500 after any restore or unpause** (list, download with
+  bytes equal, upload all `200`). A PITR restore to before an object's upload
+  makes the download `404` and the listing omit it, and the same path is
+  writable again (R6). While a Free project is pausing, Storage answered `HTTP
+  500` on the first failing sample (2 of 3 runs). `GET /health` read
+  `realtime=COMING_UP` in the read taken right after the restore or unpause in 4 of 8 runs (RP02 R3, R4, R6; RP03 R7).
+- **Free-plan pause then unpause (6 cycles):** `INACTIVE` after 62 or 63 s
+  (5 cycles; 276 s once), unpause to healthy 183 to 212 s (5 cycles; 444 s once)
+  via `COMING_UP -> RESTORING`. After the unpause REST and Realtime answer at
+  15 to 20 s, Auth at about 150 to 175 s, Storage and the pooler at about 180 to
+  217 s.
+- **A password change while paused is refused** (`400` "Cannot reset password
+  for non-active projects"), so the stale-credential condition the changelog
+  describes cannot be set up through the API on a Free project. The password
+  set before the pause works after the unpause (3 of 3 first cycles).
+- **The pooler's circuit breaker is a measurement hazard.** Polling a known-wrong
+  password every 4 s plus a 1 s probe opened it within about a minute:
+  `(ECIRCUITBREAKER) too many authentication failures, new connections are
+  temporarily blocked` answered every login, including the correct password,
+  before the password was checked. Poll a wrong password at most once a minute
+  and read `blocked` as "unanswered".
+- **Small's disk is 2 GB gp3 and WAL counts against it.** Growing a PITR project
+  to 574 MB left 505 MB free with 736 MB of WAL (R5); asking for 1500 MB filled
+  the disk at 715 MB, the next rotation call failed and the restore request was
+  refused as "database appears to be unreachable" until 301 s (R4). What filled
+  it was not separated.
+- Pending: clone (Dashboard session needed), `backups/restore` on an older
+  project, a restore target hours old, a database over 1 GB, direct 5432.
+
+## experiments/pooler-checkout - key facts (validated 2026-10-10, Micro, ap-southeast-1 and us-east-1, Pro org, Supavisor aws-0 hosts)
+
+Self-provisioning (Management API create and delete, no OpenTofu state), one
+Micro project per run. IPv4-only vantage in Singapore. Raw artifacts are in the
+ignored `evidence/`; none published to `out/`. Details: RUNLOG.md.
+
+- **Transaction-pool exhaustion is a statement-time error, after 60 s.** With the
+  effective pool (16 active backends on Micro, PC01b; the API reports
+  `default_pool_size null`) held by `pg_sleep`, client N+1 connects in 43 to
+  52 ms and its first `select 1` fails after 60,007 to 60,009 ms (6 of 6
+  trials) with `XX000 (ECHECKOUTTIMEOUT) unable to check out connection from the
+  pool after 60000ms in Transaction mode`. A statement that queues for less than
+  60 s is served (6,018 to 6,056 ms behind 8 s holders). A public status mirror
+  quotes `after 15000ms` for other clusters; this project did not reproduce
+  that figure, and what sets it was not separated.
+- **Fallback to the Supavisor session pooler (5432) works while the transaction
+  pool is exhausted:** 49 to 70 ms from the primary's failure to the fallback's
+  answer (PC02a), 56 to 117 ms after the server's own 60 s error (PC02c). The
+  session client was an extra backend: 17 active `pg_sleep` backends with 16
+  transaction-mode holders plus one session client (PC02h), against the docs'
+  combined-pool wording. Direct 5432 is unreachable from an IPv4-only client
+  without the add-on (`ENOTFOUND`, 6 of 6); with the add-on on, the dedicated
+  pooler and direct answered 126 to 168 ms after the failure. The add-on took
+  80 s (both runs) from the PATCH to an IPv4 address on this resolver.
+- **Driver pools evict reset connections; the retry has to wait.** Through a
+  toxiproxy reset or cut, node-postgres, postgres.js and Prisma had 0 failed
+  first attempts after the fault cleared (111 non-crashed runs). A retry-once
+  at 0 ms did not rescue stale-connection failures after a 150 ms flap on pg or
+  Prisma (0 of 30 each); at 300 ms it did (25 of 25, 30 of 30). postgres.js
+  waited out a 2 s cut in 9 of 12 runs (slowest statement 1,902 to 2,103 ms).
+  node-postgres `Pool` without an `'error'` listener exited in 9 of 12 runs at
+  the cut (`Unhandled 'error' event`).
+- **The `aws-0` prefix was the current one**, not a legacy one: fresh Pro
+  projects in two regions were on `aws-0` and the `aws-1` host answered
+  `(ENOTFOUND) tenant/user ... not found` for them (PC04). The lint
+  (`lib/lint-pooler-hosts.ts`) flags a literal host; read `db_host` from
+  `GET /v1/projects/{ref}/config/database/pooler` instead.
+- **Host sleep voids timings.** Run 1 lost PC02 to a laptop idle sleep (a 100 s
+  deadline fired at 241 s of wall time); later runs use `caffeinate` and a
+  `-clock` row (wall minus monotonic clock).
+
+## experiments/jit-db-access - key facts (2026-10-10, Pro org, Postgres 17)
+
+Temporary token-based database access: the caller's PAT is the Postgres
+password for a role the project grants it. Self-provisioning, one Pro
+project per run. Sources (docs claims, not measurements):
+https://supabase.com/changelog/46346-feature-preview-temporary-token-based-database-access
+and https://supabase.com/docs/guides/platform/temporary-access.
+
+- The grant routes work on Pro: `PUT /jit-access {state}` and
+  `PUT /database/jit` answer 200 (JA01c, JA01d). The 500 recorded under
+  sfp-platforms was the invite route.
+- Prerequisite: SSL enforcement. Without it `GET /jit-access` reads
+  `{"state":"unavailable","unavailableReason":"ssl_enforcement_required"}`
+  and `PUT enabled` answers 200 with that same body. `PUT /ssl-enforcement`
+  `{"requestedConfig":{"database":true}}` is followed 1 s later by a
+  `received fast shutdown request` row in postgres_logs (5 of 5 runs, JA01b).
+- Grant body key is `roles`, NOT the docs' `user_roles` (400 `roles:
+  Invalid input`); the response uses `user_roles`. `PUT` replaces the user's
+  whole role set (JA01d).
+- `expires_at` is epoch SECONDS. Fresh logins are refused at +0 to +1 s
+  (pooler `password authentication failed`, direct `PAM authentication
+  failed`). The docs example writes milliseconds: that value is accepted
+  with 200 and was not refused within 70 s, so copying the docs example
+  yields a grant with no practical expiry (JA01g, 3 runs direct, 1 pooler).
+- Expiry and `DELETE /database/jit/{user_id}` stop NEW logins only; open
+  sessions stayed alive (300 s after expiry, runs 4-5; 15 s after delete).
+  `PUT /jit-access disabled` closed the pooler session and not the direct
+  one. `PUT enabled` restores login with no re-grant (JA01g, JA01i).
+- Paths with the PAT as password: shared pooler 6543 and 5432 with
+  `options=-c jit=true` work; without the option, and for an unmapped role,
+  `password authentication failed`; direct works over IPv6 (AAAA only, no A
+  record without the IPv4 add-on; macOS needs `hostaddr` pinned); dedicated
+  pooler (db host :6543) `SASL authentication failed`. The docs' `aws-1-`
+  pooler host answered `ENOTFOUND tenant/user`; use the host from
+  `GET /config/database/pooler` (`aws-0-` here) (JA01e).
+- A PAT session is `current_user = session_user = postgres` with the role's
+  own privileges; nothing inside the session names the Supabase user (JA01f).
+- Logs: a direct JIT login is `connection authenticated: identity="postgres"
+  method=pam` plus `connection authorized ... application_name=<client>` in
+  postgres_logs; a pooler login is a supavisor_logs row with `user` and
+  `peer_ip`. No row from the logins carries the user id, email or `sbp_`
+  token; the only row with the user id was the Management API's own
+  `-- user: scoped_pat:<id>` tag on a `POST /database/query` statement
+  (JA01k). The changelog's "see who accessed the database" is not visible in
+  these two sources.
+- `allowed_networks`: documentation-range CIDR refused on both paths; the
+  direct path works with `allowed_cidrs_v6` set to the `/128` the database
+  saw; the pooler path is judged against the pooler's IPv6 address (a pooler
+  session shows an IPv6 `inet_client_addr()`), and the verdict for an
+  IPv4-only grant differed between runs and within one run (`password,
+  password, ok-v6, ok-v6`, 8 s apart). Per-client-IP scoping through the
+  shared pooler is unproven (JA01j).
+- Failed pooler logins trip `(ECIRCUITBREAKER) too many authentication
+  failures`, which also refuses valid grants and listed one banned IPv4 in
+  `POST /network-bans/retrieve` (lifted by `DELETE /network-bans`). Do not
+  retry a refused JIT login in a tight loop (run 1, discarded rows).
+- Not run: membership removal and PAT revocation (needs a second human; the
+  changelog claim is doc-cited-not-tested), sessions beyond 300 s,
+  `branches_only`, Team/Free orgs.
+
+## experiments/client-retries - key facts (supabase-js PostgREST retries, validated 2026-10-10)
+
+- Built-in retries (supabase-js 2.102.0 and later; 2.101.1 sent one request): GET, HEAD and
+  `rpc({get: true})` answered 503 or 520, or hit by a connection reset, make 4 attempts at 1, 2,
+  4 s with `X-Retry-Count` 1, 2, 3 (CR01a1-a3, CR01a5, CR01b3). POST, PATCH, DELETE, upsert
+  and default `rpc()` send 1 (CR01b1, CR01b2, CR01b3). 525, 502, 504, 500, 429, 408, 521, 522
+  and 524 each send 1 (CR01a4). Measured on a local fault proxy, supabase-js 2.112.3, Bun 1.3.14.
+- `Retry-After` on a 503 sets the spacing: 2 gave 2000 ms, 0 gave 0, 40 gave 40000 ms (above the
+  30 s cap), an HTTP date was ignored (CR01a6). The real Data-API-off 503 (PGRST002) carries
+  `Retry-After: 0`, so its four attempts ran back to back, 7252 ms in total (CR01e1).
+- Opt-out spelling: `.retry(false)` works from 2.102.0; `db: { retry: false }` only from 2.112.0
+  (2.111.0 and earlier ignore it); `db: { retryEnabled: false }`, the name in the public
+  changelog, did nothing in any of the 14 versions tested (CR01c, CR03).
+- No default timeout: a 10 s response completes (CR01d2) and a request never answered was still
+  pending at 330 s on Bun and on Node (CR04; one trial each). `db.timeout` is per attempt, not
+  per call (CR01d4).
+- Under Bun 1.3.14 an inline `.abortSignal(AbortSignal.timeout(n))` did not end a call that was
+  sleeping between retries (4 attempts, 7 s for a 2.5 s or 5 s deadline; CR01d5a, CR01d7,
+  CR03 on every version from 2.102.0). Node ended it at the deadline. An `AbortController` with
+  `setTimeout`, or a timeout signal with an `abort` listener, worked on both.
+- gateway edge_logs do not show `X-Retry-Count` (5 rows, `source = 'edge_logs'`); attempts are
+  visible only as rows (CR01f).
+- Client policy (lib/policy.ts): deadline plus one hedged GET bounded a held request to 1575 ms
+  and a hang to the 4000 ms deadline, and sent 2 requests where the built-in policy sends 1 for a
+  525 (CR02b-e). Leaving the built-in retries on under the hedge sent 6 requests in 6 s against
+  2 (CR02f). Hedging a plain insert wrote 2 rows; a hedged primary-key upsert wrote 1 (CR02g).
+- refresh-then-retry on a 401: injected and real 401s recovered with 1 refresh call and 2 REST
+  requests; a revoked session returned the original 401 after a failed refresh; 5 parallel 401s
+  made 1 refresh call (CR02h; the last is one trial).
+
+## experiments/hostname-path - key facts (validated 2026-10-10, ap-southeast-1, Pro org, n=1 per row)
+
+Self-provisioning (project `hp-<ms>`, deleted by HP09; run state in
+gitignored `.state.json`, `make down` recovers a crashed run). Custom hostname
+DNS through the Cloudflare v4 API with the global key pair (the scoped token did
+not list the zone). Details: RUNLOG.md.
+
+- **The Auth callback follows the custom domain, about 6 s after
+  `5_services_reconfigured`** (HP03d): polled every 5 s, both entry hosts named
+  the project host at 1 s and the custom host at 6 s; a round trip started
+  within seconds of `activate` in the first cycle still used the project host.
+  With the domain active, `redirect_uri` (to the issuer and in the token
+  request) is `<custom host>/auth/v1/callback` whichever host the client entered
+  at; after `DELETE custom-hostname` it named the project host again 5 s later
+  (HP09). Measured through the Keycloak slot with a mock issuer (an Edge
+  Function); a real provider's reaction to an unregistered `redirect_uri` was not
+  run.
+- **The access token's `iss` stays `<project host>/auth/v1`** for sign-ins
+  entered at the custom host (OAuth and password grant); the token is accepted
+  by `/auth/v1/user` on both hosts and the JWKS answers `200` on both (HP04,
+  HP05d). The PostgREST OpenAPI root reports `host` as the project host on both
+  (hand-read, HP05c counts the hostname).
+- **supabase-js builds every URL from the base URL it was given** (HP05): with
+  the custom hostname, all 12 operations (`getPublicUrl`, `createSignedUrl(s)`,
+  `createSignedUploadUrl`, REST, Functions, Auth, Storage) sent and returned the
+  custom host; the Storage server's sign and upload responses contain no
+  hostname. `getPublicUrl` makes no request.
+- **A custom hostname that is a CNAME to `<ref>.supabase.co` does not survive
+  `supabase.co` NXDOMAIN at the resolver** (HP07): 0 of 6 app operations,
+  `ENOTFOUND`; the same hostname as A records holding the project host's 2
+  addresses: 6 of 6 (curl pinned: `200` on both addresses with SNI = custom
+  host), platform status still `5_services_reconfigured` seconds later. Validity
+  over time and certificate renewal without the CNAME were not tested. A resolver
+  that had the chain cached kept answering until the 300 s target TTL ran out
+  (first failure at 301 s; no serve-stale, one configuration).
+- Resolution (HP06): the project host is 2 A records, no AAAA, TTL 300, same set
+  on the system resolver, 1.1.1.1, 8.8.8.8, 9.9.9.9 and DoH (Cloudflare, Google);
+  `supabase.co` is delegated root > `co.` (4 NS) > 2 NS on Cloudflare, no DS and
+  no DNSKEY, no wildcard (an unused label is NXDOMAIN).
+- Latency from one APAC vantage (HP08, 40 interleaved samples per host, new
+  connection each): p50 phases (ms) project host dns/tcp/tls/ttfb 3/10/15/27,
+  custom host 3/10/14/26, both through the SIN colo, 40 of 40 `200`. The
+  eastern-US :00/:30 vantage was not measured (the vault AWS keys were rejected
+  by STS, `InvalidClientTokenId`); ISP and `.co` TLD behaviour from other
+  networks not measured.
+- Custom-domain provisioning, two cycles on one project: verified in 221 s and
+  66 s (the `_acme-challenge` TXT was asked for in the first only), `activate`
+  `201` on the first call both times, host serving 1 s after.
+- Harness: the Keycloak provider stores userinfo claims under
+  `identity_data.custom_claims`. Docker container IPs are not routable from
+  macOS, so resolver probes run `dig` inside the Unbound container.
+
+## experiments/storage-surface - key facts (validated 2026-10-10, Pro org, ap-southeast-1, n = 3 runs each)
+
+- storage-surface (SS01, SS02; 2026-10-10, Pro org, ap-southeast-1, n = 3 runs
+  each; `experiments/storage-surface/RUNLOG.md`). Self-provisioning, projects
+  named `ss-<tag>-<epoch>`. The AWS SDK for JavaScript v3 is a
+  dependency of `canary/` only and is spawned as a child process, so the
+  compiled registry and the root typecheck do not need it; the harness runs
+  from source for this experiment (`make probe`).
+- Direct SQL delete guard (SS01a-b): `storage.protect_delete` is a
+  statement-level BEFORE DELETE trigger on `storage.objects` and
+  `storage.buckets`. As `postgres`, `DELETE ... WHERE false` is already refused
+  (SQLSTATE 42501) because it fires per statement. It accepts only the exact
+  string `true` (`'on'` and `'TRUE'` are refused). `SET`, `SET LOCAL` in a
+  transaction, and `set ...; delete ...` in one Management API query request
+  all work. `TRUNCATE` is not covered (probed inside a rolled-back
+  transaction; a committed TRUNCATE was not run). `storage.prefixes` is absent
+  (3 of 3 runs).
+- SQL-deleted objects are orphaned (SS01c): after a SQL delete the REST API and
+  the S3 endpoint report the object absent, but a row re-inserted with the
+  original `version` serves the original bytes again (REST and S3), while a row
+  re-inserted after an API delete, or with a different `version`, does not.
+  Inference from controlled reads, not a view of the backend. Persistence time
+  and storage accounting not measured.
+- List v2 (cursor) against v1 (offset) (SS01d): v1 latency grows about linearly
+  with offset (DB-side `storage.search` at the last page, in milliseconds:
+  43 / 217 / 864 at 5,000 / 25,000 / 100,000 rows); v2 is flat DB-side
+  (about 1.2 to 1.5 at every size); client side it shows no depth trend beyond
+  run-to-run noise of roughly 40 to 130 ms on single samples (one 131 ms first
+  page at 100,000 rows in run 3). The per-run client-side ratios are in the derived table of SS01d in
+  the RUNLOG. Flat prefix, SQL-inserted rows, one laptop vantage; the blog's
+  14.8x figure is a 60-million-row benchmark and is not reproduced.
+- S3 endpoint key canary (SS02; session-token auth with the service_role JWT,
+  AWS SDK v3): of 40 keys, 18 round-trip on every operation (space, `+`, `=`,
+  `&`, `,`, `;`, `@`, `:`, `$`, `!`, `'`, parentheses, `*`, `?`, nested paths,
+  leading and trailing space), 19 are refused `400 InvalidKey` (including `%`,
+  `#`, `~`, brackets, braces, backtick, `<` `>`, `"`, `\`, tab, and every
+  non-ASCII key tried), 3 get `403 SignatureDoesNotMatch` (`a//b.txt`,
+  `dot/./seg.txt`, `dot/../seg2.txt`). REST GET returned the same `InvalidKey` body (REST upload not recorded). Same
+  result on both hosts and on both Bun and Node. On Bun the dot-segment 403 is
+  the client rewriting the path after signing (local wire control); on Node
+  and for `//` the request matches what was signed and the endpoint still
+  answers 403. Dashboard-generated S3 access keys not exercised (no API to
+  create them).
+- Client action: restrict object keys to the 18-key class at upload; never
+  send `//` or dot segments in a key; percent-encode path segments in REST
+  calls (supabase-js with a plain `?` key lost the object under another name).
+
+## experiments/pipelines - key facts (validated 2026-10-10)
+
+- **Pipelines (PL, experiments/pipelines/, 2026-10-10).** The managed service
+  cannot be driven with a PAT: the public Management API description has no
+  pipelines route and `/platform/replication/{ref}/...` answers 401
+  "Unsupported access token" while `/v1` answers 200 (PL01). A destination
+  with no third-party credentials exists (DuckLake; catalog and storage can be
+  Supabase projects per the docs), but creating one is Dashboard-only. All
+  behaviour below is from the open-source engine image the docs say the managed
+  service runs, pinned by commit, with a DuckLake destination on local
+  containers, from a laptop with a 171 ms round trip to the eu-central-1 source:
+  not managed-service figures. Initial copy of 1M rows (101 MB heap): 53 s from
+  start to `sync_done`, 13.3 s of it copy (PL02). Lag tracks `batch.max_fill_ms`:
+  p50 5577 ms at the 10000 ms default, 1131 ms at 1000 ms (PL03). RLS applies
+  to neither the copy nor the change stream for a BYPASSRLS role; a role
+  without BYPASSRLS silently copied only the 100 policy-visible rows of 1000
+  (PL04). DDL: add/rename/drop column, drop NOT NULL and constant defaults
+  propagate in about 5 s; tightening NOT NULL and volatile defaults are skipped
+  with a WARN; an int-to-bigint change leaves the destination INTEGER and a
+  later out-of-range value made the replicator process exit while the table
+  state still read `ready` (PL05). 0 duplicates in 11 kill/stop trials, with and
+  without a primary key (PL06; not a bound). A stopped pipeline retains WAL
+  linearly (about 410-620 bytes per 1 KB-class row written); past
+  `max_slot_wal_keep_size` (512MB) the slot went `unreserved` then `lost`
+  (`wal_removed`) at the next automatic checkpoint, `CHECKPOINT` is refused for
+  `postgres`, default restart exits with `ReplicationSlotInvalidated`,
+  `recreate` rebuilds the table (PL07). The `etl_pipeline` add-on is listed at
+  0.053 USD/h but a PAT PATCH is refused 400 (PL08). Not measured: managed
+  copy time and lag, billing while stopped, Supabase-backed catalog/storage,
+  BigQuery/ClickHouse/Snowflake.
+
+## experiments/orioledb - key facts (validated 2026-10-10, hosted)
+
+Self-provisioning: one OrioleDB project (`POST /v1/projects` with
+`postgres_engine: "17-oriole"`), one heap control, three extra OrioleDB
+projects (feature battery, two conversion probes), all `small`,
+`ap-southeast-1`, deleted by OR99. `make probe` runs OR01-OR10; numbers in
+`RUNLOG.md`, artifacts `out/2026-10-10/`.
+
+- The create-body field `postgres_engine` is typed deprecated `null` in the
+  published OpenAPI document (read 2026-10-10) but was accepted and applied:
+  the project reads back `postgres_engine` `17-oriole` (PostgreSQL 17.6,
+  aarch64, `OrioleDB public beta 14`). The heap control read 17.11 on x86_64
+  with `wal_compression` zstd (OrioleDB project: pglz), and was created with a
+  2 GB disk against 8 GB for the OrioleDB project. Cross-project comparisons
+  carry all three differences; compare `USING orioledb` with `USING heap`
+  inside one project for the engine alone.
+- The hosted `postgres` role has no `pg_checkpoint` (`CHECKPOINT` refused) and
+  OrioleDB tables have no `xmin`; measure OrioleDB write volume with the
+  `pg_current_wal_insert_lsn()` diff across the transaction.
+- Unchanged-row upsert/UPDATE, 100,000 rows: 5,786,200 bytes of WAL on an
+  OrioleDB table against 30,946,504 on a heap table in the same project; the
+  OrioleDB table did not grow, the heap table doubled. Guards that wrote 0 on
+  heap wrote 0 on OrioleDB; the guarded upsert (which locks every row) wrote
+  5,616,512 on heap and 224 on OrioleDB. Ten all-row UPDATE rounds with
+  autovacuum off: heap 7,659,520 to 84,148,224 bytes, OrioleDB constant at
+  8,445,952; OrioleDB `n_dead_tup` still counts the updates (1,000,000), and
+  `VACUUM FULL` is refused on OrioleDB tables.
+- pgbench at `small`, 12 clients, 30 s, 2 runs, through the pooler (7.1 to
+  7.8 ms round trip): no throughput difference between an OrioleDB and a heap
+  table in the same project (ranges overlap in 3 of 4 script cells; 4-client
+  cell 466.3 vs 463.3 tps). The cells sit at the round-trip bound, not the
+  server. The vendor's 1.8x (8xlarge, TPC-C-derived) was not tested.
+- Refused on an OrioleDB table: `CREATE INDEX CONCURRENTLY`, SERIALIZABLE,
+  `VACUUM FULL`, `CLUSTER`, `ALTER TABLE ... SET ACCESS METHOD` (either
+  direction on an OrioleDB table). Accepted: GIN/GiST/BRIN/hash, FKs to and
+  from heap tables, triggers, RLS, partitions, TOAST, pgvector HNSW,
+  publications and logical slots (decoded messages identical to a heap
+  table), Realtime `postgres_changes` (6 of 6 events), Data API.
+- `ALTER TABLE ... SET ACCESS METHOD orioledb` on a heap table ended the
+  backend connection in 5 of 5 attempts; the server came back in 3 and sat in
+  a startup-process segfault loop in 2 (manual probes; `POST /restart` did not
+  recover the one tried). Do not run it on a project you need.
+- PITR: `PATCH /billing/addons` pitr_7 answers HTTP 400 "Projects using the
+  OrioleDB Technical Preview image do not support PITR addon." on the OrioleDB
+  project and 200 on the heap control. Backups: `walg_enabled` false on the
+  OrioleDB project, true on the control.
+- A Free org created an OrioleDB project (`instances.orioledb` is true on the
+  Pro, Team and Free orgs read), matching the changelog and not the "Pro and
+  up" in the announcement.
+- The heap control's 2 GB default disk filled during a 1,000,000-row plain
+  upsert (303 to 312 MB WAL per statement; `pg_wal` 0.69 then 1.29 GB with
+  `walg_enabled` true); it passed with the disk set to 8 GB. Cause not
+  isolated.
+
+## experiments/branching-nogit - key facts (validated 2026-10-10, Pro org, ap-southeast-1)
+
+- **Branching without git: `POST /merge` applies the branch's migration
+  history, not the schema difference `GET /diff` shows** (branching-nogit
+  BN01-BN03, two runs each on 2026-10-10, Pro org, ap-southeast-1). A branch
+  created with no `git_branch` reads `ACTIVE_HEALTHY` 1-2 s after the create
+  call, before the parent's schema is on it (baseline table first seen after
+  43-53 s; a diff read in that window proposes `drop table` for the parent's
+  table, one trial by hand). `POST /projects/{branch_ref}/database/query`
+  works on the branch ref (`GET /projects/{branch_ref}` is 404). A table, RLS,
+  policy, privilege change, function, column and index written that way
+  were all in `GET /diff` (default, `pgdelta=true`, `pgdelta=false`; default
+  equals `pgdelta=false`) and none reached the parent: merge 201
+  (`workflow_run_id`), nothing present after 245-258 s, parent history
+  unchanged (BN01, BN03). `PATCH request_review: true` first changed nothing
+  (BN03). The same objects written through `POST /projects/{branch_ref}/
+  database/migrations` merged in 42-56 s with a history row (BN02, same
+  branch and merge as a `/database/query` set that stayed out). By hand, once:
+  the MCP `execute_sql` set stayed out and the `apply_migration` set merged.
+  `pg_net` appears in every diff and was never installed on the parent. Not
+  measured: the dashboard's own SQL Editor and Table Editor routes (a PAT
+  cannot call them), so the blog's "tracked" is untested for the dashboard;
+  `migration_version`; the dashboard merge-request screen.
+
+## experiments/replica-routing - key facts (validated 2026-10-10, Pro org)
+
+- **The API load balancer's host is `<ref>-all.supabase.co` and the Management
+  API does not return it** (RR01e, 2026-10-10): the Dashboard route
+  `GET /platform/projects/{ref}/load-balancers` answers a PAT with 401
+  `Unsupported access token`, and the replica's REST host is
+  `<identifier>.supabase.co` (the `identifier` of the `READ_REPLICA` pooler
+  entry). Both were found by name, not read from an API.
+- **A GET through the load balancer reached the replica, a POST did not**
+  (RR01f/g/h): replica in ap-southeast-1, primary in ap-northeast-1, from a
+  Singapore workstation 40 of 40 GETs to `rpc/rr_whoami` were served by the
+  replica and a `POST` to the same stable function and a `POST` insert by the
+  primary. From Edge Functions pinned with `x-region` (10 GETs each): replica
+  for ap-southeast-1, ap-southeast-2, ap-south-1, sa-east-1; primary for
+  ap-northeast-1, eu-west-1, us-east-1, us-west-1. One project, one run.
+- **The load balancer's log row names its own choice** (RR01o): `edge_logs`
+  carries `request.cf.colo`,
+  `load_balancer_geo_aware_info.available_supabase_regions`,
+  `load_balancer_geo_aware_info.chosen_supabase_region` and
+  `load_balancer_redirect_identifier` (the target's host). Chosen region
+  followed the Cloudflare colo in all 9 colo groups seen (SIN, SYD, BOM, GRU to
+  the replica's region; NRT, DUB, IAD, SJC to the primary's). The rule is not
+  separated: a distance rule and a fixed colo table both fit. Query with
+  `source = 'edge_logs'` and `log_attributes['...']`; a `split(...)[1]` in the
+  select list was refused with `Backend error!`.
+- **`inet_server_addr()` cannot identify a replica**: it returned the
+  loopback address on both nodes. Use `pg_is_in_recovery()` plus
+  `pg_postmaster_start_time()` (RR01, exploratory run).
+- **`max_standby_streaming_delay` is 30 s on a replica and the primary, source
+  `default`; `hot_standby_feedback` is off** (RR01l). A replica query held in a
+  repeatable-read transaction was cancelled in 6 of 6 trials with SQLSTATE
+  40001 `canceling statement due to conflict with recovery`, about 30 to 32 s
+  after the primary ran UPDATE+VACUUM (3) or an ACCESS EXCLUSIVE lock (3)
+  (RR01m/n). Replay stopped for that time: a row written on the primary
+  afterwards was invisible on the replica for about the same 30 to 32 s, so the
+  read-your-writes gap on a replica is bounded by this setting, not by network
+  lag. Not run with `hot_standby_feedback` on.
+- **First read after a write on a cross-region replica (Tokyo to Singapore,
+  light load)**: 0 of 30 first reads missed, but the writing client took longer
+  to return than replication took, so this bounds the gap for that client shape
+  only (RR01i). Per-insert delay from database clocks is in RR01k (40
+  inserts, includes clock skew; one insert took a few hundred ms).
+- **Cross-region replica provisioning on Small**: entry and first answer at 271 s
+  in the published run (roughly 150 s in an exploratory run with no artifact); removal 204,
+  gone at once (RR01d, RR01p).
+- **Resetting a project's database password** (`PATCH /database/password`)
+  left the Tokyo session pooler refusing it for over 60 s in 2 exploratory
+  runs; a fresh project's pooler accepted its create-time password at once.
+
+## experiments/scoped-pats - key facts (SP01-SP10, validated 2026-10-10)
+
+Scoped personal access tokens (GA, https://supabase.com/changelog/scoped-personal-access-tokens-ga)
+against the Management API. Self-provisioning, no OpenTofu state.
+
+- Creation has no API. The public `/v1` OpenAPI document (115 paths, 170
+  operations on 2026-10-10) has no access-token creation operation, and the
+  dashboard's route `GET /platform/profile/access-tokens` answers a PAT
+  `401 "Unsupported access token"` (SP01a/b). Modules that need a token of a
+  chosen scope skip with the dashboard hand-off until `PVLAB_SCOPED_PAT_<ROLE>`
+  is set (`ORG`, `RO`, `DBRW`, `NARROW`, `MEMBER`, `REVOKE`, optional
+  `PVLAB_LEGACY_PAT`); fixtures come from `PVLAB_PEER_FIXTURE` / `_OTHER`.
+- The OpenAPI document declares `x-fga-permissions` on 164 of 170 operations
+  (73 distinct names). SP02 generates its 59 probes from it and compares the
+  refusal it predicts with the observed 403 `missing_permissions`. Reading
+  (outer OR, inner AND) is a hypothesis until a narrow token is run.
+- The lab's own `SUPABASE_ACCESS_TOKEN` has the `sbp_fc` format (the docs' mark
+  of a scoped token). With it: `GET /v1/profile` is 403 "requires a
+  user-scoped access token", `supabase whoami` exits 1 on that 403, `supabase
+  orgs list` and `projects list` exit 0 (SP06); all 59 SP02 probes pass the
+  permission check (0 `missing_permissions`; 6 feature-absent 4xx).
+- `/database/query/read-only` refuses `create table` with SQLSTATE 25006 and
+  `/database/query` creates it (SP05 control).
+- `x-ratelimit-remaining` is a per-route counter (limit 120): the same route
+  falls 117,116,115,114; two alternated routes keep separate sequences (SP10).
+  An SP04d comparison of two tokens is valid only on one route.
+- Not measured, with prerequisites in RUNLOG.md: Q14 org-scoped token on
+  production, the per-permission matrix and 403 body, SQL read-only without
+  Database read-write, the project boundary, creator-role tracking (needs a
+  second human), revocation latency, immutability and expiry (dashboard-only).
+
+## experiments/free-email-templates - key facts (validated 2026-10-10)
+
+Source claim: changelog 2026-06-03, https://github.com/orgs/supabase/discussions/46599.
+Measured on new projects (free n=3 across two free orgs, Pro control n=1),
+Management API `PATCH /v1/projects/{ref}/config/auth`, ap-southeast-1:
+
+- Free project on default SMTP: each of the six `mailer_templates_*_content`
+  fields alone, all six `mailer_subjects_*` in one PATCH, and the seven
+  notification-template content fields in one PATCH are all refused with HTTP
+  400 `Email template modification is not available for free tier projects
+  using the default email provider. Please upgrade your plan or configure a
+  custom SMTP provider.` (0 of 6 persisted, 3 of 3 runs for content and
+  subjects; notification templates n=2). A non-template PATCH (`site_url`) and
+  enabling a notification flag return 200.
+- Same project after writing dummy custom SMTP fields (host, port, user,
+  password, admin email, sender name; the write accepts a host that is not an
+  SMTP server): 6 of 6 content PATCHes 200 and persisted, subjects 200.
+- `smtp_host` alone did not lift the refusal (400, n=2). One PATCH carrying the
+  SMTP fields plus a template field succeeded (n=3).
+- Clearing the SMTP fields (null) returned 200 and the stored custom templates
+  were gone (6 of 6 equal to default text, n=2); template writes were refused
+  again (n=3).
+- Pro-org control, default SMTP: 6 of 6 content PATCHes, subjects and
+  notification templates all 200 and persisted (n=1).
+- Not measured: pre-2026-06-03 free projects, email delivery, which SMTP
+  fields lift the lock, the dashboard path, other plans.
+
+## experiments/mgmt-api-faults - key facts (MF01-MF05, validated 2026-10-10)
+
+Fault injection in front of the Management API (local proxy container; the CLI
+via a profile file whose `api_url` is the proxy, the OpenTofu provider via
+`endpoint`, the harness via `mgmtBase`). Every fault is injected; no real 5xx
+was observed. Counts are proxy-log rows. Pro org, ap-southeast-1, one trial per
+cell unless the RUNLOG says otherwise.
+
+- Harness `mgmt()` never retries (1 attempt on 500/502/503/504, MF01a).
+  `functionPresent()` retries 429 only, a fixed 15 s sleep (3 attempts, about
+  30 s for two 429s); a 500 on its read returns `present: false` with `status`
+  500 (MF01c). `mgmt()` throws `TimeoutError` at its 30 s default (MF01d).
+- supabase CLI 2.120.0: GET, PUT and DELETE get 6 attempts per call with no
+  pause on a 500 (GET: also 502/503/504); POST gets 1 attempt on 500, 502, 503,
+  504 and 429; 429 is not retried for GET either (MF03a-c). Per-attempt timeout
+  60 s (a 100 s hold gave attempts at 0, 60, ..., 300 s, exit after 360 s,
+  MF03e). A held POST is not resent: the create lands, the CLI exits 1 at
+  60 s (MF05a).
+- OpenTofu provider (supabase/supabase, version in the experiment lock file):
+  retries GET (4 attempts on a persistent 503; 2 on a single 500 or 429), does
+  not retry POST, PATCH or DELETE on 500 (MF04a, d, e, f). Waited a 130 s held
+  create without giving up (MF05b).
+- A create answered 500 after upstream created the project leaves state empty
+  and an orphan upstream; re-apply gets 400 (name already exists in the org)
+  until the orphan is deleted (MF04b-c). The same-name 400 is the only
+  duplicate protection observed; a retry with a fresh name is not covered and
+  was not run (MF02c).
+- Partial apply: project in state, settings write failed (MF04d0); a settings
+  write that landed but answered 500 converges at the next plan (MF04d2); a
+  DELETE that landed but answered 500 leaves a state entry that destroys
+  cleanly later (MF04f2-f3).
+- Not measured: real 5xx bodies, connection-level faults, PATCH through the CLI,
+  writes answered 502/503/504/429 in the provider, docs claims.
+
+## experiments/pg-minor-17-11 - key facts (validated 2026-10-10, local Docker, supabase/postgres 17.6.1.178 -> 17.11.0.004 and 15.14.1.178 -> 15.19.0.004)
+
+Local only, no managed project. Each module starts the old image on a fresh
+data directory, builds a fixture, stops it, and starts the new image on the
+SAME data directory (binaries replaced, data kept; not the hosted upgrade
+procedure). Reference answers come from a sequential scan or from a count that
+does not use the code under test. Details: RUNLOG.md.
+
+- **pgcrypto bf / blowfish / cast5 were stored unencrypted on the old image
+  and fail to decrypt by default on the new one (PG01).** The sentence is
+  visible in the ciphertext bytes, a wrong key decrypts, and on the new image
+  right and wrong key both raise `encrypt error: Cipher cannot be initialized`
+  unless `ignore-cipher-failure=1` is passed (then both decrypt). The old image
+  rejects that option (`Illegal argument to function`), so it exists only after
+  the upgrade. A wrong-passphrase scan flags the three ciphers on the old image
+  and flags nothing on the new image by default (the values error like
+  properly encrypted ones, with a different message); run it before the
+  upgrade or with the option. aes128, aes256, 3des and the default are
+  unaffected. Same on 15.14 -> 15.19. Public-key variants not measured.
+- **A non-built-in RESTRICT / JOIN estimator needs superuser on the new image
+  (PG02).** As `postgres`: refused with 42501 for CREATE OPERATOR and for ALTER
+  OPERATOR; `eqsel` accepted. As `supabase_admin`: accepted. `postgres` cannot
+  create C functions (42501 permission denied for language c). Operators created
+  on the old image keep working; `pg_dump` restored as `postgres` fails (2 of 3
+  operators missing), as `supabase_admin` is clean. Same on both pairs.
+- **btree_gist float4 / float8 indexes with NaN return wrong counts and
+  REINDEX INDEX CONCURRENTLY fixes them (PG03).** On the old image 5 of 10
+  predicates (float4) and 7 of 10 (float8) disagree with the heap, for example
+  `x = 'NaN'` returns 0 of 50; a stale index on the new image still disagrees on
+  3 and 5; after reindex and for a fresh index, 0. amcheck 1.4 / 1.3 has no
+  GiST check on these images.
+- **ltree values over 14,654 labels compare wrongly on the old image (PG04).**
+  First wrong n is 14655 on both pairs (19 of 34 sweep values); the B-tree
+  built on the old image fails `bt_index_parent_check`. On the new image
+  comparisons are right; the stale index passed amcheck and answered correctly
+  for one 453-row fixture, which does not show stale indexes are safe.
+- **The ltree case-folding index advice did not reproduce (PG05).** A GiST
+  index on ltree misses rows for case-insensitive (`@`) matches whose accented
+  letters differ in case from the stored label (about 72 percent of 600 queries)
+  on the old image, the new image, after REINDEX and for a fresh index, in ICU
+  and libc databases, on both pairs. The index hash function is byte-identical
+  in the upstream 17.6 / 17.11 and 15.14 / 15.19 sources; the operator side
+  changed (libc databases: `U+0130 STANBUL@` matches 3 rows instead of 1, the
+  index still returns 1). Inference: the index-side fix described by the
+  changelog is the 18.2 one; whether the hosted build differs is untested.
+
+## experiments/cli-surface - key facts (Supabase CLI 2.120.0, validated 2026-10-10)
+
+- **pg-delta vs migra (CL01, CL02, CL03).** Measured by catalog fingerprint (238 lines,
+  lib/fingerprint.ts), not by reading the SQL. On a fixture with FORCE RLS, 6 policies,
+  column and sequence grants, default privileges, comments and a security_invoker view, a
+  `db diff --use-migra` migration rebuilt 223 of 238 lines (it dropped FORCE RLS, the comments,
+  default privileges, schema USAGE grants, security_invoker and the function EXECUTE grant to
+  `authenticated`, and left PUBLIC execute); `--use-pg-delta` rebuilt 238 of 238. On 2.120.0 a fresh
+  `supabase init` ran pg-delta with no flag (`[experimental.pgdelta] enabled = true`); the sources disagree
+  on whether that is the default (the changelog says not yet, the Select 2026 blog says it is for new init projects). Declarative
+  `generate`, then `sync`, then `db reset` also gave 238 of 238, and a second sync, diff and export
+  were empty or identical. `sync` orders by dependency (hand-written tree, files named against
+  dependency order), turns a deleted table file into DROP TABLE with a destructive-changes
+  warning, and rewrites a changed policy as drop plus create. pg-delta named 17 of 22 object
+  kinds in its diff; `--strict-coverage` fails on cast, operator, statistics object and text
+  search configuration. With an exported `supabase/schemas` tree present, `db diff --use-migra`
+  fails (`extension "pgcrypto" already exists`). Unmeasured: Postgres 15 targets (the diff
+  contains MAINTAIN grants), correctness of kinds beyond a marker-name regex.
+- **config pull and pull (CL04).** `config pull` compares api, auth, database, pooler, realtime,
+  storage. Written after API-side changes: max_rows, storage file_size_limit, anonymous
+  sign-ins. Skipped: an enabled GitHub provider ("requires values pull cannot write"; the secret
+  must be set by hand). Not pulled: storage buckets. `supabase pull` on a never-migrated
+  project exits 1 on the migration-history step but writes the schema migration (238 of 238
+  fingerprint lines on a local rebuild). `db diff --linked --use-migra` failed with
+  `getaddrinfo ENOTFOUND` for the direct DB host from a vantage that resolves no A record for it,
+  while pg-delta worked; cause not separated.
+- **Experimental stack without Docker (CL20-CL22).** Off by default: no variable or key means
+  the legacy Docker backend (exit 1 without Docker). `SUPABASE_EXPERIMENTAL_STACK=1` or
+  `[experimental] stack = true` selects the stack; the variable wins over the key (0 beats true).
+  `supabase init` under the variable writes `stack = true` and no `port =` lines, so every stack
+  gets its own random ports (3 stacks, 30 distinct ports). Native runtime in a linux/arm64
+  container: cold start 14145 ms (artifact download), warm restart 643 ms, 2 extra worktrees
+  about 2 s each, `stop` about 12 s. Only the database runs at return; 9 services start on first
+  request (rest 312 ms ... studio 4937 ms). Summed PSS 252 MB asleep, 2145 MB awake per stack (one run, n=1, 10 CPUs).
+  Stack identity is directory plus branch: a branch switch inside a worktree then `start` makes a
+  second, empty stack. A config with fixed legacy ports makes the second worktree fail to bind.
+  Config changes apply on `stop` then `start` (not `start` or `stack restart`). The stack backend
+  refuses `--use-migra`. Image transformation, pooler and drift behaviour: RUNLOG CL22c, CL22d.
+  Unmeasured: amd64, CI runners, idle stops, pooler SQL path.
+
+## experiments/self-hosted-defaults - key facts (SD01-SD08, validated 2026-10-10, local rig)
+
+Local rig, no project or PAT: `make stack up probe clean` clones
+supabase/supabase at a pinned commit into the gitignored `work/`, copies
+`docker/` to `work/stack`, runs the upstream key scripts and drives the stack
+through the gateway port, `docker exec` and `docker compose`. The directory
+`work/` holds a full clone: run `bun test` with a path (`make unit` does), or
+bun discovers the clone's own test files.
+
+- Gateway is Envoy (`api-gw`), no Kong service, nothing published on host 8443
+  or 8001 (SD01); the Kong override swaps it in with 8443 and a `server: kong/...`
+  header, and the swap back restores Envoy (SD07, the control for SD01's
+  absences). The Envoy container keeps the network aliases `envoy` and `kong`,
+  so a hostname that still says `kong` reaches Envoy.
+- Opaque keys: no key or a made-up `sb_secret_` key gets Envoy's own 401
+  (`text/plain`, `Unauthorized`); `sb_publishable_` behaves as the legacy anon
+  JWT and `sb_secret_` as the legacy service_role JWT on the six routes probed;
+  PostgREST sees `role` anon or service_role with claims `exp`, `iat`, `iss`,
+  `role` only (SD02). Precondition: `.env.example` ships the four opaque-key
+  variables empty; with them empty Envoy logs "legacy API key mode (sb_ keys
+  disabled)" and answers 401 to both `sb_` keys while the legacy JWTs still work
+  (SD08). `utils/add-new-auth-keys.sh` also uncomments four lines in
+  `docker-compose.yml` (`GOTRUE_JWT_KEYS`, `API_JWT_JWKS`, `JWT_JWKS`,
+  `SUPABASE_JWKS`; SD02d); with it, access tokens are ES256 with a `kid` that
+  verifies against `/auth/v1/.well-known/jwks.json` (SD06b).
+- Database is Postgres 17 by image tag, server and data directory (SD03a). The
+  `pg_graphql` extension is available but not created on a fresh stack, and
+  `POST /graphql/v1` answers HTTP 200 with an error body (SD03c).
+- Studio and postgres-meta run as `postgres` (not a superuser: rolsuper false;
+  `supabase_admin` is) through `/pg/query` and Studio's pg-meta route (SD04).
+  The database shows one application name for both, so Studio's own connection,
+  if it has one, was not observed. Realtime, Supavisor, `pg_cron` and `pg_net`
+  still connect as `supabase_admin`.
+- Analytics and Vector exist only with `docker-compose.logs.yml`: the override
+  adds exactly those two services, Vector is the only service mounting the
+  Docker socket, Studio's `ENABLED_FEATURES_LOGS_ALL` flips false to true, and
+  Envoy has no `/analytics/v1` route (SD05).
+- `API_EXTERNAL_URL` is `<public url>/auth/v1` and equals `GOTRUE_JWT_ISSUER`;
+  token `iss` is that value; `generate_link` returns `/auth/v1/verify` (no
+  doubled prefix) (SD06a-c). With SAML disabled, `/auth/v1/sso/saml/metadata`
+  reaches Auth (404 `saml_provider_disabled`) and the old `/sso/saml/metadata`
+  falls to the dashboard gate; with SAML enabled the metadata entityID and ACS
+  URL are `<API_EXTERNAL_URL>/sso/saml/{metadata,acs}`, the ACS route needs no
+  apikey, and an invented IdP registered with the secret key yields a SAMLRequest
+  redirect (SD06d-f). A real IdP assertion was not exercised.
+- Not measured: `sb_` keys against Realtime and Edge Functions, a Postgres 15 to
+  17 upgrade, Linux amd64, image digests, repeat runs.
+
+## experiments/multigres - key facts (validated at runtime; see RUNLOG.md)
+
+Setup:
+
+- Local only, no cloud spend: the upstream repo's all-in-one image
+  (`Dockerfile.cluster`) runs etcd + multiadmin + per cell pgctld/postgres,
+  multipooler, multiorch, multigateway as child processes. The v0.1.0 tag has
+  no such Dockerfile (404 at that ref); the Makefile builds a pinned `main`
+  commit. This is NOT the Kubernetes operator path the blog describes.
+- 3 cells, `synchronous_standby_names = ANY 1 (3 poolers)`,
+  `synchronous_commit=on`, multiorch timers 500 ms, and
+  `allow-unsafe-initial-cohort: true` set by the entrypoint. A single cell
+  never becomes ready; the shard needs 2 poolers to elect a leader.
+- Run from source (`bun harness/src/run.ts`), not the linux-x64 `pvlab`.
+  Faults are `docker exec kill`; the tests recreate the container themselves.
+
+Measured (macOS Docker Desktop, 8 closed-loop writers; out/2026-10-10/run-2026-10-10T01-44-48-951Z.json):
+
+- 17 failovers, 2,216,532 acknowledged writes checked, 0 acknowledged-but-lost.
+  Includes MG08: a standby held 22-23 MB behind (SIGSTOP 20 s), then primary
+  and the current standby killed; the lagging standby was never promoted.
+- Client-visible stall (longest ack-free gap): postgres SIGKILL 1.1-4.2 s
+  (MG02), 1.9-6.7 s with one 10 writes/s client (MG09); whole-cell kill
+  14.7-15.1 s (MG03); hung primary (SIGSTOP) 20.0 and 25.1 s in run5 (the 25.1
+  includes a client 5 s connect timeout) and 20.0 to 56.2 s over six runs in
+  three artifacts: the pooler-level promote lands at about +20 s, multiorch
+  logs the promotion success at about +40 s (the recruit RPC to the frozen cell
+  times out first), and in the 56 s run the first promotion attempt failed and
+  a second succeeded at +57.8 s (MG04). Detection after a postgres kill varies
+  from about 1 s to about 6.7 s and the cause is unexplained.
+- Clients are not shielded: in-flight statements fail (one per worker), new
+  connections get `no writable primary is currently available` or `database is
+  temporarily unavailable; please retry`, and 2-5 connects per postgres-kill
+  run were refused with `password authentication failed` using the correct
+  password. pgbench clients abort at the kill (exit 2); a relaunch loop
+  recovered with a 2.3 s gap.
+- Nothing restarts a killed cell in this container: after killing a primary's
+  postgres + multipooler + pgctld the cluster stayed at 2 nodes for 45 s.
+- Gateway feature matrix (S01 probes): 9 of 9 on the zone1 and zone2
+  gateways, one uncontended client. Per-user pools: each role got a backend
+  logged in as that role (2 roles).
+
+Not measured: the operator/kind path, the invite-only private alpha, network
+partitions, other durability policies, a contended pool.
+
+## experiments/terraform-edge-functions - key facts (validated 2026-10-10, tofu 1.13.1, supabase provider 1.11.0)
+
+- 24 `supabase_edge_function` resources + one `supabase_edge_function_secrets`
+  in one apply at `-parallelism=24`: tofu reported 25 created, exit 0, 0 errors
+  in 4 of 4 runs; the Management API listed 3, 5, 3 and 4 of the 24 (the
+  listing did not grow between +10 s and +70 s). In the 2 runs that probed the
+  unlisted slugs, `GET /functions/{slug}` was 404 on all of them (21, 20) and
+  an invocation answered 200 on all of them. At `-parallelism=1` the same
+  apply listed 24/24 (3 runs, 31 to 41 s).
+- Re-applying at 24 does not converge: after 4 rounds 13, 14, 14, 10 of 24
+  listed. Each round's reported creations equal 24 minus the listed count
+  before the round (16 of 16 rounds).
+- Width sweep, fresh state, listed at +70 s: width 1 24, width 2 17 (2 runs),
+  width 4 9 and 13, width 10 4 to 6, width 24 2 to 4. Direct
+  `POST /functions/deploy`, 24 in flight: 24 x 201, 3/24 listed (2 runs); one
+  at a time: 24/24. The loss is the endpoint's, as in edge-function-limits
+  EF05a; the provider adds a success report with no check.
+- Updates are planned in place (24 change, 0 replace) and land (24/24 serve
+  the new body), but every update apply exits 1 with `Provider produced
+  inconsistent result after apply` on `.checksum`, `.updated_at`, `.version`
+  (72 errors for 24 functions), at width 1 and at 24. At width 24 the listing
+  showed 2/24 (6/24 in one run) versions increased while 24/24 served the new
+  body; the cause is not separated.
+- Destroy at `-parallelism=24` exits 0 and empties state while the listed
+  functions stay: 14 listed before, 13 after (run3); 10 and 10 (run4); in
+  run4 23 of 24 slugs still answered 200 after the destroy (one trial).
+  Fresh-state destroy at the same width left 7 of 17 (width 2), 4 to 7 (width
+  4), 3 to 5 (width 10), 1 to 3 (width 24) listed; `-parallelism=1` left 0.
+- The secrets resource listed 0/3 after a width-24 apply (run3 and run4 first
+  apply, run2 and run4 fresh apply) and 3/3 at width 1.
+- Not measured: other provider versions, Terraform, other regions or sizes,
+  whether unlisted functions list later, how long a destroyed function keeps
+  answering.
