@@ -1,0 +1,612 @@
+{
+  "startedAt": "2026-10-10T01:04:48.057Z",
+  "finishedAt": "2026-10-10T01:07:57.175Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "realtime-surface",
+  "labCommit": "70e4244",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "RT01a",
+      "title": "RT01a: setup",
+      "status": "pass",
+      "detail": "supabase-js 2.112.3; first change event 10655 ms after subscribing, from canary insert 2 of 2 (one every 10 s); 1 canary event(s) received; replica identity d",
+      "measurements": {
+        "first_change_event_ms": 10655,
+        "canary_inserts": 2,
+        "first_delivered_canary": 2,
+        "canary_events": 1,
+        "replica_identity": "d",
+        "supabase_js": "2.112.3"
+      },
+      "durationMs": 189118
+    },
+    {
+      "id": "RT01b-eq",
+      "title": "RT01b-eq: filter team=eq.a",
+      "status": "pass",
+      "detail": "got 4 of batch 8, SQL oracle 4; same ids",
+      "measurements": {
+        "subscribe": "SUBSCRIBED",
+        "got": 4,
+        "oracle": 4,
+        "same_ids": 1
+      },
+      "evidence": "{\"message\":\"Subscribed to PostgreSQL\",\"status\":\"ok\",\"extension\":\"postgres_changes\",\"channel\":\"rt01-eq\"}",
+      "durationMs": 189118
+    },
+    {
+      "id": "RT01b-and2",
+      "title": "RT01b-and2: filter team=eq.a,status=eq.open",
+      "status": "pass",
+      "detail": "got 2 of batch 8, SQL oracle 2; same ids",
+      "measurements": {
+        "subscribe": "SUBSCRIBED",
+        "got": 2,
+        "oracle": 2,
+        "same_ids": 1
+      },
+      "evidence": "{\"message\":\"Subscribed to PostgreSQL\",\"status\":\"ok\",\"extension\":\"postgres_changes\",\"channel\":\"rt01-and2\"}",
+      "durationMs": 189118
+    },
+    {
+      "id": "RT01b-and3",
+      "title": "RT01b-and3: filter team=eq.a,status=eq.open,flag=eq.true",
+      "status": "pass",
+      "detail": "got 1 of batch 8, SQL oracle 1; same ids",
+      "measurements": {
+        "subscribe": "SUBSCRIBED",
+        "got": 1,
+        "oracle": 1,
+        "same_ids": 1
+      },
+      "evidence": "{\"message\":\"Subscribed to PostgreSQL\",\"status\":\"ok\",\"extension\":\"postgres_changes\",\"channel\":\"rt01-and3\"}",
+      "durationMs": 189118
+    },
+    {
+      "id": "RT01b-and_range",
+      "title": "RT01b-and_range: filter n=gt.2,n=lt.6",
+      "status": "pass",
+      "detail": "got 3 of batch 8, SQL oracle 3; same ids",
+      "measurements": {
+        "subscribe": "SUBSCRIBED",
+        "got": 3,
+        "oracle": 3,
+        "same_ids": 1
+      },
+      "evidence": "{\"message\":\"Subscribed to PostgreSQL\",\"status\":\"ok\",\"extension\":\"postgres_changes\",\"channel\":\"rt01-and_range\"}",
+      "durationMs": 189118
+    },
+    {
+      "id": "RT01b-in",
+      "title": "RT01b-in: filter team=in.(a,c)",
+      "status": "pass",
+      "detail": "got 5 of batch 8, SQL oracle 5; same ids",
+      "measurements": {
+        "subscribe": "SUBSCRIBED",
+        "got": 5,
+        "oracle": 5,
+        "same_ids": 1
+      },
+      "evidence": "{\"message\":\"Subscribed to PostgreSQL\",\"status\":\"ok\",\"extension\":\"postgres_changes\",\"channel\":\"rt01-in\"}",
+      "durationMs": 189118
+    },
+    {
+      "id": "RT01b-like",
+      "title": "RT01b-like: filter email=like.a%",
+      "status": "pass",
+      "detail": "got 1 of batch 8, SQL oracle 1; same ids",
+      "measurements": {
+        "subscribe": "SUBSCRIBED",
+        "got": 1,
+        "oracle": 1,
+        "same_ids": 1
+      },
+      "evidence": "{\"message\":\"Subscribed to PostgreSQL\",\"status\":\"ok\",\"extension\":\"postgres_changes\",\"channel\":\"rt01-like\"}",
+      "durationMs": 189118
+    },
+    {
+      "id": "RT01b-ilike",
+      "title": "RT01b-ilike: filter email=ilike.a%",
+      "status": "pass",
+      "detail": "got 2 of batch 8, SQL oracle 2; same ids",
+      "measurements": {
+        "subscribe": "SUBSCRIBED",
+        "got": 2,
+        "oracle": 2,
+        "same_ids": 1
+      },
+      "evidence": "{\"message\":\"Subscribed to PostgreSQL\",\"status\":\"ok\",\"extension\":\"postgres_changes\",\"channel\":\"rt01-ilike\"}",
+      "durationMs": 189118
+    },
+    {
+      "id": "RT01b-is_null",
+      "title": "RT01b-is_null: filter note=is.null",
+      "status": "pass",
+      "detail": "got 2 of batch 8, SQL oracle 2; same ids",
+      "measurements": {
+        "subscribe": "SUBSCRIBED",
+        "got": 2,
+        "oracle": 2,
+        "same_ids": 1
+      },
+      "evidence": "{\"message\":\"Subscribed to PostgreSQL\",\"status\":\"ok\",\"extension\":\"postgres_changes\",\"channel\":\"rt01-is_null\"}",
+      "durationMs": 189118
+    },
+    {
+      "id": "RT01b-is_true",
+      "title": "RT01b-is_true: filter flag=is.true",
+      "status": "pass",
+      "detail": "got 3 of batch 8, SQL oracle 3; same ids",
+      "measurements": {
+        "subscribe": "SUBSCRIBED",
+        "got": 3,
+        "oracle": 3,
+        "same_ids": 1
+      },
+      "evidence": "{\"message\":\"Subscribed to PostgreSQL\",\"status\":\"ok\",\"extension\":\"postgres_changes\",\"channel\":\"rt01-is_true\"}",
+      "durationMs": 189118
+    },
+    {
+      "id": "RT01b-is_false",
+      "title": "RT01b-is_false: filter flag=is.false",
+      "status": "pass",
+      "detail": "got 3 of batch 8, SQL oracle 3; same ids",
+      "measurements": {
+        "subscribe": "SUBSCRIBED",
+        "got": 3,
+        "oracle": 3,
+        "same_ids": 1
+      },
+      "evidence": "{\"message\":\"Subscribed to PostgreSQL\",\"status\":\"ok\",\"extension\":\"postgres_changes\",\"channel\":\"rt01-is_false\"}",
+      "durationMs": 189118
+    },
+    {
+      "id": "RT01b-match",
+      "title": "RT01b-match: filter email=match.^[a-d]",
+      "status": "pass",
+      "detail": "got 4 of batch 8, SQL oracle 4; same ids",
+      "measurements": {
+        "subscribe": "SUBSCRIBED",
+        "got": 4,
+        "oracle": 4,
+        "same_ids": 1
+      },
+      "evidence": "{\"message\":\"Subscribed to PostgreSQL\",\"status\":\"ok\",\"extension\":\"postgres_changes\",\"channel\":\"rt01-match\"}",
+      "durationMs": 189118
+    },
+    {
+      "id": "RT01b-imatch",
+      "title": "RT01b-imatch: filter email=imatch.^[a-d]",
+      "status": "pass",
+      "detail": "got 5 of batch 8, SQL oracle 5; same ids",
+      "measurements": {
+        "subscribe": "SUBSCRIBED",
+        "got": 5,
+        "oracle": 5,
+        "same_ids": 1
+      },
+      "evidence": "{\"message\":\"Subscribed to PostgreSQL\",\"status\":\"ok\",\"extension\":\"postgres_changes\",\"channel\":\"rt01-imatch\"}",
+      "durationMs": 189118
+    },
+    {
+      "id": "RT01b-isdistinct",
+      "title": "RT01b-isdistinct: filter note=isdistinct.active",
+      "status": "pass",
+      "detail": "got 6 of batch 8, SQL oracle 6; same ids",
+      "measurements": {
+        "subscribe": "SUBSCRIBED",
+        "got": 6,
+        "oracle": 6,
+        "same_ids": 1
+      },
+      "evidence": "{\"message\":\"Subscribed to PostgreSQL\",\"status\":\"ok\",\"extension\":\"postgres_changes\",\"channel\":\"rt01-isdistinct\"}",
+      "durationMs": 189118
+    },
+    {
+      "id": "RT01b-not_eq",
+      "title": "RT01b-not_eq: filter status=not.eq.open",
+      "status": "pass",
+      "detail": "got 3 of batch 8, SQL oracle 3; same ids",
+      "measurements": {
+        "subscribe": "SUBSCRIBED",
+        "got": 3,
+        "oracle": 3,
+        "same_ids": 1
+      },
+      "evidence": "{\"message\":\"Subscribed to PostgreSQL\",\"status\":\"ok\",\"extension\":\"postgres_changes\",\"channel\":\"rt01-not_eq\"}",
+      "durationMs": 189118
+    },
+    {
+      "id": "RT01b-not_like",
+      "title": "RT01b-not_like: filter email=not.like.a%",
+      "status": "pass",
+      "detail": "got 6 of batch 8, SQL oracle 6; same ids",
+      "measurements": {
+        "subscribe": "SUBSCRIBED",
+        "got": 6,
+        "oracle": 6,
+        "same_ids": 1
+      },
+      "evidence": "{\"message\":\"Subscribed to PostgreSQL\",\"status\":\"ok\",\"extension\":\"postgres_changes\",\"channel\":\"rt01-not_like\"}",
+      "durationMs": 189118
+    },
+    {
+      "id": "RT01b-not_in",
+      "title": "RT01b-not_in: filter team=not.in.(a,b)",
+      "status": "pass",
+      "detail": "got 1 of batch 8, SQL oracle 1; same ids",
+      "measurements": {
+        "subscribe": "SUBSCRIBED",
+        "got": 1,
+        "oracle": 1,
+        "same_ids": 1
+      },
+      "evidence": "{\"message\":\"Subscribed to PostgreSQL\",\"status\":\"ok\",\"extension\":\"postgres_changes\",\"channel\":\"rt01-not_in\"}",
+      "durationMs": 189118
+    },
+    {
+      "id": "RT01b-not_is_null",
+      "title": "RT01b-not_is_null: filter note=not.is.null",
+      "status": "pass",
+      "detail": "got 6 of batch 8, SQL oracle 6; same ids",
+      "measurements": {
+        "subscribe": "SUBSCRIBED",
+        "got": 6,
+        "oracle": 6,
+        "same_ids": 1
+      },
+      "evidence": "{\"message\":\"Subscribed to PostgreSQL\",\"status\":\"ok\",\"extension\":\"postgres_changes\",\"channel\":\"rt01-not_is_null\"}",
+      "durationMs": 189118
+    },
+    {
+      "id": "RT01b-and_not",
+      "title": "RT01b-and_not: filter team=eq.a,status=not.eq.open",
+      "status": "pass",
+      "detail": "got 2 of batch 8, SQL oracle 2; same ids",
+      "measurements": {
+        "subscribe": "SUBSCRIBED",
+        "got": 2,
+        "oracle": 2,
+        "same_ids": 1
+      },
+      "evidence": "{\"message\":\"Subscribed to PostgreSQL\",\"status\":\"ok\",\"extension\":\"postgres_changes\",\"channel\":\"rt01-and_not\"}",
+      "durationMs": 189118
+    },
+    {
+      "id": "RT01b-and_like_is",
+      "title": "RT01b-and_like_is: filter email=ilike.a%,flag=is.true",
+      "status": "pass",
+      "detail": "got 2 of batch 8, SQL oracle 2; same ids",
+      "measurements": {
+        "subscribe": "SUBSCRIBED",
+        "got": 2,
+        "oracle": 2,
+        "same_ids": 1
+      },
+      "evidence": "{\"message\":\"Subscribed to PostgreSQL\",\"status\":\"ok\",\"extension\":\"postgres_changes\",\"channel\":\"rt01-and_like_is\"}",
+      "durationMs": 189118
+    },
+    {
+      "id": "RT01b-base",
+      "title": "RT01b-base: unfiltered subscriber receives the whole batch",
+      "status": "pass",
+      "detail": "8 of the 8 batch rows; 0 other event(s) (late canary rows)",
+      "measurements": {
+        "subscribe": "SUBSCRIBED",
+        "got": 8,
+        "other_events": 0
+      },
+      "durationMs": 189118
+    },
+    {
+      "id": "RT01c-none",
+      "title": "RT01c-none: no select (control)",
+      "status": "pass",
+      "detail": "INSERT:new[email,flag,id,n,note,secret,status,team]old[] | UPDATE:new[email,flag,id,n,note,secret,status,team]old[id] | UPDATE:new[email,flag,id,n,note,secret,status,team]old[id] | DELETE:new[]old[id]",
+      "measurements": {
+        "subscribe": "SUBSCRIBED",
+        "events": 4
+      },
+      "durationMs": 189118
+    },
+    {
+      "id": "RT01c-status",
+      "title": "RT01c-status: select [status]",
+      "status": "info",
+      "detail": "INSERT:new[id,status]old[] | UPDATE:new[id,status]old[id] | UPDATE:new[id,status]old[id] | DELETE:new[]old[id]",
+      "measurements": {
+        "subscribe": "SUBSCRIBED",
+        "events": 4,
+        "insert_keys": "id,status",
+        "pk_in_insert": 1,
+        "update_events": 2,
+        "delete_events": 1
+      },
+      "evidence": "{\"message\":\"Subscribed to PostgreSQL\",\"status\":\"ok\",\"extension\":\"postgres_changes\",\"channel\":\"rt01c-status\"}",
+      "durationMs": 189118
+    },
+    {
+      "id": "RT01c-id_team",
+      "title": "RT01c-id_team: select [id,team]",
+      "status": "info",
+      "detail": "INSERT:new[id,team]old[] | UPDATE:new[id,team]old[id] | UPDATE:new[id,team]old[id] | DELETE:new[]old[id]",
+      "measurements": {
+        "subscribe": "SUBSCRIBED",
+        "events": 4,
+        "insert_keys": "id,team",
+        "pk_in_insert": 1,
+        "update_events": 2,
+        "delete_events": 1
+      },
+      "evidence": "{\"message\":\"Subscribed to PostgreSQL\",\"status\":\"ok\",\"extension\":\"postgres_changes\",\"channel\":\"rt01c-id_team\"}",
+      "durationMs": 189118
+    },
+    {
+      "id": "RT01c-status_email",
+      "title": "RT01c-status_email: select [status,email]",
+      "status": "info",
+      "detail": "INSERT:new[email,id,status]old[] | UPDATE:new[email,id,status]old[id] | UPDATE:new[email,id,status]old[id] | DELETE:new[]old[id]",
+      "measurements": {
+        "subscribe": "SUBSCRIBED",
+        "events": 4,
+        "insert_keys": "email,id,status",
+        "pk_in_insert": 1,
+        "update_events": 2,
+        "delete_events": 1
+      },
+      "evidence": "{\"message\":\"Subscribed to PostgreSQL\",\"status\":\"ok\",\"extension\":\"postgres_changes\",\"channel\":\"rt01c-status_email\"}",
+      "durationMs": 189118
+    },
+    {
+      "id": "RT01c-nonexistent",
+      "title": "RT01c-nonexistent: select [nope]",
+      "status": "info",
+      "detail": "subscribed, no events",
+      "measurements": {
+        "subscribe": "SUBSCRIBED",
+        "events": 0,
+        "insert_keys": "",
+        "pk_in_insert": 0,
+        "update_events": 0,
+        "delete_events": 0
+      },
+      "evidence": "{\"message\":\"Unable to subscribe to changes with given parameters. An exception happened so please check your connect parameters: [event: *, schema: public, table: rt01_t, filters: [], select: [\\\"nope\\\"]]. Exception: ERROR P0001 (raise_exception) invalid column for select nope\",\"status\":\"error\",\"extension\":\"postgres_changes\",\"channel\":\"rt01c-nonexistent\"}",
+      "durationMs": 189118
+    },
+    {
+      "id": "RT01d-default-team_a",
+      "title": "RT01d (replica identity default): team_a",
+      "status": "info",
+      "detail": "DELETE ids [] of seeded [12,13,14,15]; UPDATE events 1 (new.team [a])",
+      "measurements": {
+        "subscribe": "SUBSCRIBED",
+        "delete_events": 0,
+        "delete_old_keys": "",
+        "update_events": 1
+      },
+      "evidence": "{\"message\":\"Subscribed to PostgreSQL\",\"status\":\"ok\",\"extension\":\"postgres_changes\",\"channel\":\"rt01d-default-a\"}",
+      "durationMs": 189118
+    },
+    {
+      "id": "RT01d-default-and2_del",
+      "title": "RT01d (replica identity default): and2_del",
+      "status": "info",
+      "detail": "DELETE ids [] of seeded [12,13,14,15]; UPDATE events 0 (new.team [])",
+      "measurements": {
+        "subscribe": "SUBSCRIBED",
+        "delete_events": 0,
+        "delete_old_keys": "",
+        "update_events": 0
+      },
+      "evidence": "{\"message\":\"Subscribed to PostgreSQL\",\"status\":\"ok\",\"extension\":\"postgres_changes\",\"channel\":\"rt01d-default-and\"}",
+      "durationMs": 189118
+    },
+    {
+      "id": "RT01d-default-pk_del",
+      "title": "RT01d (replica identity default): pk_del",
+      "status": "info",
+      "detail": "DELETE ids [12] of seeded [12,13,14,15]; UPDATE events 0 (new.team [])",
+      "measurements": {
+        "subscribe": "SUBSCRIBED",
+        "delete_events": 1,
+        "delete_old_keys": "id",
+        "update_events": 0
+      },
+      "evidence": "{\"message\":\"Subscribed to PostgreSQL\",\"status\":\"ok\",\"extension\":\"postgres_changes\",\"channel\":\"rt01d-default-pk\"}",
+      "durationMs": 189118
+    },
+    {
+      "id": "RT01d-default-unfiltered_del",
+      "title": "RT01d (replica identity default): unfiltered_del",
+      "status": "info",
+      "detail": "DELETE ids [12,13,14,15] of seeded [12,13,14,15]; UPDATE events 0 (new.team [])",
+      "measurements": {
+        "subscribe": "SUBSCRIBED",
+        "delete_events": 4,
+        "delete_old_keys": "id",
+        "update_events": 0
+      },
+      "evidence": "{\"message\":\"Subscribed to PostgreSQL\",\"status\":\"ok\",\"extension\":\"postgres_changes\",\"channel\":\"rt01d-default-none\"}",
+      "durationMs": 189118
+    },
+    {
+      "id": "RT01d-full-team_a",
+      "title": "RT01d (replica identity full): team_a",
+      "status": "info",
+      "detail": "DELETE ids [16,17] of seeded [16,17,18,19]; UPDATE events 1 (new.team [a])",
+      "measurements": {
+        "subscribe": "SUBSCRIBED",
+        "delete_events": 2,
+        "delete_old_keys": "email,flag,id,n,note,secret,status,team",
+        "update_events": 1
+      },
+      "evidence": "{\"message\":\"Subscribed to PostgreSQL\",\"status\":\"ok\",\"extension\":\"postgres_changes\",\"channel\":\"rt01d-full-a\"}",
+      "durationMs": 189118
+    },
+    {
+      "id": "RT01d-full-and2_del",
+      "title": "RT01d (replica identity full): and2_del",
+      "status": "info",
+      "detail": "DELETE ids [16] of seeded [16,17,18,19]; UPDATE events 0 (new.team [])",
+      "measurements": {
+        "subscribe": "SUBSCRIBED",
+        "delete_events": 1,
+        "delete_old_keys": "email,flag,id,n,note,secret,status,team",
+        "update_events": 0
+      },
+      "evidence": "{\"message\":\"Subscribed to PostgreSQL\",\"status\":\"ok\",\"extension\":\"postgres_changes\",\"channel\":\"rt01d-full-and\"}",
+      "durationMs": 189118
+    },
+    {
+      "id": "RT01d-full-pk_del",
+      "title": "RT01d (replica identity full): pk_del",
+      "status": "info",
+      "detail": "DELETE ids [16] of seeded [16,17,18,19]; UPDATE events 0 (new.team [])",
+      "measurements": {
+        "subscribe": "SUBSCRIBED",
+        "delete_events": 1,
+        "delete_old_keys": "email,flag,id,n,note,secret,status,team",
+        "update_events": 0
+      },
+      "evidence": "{\"message\":\"Subscribed to PostgreSQL\",\"status\":\"ok\",\"extension\":\"postgres_changes\",\"channel\":\"rt01d-full-pk\"}",
+      "durationMs": 189118
+    },
+    {
+      "id": "RT01d-full-unfiltered_del",
+      "title": "RT01d (replica identity full): unfiltered_del",
+      "status": "info",
+      "detail": "DELETE ids [16,17,18,19] of seeded [16,17,18,19]; UPDATE events 0 (new.team [])",
+      "measurements": {
+        "subscribe": "SUBSCRIBED",
+        "delete_events": 4,
+        "delete_old_keys": "email,flag,id,n,note,secret,status,team",
+        "update_events": 0
+      },
+      "evidence": "{\"message\":\"Subscribed to PostgreSQL\",\"status\":\"ok\",\"extension\":\"postgres_changes\",\"channel\":\"rt01d-full-none\"}",
+      "durationMs": 189118
+    },
+    {
+      "id": "RT01e-control",
+      "title": "RT01e-control: PostgREST as authenticated after the column revoke",
+      "status": "pass",
+      "detail": "select=secret: 42501 permission denied for table rt01_t; select=id,team: ok",
+      "durationMs": 189118
+    },
+    {
+      "id": "RT01e-priv",
+      "title": "RT01e-priv: has_column_privilege for authenticated",
+      "status": "info",
+      "detail": "{\"secret_priv\":false,\"team_priv\":true}",
+      "measurements": {
+        "secret_priv": "false",
+        "team_priv": "true"
+      },
+      "durationMs": 189118
+    },
+    {
+      "id": "RT01e-star",
+      "title": "RT01e-star",
+      "status": "info",
+      "detail": "INSERT:new[email,flag,id,n,note,status,team] | UPDATE:new[email,flag,id,n,note,status,team] | UPDATE:new[email,flag,id,n,note,status,team] | DELETE:new[]",
+      "measurements": {
+        "subscribe": "SUBSCRIBED",
+        "events": 4,
+        "insert_secret": "absent",
+        "update_note_only_secret": "absent",
+        "update_secret_set_secret": "absent",
+        "delete_events": 1
+      },
+      "evidence": "SUBSCRIBED | {\"message\":\"Subscribed to PostgreSQL\",\"status\":\"ok\",\"extension\":\"postgres_changes\",\"channel\":\"rt01e-star\"}",
+      "durationMs": 189118
+    },
+    {
+      "id": "RT01e-ok",
+      "title": "RT01e-ok",
+      "status": "info",
+      "detail": "INSERT:new[id,team] | UPDATE:new[id,team] | UPDATE:new[id,team] | DELETE:new[]",
+      "measurements": {
+        "subscribe": "SUBSCRIBED",
+        "events": 4,
+        "insert_secret": "absent",
+        "update_note_only_secret": "absent",
+        "update_secret_set_secret": "absent",
+        "delete_events": 1
+      },
+      "evidence": "SUBSCRIBED | {\"message\":\"Subscribed to PostgreSQL\",\"status\":\"ok\",\"extension\":\"postgres_changes\",\"channel\":\"rt01e-ok\"}",
+      "durationMs": 189118
+    },
+    {
+      "id": "RT01e-secret",
+      "title": "RT01e-secret",
+      "status": "info",
+      "detail": "",
+      "measurements": {
+        "subscribe": "SUBSCRIBED",
+        "events": 0,
+        "insert_secret": "no-event",
+        "update_note_only_secret": "no-event",
+        "update_secret_set_secret": "no-event",
+        "delete_events": 0
+      },
+      "evidence": "SUBSCRIBED | {\"message\":\"Unable to subscribe to changes with given parameters. An exception happened so please check your connect parameters: [event: *, schema: public, table: rt01_t, filters: [], select: [\\\"id\\\", \\\"secret\\\"]]. Exception: ERROR P0001 (raise_exception) invalid column for select secret\",\"status\":\"error\",\"extension\":\"postgres_changes\",\"channel\":\"rt01e-secret\"}",
+      "durationMs": 189118
+    },
+    {
+      "id": "RT01e-filter_secret",
+      "title": "RT01e-filter_secret",
+      "status": "info",
+      "detail": "",
+      "measurements": {
+        "subscribe": "SUBSCRIBED",
+        "events": 0,
+        "insert_secret": "no-event",
+        "update_note_only_secret": "no-event",
+        "update_secret_set_secret": "no-event",
+        "delete_events": 0
+      },
+      "evidence": "SUBSCRIBED | {\"message\":\"Unable to subscribe to changes with given parameters. An exception happened so please check your connect parameters: [event: *, schema: public, table: rt01_t, filters: [{\\\"secret\\\", \\\"eq\\\", \\\"s\\\", false}], select: nil]. Exception: ERROR P0001 (raise_exception) invalid column for filter secret\",\"status\":\"error\",\"extension\":\"postgres_changes\",\"channel\":\"rt01e-fsecret\"}",
+      "durationMs": 189118
+    },
+    {
+      "id": "RT01e-anon_secret",
+      "title": "RT01e-anon_secret",
+      "status": "info",
+      "detail": "INSERT:new[id,secret] | UPDATE:new[id,secret] | UPDATE:new[id,secret] | DELETE:new[]",
+      "measurements": {
+        "subscribe": "SUBSCRIBED",
+        "events": 4,
+        "insert_secret": "present=s1",
+        "update_note_only_secret": "present=s1",
+        "update_secret_set_secret": "present=s2",
+        "delete_events": 1
+      },
+      "evidence": "SUBSCRIBED | {\"message\":\"Subscribed to PostgreSQL\",\"status\":\"ok\",\"extension\":\"postgres_changes\",\"channel\":\"rt01e-anon-secret\"}",
+      "durationMs": 189118
+    },
+    {
+      "id": "RT01f",
+      "title": "RT01f: delivered events per subscriber, 20 inserts (10 team a)",
+      "status": "pass",
+      "detail": "unfiltered 20, team=eq.a 10, team=eq.a + select [id] 10. usage.api-counts total_realtime_requests before 7 after 7 (counts requests, not messages; billed message counts are not readable with a PAT)",
+      "measurements": {
+        "delivered_unfiltered": 20,
+        "delivered_filtered": 10,
+        "delivered_filtered_select": 10,
+        "usage_status": 200,
+        "usage_buckets": 2,
+        "usage_realtime_before": 7,
+        "usage_realtime_after": 7
+      },
+      "evidence": "usage.api-counts row keys: timestamp,total_auth_requests,total_realtime_requests,total_rest_requests,total_storage_requests",
+      "durationMs": 189118
+    }
+  ]
+}
