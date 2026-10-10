@@ -281,7 +281,12 @@ change without a DROP, finished it in 15.9 s and 6 turns: `alter policy ...
 using (...)` instead of drop and create, which the server does not treat as
 destructive. On stage the interactive client should show the confirmation
 instead; that path was not rehearsed here, so expect a prompt to accept at
-the `drop policy` step.
+the `drop policy` step. K07 (RUNLOG 2026-10-10) measured the confirmation
+from clients with and without elicitation support: a client that does not
+declare form elicitation in its 2026-07-28 request metadata ran `drop`,
+`truncate` and `update` without `where` with no prompt, and a `skip_elicitations`
+list on the server URL removes the prompt for the named tools. The stage
+client's declared capabilities decide which of the two the audience sees.
 
 Totals: 19 tool calls (11 `execute_sql`, 3 `apply_migration`, 2
 `get_advisors`, 1 each `list_tables`, `query_logs`, tool search), about

@@ -1,0 +1,12 @@
+{
+  "imports": {
+    "mcp-sdk": "npm:@modelcontextprotocol/server@2.0.0"
+  },
+  "nodeModulesDir": "none",
+  "compilerOptions": {
+    "strict": true
+  },
+  "tasks": {
+    "check": "deno check index.ts"
+  }
+}

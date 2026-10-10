@@ -1,5 +1,246 @@
 # governed-starter-kit - RUNLOG
 
+## 2026-10-10 - app MCP server block (K06) and MCP confirmations (K07)
+
+Vantage: operator laptop (macOS), Bun 1.3.14, supabase CLI 2.120.0, Claude
+Code 2.1.287, hosted MCP server `serverInfo` version 0.13.0 (read from the
+server). Every project is a throwaway micro project in the Team org,
+ap-southeast-1, created by the module and deleted by it; names carry the
+prefix `kit-mcp-`. Run: the runner called directly with `--only K06,K07
+--destructive` and `PVLAB_K_CLAUDE=1` (what `make mcp-probe MCP_CLAUDE=1`
+wraps). Figures below are from the last full run (18 results, 18 pass, 0
+fail, 5 min 51 s, K06 and K07 each on their own new project) unless a line
+says otherwise. Earlier runs (the first four on an adopted project, then
+three on new projects) are not comparable: they failed on module defects or
+request timeouts (4 failures, 1, then 2 failures with 3 passes; see "Module
+defects fixed" below). Only the last run and the passing portions of the
+first full run after the module fixes can be compared with it. n = 1 per
+cell: one client, one statement, one project.
+
+Sources the claims below come from (docs, not measured here):
+https://supabase.com/blog/select-2026-build-anything (the block, its two
+prerequisites), https://supabase.com/changelog/supabase-middleware-1-0
+(Middleware 1.0.0), https://supabase.com/docs/guides/getting-started/mcp
+(elicitations, `skip_elicitations`) and
+https://supabase.com/docs/guides/troubleshooting/sql-confirmations-do-not-appear-in-your-mcp-client-sQf7Kp.
+
+### K06 - the "MCP server for your app" block with Supabase Middleware 1.0
+
+The block was fetched from the public library registry
+(`https://supabase.com/library/r/mcp.json`, item `mcp`: an Edge Function
+`index.ts`, `deno.json`, `deno.lock`, a `whoami` tool). Its lock file pins
+the middleware at 1.0.0 and `@supabase/server` at 1.9.0. Kit changes:
+`tools/app.ts` (three tools), `sql/60-mcp.sql` (a table with an RLS policy on
+`client_id`), the SDK import moved to an import-map entry in `deno.json`
+(this repo's identifier scan rejects the package scope as a 20-letter
+token), and `tools/result.ts` (below). `deno check` passes.
+
+- Provisioning: 24 s from create to a healthy, write-ready project (includes
+  the module's fixed 20 s pause); `supabase functions deploy mcp --use-api
+  --no-verify-jwt` 5 s. The project signed with ES256 (`in_use`) and listed
+  an HS256 key as `previously_used`; no key rotation was needed. The OAuth
+  server and dynamic registration were enabled with one auth-config PATCH
+  (HTTP 200).
+- Discovery: the unauthenticated call answered 401 with
+  `WWW-Authenticate: Bearer` and a `resource_metadata` URL; that metadata
+  lists one authorization server; the authorization-server metadata has a
+  registration endpoint and advertises PKCE methods `S256,plain`.
+- Dynamic client registration: two public clients, HTTP 201 each, distinct
+  client ids. The consent step was the API call a consent page makes
+  (approve), not a browser click.
+- Tokens: 4 of 4 code flows (alice, bob, carol with client A; alice with
+  client B) issued a token. Claims: `client_id` equal to the registered
+  client, `aud=authenticated`, `role=authenticated`, `scope=email`, header
+  `alg=ES256`, lifetime 3600 s; claim names `aal, amr, app_metadata, aud,
+  client_id, email, exp, iat, is_anonymous, iss, phone, role, scope,
+  session_id, sub, user_metadata`.
+- Tools through the function (legacy 2025-06-18 handshake, which the
+  function accepted): `tools/list` returned the four tools; `whoami` returned
+  the token's user id and `client_id` (id equal to the token `sub`, client
+  equal to client A). Per-user RLS: of 3 request rows in the table alice
+  (Sales) saw 2 and carol (Marketing) saw 1, no overlap. Writes:
+  `decide_purchase_request` as the employee was refused, as the Sales manager
+  on a Sales request approved (row `approved` in the database), as the Sales
+  manager on a Marketing request refused (row still `pending`).
+- `client_id` reaches RLS: with rows tagged for client A, client B and no
+  client, alice's token from client A read only `note-for-a`, her token from
+  client B only `note-for-b`, bob's token from client A `note-for-a`. A
+  password-session access token (no OAuth) was accepted by the function,
+  `client_id` null, and read only the untagged row (`unscoped`); its header
+  `alg` was ES256. Policies therefore have to name both paths, as the
+  block's own docs say.
+- Refused bearer values (HTTP 401 each): the project's publishable key, the
+  legacy `anon` JWT, a non-JWT string, one character. Not measured: a user
+  access token signed with a legacy HS256 secret, which is what the block's
+  docs say it rejects; the legacy `anon` key is not a user token.
+- OAuth scope does not limit database access: the same `scope=email` token
+  sent to the Data API (`/rest/v1/purchase_requests`) answered 200 with 2
+  rows. The block's docs say scopes identify rather than authorise; this is
+  the measurement behind that sentence.
+- Block defect found: on the first run (adopted project, before the kit
+  change) the refused write came back as `[P0001] [object Object]` - the
+  block's `runtimeErrorResult` does `String(error)` on a PostgREST error
+  object, so the model never sees the reason. The kit copy now reads the
+  object's `message`; the final run's text is `[P0001] not permitted or not
+  found`. One observation of the original, with the client library version
+  the block's lock file pins (2.108.2); not checked on other versions.
+- Not done: connecting Claude or another client interactively (the consent
+  page is a browser step), the OAuth Consent block, the headless app
+  template, a Workers deploy (the vault Cloudflare token answers 403 on
+  Workers), and the 2026-07-28 protocol shape against the function.
+
+### K07 - confirmations on the hosted Supabase MCP server
+
+Setup, measured. The server speaks two shapes. A legacy client sends
+`initialize` and gets a session id (L0 and L1 below negotiated protocol
+2025-11-25). A 2026-07-28 client (what Claude Code 2.1.287 sent when its
+requests went through a local forwarding proxy, one capture) sends no
+`initialize`: `server/discover` first, then every request carries protocol
+version, client info and client capabilities in `params._meta` (`roots`, and
+`elicitation` with `form` and `url` for Claude Code), plus `Mcp-Method` and
+`Mcp-Name` headers. A tool that needs a confirmation answers `resultType:
+"input_required"` with `inputRequests`, and the client repeats the same call
+with `inputResponses` and a `requestState`. A raw client written for this
+(`lib/mcp-client.ts`) reproduces both shapes. Clients used below: L0 legacy,
+no capability; L1 legacy, declares `elicitation.form`; S0 2026-07-28, no
+capability; S1 2026-07-28, declares form elicitation and accepts, declines
+or cancels; SU 2026-07-28, declares URL elicitation only.
+
+- Tool surface differs by client: on an account-scoped connection L0, L1 and
+  S0 listed 29 tools including `get_cost`; SU listed 30; S1 listed 27 and no
+  `get_cost`. (`confirm_cost` and the `confirm_cost_id` parameter of
+  `create_branch` go with `get_cost`; the tool description for the parameter
+  says it is only for clients without per-request form-elicitation
+  capability.) L1 declares a form capability at `initialize` and still got
+  the 29-tool list.
+- Destructive SQL, S1 accepting, `execute_sql` on a project-scoped connection
+  (14 statements, table reset between): confirmation raised for `drop`,
+  `DROP` (upper case), `truncate`, `update` with no `where`, `delete` with no
+  `where`, `delete ... where true`, `alter table ... drop column`, a `do`
+  block that runs `execute 'drop table ...'`, and `select 1; drop table ...`.
+  Not raised for `update ... where id = 1`, `update ... where true`,
+  `insert`, `select`, and `select 'drop table ...'` (a string literal). The
+  `where true` pair is asymmetric: the `delete` was caught, the `update` was
+  not. The message: "This SQL includes destructive operations (DROP,
+  DELETE, TRUNCATE or UPDATE without WHERE). It may permanently remove data,
+  tables, schemas or other objects. Run it on project <ref>?" with an empty
+  form schema.
+- S1 declining: 4 of 4 `execute_sql` statements and `apply_migration` with
+  DROP not run (table intact), result `status: declined`. S1 cancelling:
+  the same 5, `status: cancelled`.
+- Clients without form elicitation in the request: L0, L1, S0 and SU ran
+  `drop`, `truncate`, `update` without `where`, `delete` without `where`
+  (4 statements each) and `apply_migration` with DROP, all with no
+  confirmation and the table changed (20 of 20). The handler of each client
+  would have declined; it was never called. So the docs' sentence "SQL
+  follows the existing execution path" is what happened, for L1 included.
+- `apply_migration`, S1 accepting: DROP and TRUNCATE confirmed and applied
+  (one migration row recorded for the DROP); a CREATE TABLE did not ask.
+- `skip_elicitations`: with `execute_sql,apply_migration` an S1 client that
+  would decline was not asked and the statements ran (3 `execute_sql`, 1
+  `apply_migration`). It is per tool: skipping `apply_migration` alone left
+  `execute_sql` DROP asking (declined, not run) and skipping `execute_sql`
+  alone left `apply_migration` DROP asking. Rejected with HTTP 400 on the
+  first request: `Execute_SQL` (case), `all`, `bogus` (message `Invalid
+  option: expected one of "create_project"|"create_branch"|"execute_sql"|...`)
+  and the parameter given twice (`expected string, received array`); a
+  comma list is the only form.
+- `read_only=true`: DROP not confirmed and not run; Postgres answered
+  `25006 cannot execute DROP TABLE in a read-only transaction`.
+- What one confirmation covers (S1, update without `where`, n = 1): the
+  `requestState` payload has keys `b, exp, p`; `p` holds tool, project and a
+  hash of the query; `exp` was 119 s ahead. Presented with a different query
+  (a DROP) the same state was refused and the table survived. Presented
+  again with the same query and the same accepted answer, it ran again: the
+  value went `a,b,c` to `ax,bx,cx` to `axx,bxx,cxx`, so one acceptance
+  covers repeats of that query until `exp`. An accepted answer without a
+  `requestState` did not run the statement (the server asked again). Whether
+  the state survives past `exp` was not tested.
+- Branch tools: `create_branch` on a project-scoped connection. S1 declining
+  and cancelling: no branch, `declined` / `cancelled`. L0, L1, S0 and SU:
+  no branch and `Cost confirmation ID does not match the expected cost of
+  creating a branch` (the helper tools are not exposed in a project-scoped
+  connection, so these clients cannot create a branch at all). S1 accepting:
+  one branch, 610 ms for the call, and the message "Preview branch:
+  $0.01344/hr until deleted (~$9.68 per 30 days). Auto-pauses on inactivity.
+  Standard rate, before plan allowances or exemptions." S1 with
+  `skip_elicitations=create_branch`: no prompt and a schema error (the call
+  then needs the helper parameter it does not have), no branch. On a project
+  that had never had a branch the listing showed 0 default-branch rows
+  before the first accepted create and 1 after (a `main` row appears).
+- Account-scoped, S0 (no elicitation), where the helper tools exist:
+  `get_cost` returned the quote (amount 0.01344, hourly), `confirm_cost`
+  returned a confirmation id, `create_branch` without the id errored (no
+  branch) and with it created one. The two helper calls were made by the
+  script with no person between them; whether a model asks its user first is
+  up to the model and the client.
+- `reset_branch`, `rebase_branch` and `delete_branch` under S1 with a decline
+  handler: no elicitation, all three returned `ok`. The docs list four tools
+  for confirmations (`create_project`, `create_branch`, `execute_sql`,
+  `apply_migration`); this is consistent with that list, not a finding about
+  intent.
+- Claude Code 2.1.287, `claude -p --model haiku` with an Elicitation hook
+  (`scripts/k07-elicit-hook.sh`, output `hookSpecificOutput` with `action`,
+  per https://code.claude.com/docs/en/hooks), 10 runs (n = 1 per cell, one
+  model). The outcome per run is inferred from the database state (statement
+  applied or not, branch created or not) and from the hook event count; the
+  model's reply text varies and is not the measurement. One hook event per
+  confirmed call: decline hook - DROP, TRUNCATE, UPDATE without WHERE and
+  `create_branch` not run (`declined`); accept hook - the three statements
+  applied, `create_branch` created a branch (deleted afterwards); no hook
+  (`-p` alone) - DROP not run; the reply in the last run said cancelled in
+  prose, and the literal `{"status":"cancelled"}` payload was seen in an
+  earlier development run (and is the OBSERVABILITY.md observation);
+  `skip_elicitations` on both SQL tools - no hook event, DROP applied. So Claude Code does support form
+  elicitation, and in `-p` mode the absence of a hook is a cancel, not an
+  acceptance.
+- Hook gotcha: a first attempt with the answer nested as
+  `decision: { action: ... }` made the model report `cancelled` in all 6 SQL runs and both branch runs
+  that had a hook in that attempt, accept and decline alike; the page linked
+  above puts `action` directly in `hookSpecificOutput`, which worked. (The
+  nested form came from a summarised copy of the page that was not kept, so
+  its origin cannot be checked.) The wrong
+  format fails closed here because the cancel runs nothing; a hook author
+  could miss it.
+- Not done: the interactive dialog in Claude Code (accept and decline
+  buttons, Esc), any other client product, `create_project` (a decline would
+  show the quote; not run), URL elicitation (`create_edge_function_secret`),
+  and the expiry of `requestState`.
+
+Reading K07 against the docs. The docs say confirmations are "a guardrail,
+not a guarantee"; the measurement shows what that means in practice. SQL
+confirmation fails open: it exists only for a client that declares form
+elicitation in the 2026-07-28 request metadata, and a client that declared
+it at a 2025 `initialize` (L1) ran DROP unprompted. Cost confirmation for a
+branch fails closed on a project-scoped connection and falls back to the
+agent-driven helper tools on an account-scoped one. A hook or rule that
+answers for the user (as the Claude Code hook here) turns the confirmation
+into a pass-through. Detection is by statement shape: a `where true` update
+passed while a `where true` delete was caught, and a string literal
+containing DROP passed, so the docs' warning that it "may not catch every
+destructive operation" is borne out.
+
+Module defects fixed on the way (so earlier artifacts differ from the final
+one): the first K07 run reported every statement as applied because its
+baseline state string was wrong (the table name prints without the schema);
+the first full run on new projects counted rows from the branch listing, so
+the first accepted create on a never-branched project read as 2 new branches
+(the `main` row), which failed K07.10; the second full run
+died on request timeouts in K06 and K07 (the management API and the MCP call
+both timed out once), so timeouts are now retried and lengthened.
+
+Cleanup: 7 projects created: the adopted development project `kit-mcp-dev`,
+three K06 projects (two deleted by the module, one left behind when a
+request timeout aborted K06 before teardown ran, deleted by hand; `provision`
+now also deletes a project it created when readiness fails) and three K07 projects
+(all deleted by the module). Module output records 9 branch deletions
+(each branch deleted within minutes, billed at the quoted hourly rate, cents
+in total). Two
+steps were manual and have no run output: deleting `kit-mcp-dev` and the
+left-behind K06 project. Check after the last run: a read-only `GET
+/v1/projects` on 2026-10-10 returned 4 projects, none named `kit-mcp-`
+(count saved as a small JSON file next to the run outputs).
+
 ## 2026-10-09 (midnight) - third full run: erfi.dev hostnames, printed demo users, troubleshooting; destroyed
 
 - `make up` 94 s (35 pass, 2 expected skips); model key checked with a
