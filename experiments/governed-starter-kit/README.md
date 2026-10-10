@@ -223,6 +223,42 @@ run 2026-10-08/09. The first call after each of four fresh deploys answered
 hours without a redeploy answered the first call 200. Make one warm-up call
 after a deploy before showing it.
 
+## App MCP server and MCP confirmations (K06, K07)
+
+`supabase/functions/mcp` is the "MCP server for your app" library block
+(https://supabase.com/blog/select-2026-build-anything) with Supabase
+Middleware 1.0 (https://supabase.com/changelog/supabase-middleware-1-0): one
+Edge Function that answers OAuth discovery for MCP clients, verifies the
+caller's Supabase access token and hands every tool a client that runs as that
+user. The kit adds three tools to the block's `whoami`:
+`list_purchase_requests`, `decide_purchase_request` (both go through the same
+policies and the same `decide_purchase_request` function as the web app) and
+`list_client_notes` (rows scoped by the token's `client_id`,
+`sql/60-mcp.sql`). The block needs asymmetric signing keys and the project's
+OAuth server; deploy with `supabase functions deploy mcp --use-api
+--no-verify-jwt`. Two changes to the block's own files: `tools/result.ts`
+reads `error.message` from a PostgREST error object (the original printed
+`[object Object]`, RUNLOG 2026-10-10), and the MCP SDK import goes through the
+`mcp-sdk` entry in `deno.json` instead of an inline `npm:` specifier.
+
+K06 checks it end to end and K07 measures the hosted Supabase MCP server's
+confirmations (destructive SQL, paid branches, `skip_elicitations`) from
+clients with and without elicitation support, including Claude Code with an
+Elicitation hook. Both provision their own throwaway project, so neither
+needs `make up` and neither touches kit-live or kit-ready:
+
+```bash
+sx SUPABASE_ACCESS_TOKEN -- make mcp-probe                 # K06 + K07, project names kit-mcp-*
+sx SUPABASE_ACCESS_TOKEN -- make mcp-probe MCP_CLAUDE=1    # K07 also drives `claude -p` (needs a login)
+sx SUPABASE_ACCESS_TOKEN -- make mcp-probe ONLY=K06 PROJECT_PREFIX=my-prefix-
+```
+
+Not covered: connecting Claude (or any client) interactively to the deployed
+function (the consent step needs a browser and a consent page; K06 approves
+the consent through the API a page would call), and the OAuth Consent block
+and headless app template from the same announcement. Cloudflare Workers
+deploys of the kit app are separate (`make app-deploy`).
+
 ## Troubleshooting segment
 
 `make fault-inject` adds two faults to `kit-ready` in objects of their own
