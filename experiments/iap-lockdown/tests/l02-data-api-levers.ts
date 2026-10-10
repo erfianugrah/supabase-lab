@@ -18,6 +18,7 @@
 import type { Ctx, TestModule, TestResult } from "../../../harness/src/types.js";
 import { mgmt } from "../../../harness/src/mgmt.js";
 import {
+  GRAPHQL_PROBE_QUERY,
   fetchKeys,
   inventory,
   toMeasurements,
@@ -97,7 +98,7 @@ const mod: TestModule = {
               Authorization: `Bearer ${keys.anonJwt}`,
               "Content-Type": "application/json",
             },
-            body: JSON.stringify({ query: "{ __schema { queryType { name } } }" }),
+            body: JSON.stringify({ query: GRAPHQL_PROBE_QUERY }),
           });
           return r.status !== 200;
         }, 60_000);
