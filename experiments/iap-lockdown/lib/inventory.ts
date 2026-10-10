@@ -23,6 +23,9 @@ export const EF_OPEN = "iap-probe-open";
 export const EF_LOCKED = "iap-probe-locked";
 export const IAP_USER_PASSWORD = `${crypto.randomUUID()}Aa1!`;
 
+/** Introspection-free GraphQL probe: works with or without introspection. */
+export const GRAPHQL_PROBE_QUERY = "{ __typename }";
+
 export interface Probe {
   status: number;
   /** Platform error code parsed from the JSON body (PGRST*, etc), verbatim. */
@@ -57,7 +60,12 @@ export async function http(
     let code = "";
     try {
       const j = JSON.parse(text);
-      code = String(j.code ?? j.error_code ?? j.error ?? j.message ?? j.msg ?? "").slice(0, 80);
+      // GraphQL answers 200 with an errors envelope (pg_graphql absent, or a
+      // field refused), so a 200 alone is not "on": surface errors[0].message
+      // or, for a served { __typename }, "ok:<type>".
+      const gqlErr = Array.isArray(j.errors) ? j.errors[0]?.message : undefined;
+      const gqlOk = j.data?.__typename ? `ok:${j.data.__typename}` : undefined;
+      code = String(j.code ?? j.error_code ?? j.error ?? j.message ?? j.msg ?? gqlErr ?? gqlOk ?? "").slice(0, 80);
     } catch {
       code = text.trim().slice(0, 60);
     }
@@ -275,12 +283,17 @@ export async function inventory(
 
   await add("rest_root", http(`${base}/rest/v1/`, { key }));
   await add("rest_table", http(`${base}/rest/v1/${TABLE}?select=id&limit=1`, { key }));
+  // { __typename } is answered by any live pg_graphql; { __schema } is refused
+  // by default on pg_graphql 1.6.0+ (projects created after 2026-06-29) and
+  // pg_graphql is absent on new projects, so neither can mean "GraphQL on".
+  // Live: 200 + code "ok:Query". Absent: 200 + "pg_graphql extension is not
+  // enabled." (see data-api-defaults DD02).
   await add(
     "graphql",
     http(`${base}/graphql/v1`, {
       method: "POST",
       key,
-      body: { query: "{ __schema { queryType { name } } }" },
+      body: { query: GRAPHQL_PROBE_QUERY },
     }),
   );
   await add("auth_health", http(`${base}/auth/v1/health`, { key }));
