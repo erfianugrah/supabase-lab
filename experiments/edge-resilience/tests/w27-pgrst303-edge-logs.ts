@@ -14,18 +14,33 @@
  *         Expect 401 PGRST303 / 79 bytes, 401 PGRST303 / 70 bytes, 200.
  *         The two error bodies differ only in the message, so the byte count
  *         IS the message.
- *   W27b  edge_logs via `/analytics/endpoints/logs.all`: the same three rows
- *         read back with response.headers.content_length, proxy_status and
- *         the parsed JWT payload (issued_at, expires_at). Pass when every
- *         content_length equals the wire byte count and issued_at minus the
- *         request timestamp reproduces the +300s skew. Records the exact SQL
- *         that worked, and what the `logs` (stream) endpoint said to it.
+ *   W27b  edge_logs via the unified `/analytics/endpoints/logs` (ClickHouse
+ *         dialect, `source = 'edge_logs'`, nested fields through the
+ *         `log_attributes` map): the same three rows read back with
+ *         response.headers.content_length, proxy_status and the parsed JWT
+ *         payload (issued_at, expires_at). Pass when every content_length
+ *         equals the wire byte count and issued_at minus the request
+ *         timestamp reproduces the +300s skew. Records the exact SQL that
+ *         worked. Until 2026-09-23 this row read `logs.all` (BigQuery
+ *         dialect, `unnest(metadata)`); that endpoint answers 410 now, and
+ *         one request to it is made here to record the status.
+ *   W27d  the incident-window read FAILURE-MATRIX 3.1 cites: select on
+ *         `proxy_status = 'PostgREST; error=PGRST303'`, split future-iat from
+ *         expired in SQL (`issued_at` minus `toUnixTimestamp(timestamp)`;
+ *         `expires_at` below it). The probe's User-Agent prefix is kept in
+ *         the predicate so a shared project's other rows stay out. Pass when
+ *         the future-iat probe row reads a skew of 290-310 s and not-expired,
+ *         and the expired probe row reads expired.
  *   W27c  42501 mapping: a table with all privileges revoked from anon and
  *         authenticated (`revoke all on table`), hit as anon (publishable key
  *         only), as the legacy anon JWT, and as a minted authenticated token.
  *         S21 measured anon 401 / authenticated 403 on 2026-09-03 on the wire
  *         only; this row adds the legacy-anon-JWT-as-bearer case and the
  *         edge_logs shape, and records what proxy_status carries for it.
+ *         On the unified table a 42501 row has no `transfer_encoding` and no
+ *         `content_length` key at all (read back as ""), where the retired
+ *         `logs.all` read showed transfer_encoding "chunked" - the
+ *         `log_*_transfer_encoding` measurements record "-" for that reason.
  *
  * Pass means the platform did what a reader of edge_logs would assume;
  * fail is a measured disagreement, not a harness error. Platform error text
@@ -34,7 +49,7 @@
  * Not settled by this module: the stale-time cache itself (a PostgREST build
  * with a one-second skew, out of scope here), and whether a project
  * provisioned in an earlier Logs Explorer era exposes the same field paths -
- * this project is a 2026-09 provision.
+ * the 2026-10-10 re-run used a project provisioned that day.
  *
  * DESTRUCTIVE: creates public.w27_locked and drops it in finally. Needs
  * public.w_probe (the Makefile seed) for W27a/b.
@@ -42,7 +57,7 @@
 import { createHmac } from "node:crypto";
 import type { Ctx, TestModule, TestResult } from "../../../harness/src/types";
 import { mgmt } from "../../../harness/src/mgmt";
-import { fetchKeys, logsAllQuery, logsQuery as logsStream, sql } from "../../../harness/src/platform";
+import { fetchKeys, logsQuery, sql } from "../../../harness/src/platform";
 
 const ID = "W27";
 const SUB = "00000000-0000-0000-0000-000000000027";
@@ -93,26 +108,50 @@ async function hit(ctx: Ctx, path: string, ua: string, bearer?: string): Promise
 }
 
 /**
- * The flattened edge_logs read. `logs.all` answers this; the `logs` stream
- * endpoint answered "Backend error! Retry your query." to the identical text
- * on 2026-09-03 (S18) and again here. Kept as one string so the artifact
- * carries exactly what ran.
+ * The edge_logs read on the unified `logs` table. Nested request/response
+ * fields are flat string keys of the `log_attributes` map; a key that is absent
+ * on a row reads as the empty string (not null), so "no JWT payload" and
+ * "chunked, no content_length" both come back as "". `timestamp` is an ISO
+ * string in UTC without a zone suffix (the BigQuery-era `logs.all` returned
+ * microseconds since epoch). Kept as one string so the artifact carries
+ * exactly what ran.
  */
-const richSql = (uaPrefix: string) => `select id, timestamp, r.method, r.path, h.user_agent, res.status_code,
-       rh.content_length, rh.transfer_encoding, rh.proxy_status,
-       jp.issued_at, jp.expires_at, jp.role, jp.subject, sb.auth_user
-from edge_logs
-cross join unnest(metadata) as m
-cross join unnest(m.request) as r
-cross join unnest(r.headers) as h
-cross join unnest(m.response) as res
-cross join unnest(res.headers) as rh
-cross join unnest(r.sb) as sb
-left join unnest(sb.jwt) as jwt
-left join unnest(jwt.authorization) as auth
-left join unnest(auth.payload) as jp
-where h.user_agent like '${uaPrefix}%'
-order by timestamp desc`;
+const A = (k: string) => `log_attributes['${k}']`;
+const richSql = (uaPrefix: string) => `select timestamp,
+       ${A("request.method")} as method, ${A("request.path")} as path,
+       ${A("request.headers.user_agent")} as user_agent,
+       ${A("response.status_code")} as status_code,
+       ${A("response.headers.content_length")} as content_length,
+       ${A("response.headers.transfer_encoding")} as transfer_encoding,
+       ${A("response.headers.proxy_status")} as proxy_status,
+       ${A("request.sb.jwt.authorization.payload.issued_at")} as issued_at,
+       ${A("request.sb.jwt.authorization.payload.expires_at")} as expires_at,
+       ${A("request.sb.jwt.authorization.payload.role")} as role,
+       ${A("request.sb.auth_user")} as auth_user
+from logs
+where source = 'edge_logs'
+  and ${A("request.headers.user_agent")} like '${uaPrefix}%'
+order by timestamp desc
+limit 100`;
+
+/**
+ * The incident-window form: select on the error class, split future-iat from
+ * expired in SQL. `toInt64OrNull` because every map value is a string. The
+ * User-Agent predicate is the probe's marker; drop it to scan a real window.
+ */
+const incidentSql = (uaPrefix: string) => `select timestamp,
+       ${A("request.headers.user_agent")} as user_agent,
+       ${A("response.headers.content_length")} as content_length,
+       toInt64OrNull(${A("request.sb.jwt.authorization.payload.issued_at")}) as issued_at,
+       toInt64OrNull(${A("request.sb.jwt.authorization.payload.expires_at")}) as expires_at,
+       issued_at - toUnixTimestamp(timestamp) as iat_skew_s,
+       expires_at < toUnixTimestamp(timestamp) as is_expired
+from logs
+where source = 'edge_logs'
+  and ${A("response.headers.proxy_status")} = 'PostgREST; error=PGRST303'
+  and ${A("request.headers.user_agent")} like '${uaPrefix}%'
+order by timestamp desc
+limit 100`;
 
 interface LogRow {
   user_agent: string;
@@ -124,16 +163,32 @@ interface LogRow {
   expires_at: number | null;
   role: string | null;
   auth_user: string | null;
-  /** microseconds since epoch */
-  timestamp: number;
+  /** seconds since epoch, from the ISO timestamp (UTC) */
+  ts_s: number;
 }
 
-async function logsAll(ctx: Ctx, sqlText: string): Promise<{ rows: LogRow[]; error: string }> {
-  const r = await logsAllQuery(ctx, sqlText, 1);
-  return { rows: r.rows as unknown as LogRow[], error: r.error };
+const nullIfEmpty = (v: unknown): string | null => (v === undefined || v === null || v === "" ? null : String(v));
+const numOrNull = (v: unknown): number | null => {
+  const s = nullIfEmpty(v);
+  return s === null || !Number.isFinite(Number(s)) ? null : Number(s);
+};
+
+function parseRow(r: Record<string, unknown>): LogRow {
+  return {
+    user_agent: String(r.user_agent ?? ""),
+    status_code: Number(r.status_code),
+    content_length: nullIfEmpty(r.content_length),
+    transfer_encoding: nullIfEmpty(r.transfer_encoding),
+    proxy_status: nullIfEmpty(r.proxy_status),
+    issued_at: numOrNull(r.issued_at),
+    expires_at: numOrNull(r.expires_at),
+    role: nullIfEmpty(r.role),
+    auth_user: nullIfEmpty(r.auth_user),
+    ts_s: Math.floor(Date.parse(`${String(r.timestamp)}Z`) / 1000),
+  };
 }
 
-/** Poll logs.all until every expected User-Agent has a row, or the budget is spent. */
+/** Poll the unified logs endpoint until every expected User-Agent has a row, or the budget is spent. */
 async function awaitRows(
   ctx: Ctx,
   uaPrefix: string,
@@ -142,8 +197,9 @@ async function awaitRows(
   const t0 = Date.now();
   let last: { rows: LogRow[]; error: string } = { rows: [], error: "" };
   while (Date.now() - t0 < LOG_WAIT_MS) {
-    last = await logsAll(ctx, richSql(uaPrefix));
-    const seen = new Set(last.rows.map((r) => r.user_agent));
+    const r = await logsQuery(ctx, richSql(uaPrefix), 1);
+    last = { rows: (r.rows as Record<string, unknown>[]).map(parseRow), error: r.error };
+    const seen = new Set(last.rows.map((x) => x.user_agent));
     if (expected.every((ua) => seen.has(ua))) break;
     await Bun.sleep(LOG_POLL_MS);
   }
@@ -207,16 +263,23 @@ const mod: TestModule = {
         measurements: ma,
       });
 
-      // W27b - edge_logs through logs.all
+      // W27b - edge_logs through the unified logs endpoint
       const expectedUa = ["future", "expired", "valid"].map(ua);
       const logs = await awaitRows(ctx, uaPrefix, expectedUa);
-      const stream = await logsStream(ctx, richSql(uaPrefix), 1);
+      // One request to the retired endpoint, recorded as data (410 since 2026-09-23).
+      const nowIso = new Date();
+      const legacyQs =
+        `sql=${encodeURIComponent("select 1")}` +
+        `&iso_timestamp_start=${encodeURIComponent(new Date(nowIso.getTime() - 3600_000).toISOString())}` +
+        `&iso_timestamp_end=${encodeURIComponent(nowIso.toISOString())}`;
+      const legacy = await mgmt(ctx, "GET", `/projects/${ctx.ref}/analytics/endpoints/logs.all?${legacyQs}`);
+      const legacyMsg = String((legacy.json as Record<string, unknown> | undefined)?.message ?? legacy.text).slice(0, 80);
       const mb: Record<string, number | string> = {
         log_lag_s: logs.lagS,
         log_rows_found: logs.rows.length,
-        logs_all_error: logs.error || "-",
-        logs_stream_rows: stream.rows.length,
-        logs_stream_error: stream.error || "-",
+        logs_endpoint_error: logs.error || "-",
+        logs_all_http: legacy.status,
+        logs_all_message: legacyMsg,
       };
       const byUa = new Map(logs.rows.map((r) => [r.user_agent, r]));
       let bPass = logs.rows.length >= 3;
@@ -228,8 +291,7 @@ const mod: TestModule = {
           bLines.push(`${k}: no edge_logs row within ${logs.lagS}s`);
           continue;
         }
-        const reqEpoch = Math.floor(row.timestamp / 1_000_000);
-        const skew = row.issued_at == null ? null : row.issued_at - reqEpoch;
+        const skew = row.issued_at == null ? null : row.issued_at - row.ts_s;
         mb[`log_${k}_status`] = row.status_code;
         mb[`log_${k}_content_length`] = row.content_length ?? "-";
         mb[`log_${k}_transfer_encoding`] = row.transfer_encoding ?? "-";
@@ -246,11 +308,53 @@ const mod: TestModule = {
       if (typeof futureSkew !== "number" || futureSkew < 290 || futureSkew > 310) bPass = false;
       out.push({
         id: `${ID}b`,
-        title: "edge_logs: content_length, proxy_status and JWT payload via logs.all",
+        title: "edge_logs: content_length, proxy_status and JWT payload via the unified logs endpoint",
         status: bPass ? "pass" : "fail",
-        detail: `${bLines.join("; ")}. Rows landed in ${logs.lagS}s. logs (stream) endpoint: ${stream.error || `${stream.rows.length} rows`}`,
+        detail: `${bLines.join("; ")}. Rows landed in ${logs.lagS}s. logs.all: HTTP ${legacy.status} "${legacyMsg}"`,
         measurements: mb,
-        evidence: `-- logs.all, 1h window, the query that returned the rows above:\n${richSql(uaPrefix)}`,
+        evidence: `-- /analytics/endpoints/logs, 1h window, the query that returned the rows above:\n${richSql(uaPrefix)}`,
+      });
+
+      // W27d - the incident-window form: error class selected on proxy_status, split in SQL
+      let inc: { rows: Record<string, unknown>[]; error: string } = { rows: [], error: "" };
+      const incT0 = Date.now();
+      let incPolls = 0;
+      while (Date.now() - incT0 < 60_000) {
+        incPolls++;
+        const r = await logsQuery(ctx, incidentSql(uaPrefix), 1);
+        inc = { rows: r.rows as Record<string, unknown>[], error: r.error };
+        if (inc.rows.length >= 2) break;
+        await Bun.sleep(LOG_POLL_MS);
+      }
+      const incBy = new Map(inc.rows.map((r) => [String(r.user_agent), r]));
+      const incFuture = incBy.get(ua("future"));
+      const incExpired = incBy.get(ua("expired"));
+      const sqlSkew = incFuture ? Number(incFuture.iat_skew_s) : NaN;
+      const dPass =
+        Boolean(incFuture && incExpired) &&
+        sqlSkew >= 290 && sqlSkew <= 310 &&
+        Number(incFuture!.is_expired) === 0 &&
+        Number(incExpired!.is_expired) === 1 &&
+        inc.rows.length === 2;
+      out.push({
+        id: `${ID}d`,
+        title: "incident window: PGRST303 selected on proxy_status, future-iat vs expired split in SQL",
+        status: dPass ? "pass" : "fail",
+        detail:
+          `rows matching proxy_status PGRST303: ${inc.rows.length} (expect 2: future, expired). ` +
+          `future: iat_skew_s ${incFuture?.iat_skew_s ?? "n/a"}, is_expired ${incFuture?.is_expired ?? "n/a"}, content_length ${incFuture?.content_length ?? "n/a"}; ` +
+          `expired: iat_skew_s ${incExpired?.iat_skew_s ?? "n/a"}, is_expired ${incExpired?.is_expired ?? "n/a"}, content_length ${incExpired?.content_length ?? "n/a"}` +
+          (inc.error ? `; endpoint error: ${inc.error}` : ""),
+        measurements: {
+          incident_rows: inc.rows.length,
+          incident_polls: incPolls,
+          future_iat_skew_sql_s: incFuture ? Number(incFuture.iat_skew_s) : "-",
+          future_is_expired: incFuture ? Number(incFuture.is_expired) : "-",
+          expired_iat_skew_sql_s: incExpired ? Number(incExpired.iat_skew_s) : "-",
+          expired_is_expired: incExpired ? Number(incExpired.is_expired) : "-",
+          incident_error: inc.error || "-",
+        },
+        evidence: `-- /analytics/endpoints/logs, 1h window:\n${incidentSql(uaPrefix)}`,
       });
 
       // W27c - 42501 mapping
