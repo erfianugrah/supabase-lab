@@ -255,7 +255,143 @@ facts):
   a decision webhook, a coding agent building and deploying an app on a
   scoped MCP server, self-service project provisioning, and a reversible
   troubleshooting segment. Two Team-org projects, rebuilt with `make up`.
-  Measured 2026-10-05 to 2026-10-07; see its README and RUNLOG.
+  Measured 2026-10-05 to 2026-10-07; see its README and RUNLOG. K06 deploys
+  the Select 2026 MCP server block (Supabase Middleware 1.0) and checks OAuth
+  discovery, per-user RLS and `client_id` RLS end to end; K07 measures the
+  hosted MCP server's confirmations (destructive SQL, paid branches,
+  `skip_elicitations`) by client capability, including Claude Code with an
+  Elicitation hook. Both provision their own project (`make mcp-probe`);
+  measured 2026-10-10.
+- `data-api-defaults` - what a project created through `POST /v1/projects`
+  does with the Data API defaults that changed in 2026: default table
+  privileges in `public` (and the 42501 grant hint after the opt-in revoke),
+  pg_graphql absent by default and refused introspection, the `GET /rest/v1/`
+  OpenAPI spec per key type and its Management API replacement, `CREATE
+  EXTENSION ... VERSION` ignored with a warning, and the realtime-schema
+  lockdown as `postgres`. One Pro project per run (DD01-DD04, DD99). Measured
+  2026-10-10; see its RUNLOG.
+- `realtime-surface` - Realtime behaviour from changelog and blog claims:
+  Postgres Changes AND filters, operators, `select` and DELETE; loss during a
+  disconnect and a heartbeat canary; Broadcast Replay limits; binary Broadcast
+  across three send paths and two client versions. Self-provisioning (Pro
+  org), RT01-RT04, n = 1 per row. Measured 2026-10-10; see its RUNLOG.
+- `auth-providers` - custom OIDC provider quota, PKCE, `email_optional` and
+  audience; passkeys with a CDP virtual authenticator; a per-method sign-in
+  canary; SAML SSO without a third-party IdP (AU01-AU04). Self-provisioning,
+  Pro org. Measured 2026-10-10; see its RUNLOG.
+- `observability-surface` - what the observability surface does when probed
+  from outside: supabase-js trace propagation by release and packaging, the
+  Health Check Advisors' firing rule (a failing-request count per two
+  clock-aligned five-minute buckets, not the stated 10% share) with detection,
+  cache and clearing times, a 36-minute log-ingestion canary, `supabase
+  notebooks` pull and push, and a log-drain sink that is ready but blocked on
+  an organization-level API gate. Self-provisioning, no OpenTofu state.
+  Measured 2026-10-10; see its RUNLOG.
+- `edge-runtime-auth` - `@supabase/server` auth modes (`none`, `user`,
+  `secret`, `publishable`, `['user','secret']`) against 14 credential
+  presentations on an Edge Function and on the Workers runtime (workerd in a
+  container, and the same Worker deployed to Cloudflare Workers), plus an Edge
+  Function canary: redeploy version drift, whether `supabase-js`
+  `functions.invoke` retries a 503, and p50/p95 over a 600 s window against an
+  RPC twin. Self-provisioning, no OpenTofu state. Measured 2026-10-10; see its
+  RUNLOG.
+- `lifecycle-ops` - the status page as a per-region change gate, create
+  through a region-fallback wrapper with an abandoned and re-sent POST, and an
+  n = 5 restart envelope over REST, Auth, Storage, pooler and direct
+  (LO01, LO03-LO05). Self-provisioning, no OpenTofu state. Measured 2026-10-10; see
+  its RUNLOG.
+- `restore-paths` - restore paths on Pro and Free: which exist through the
+  Management API, PITR restore per-path outage, which database password and
+  whether Storage survive, and Free pause and unpause timing (RP01-RP03).
+  Self-provisioning. Measured 2026-10-10; see its RUNLOG.
+- `pooler-checkout` - Supavisor transaction-pool exhaustion
+  (`ECHECKOUTTIMEOUT`), fallback to session, direct and dedicated poolers,
+  node-postgres, postgres.js and Prisma behaviour under a TCP reset, and an
+  `aws-0` host lint. Self-provisioning, Micro. Measured 2026-10-10; see its
+  RUNLOG.
+- `jit-db-access` - temporary token-based database access: grant a role with
+  an expiry through the Management API, log in with the PAT as the Postgres
+  password through the shared pooler and the direct path, and measure expiry
+  (epoch seconds enforced; the docs' millisecond example does not expire),
+  revocation (new logins stop, open sessions survive), `allowed_networks` on
+  the pooler path, and what postgres_logs and supavisor_logs record.
+  Self-provisioning, no OpenTofu state. Measured 2026-10-10; see its RUNLOG.
+- `client-retries` - what the supabase-js PostgREST retry policy does on the
+  wire (statuses, methods, `Retry-After`, opt-out names per version, timeouts)
+  and two client policies that the built-in retries lack: a deadline plus one
+  hedged GET, and refresh-then-retry on a 401. Self-provisioning (CR01, CR02);
+  CR03 and CR04 need no project. Measured 2026-10-10; see its RUNLOG.
+- `hostname-path` - a custom hostname on a Pro project: OAuth callback, `iss`
+  and SDK URL hosts (HP02-HP05), resolution through six paths and a local
+  NXDOMAIN-on-`supabase.co` rig with an app on the custom hostname
+  (HP06-HP07), and phase-split latency (HP08). Self-provisioning; needs
+  Cloudflare DNS and Docker. Measured 2026-10-10; see its RUNLOG.
+- `storage-surface` - the Storage direct-SQL delete guard and orphaned
+  objects, list v1 against cursor v2 at depth, and S3-endpoint handling of
+  special-character keys with the AWS SDK v3. Self-provisioning; SS01, SS02.
+  Measured 2026-10-10; see its RUNLOG.
+- `pipelines` - Supabase Pipelines (public alpha): what a PAT can reach
+  (nothing of the managed service), and replication behaviour of the
+  open-source engine against a Pro project with a local DuckLake destination:
+  initial copy, lag against batch wait, RLS, DDL propagation, duplicates after
+  a forced restart, and retained WAL and slot invalidation while stopped
+  (PL01-PL08, PL99). Run: `make -C experiments/pipelines run`. Measured
+  2026-10-10; see its RUNLOG.
+- `orioledb` - hosted OrioleDB against heap: redundant-writes counters, bloat
+  after repeated UPDATEs, a pgbench pair, per-table access methods, what
+  refuses or crashes on an OrioleDB table, PITR, logical replication and
+  Realtime. Live, about five small projects in a Pro org. Measured 2026-10-10;
+  see its RUNLOG.
+- `branching-nogit` - branching without git: a change written to a git-less
+  branch through the SQL route reaches `GET /diff` but not the parent on `POST
+  /merge`; the same objects through the migrations route do (BN01-BN03).
+  Self-provisioning, Pro org. Measured 2026-10-10; see its RUNLOG.
+- `replica-routing` - where the API load balancer sends a GET with a
+  cross-region read replica, read-your-writes after a write, and
+  `max_standby_streaming_delay` cancellation of a long replica query (RR01).
+  Self-provisioning, Pro org. Measured 2026-10-10; see its RUNLOG.
+- `scoped-pats` - what a scoped personal access token can create, read and
+  write through the Management API: creation surface, a per-permission matrix
+  from the OpenAPI `x-fga-permissions`, the SQL read-only boundary, CLI
+  `whoami`, and the per-route rate-limit header. Token-dependent modules
+  self-skip until `PVLAB_SCOPED_PAT_*` are supplied. Measured 2026-10-10; see
+  its RUNLOG.
+- `free-email-templates` - whether new free-plan projects can edit auth email
+  templates through the Management API, on default SMTP and on dummy custom
+  SMTP, with a Pro-org control (FE01, FE02). Self-provisioning. Measured
+  2026-10-10; see its RUNLOG.
+- `mgmt-api-faults` - a fault-injecting proxy in front of api.supabase.com:
+  retries on 5xx and 429, partial apply and orphaned state, and duplicate
+  POSTs, for the supabase CLI, the OpenTofu provider and the harness client
+  (MF01-MF05). Measured 2026-10-10; see its RUNLOG.
+- `pg-minor-17-11` - the 17.6 to 17.11 and 15.14 to 15.19 minor on four
+  extension behaviours the changelog flags (pgcrypto legacy ciphers,
+  non-built-in operator estimators, btree_gist NaN, ltree), measured on the
+  public images in local Docker. Measured 2026-10-10; see its RUNLOG.
+- `cli-surface` - Supabase CLI 2.120.0: pg-delta against migra by catalog
+  fingerprint, a declarative sync round trip, `config pull`, `pull` and linked
+  diff on a throwaway project, and the experimental native stack in a
+  container with no Docker (one stack, three worktrees, drift).
+  Self-provisioning. Measured 2026-10-10; see its RUNLOG.
+- `self-hosted-defaults` - a local rig on a pinned supabase/supabase `docker/`
+  checkout that asserts the 2026 defaults against a running stack: the Envoy
+  gateway (no Kong, no 8443, with a Kong-override control), `sb_` keys through
+  Envoy and the role PostgREST sees, Postgres 17 with `pg_graphql` off, Studio
+  and postgres-meta as `postgres`, logs only via `docker-compose.logs.yml`,
+  and `API_EXTERNAL_URL` with `/auth/v1` and SAML at `/auth/v1/sso/saml/*`
+  (SD01-SD08). No project, no PAT, no cloud spend. Measured 2026-10-10; see
+  its RUNLOG.
+- `multigres` - Multigres OSS failover: kill the primary under a write load
+  (postgres crash, cell loss, hung primary, lagging standby), count
+  acknowledged-but-lost commits against a client-side commit log, plus the
+  pooler feature matrix through the gateway. Local Docker, no cloud resources.
+  Measured 2026-10-10; see its RUNLOG.
+- `terraform-edge-functions` - the OpenTofu `supabase_edge_function` and
+  `supabase_edge_function_secrets` resources with 24 functions at
+  `-parallelism=24`: tofu reports 25 created, the API lists 3 to 5, the rest
+  answer 200 but are not listed; updates land with exit 1; a width-24 destroy
+  leaves the listed functions in place and empties state. `-parallelism=1`
+  is clean. Measured 2026-10-10; see its RUNLOG.
 
 ## Ad-hoc platform probes (no experiment dir)
 
@@ -288,8 +424,10 @@ write-ups publish to lexicanum (erfi.dev).
   the `{result,error}` envelope (`Backend error! Retry your query.`);
   no deprecation/sunset header on `logs.all`; `x-ratelimit-limit: 10`.
   Sources seen: edge_logs, postgres_logs, pgbouncer_logs, storage_logs,
-  realtime_logs. Our only live caller is the MFA-audit script
-  (auth logs); lab experiments use usage.api-counts/metrics - unaffected.
+  realtime_logs. Lab callers until 2026-10-10 were edge-resilience W27, security-lockdown
+  S18 and data-api-reenable DA02L; all three were ported to the unified `logs`
+  endpoint that day and `logsAllQuery` is deleted (the s2z-wake surface list
+  keeps its `logs.all` readings as pre-2026-09-23 history).
   Full write-up: https://erfi.dev/guides/supabase-management-api-logs-endpoint/
 
 ## Setup (once)
