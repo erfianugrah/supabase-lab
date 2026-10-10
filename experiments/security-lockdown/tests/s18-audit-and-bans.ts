@@ -26,19 +26,21 @@
 import { spawnSync } from "node:child_process";
 import type { Ctx, TestModule, TestResult } from "../../../harness/src/types.js";
 import { mgmt } from "../../../harness/src/mgmt.js";
-import { logsAllQuery, logsQuery as logsQueryStream } from "../../../harness/src/platform.js";
+import { logsQuery as logsQueryUnified } from "../../../harness/src/platform.js";
 
 /**
- * Same query, against `/analytics/endpoints/logs.all` with a 1-hour window.
- * The `logs` stream endpoint the shared helper uses answered "Backend error!
- * Retry your query." to every query in the first S18 run while `logs.all`
- * answered the identical SQL by hand; both are tried, logs.all first.
+ * Reads go to the unified `/analytics/endpoints/logs` (ClickHouse dialect)
+ * with a 1-hour window. `logs.all` answers 410 since 2026-09-23, so the
+ * BigQuery `cross join unnest(metadata)` form S18 used until then is gone:
+ * nested fields are flat string keys of the `log_attributes` map, the
+ * per-source table is `where source = 'edge_logs'`, and a key a row lacks
+ * reads as the empty string. The endpoint refuses a query with HTTP 200 and
+ * an `error` field, so findInLogs still tries the rich (attribute) query
+ * first and falls back to the message-text query.
  */
 async function logsQuery(ctx: Ctx, sqlText: string, windowHours = 1) {
-  const r = await logsAllQuery(ctx, sqlText, windowHours);
-  if (!r.error) return { status: r.status, rows: r.rows as Record<string, unknown>[], error: "" };
-  const alt = await logsQueryStream(ctx, sqlText, windowHours);
-  return { status: alt.status, rows: alt.rows as Record<string, unknown>[], error: `logs.all: ${r.error.slice(0, 120)}; logs: ${alt.error}` };
+  const r = await logsQueryUnified(ctx, sqlText, windowHours);
+  return { status: r.status, rows: r.rows as Record<string, unknown>[], error: r.error };
 }
 import { fetchKeys, httpBody, errCode, waitFor } from "../lib/sec.js";
 
@@ -54,17 +56,23 @@ async function findInLogs(ctx: Ctx, rich: string, simple: string, timeoutMs: num
   const t0 = Date.now();
   let via = "rich";
   let err = "";
+  let polls = 0;
+  let last = "";
   while (Date.now() - t0 < timeoutMs) {
+    polls++;
+    const q0 = Date.now();
     let r = await logsQuery(ctx, via === "rich" ? rich : simple, 1);
     if (r.error && via === "rich") {
       err = r.error;
       via = "simple";
       r = await logsQuery(ctx, simple, 1);
     }
+    last = `last poll HTTP ${r.status}, ${r.rows.length} rows, ${Date.now() - q0} ms${r.error ? `, error ${r.error.slice(0, 80)}` : ""}`;
     if (r.rows.length > 0) return { found: true, lagS: Math.round((Date.now() - t0) / 1000), row: r.rows[0], via, err };
     await new Promise((res) => setTimeout(res, 10_000));
   }
-  return { found: false, lagS: Math.round((Date.now() - t0) / 1000), via, err };
+  // A not-found names its poll count and last response: "empty for N polls" and "the endpoint never answered" read differently.
+  return { found: false, lagS: Math.round((Date.now() - t0) / 1000), via, err: `${err ? `${err}; ` : ""}${polls} polls, ${last}` };
 }
 
 function psqlAttempt(connstr: string): string {
@@ -105,8 +113,8 @@ const mod: TestModule = {
       const rest = await httpBody(`https://${ctx.apiHost}/rest/v1/sec18_${n1}?select=id`, { key: keys.anonJwt });
       const restLog = await findInLogs(
         ctx,
-        `select id, timestamp, r.method, r.path, h.cf_connecting_ip, h.x_real_ip from edge_logs cross join unnest(metadata) as m cross join unnest(m.request) as r cross join unnest(r.headers) as h where r.path like '%sec18_${n1}%' limit 3`,
-        `select id, timestamp, event_message from edge_logs where event_message like '%sec18_${n1}%' limit 3`,
+        `select timestamp, log_attributes['request.method'] as method, log_attributes['request.headers.cf_connecting_ip'] as cf_connecting_ip, log_attributes['request.headers.x_real_ip'] as x_real_ip from logs where source = 'edge_logs' and log_attributes['request.path'] like '%sec18_${n1}%' limit 3`,
+        `select timestamp, event_message from logs where source = 'edge_logs' and event_message like '%sec18_${n1}%' limit 3`,
         LOG_WAIT_MS,
       );
       const ipPresent = Boolean(restLog.row?.cf_connecting_ip || restLog.row?.x_real_ip);
@@ -125,8 +133,8 @@ const mod: TestModule = {
       const sto = await httpBody(`https://${ctx.apiHost}/storage/v1/bucket?sec18=${n2}`, { key: keys.serviceJwt });
       const stoLog = await findInLogs(
         ctx,
-        `select id, timestamp, r.method, r.url, h.cf_connecting_ip, h.x_real_ip from edge_logs cross join unnest(metadata) as m cross join unnest(m.request) as r cross join unnest(r.headers) as h where r.url like '%sec18=${n2}%' limit 3`,
-        `select id, timestamp, event_message from edge_logs where event_message like '%sec18=${n2}%' limit 3`,
+        `select timestamp, log_attributes['request.method'] as method, log_attributes['request.headers.cf_connecting_ip'] as cf_connecting_ip, log_attributes['request.headers.x_real_ip'] as x_real_ip from logs where source = 'edge_logs' and log_attributes['request.url'] like '%sec18=${n2}%' limit 3`,
+        `select timestamp, event_message from logs where source = 'edge_logs' and event_message like '%sec18=${n2}%' limit 3`,
         LOG_WAIT_MS,
       );
       out.push({
@@ -144,8 +152,8 @@ const mod: TestModule = {
       const bad = await httpBody(`https://${ctx.apiHost}/auth/v1/token?grant_type=password`, { method: "POST", key: keys.anonJwt, body: { email: `sec18-${n3}@example.com`, password: "not-the-password" } });
       const badLog = await findInLogs(
         ctx,
-        `select id, timestamp, event_message from auth_logs where event_message like '%"path":"/token"%' and event_message like '%"error_code":"invalid_credentials"%' order by timestamp desc limit 3`,
-        `select id, timestamp, event_message from auth_logs where event_message like '%"path":"/token"%' and event_message like '%"status":400%' order by timestamp desc limit 3`,
+        `select timestamp, event_message from logs where source = 'auth_logs' and event_message like '%"path":"/token"%' and event_message like '%"error_code":"invalid_credentials"%' order by timestamp desc limit 3`,
+        `select timestamp, event_message from logs where source = 'auth_logs' and event_message like '%"path":"/token"%' and event_message like '%"status":400%' order by timestamp desc limit 3`,
         AUTH_LOG_WAIT_MS,
       );
       const email = `sec18-ok-${n3}@example.com`;
@@ -173,8 +181,8 @@ const mod: TestModule = {
       }, 60_000, 5000);
       const okLog = await findInLogs(
         ctx,
-        `select id, timestamp, event_message from auth_logs where event_message like '%"action":"login"%' and event_message like '%${email}%' limit 3`,
-        `select id, timestamp, event_message from auth_logs where event_message like '%${email}%' limit 3`,
+        `select timestamp, event_message from logs where source = 'auth_logs' and event_message like '%"action":"login"%' and event_message like '%${email}%' limit 3`,
+        `select timestamp, event_message from logs where source = 'auth_logs' and event_message like '%${email}%' limit 3`,
         AUTH_LOG_WAIT_MS,
       );
       out.push({
