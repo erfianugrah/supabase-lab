@@ -1,0 +1,74 @@
+# Destination side of the pipelines lab: a DuckLake catalog (Postgres) and an
+# S3-compatible object store (VersityGW (POSIX backend)), plus the open-source Supabase ETL
+# replicator that feeds them from a Supabase project.
+#
+# Nothing here is the managed Pipelines service. The replicator image is the
+# open-source engine the managed product documents it runs
+# (https://supabase.com/docs/guides/database/replication/pipelines); the image
+# tag is pinned by the lab so a run names the exact build it measured.
+#
+# Secrets arrive by environment passthrough (no value in this file):
+#   APP_PIPELINE__PG_CONNECTION__PASSWORD   source database password
+#   PL_CATALOG_PASSWORD, PL_S3_KEY, PL_S3_SECRET   throwaway local values
+name: pl
+services:
+  catalog:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: etl
+      POSTGRES_PASSWORD: ${PL_CATALOG_PASSWORD}
+      POSTGRES_DB: ducklake_catalog
+    ports:
+      - "127.0.0.1:55432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U etl -d ducklake_catalog"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  s3:
+    image: ghcr.io/versity/versitygw:latest
+    command: posix /data
+    volumes:
+      - s3data:/data
+    environment:
+      ROOT_ACCESS_KEY_ID: ${PL_S3_KEY}
+      ROOT_SECRET_ACCESS_KEY: ${PL_S3_SECRET}
+    ports:
+      - "127.0.0.1:59000:7070"
+
+  bucket:
+    image: amazon/aws-cli:latest
+    depends_on:
+      - s3
+    environment:
+      AWS_ACCESS_KEY_ID: ${PL_S3_KEY}
+      AWS_SECRET_ACCESS_KEY: ${PL_S3_SECRET}
+      AWS_DEFAULT_REGION: us-east-1
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - for i in $$(seq 1 60); do aws --endpoint-url http://s3:7070 s3api head-bucket --bucket ducklake && exit 0; aws --endpoint-url http://s3:7070 s3 mb s3://ducklake && exit 0; sleep 2; done; exit 1
+
+  replicator:
+    image: public.ecr.aws/supabase/etl-replicator:${PL_REPLICATOR_TAG}
+    profiles: ["replicator"]
+    # The laptop's resolver intermittently failed on the project host for 30 s or more.
+    dns: ["1.1.1.1", "8.8.8.8"]
+    depends_on:
+      catalog:
+        condition: service_healthy
+      bucket:
+        condition: service_completed_successfully
+    environment:
+      APP_CONFIG_DIR: /config
+      APP_ENVIRONMENT: dev
+      APP_PIPELINE__PG_CONNECTION__PASSWORD:
+      APP_PIPELINE__STORE_PG_CONNECTION__PASSWORD:
+      APP_DESTINATION__DUCKLAKE__CATALOG_URL: postgres://etl:${PL_CATALOG_PASSWORD}@catalog:5432/ducklake_catalog
+      APP_DESTINATION__DUCKLAKE__S3_ACCESS_KEY_ID: ${PL_S3_KEY}
+      APP_DESTINATION__DUCKLAKE__S3_SECRET_ACCESS_KEY: ${PL_S3_SECRET}
+    volumes:
+      - ./.run/replicator:/config:ro
+
+volumes:
+  s3data:
