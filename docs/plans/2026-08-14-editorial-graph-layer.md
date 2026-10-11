@@ -1,5 +1,7 @@
 # editorial graph layer: AU patterns, ABN keys, and the time axis
 
+> **STATUS 2026-10-11: SHIPPED** in 955bcd3 (2026-08-14); loop outcomes and demo-readiness status in 8058e77. The banner below is the original one, kept for history.
+>
 > **STATUS 2026-08-14: IN PROGRESS.** Implements Tracks E1/E3 (extraction
 > side), F2 and F3 of `2026-08-14-pdf-corpus-graph-demo-readiness.md` against
 > the live rebuilt project. Companion loop plan:
