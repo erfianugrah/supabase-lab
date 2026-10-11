@@ -574,8 +574,10 @@ each user's auth rows". Findings and artifacts in RUNLOG.md; out/2026-09-25/.
 - **The upgrade window is not measurable on a throwaway project** (F06). A newly
   created project comes up already at the latest app version - `eligible: false`,
   current == latest, no targets - and `postgres_engine` / `release_channel` on
-  `POST /v1/projects` are both DEPRECATED and typed null, so an older one cannot
-  be requested. Measuring a real client-visible upgrade window means upgrading
+  `POST /v1/projects` are both DEPRECATED and typed null in the OpenAPI
+  document. That does not make the field inert: orioledb OR01 (2026-10-10) sent
+  `postgres_engine: "17-oriole"` and it was accepted and applied. Requesting an
+  older Postgres major through it was not tried. Measuring a real client-visible upgrade window means upgrading
   something real. That is the structural reason the "upgrades take hours" claim
   stays unquantified.
 - What IS free: `duration_estimate_hours` in the eligibility payload. Observed
@@ -1449,9 +1451,12 @@ history.
   refuses, down the LinkAccount and AccountExists paths, and get sessions),
   its payload carries `user.user_metadata.custom_claims.transfer_sub` and
   `user.email`, and a refusal leaves 0 `auth.users` rows behind - unlike
-  IT01e's unverified-email refusal. Not probed: the managed platform's hook
-  config surface (`hook_before_user_created_enabled` / `_uri` / `_secrets` are
-  read off the published Management API document; IT02 and IT03 are the
+  IT01e's unverified-email refusal. The managed hook config surface
+  (`hook_before_user_created_enabled` / `_uri` / `_secrets`) was driven on a
+  managed Micro project by security-lockdown S19d (2026-09-03): a
+  Postgres-function hook rejected a blocked domain with its own 400 text,
+  active 5 s after the PATCH. Not probed on managed: whether the hook arms on
+  CreateAccount only, as on self-hosted v2.197.0 (IT02 and IT03 are the
   managed-vantage modules and have NOT been run).
 
 ## experiments/audit-integrity - key facts (validated 2026-09-08, micro x2 on Pro + Team orgs; entitlements and members read on Free + Pro + Team)
@@ -1831,7 +1836,10 @@ Redacted artifacts: `out/2026-09-30/`. Details: RUNLOG.md.
 - **Enabling the IPv4 add-on left `db.<ref>.supabase.co` with no record for
   more than 10 minutes from this resolver** (AAAA withdrawn, A not yet
   visible, `getaddrinfo ENOTFOUND` for 217 samples at 500 ms), then an A at
-  TTL 30. Shared pooler and REST: 0 failed samples through it (MS02).
+  TTL 30. Shared pooler and REST: 0 failed samples through it (MS02). One
+  observation (600 s window, A seen about 11 min after the PATCH); pooler-checkout
+  on 2026-10-10 saw the A record 80 s after the PATCH in both runs, so quote
+  both and do not promise either.
   Negative caching at the vantage not ruled out.
 - **A network restriction presents differently per path** (MS03): Supavisor
   refuses at 2.7-3.3 s with `(EADDRNOTALLOWED) address not in tenant
@@ -2638,11 +2646,12 @@ ignored `evidence/`; none published to `out/`. Details: RUNLOG.md.
   pool is exhausted:** 49 to 70 ms from the primary's failure to the fallback's
   answer (PC02a), 56 to 117 ms after the server's own 60 s error (PC02c). The
   session client was an extra backend: 17 active `pg_sleep` backends with 16
-  transaction-mode holders plus one session client (PC02h), against the docs'
-  combined-pool wording. Direct 5432 is unreachable from an IPv4-only client
+  transaction-mode holders plus one session client (PC02h); no documented
+  combined limit was found to compare it with (RUNLOG PC02h, n=1). Direct 5432 is unreachable from an IPv4-only client
   without the add-on (`ENOTFOUND`, 6 of 6); with the add-on on, the dedicated
   pooler and direct answered 126 to 168 ms after the failure. The add-on took
-  80 s (both runs) from the PATCH to an IPv4 address on this resolver.
+  80 s (both runs) from the PATCH to an IPv4 address on this resolver
+  (medium-serverless MS02 on 2026-09-30 saw no record for about 11 min).
 - **Driver pools evict reset connections; the retry has to wait.** Through a
   toxiproxy reset or cut, node-postgres, postgres.js and Prisma had 0 failed
   first attempts after the fault cleared (111 non-crashed runs). A retry-once
