@@ -2,7 +2,8 @@
 
 Chronological record of what was run. Org slugs and project refs are not
 recorded; the org class is (a Pro-plan organization). Published artifacts
-(refs, hostnames and the vantage address redacted) are in `out/2026-10-10/`;
+(refs, hostnames and the vantage address redacted) are in `out/2026-10-10/`
+(SS01, SS02) and `out/2026-10-12/` (SS03 to SS07);
 the file names below are those artifacts' names, and each cell cites a module
 id. Pin the citations to the lab commit that adds this directory.
 
@@ -278,3 +279,500 @@ scouting project were deleted by hand. `GET /v1/projects` after the last run
 listed no project with the prefix; that sweep output is not attached here. One
 AWS control attempt used a credential pair that Amazon S3 answered with
 `InvalidAccessKeyId`; no AWS resource was created.
+
+## 2026-10-12 - SS03 to SS07 (managed Pro project in ap-southeast-1; local self-hosted stack)
+
+Claims under test come from public sources only:
+https://supabase.com/docs/guides/storage/s3/compatibility (the S3 feature
+table), https://supabase.com/docs/guides/storage/uploads/resumable-uploads,
+https://supabase.com/docs/guides/storage/uploads/file-limits and the Storage
+server source at https://github.com/supabase/storage. "Docs" below means
+those pages as fetched on 2026-10-12.
+
+One module, `SS03`, runs the SS03, SS04 and SS05 rows of PLAN.md on one target
+per run, with the same row ids and measurement keys on every target. SS06 is
+the row-by-row diff of those runs; SS07 is read only. Published artifacts are
+in `out/2026-10-12/`:
+
+| artifact | target | storage server | module |
+|---|---|---|---|
+| `run-2026-10-12T08-47-30-825Z` | managed, run 2 (primary) | 1.80.2 | SS03 |
+| `run-2026-10-12T08-01-48-370Z` | managed, run 1: SUPERSEDED by run 2 (harness bug, see below); kept, not cited | 1.80.2 | SS03 |
+| `run-2026-10-12T07-49-15-587Z` | self-hosted, file backend, default bind mount (preflight only) | 1.74.0 | SS03 |
+| `run-2026-10-12T08-46-52-828Z` | `sh-file@v1.74.0` | 1.74.0 | SS03 |
+| `run-2026-10-12T09-03-10-608Z` | `sh-s3@v1.74.0` | 1.74.0 | SS03 |
+| `run-2026-10-12T08-57-25-340Z` | `sh-file@v1.80.2` | 1.80.2 | SS03 |
+| `run-2026-10-12T08-52-50-926Z` | `sh-s3@v1.80.2` | 1.80.2 | SS03 |
+| `run-2026-10-12T09-28-56-937Z` | diff of managed run 2, `sh-file@v1.74.0`, `sh-s3@v1.74.0`, `sh-file@v1.80.2`, `sh-s3@v1.80.2` | - | SS06 |
+| `run-2026-10-12T07-49-33-833Z` | Management API, Pro org | - | SS07 |
+| `run-2026-10-12T10-15-37-476Z` | managed, run 4: SS03d and SS03k only, fresh key per path and host (primary for those rows) | 1.80.2 | SS03 |
+| `run-2026-10-12T09-35-13-830Z` | managed, run 3: same rows, partial (lost DNS near the end) | 1.80.2 | SS03 |
+| `run-2026-10-12T09-36-10-805Z` | `sh-s3@v1.80.2`, same rows, control for run 4 | 1.80.2 | SS03 |
+
+Shape: managed - one project per run, `ss-ss03-<epoch>`, created and deleted
+by the module (teardown DELETE 200 in runs 1, 2 and 4; run 3 see Cleanup);
+two hosts, the gateway `<ref>.supabase.co` and the direct storage host
+`<ref>.storage.supabase.co`; S3 auth in the session-token form with the
+service_role JWT. Self-hosted - the self-hosted-defaults rig at its pinned
+supabase/supabase commit, one fresh stack per run, one host (the Envoy
+gateway, addressed as `localhost:8000`), S3 auth with the stack's
+`S3_PROTOCOL_ACCESS_KEY_ID` / `_SECRET`. The kind label is
+`sh-<STORAGE_BACKEND>@<storage image tag>`, read from the running container;
+the v1.80.2 variants use the rig's `storage-image` layer, so the version
+effect can be told from the backend effect. Client: the AWS SDK for
+JavaScript v3 and tus-js-client 4.3.1 (versions in `canary/bun.lock`), under
+Node, from one laptop vantage. Fixtures from fixed seeds: `big` 2 GiB (128
+parts of 16 MiB), `mid` 64 MiB, a gzip stream of 256 MiB of random bytes, and a
+64x64 PNG.
+
+Operator notes (not artifact-backed). Development runs between 07:45 and 09:03
+UTC are not cited; they found the harness bugs fixed before the cited runs (a
+2 GiB body hashed in one call, TUS dispatch, the error-cell format). Managed
+run 1 (`run-2026-10-12T08-01-48-370Z`) is superseded: it started before the
+first of those fixes reached `canary/battery.ts`, and the harness hashed a whole
+2 GiB response in one buffer, so its SS03c stops after `big_rest_multi` with
+`battery_error` (RangeError); its SS03i and SS05d cells use the older format.
+Every managed figure below is from run 2 (`run-2026-10-12T08-47-30-825Z`),
+except the cache-state and timing cells of SS03d and SS03k, which are from the
+fresh-key re-run (run 4, `run-2026-10-12T10-15-37-476Z`).
+Run 1 is kept in `out/` unchanged except for one local path in that stack
+trace, redacted to `<lab>/`. One `sh-file@v1.74.0`
+development run answered the 64 MiB PutObject at the default limit with 413
+`EntityTooLarge`; the cited run got a 503 from Envoy for the same request (see
+SS03i), so that cell is not stable.
+
+### Self-hosted rig: what had to change to run the battery at all
+
+| finding | measured | where |
+|---|---|---|
+| File backend on the default `./volumes/storage` bind mount, Docker Desktop for macOS | 1 KiB upload: S3 `500 InternalError`, REST `500 ... "The file system does not support extended attributes or has the feature disabled."` | SS03_target in `run-2026-10-12T07-49-15-587Z` (`preflight_s3_put_1KiB`, `preflight_rest_post_1KiB`) |
+| S3 ListBuckets at `http://127.0.0.1:8000` vs at the host of `SUPABASE_PUBLIC_URL` (`localhost:8000`) | `403 SignatureDoesNotMatch` vs `200 ok` | SS03_target, every self-hosted run |
+
+The file backend stores object metadata in extended attributes (the stack
+trace names `fs-xattr`), so the cited `sh-file` runs put the data directory on
+a named Docker volume (the rig's `storage-volume` layer). The Storage server
+verifies SigV4 against the host of `STORAGE_PUBLIC_URL` when one is set
+(https://github.com/supabase/storage/blob/v1.74.0/src/storage/protocols/s3/signature-v4.ts,
+the `publicUrl` branch), so a client must use exactly that host. The
+`sh-s3` runs keep MinIO's data on a bind mount (`minio-hostdir` layer): on the
+default named volume, MinIO answered 507 `XMinioStorageFull` ("minimum free
+drive threshold") partway through a run on this machine's Docker disk
+(operator note; a development run). The upload limit is hard-coded in the
+pinned `docker-compose.yml` (`FILE_SIZE_LIMIT: 52428800`), so the module
+raises it with the `storage-limit` layer rather than an `.env` entry.
+
+### SS03_target and SS03i - default limit, then raised
+
+| item | managed | self-hosted |
+|---|---|---|
+| default limit | `default_file_size_limit` 52428800 (Management API storage config) | 52428800 (container env) |
+| S3 protocol default | `default_s3_protocol_enabled` true | - |
+| raise | `PATCH 200; fileSizeLimit now 10737418240`; a 64 MiB PutObject succeeded after `8s` (run 2) | `compose exit 0; FILE_SIZE_LIMIT now 10737418240`, `1s` |
+
+At the default limit, a 64 MiB upload (SS03i, managed run 2 then `sh-s3@v1.80.2`):
+
+| request | managed | self-hosted |
+|---|---|---|
+| S3 PutObject | `413 ct=text/plain code=EntityTooLarge` | `413 ct=application/xml code=EntityTooLarge` (`sh-file@v1.74.0`: `503 ct=text/plain code=- message=upstream connect error or disconnect/reset before headers`) |
+| REST POST | `400 ct=application/json code=EntityTooLarge body.statusCode=413` | same |
+| multipart, four 16 MiB parts | `part 4: 413 EntityTooLarge`: parts are refused once the running total passes the limit | same on every self-hosted run except `sh-file@v1.74.0` (`part 4: 503`) |
+
+### SS03a, SS03b, SS03j - multipart of `big`
+
+| row | managed | self-hosted (all four) |
+|---|---|---|
+| per-part ETag equals the local part MD5 | `128/128` | `128/128` |
+| ListParts after 40 parts | `200 count=40 etags_match=40` | same |
+| client process exits after 40 parts; a new process | ListMultipartUploads finds it (`true`), ListParts `40`, uploads `88` more, CompleteMultipartUpload `200 ok` | same |
+| SHA-256 of a full GET equals the fixture | `true`, `get_bytes` 2147483648 | `true` |
+| final ETag | `aws-multipart (md5 of part md5s, -128)` | `sh-s3@*`: the same; `sh-file@*`: `md5-of-object` |
+| AbortMultipartUpload | ListParts after: `404 NoSuchUpload`; not in ListMultipartUploads | same |
+| wall time (SS03j, info) | upload `208.3` s to the direct host, download `58.1` s from the gateway | local, not comparable |
+
+The ETag form follows the backend, not the version. The same split shows on
+single uploads: `mid_put_etag` (one 64 MiB PutObject with a known length) is
+`"b5d87668321e5b89a5adfed51e705c60-4"` on managed and `sh-s3`, the object MD5
+on `sh-file`, and an unknown-length PutObject (chunked transfer encoding,
+SS03g `put_unknown_length_etag`) gives `md5-dash-4` on managed and `sh-s3`.
+Docs make no statement about ETag form.
+
+### SS03c, SS03d - range reads
+
+Single ranges (first 1 KiB, a 4 KiB middle range, suffix `-1024`, open
+`N-`) returned 206 with the right `Content-Range` and bytes (`hash=ok`) on
+`mid` and `big`, on S3 and REST, on every target. The rows that differ (SS06-SS03c):
+
+| request | managed | sh-file 1.74.0 / 1.80.2 | sh-s3 1.74.0 / 1.80.2 |
+|---|---|---|---|
+| `Accept-Ranges` on S3 HeadObject and GetObject | `absent` | `absent` | `absent` |
+| `Accept-Ranges` on REST 206 | `ar=-` | `ar=bytes` | `ar=bytes` |
+| past EOF, S3 | `416 InvalidRange` | `416 InvalidRange` | `416 S3Error` / `416 InvalidRange` |
+| past EOF, REST | `416 cr=bytes */67108864 cl=0` | `416` JSON | `500` JSON / `416` JSON |
+| `bytes=0-9,20-29`, S3 | `200` whole object | `416 InvalidRange` | `200` whole object |
+| `bytes=0-9,20-29`, REST | `206 ct=multipart/byteranges` | `416` | `200` whole object |
+| `Bytes=0-9` (mixed-case unit), S3 | `200` whole object | `416` / `206 cr=bytes 0-9` | `200` whole object |
+| `Bytes=0-9`, REST | `206 cr=bytes 0-9` | `416` / `206 cr=bytes 0-9` | `200` whole object |
+
+On managed the REST answer to a multi-range or a mixed-case unit differs from
+the S3 answer on the same object; the origin answers both like `sh-s3`, so the
+multipart/byteranges body and the case-insensitive unit come from the layer in
+front (inference: the CDN serves REST reads, not S3; see SS03d). A client that
+sends a multi-range request to S3 GetObject on managed or `sh-s3` receives the
+whole object with status 200, 2 GiB in the `big` case.
+
+SS03d, one 1 KiB range at offset 1 MiB through every read path and host. The
+first design (runs 1 and 2) read objects that SS03c had already read through
+`/object/authenticated`, so its "first" reads were not cold (`HIT` on several);
+those SS03d cells are superseded for cache state. The re-run gives every path
+and host its own server-side copy of the object (`CopyObject` to a fresh key,
+deleted after its two reads), so the first read is the first request for that
+key anywhere: managed `run-2026-10-12T10-15-37-476Z` (rows SS03d and SS03k
+only, fresh project), with `run-2026-10-12T09-35-13-830Z` as a partial repeat
+(it lost DNS late in the run; two warming probes and six SS03k cells say
+`copy 0 TimeoutError` / `copy 0 Error`), and `sh-s3@v1.80.2` as the control
+(`run-2026-10-12T09-36-10-805Z`).
+
+Every read returned `206` with the right bytes on every target and host. Cache
+state on managed, run 4, `mid` and `big` alike:
+
+| path | first read (fresh key) | repeat read |
+|---|---|---|
+| S3 presigned GET | `cf=DYNAMIC` | `cf=DYNAMIC` |
+| signed URL | `cf=MISS` | `cf=REVALIDATED` |
+| `/object/public` | `cf=MISS` | `cf=HIT` |
+| `/object/authenticated` | `cf=MISS` | `cf=HIT`, except `big_direct_auth_repeat` `cf=MISS` |
+
+Time for the 1 KiB range of `big` (`big_<host>_<path>_<read>_timing_ms`, time to
+the response headers and total, ms, run 4):
+
+| path | gateway, cold | gateway, repeat | direct, cold | direct, repeat |
+|---|---|---|---|---|
+| presigned | `ttfb=185 total=186` | `ttfb=160 total=160` | `ttfb=197 total=197` | `ttfb=158 total=159` |
+| signed URL | `ttfb=272 total=283` | `ttfb=111 total=111` | `ttfb=282 total=312` | `ttfb=109 total=110` |
+| public | `ttfb=389 total=395` | `ttfb=87 total=87` | `ttfb=319 total=330` | `ttfb=86 total=86` |
+| authenticated | `ttfb=1718 total=1728` | `ttfb=102 total=102` | `ttfb=337 total=363` | `ttfb=31521 total=31527` (`cf=MISS`) |
+
+A cold ranged read of the 2 GiB object answered within `ttfb=1718` ms on every
+path, while whole 2 GiB reads in SS03k took `ms=53064` to `ms=155110` from this
+vantage, so on a MISS the edge did not wait for the whole object before serving
+the range. One repeat read (`/object/authenticated` on the direct host) was a
+MISS that took `ttfb=31521` ms for 1 KiB; in run 3 the same cell was `cf=HIT`
+(`ttfb=116`).
+A wait of that size fits a request queued behind the edge filling the whole
+object into cache after the first MISS; that is inference from one sample, not
+a measured mechanism. The self-hosted control has no cache: every cold and
+repeat timing is 4 to 105 ms locally.
+
+Does a read through one path or host warm another (`warms_*`, fresh key per
+probe, `mid`, a public bucket):
+
+| first read, then | run 4 | run 3 |
+|---|---|---|
+| authenticated, then public, same host | `cf=MISS -> pub@gateway 206 cf=HIT` | not measured (copy timed out) |
+| public, then authenticated, same host | `cf=MISS -> auth@gateway 206 cf=HIT` | same |
+| authenticated, then signed URL, same host | `cf=MISS -> sign@gateway 206 cf=MISS` | not measured |
+| authenticated on the gateway, then on the direct host | `cf=MISS -> auth@direct 206 cf=MISS` | same |
+| public on the gateway, then on the direct host | `cf=MISS -> pub@direct 206 cf=MISS` | same |
+
+So `/object/public` and `/object/authenticated` share one cache entry per host
+for an object in a public bucket; signed URLs have their own entries, and the
+gateway and the direct storage host do not share. Not measured: the same
+probes on a private bucket. The S3 SDK cells do not record the header; the
+presigned S3 GET shows `DYNAMIC`. Docs list Range and PartNumber as supported
+on GetObject; Range is measured here, PartNumber in SS03g.
+
+### SS03e - conditional reads
+
+| request (1 MiB object) | managed S3 / presigned | managed signed, public, authenticated | self-hosted 1.74.0 (file, s3) | self-hosted 1.80.2 (file, s3) |
+|---|---|---|---|---|
+| GET `If-None-Match` = ETag | `304` | `304 cf=HIT` | `304` | `304` |
+| GET `If-Match` wrong | `412 PreconditionFailed` | `200 ... cf=HIT` | `200` | `412 PreconditionFailed` |
+| GET `If-Modified-Since` = Last-Modified | `304` | `304 cf=HIT` | file `200`, s3 `304` | `304` |
+| GET `If-Unmodified-Since` yesterday | `412 PreconditionFailed` | `200 ... cf=HIT` | `200` | `412 PreconditionFailed` |
+| GET other ETag + `If-Modified-Since` = Last-Modified | `200` | `200` | file `200`, s3 `304` | file `200`, s3 `304` |
+| HEAD, any of the above, S3 | `200` | - | `200` | `200` |
+| HEAD on the signed URL | - | `304` for If-None-Match and If-Modified-Since, `200` for If-Match wrong and If-Unmodified-Since, `cf=REVALIDATED` | If-None-Match `304`, If-Match and If-Unmodified-Since `200`; If-Modified-Since file `200`, s3 `304` | as GET: `412` for If-Match wrong and If-Unmodified-Since, `304` for If-None-Match and If-Modified-Since |
+| HEAD on public and authenticated | - | as the signed URL, `cf=REVALIDATED` | `200` for every condition | `200` for every condition |
+
+Cache state on managed when these were sent (run 2, quoted from the cells):
+the GET controls read signed URL `cf=MISS`, public `cf=MISS`, authenticated
+`cf=HIT` (the module reads the paths in the order S3, presigned, signed, public,
+authenticated, so the signed-URL and public reads of the same object came
+first; see the SS03d warming probes); every conditional GET after the control on those three paths shows
+`cf=HIT`, and every HEAD on them `cf=REVALIDATED`. So the managed column for
+the CDN paths is the CDN's answer for a cached object; S3 and presigned reads
+are `cf=DYNAMIC` (not cached), the origin's answer. The cold-cache case of a
+conditional read was not measured.
+
+RFC 9110 has If-None-Match override If-Modified-Since, so "other ETag +
+If-Modified-Since" should be 200; managed and the file backend give 200, the
+`sh-s3` targets 304. The `sh-s3` targets store objects in MinIO, and the
+Storage server passes conditional reads to its S3 backend, so `sh-s3` answers
+like this one (and If-Modified-Since `304` at 1.74.0) may be MinIO's behaviour
+rather than the Storage server's; read them as "self-hosted with MinIO", not as
+"self-hosted". Managed also uses an S3 backend and answers 200 here. S3 HeadObject ignored every conditional header on every
+target (docs list all four as supported on HeadObject).
+
+Ranged reads with a wrong `If-Match`, after two warming reads of the same range:
+
+| path | managed (run 2) | self-hosted 1.74.0 | self-hosted 1.80.2 |
+|---|---|---|---|
+| presigned S3 | `412 cf=DYNAMIC` | `206` | `412` |
+| signed URL, public, authenticated | `206 cf=HIT bytes=1024` | `206` | `412` |
+
+The overwrite case: read `cond-overwrite.bin` twice through
+`/object/authenticated` with a range, overwrite it through S3, then ask for the
+same range with `If-Match` set to the first version's ETag:
+
+| path | managed | self-hosted 1.74.0 | self-hosted 1.80.2 |
+|---|---|---|---|
+| `/object/authenticated` | `206 cf=HIT bytes=100 v1-bytes` | `206 ... v2-bytes` | `412` |
+| S3 GetObject | `412 PreconditionFailed` | `206 bytes=100 v2-bytes` | `412 PreconditionFailed` |
+| `/object/public` | `206 cf=MISS bytes=100 v2-bytes` | `206 ... v2-bytes` | `412` |
+
+On managed, `/object/authenticated` served the pre-overwrite bytes from the
+cache after the overwrite (the If-Match matched the cached copy), and the
+public URL, on a MISS, returned the new bytes with status 206 although they no
+longer match the If-Match ETag. The Storage server at 1.80.2 enforces If-Match
+on every path when reached directly (`sh-*@v1.80.2`); on managed only the S3
+paths, which the CDN does not cache (`DYNAMIC`), give the origin's answer. Same
+in run 1. Not measured: how long the stale copy stays served, and whether a
+different `Range` or a fresh signed URL avoids it.
+
+### SS03f - conditional writes
+
+Identical on every target (SS06-SS03f, 0 keys differ):
+
+| request on an existing key | measured |
+|---|---|
+| PutObject `If-None-Match: *` | `200 ok -> overwritten` |
+| PutObject `If-Match` stale ETag | `200 ok -> overwritten` |
+| CompleteMultipartUpload `If-None-Match: *` | `200 ok -> overwritten` |
+| CreateMultipartUpload `If-None-Match: *` | `200 upload id returned` |
+| UploadPartCopy `x-amz-copy-source-if-match` wrong | `200 ok etag=returned` |
+
+Docs mark UploadPartCopy's copy-source conditions unsupported and do not list
+conditional writes. Measured: the conditions are accepted and ignored, so an
+"only create if absent" or "only replace this version" PUT overwrites.
+
+### SS03g - checksums
+
+Identical on every target (SS06-SS03g, only `put_unknown_length_etag`
+differs):
+
+| request | measured |
+|---|---|
+| PutObject with `x-amz-checksum-sha256` correct / wrong | `200 ok ... -> stored` both; no checksum echoed |
+| PutObject `Content-MD5` correct / wrong | `200 ok ... -> stored` both |
+| PutObject `x-amz-checksum-crc32` wrong (header) | `200 ok ... -> stored` |
+| aws-chunked body with a trailing `x-amz-checksum-crc32`, correct / wrong | `200 ok -> stored` both |
+| SDK default (`x-amz-checksum-crc32` sent as a header for a buffer body) and `requestChecksumCalculation: WHEN_REQUIRED` | `200` both |
+| HeadObject / GetObject `ChecksumMode: ENABLED` | `200 sha256=absent crc32=absent` |
+| GetObjectAttributes | `200 ct=application/octet-stream bytes=262144 body=the object bytes (fell through to GetObject)` |
+| UploadPart with SHA-256 correct / wrong | `200 ok` both |
+| HEAD `?partNumber=1` on the 128-part object | `200 cl=2147483648` (the whole object, not part 1) |
+
+Docs mark Content-MD5 and the `x-amz-checksum-*` headers unsupported; measured,
+"unsupported" means accepted and not checked: a corrupted body with a correct
+client checksum would be stored. Docs list PartNumber as supported on GetObject;
+on HeadObject it returned the whole object's length.
+
+### SS03h - CORS
+
+| response | managed | self-hosted (Envoy) |
+|---|---|---|
+| preflight on S3, signed, public, authenticated paths | `200 allow-origin=*`, methods listed, requested headers echoed, `max-age=3600`, no expose list | `200 allow-origin=https://cors-probe.example`, `expose-headers=*` |
+| actual GET (S3, signed, public, authenticated) | `allow-origin=*`, `expose-headers=-`: ETag, Content-Range and x-amz-checksum not exposed | `expose-headers=*` |
+| S3 UploadPart response | `expose-headers=etag` | `expose-headers=*` |
+| PutBucketCors on a bucket name that does not exist | `200 ok; bucket exists afterwards: yes` (deleted again, 204) | same |
+| GetBucketCors, raw | `200 ListBucketResult body (routed to ListObjects)` | same |
+
+A browser on managed can read the ETag of an UploadPart response (what a
+browser multipart upload needs) but not the ETag or Content-Range of a GET.
+Docs mark PutBucketCors and GetBucketCors unsupported; measured, PutBucketCors
+creates a bucket and GetBucketCors lists objects. A wildcard
+`Access-Control-Expose-Headers` is not honoured by browsers on credentialed
+requests (Fetch standard), so the self-hosted `*` does not cover requests sent
+with cookies.
+
+### SS03i - error bodies (managed run 2; self-hosted in SS06-SS03i)
+
+| case | S3 | REST |
+|---|---|---|
+| missing key | `404 ct=text/plain code=NoSuchKey` | `400 ct=application/json code=NoSuchKey body.statusCode=404` |
+| missing bucket | `404 ct=text/plain code=NoSuchKey` | `400 ... code=NoSuchBucket body.statusCode=404` |
+| wrong secret / forged JWT | `403 ... code=SignatureDoesNotMatch` | `400 ... code=AccessDenied body.statusCode=403` |
+| key `100%.txt` | `400 ... code=InvalidKey` | `400 ... code=InvalidKey` |
+| range past EOF | `416 ... code=InvalidRange` | `416 ct=- code=-` (empty body) |
+
+S3 error bodies are XML served as `text/plain` on managed and as
+`application/xml` on every self-hosted target; a missing bucket answers
+`NoSuchKey` on S3 everywhere. REST errors carry HTTP 400 with the real status
+in the JSON body. `sh-s3@v1.74.0` answers a REST range past EOF with
+`500 ... code=InternalError` and an S3 one with `code=S3Error`; 1.80.2 gives 416
+`InvalidRange` on both.
+
+### SS03k - whole reads of a gzip-encoded object and of `big`
+
+The cited managed cells are from the fresh-key re-run
+(`run-2026-10-12T10-15-37-476Z`): each path and host reads its own server-side
+copy, first (cold) and repeat. Runs 1 and 2 read shared, already-warm keys; their
+SS03k cells agree on bytes and headers and are superseded for cache state.
+
+Every read of both objects, through presigned S3, signed URL, public URL and
+`/object/authenticated`, on both hosts, first and repeat, returned the stored
+bytes with the full length (`hash=stored-bytes`, `cl=268517089` for the gzip
+object, `cl=2147483648` for `big`) and no `transfer-encoding`: 16 of 16 cells per
+object in run 4, and the same on every self-hosted target (8 of 8). The
+requests sent `Accept-Encoding: gzip, deflate, br`. Cache state of the repeat
+whole read on managed, run 4:
+
+| path | gzip object, gateway / direct | `big`, gateway / direct |
+|---|---|---|
+| presigned | `DYNAMIC` / `DYNAMIC` | `DYNAMIC` / `DYNAMIC` |
+| signed URL | `MISS` / `MISS` | `MISS` / `HIT` |
+| public | `HIT` / `HIT` | `HIT` / `HIT` |
+| authenticated | `HIT` / `HIT` | `HIT` / `HIT` |
+
+The edge cached and served the 2 GiB object intact. Signed URLs re-fetched the
+whole object on three of four repeat reads; their ranged repeats in SS03d were
+`REVALIDATED`. The difference between targets is the header on the gzip object
+(stored through S3 PutObject with `ContentEncoding: gzip`):
+
+| target | `Content-Encoding` on every read of the gzip object |
+|---|---|
+| managed (1.80.2) | `ce=gzip` |
+| `sh-file@v1.80.2`, `sh-s3@v1.80.2` | `ce=gzip` |
+| `sh-file@v1.74.0`, `sh-s3@v1.74.0` | `ce=-` (absent) |
+
+So at 1.74.0 a gzip object is served as opaque bytes with no encoding header,
+and a browser would not decode it; at 1.80.2 the header comes back. Neither the
+edge nor the origin re-encoded or truncated anything. Not measured: objects
+past 2 GiB, CDN eviction, and a client that decodes (fetch, browsers), which
+would see the decompressed body as a client property.
+
+### SS03l - server-side encryption headers
+
+Identical on every target (SS06-SS03l, 0 keys differ):
+
+| request | measured |
+|---|---|
+| PutObject with SSE-C headers | `200 accepted sse_response_headers=none`; GET without the key `200 plaintext bytes returned` |
+| PutObject `x-amz-server-side-encryption: AES256` | `200 accepted`, GET returns the plaintext, no SSE header on HEAD |
+| PutObject `aws:kms` with a key id | `200 accepted`, same |
+| CreateMultipartUpload with each of the three | `200` (an upload id) |
+| GetBucketEncryption | `200 ListBucketResult body (routed to ListObjects)` |
+
+Docs mark SSE unsupported. Measured: the headers are accepted and silently
+ignored. A client that sets SSE-C believes the object needs its key; the object
+is readable without it. Nothing here says how the platform encrypts data at
+rest; that is not observable from the API.
+
+### SS04 - TUS
+
+| row | managed | self-hosted |
+|---|---|---|
+| `big`, 6 MiB chunks, SHA-256 of a GET (SS04a) | `true` (direct host) | `true` |
+| `mid` with 5, 6 and 8 MiB chunks | `completed, sha256 ok` all three | same |
+| SIGKILL after `20` chunks, resume from the stored URL in a new process (SS04b) | HEAD `200 upload-offset=125829120`, `completed, 322 more chunks` | same |
+| kill on the gateway after 2 chunks, resume on the direct host | `HEAD 200 offset=12582912; completed`, SHA-256 `true` | n/a (one host) |
+| TUS object through S3 (SS04c) | range `206`; ETag `md5-dash-342` | `sh-s3@*` `md5-dash-342`; `sh-file@*` `md5-of-object` |
+| `Upload-Expires` on the creation response (SS04d) | `present`, `24` hours | `sh-s3@*` `present`, `1` hour; `sh-file@*` `absent` |
+| TUS to an existing key without `x-upsert` | `refused: 409 The resource already exists` | same |
+
+Docs: chunk size "must be set to 6MB (for now) do not change it"; measured, 5
+and 8 MiB chunks completed with the right bytes on every target, n = 1 each.
+Docs: the upload URL is "valid for up to 24 hours"; managed reports 24 hours,
+self-hosted 1 hour with the s3 backend and no header with the file backend.
+Docs: an existing path gives "400 Asset Already Exists"; measured 409. The ETag
+of a TUS object counts the backend's parts (342, one per 6 MiB TUS chunk of the
+2 GiB object), so it does not match a multipart upload of the same bytes.
+
+### SS05 - a client-side encrypted object
+
+| row | measured (every target) |
+|---|---|
+| `mid` as AES-256-GCM, 4 MiB chunks (+16-byte tag), uploaded as `application/octet-stream` (SS05a) | chunk-aligned ranges 0, 7 and 15 via S3 and REST: `decrypts to the plaintext slice` |
+| `storage.objects.metadata` (SS05b) | keys `cacheControl,contentLength,eTag,httpStatusCode,lastModified,mimetype,size`; `user_metadata` `{}`; `cacheControl` `no-cache` |
+| image render on the ciphertext (SS05c) | managed `400 ... "The source image file is too large to process"`; self-hosted `400 ... "The source image is invalid or unsupported for rendering"`; PNG control `200 ct=image/png` everywhere |
+| upload with no content type, REST and S3, ciphertext and a PNG | stored mimetype `application/octet-stream` for all four: no sniffing |
+| owner-only RLS select policy (SS05d) | before the policy every user gets `400 ... NoSuchKey`; after it, the owner `206` (REST, managed `cf=MISS`) and S3 session token `206 ok`; the other user `400 cf=BYPASS` and S3 `404 NoSuchKey`; anon `400` |
+
+The server records size, type, ETag and cache settings only; nothing beyond
+what the client sent. The metadata ETag is `md5-dash-N` on managed and `sh-s3`,
+`32-hex` on `sh-file`. SS05d read the owner first; the other user's read right
+after it was not served from the cache (`BYPASS`). The residency-facts finding
+that a cached private object reaches a second user was a read of the same URL
+with no Range; this row used a 16-byte range and does not test that case.
+
+### SS06 - managed against self-hosted
+
+The `sh-s3` columns are the Storage server on MinIO. Where `sh-s3` differs
+from both managed and `sh-file` (If-Modified-Since precedence, a REST range
+past EOF at 1.74.0, whole-object answers to multi-range requests, the
+`S3Error` code), MinIO as the backing store is a candidate cause that these
+runs do not separate from the Storage server's own code; none of those rows is
+a statement about self-hosting in general.
+
+Versions: managed 1.80.2 (both runs); the pinned self-hosted compose file
+1.74.0; the image override 1.80.2. From `run-2026-10-12T09-28-56-937Z`, rows
+with a difference:
+
+| row | what differs | follows |
+|---|---|---|
+| SS03a, SS04c, SS05b, SS03g `put_unknown_length_etag` | ETag form | backend: managed = `sh-s3` |
+| SS03c | Accept-Ranges on REST, multi-range, mixed-case unit, past EOF | CDN on managed; backend and version on self-hosted |
+| SS03e | If-Match and If-Unmodified-Since | version (1.74.0 ignores them) and, on managed REST paths, the CDN |
+| SS03e | If-Modified-Since alone, and its precedence | backend (file 200, s3 304 at 1.74.0); the s3 rows may be MinIO's answers |
+| SS03e | HEAD conditionals on public and authenticated (managed answers 304 via the CDN; self-hosted 200 for every condition) | CDN |
+| SS03k | `Content-Encoding: gzip` returned or dropped | version (absent at 1.74.0) |
+| SS03h | ACAO `*` vs the Origin echoed, no expose list vs `*` | gateway (Cloudflare vs Envoy) |
+| SS03i | XML error content type; 500 on a REST range past EOF | gateway; `sh-s3@v1.74.0` |
+| SS04d | `Upload-Expires` 24 h / 1 h / absent | deployment configuration and backend |
+| SS05c | image render error text on the ciphertext | image service configuration |
+
+Same on every target: SS03b, SS03d (statuses and bytes), SS03f, SS03g
+(checksums), SS03k (bytes and Content-Length), SS03l, SS04a, SS04b, SS05a,
+SS05d.
+
+### SS07 - region catalogue and key-management API surface (read only)
+
+| item | measured |
+|---|---|
+| `GET /v1/projects/available-regions` for the Pro org | `200`; `specific_count` 17 (17 on 2026-08-20; that run did not record the codes); smart groups `americas,apac,emea`; provider `AWS` |
+| specific region codes | `ap-northeast-1,ap-northeast-2,ap-south-1,ap-southeast-1,ap-southeast-2,ca-central-1,eu-central-1,eu-central-2,eu-north-1,eu-west-1,eu-west-2,eu-west-3,sa-east-1,us-east-1,us-east-2,us-west-1,us-west-2` |
+| operations in the published OpenAPI document | `169` |
+| operations mentioning encryption, KMS, customer-managed or BYO keys | `1`: `PUT /v1/projects/{ref}/pgsodium` |
+| operations with "key" in the path | `14`: API keys and auth signing keys only |
+
+No published Management API operation configures storage or database
+encryption keys. That is "no published API surface", not "no such option".
+
+### Not measured (SS03 to SS07)
+
+- Repeat runs on self-hosted (n = 1 per variant) and more than two on managed.
+- Any region other than ap-southeast-1, any vantage other than one laptop;
+  SS03j and the SS03k `ms=` fields are single samples, not throughput.
+- Dashboard-generated S3 access keys on managed (no API creates them).
+- Objects past 2 GiB; parallel part uploads; TUS with concurrent clients on one URL.
+- How long a stale cached copy is served after an overwrite (SS03e), and
+  whether purge or a fresh signed URL changes it.
+- Self-hosted on Linux amd64; any gateway other than Envoy; the RustFS override.
+- Self-hosted file backend on the default bind mount past the failed preflight.
+- Whether deleted objects free MinIO space (the MinIO data directory still held
+  several GB after the module's deletes; operator note, not measured).
+- Contract and certification questions (encryption at rest, BAA, SLA).
+
+### Cleanup
+
+Four managed projects were created (runs 1 to 4). Runs 1, 2 and 4 deleted
+theirs in `finally` (teardown DELETE 200, `teardown_delete_status`). Run 3 lost
+DNS resolution for api.supabase.com at the end and its teardown returned -1;
+`make sweep` printed nothing at that point because the sweep's own request had
+failed silently, and a direct `GET /v1/projects` then listed the run 3 project,
+which was deleted by hand (DELETE 200). Two fixes followed: `teardown` in
+`lib.ts` retries thrown errors for about 10 minutes, and `make sweep` fails
+when the API call fails and prints a count. After run 4: `sweep: 0 ss-
+projects` (10:58 UTC). Operator notes; the sweep output is not an artifact. Each self-hosted stack was removed with `make clean` in
+self-hosted-defaults before the next variant and after the last. The fixtures
+in `evidence/fixtures/` were deleted with `make clean-fixtures`.

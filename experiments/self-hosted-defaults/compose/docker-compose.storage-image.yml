@@ -1,0 +1,7 @@
+# Run the Storage server at another published tag than the pinned compose
+# file's (supabase/storage-api on Docker Hub), so a version effect can be told
+# from a backend effect. Only applied when STORAGE_IMAGE_TAG is set
+# (`make up LAYERS=storage-image STORAGE_IMAGE_TAG=vX.Y.Z`).
+services:
+  storage:
+    image: supabase/storage-api:${STORAGE_IMAGE_TAG:?set STORAGE_IMAGE_TAG}
