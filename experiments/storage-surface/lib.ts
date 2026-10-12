@@ -6,6 +6,8 @@
  * project in `finally`. A project name always starts with `ss-` so a
  * sweep by prefix finds anything a crashed run left behind.
  */
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import pg from "pg";
 import type { Ctx } from "../../harness/src/types";
 import { mgmt } from "../../harness/src/mgmt";
@@ -93,8 +95,19 @@ export async function provision(ctx: Ctx, org: string, tag: string): Promise<Pro
 
 export async function teardown(ctx: Ctx, ref: string): Promise<number> {
   if (!ref) return 0;
-  const r = await mgmtRetry(ctx, "DELETE", `/projects/${ref}`);
-  return r.status;
+  // A network error here leaks a project (one SS03 run lost DNS for about a
+  // minute at the end and returned -1), so retry thrown errors as well as
+  // throttling, for up to about 10 minutes.
+  for (let i = 0; i < 20; i++) {
+    try {
+      const r = await mgmtRetry(ctx, "DELETE", `/projects/${ref}`);
+      if (r.status < 500 && r.status !== 0) return r.status;
+    } catch {
+      /* DNS / connection failure: try again */
+    }
+    await sleep(30_000);
+  }
+  return -1;
 }
 
 /** One SQL statement through the Management API (runs as postgres via pg-meta). */
@@ -247,4 +260,192 @@ export async function s3matrix(cfg: S3Cfg, bucket: string, restBase: string, res
   const r = await exec([runtime, "matrix.ts"], CANARY_DIR, JSON.stringify({ cfg, bucket, restBase, restKey }));
   if (r.code !== 0) throw new Error(`matrix.ts exited ${r.code}: ${r.err.slice(0, 400)}`);
   return JSON.parse(r.out);
+}
+
+// ---- SS03-SS05: one battery, three kinds of target ----
+//
+// The canary scripts (canary/upload.ts, canary/battery.ts) take a Target on
+// stdin and never learn whether it is a managed project or the local stack.
+// The module builds the Target: from a provisioned project, or from the
+// self-hosted rig described by ctx.endpoints (`stack_dir`, `gw`), the same
+// roles experiments/self-hosted-defaults uses.
+
+export interface Creds {
+  accessKeyId: string;
+  secretAccessKey: string;
+  sessionToken?: string;
+}
+export interface TargetHost {
+  name: "gateway" | "direct";
+  rest: string;
+  s3: string;
+}
+export interface Target {
+  kind: string;
+  managed: boolean;
+  hosts: TargetHost[];
+  region: string;
+  creds: Creds;
+  sessionKeyId: string;
+  anon: string;
+  service: string;
+  secrets: string[];
+}
+
+export function managedTarget(p: Proj): Target {
+  return {
+    kind: "managed",
+    managed: true,
+    hosts: [
+      { name: "gateway", rest: `${p.apiBase}/storage/v1`, s3: `${p.apiBase}/storage/v1/s3` },
+      { name: "direct", rest: `${p.storageHost}/storage/v1`, s3: `${p.storageHost}/storage/v1/s3` },
+    ],
+    region: REGION,
+    creds: { accessKeyId: p.ref, secretAccessKey: p.anon, sessionToken: p.service },
+    sessionKeyId: p.ref,
+    anon: p.anon,
+    service: p.service,
+    secrets: [p.anon, p.service, p.dbPass],
+  };
+}
+
+export interface Stack {
+  dir: string;
+  gw: string;
+  env: Record<string, string>;
+}
+
+/** The self-hosted rig from ctx.endpoints, or null when the run is not pointed at one. */
+export function stackOf(ctx: Ctx): Stack | null {
+  const dir = ctx.endpoints["stack_dir"] ?? "";
+  const gw = ctx.endpoints["gw"] ?? "";
+  if (!dir || !gw || !existsSync(join(dir, ".env"))) return null;
+  const env: Record<string, string> = {};
+  for (const line of readFileSync(join(dir, ".env"), "utf8").split("\n")) {
+    const m = line.match(/^([A-Z][A-Z0-9_]*)=(.*)$/);
+    if (m) env[m[1]!] = (m[2] ?? "").replace(/^(["'])(.*)\1$/, "$2");
+  }
+  return { dir, gw, env };
+}
+
+export async function shell(cmd: string[], env?: Record<string, string>, cwd?: string): Promise<{ code: number; out: string; err: string }> {
+  const p = Bun.spawn(cmd, { cwd, env: env ? { ...process.env, ...env } : undefined, stdout: "pipe", stderr: "pipe" });
+  const [out, err] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text()]);
+  return { code: await p.exited, out, err };
+}
+
+/** STORAGE_BACKEND, FILE_SIZE_LIMIT, image and compose files of the running storage container. */
+export async function storageContainer(): Promise<{ backend: string; limit: string; image: string; files: string[]; workdir: string } | null> {
+  const r = await shell(["docker", "inspect", "supabase-storage"]);
+  if (r.code !== 0) return null;
+  const info = JSON.parse(r.out)[0];
+  const env: Record<string, string> = {};
+  for (const kv of (info?.Config?.Env ?? []) as string[]) {
+    const i = kv.indexOf("=");
+    if (i > 0) env[kv.slice(0, i)] = kv.slice(i + 1);
+  }
+  const labels = (info?.Config?.Labels ?? {}) as Record<string, string>;
+  return {
+    backend: env.STORAGE_BACKEND ?? "",
+    limit: env.FILE_SIZE_LIMIT ?? "",
+    image: String(info?.Config?.Image ?? ""),
+    files: (labels["com.docker.compose.project.config_files"] ?? "").split(",").filter(Boolean),
+    workdir: labels["com.docker.compose.project.working_dir"] ?? "",
+  };
+}
+
+export function stackTarget(s: Stack, backend: string, image: string): Target {
+  const tag = image.split(":")[1] ?? "";
+  return {
+    kind: `sh-${backend}${tag ? `@${tag}` : ""}`,
+    managed: false,
+    hosts: [{ name: "gateway", rest: `${s.gw}/storage/v1`, s3: `${s.gw}/storage/v1/s3` }],
+    region: s.env.REGION ?? "stub",
+    creds: { accessKeyId: s.env.S3_PROTOCOL_ACCESS_KEY_ID ?? "", secretAccessKey: s.env.S3_PROTOCOL_ACCESS_KEY_SECRET ?? "" },
+    sessionKeyId: s.env.STORAGE_TENANT_ID ?? "stub",
+    anon: s.env.ANON_KEY ?? "",
+    service: s.env.SERVICE_ROLE_KEY ?? "",
+    secrets: Object.entries(s.env)
+      .filter(([k, v]) => /(PASSWORD|SECRET|KEY|TOKEN|JWT|JWKS)/i.test(k) && v.length >= 8)
+      .map(([, v]) => v),
+  };
+}
+
+/**
+ * Re-create the storage service with a raised FILE_SIZE_LIMIT, through the
+ * rig's storage-limit layer, keeping every compose file the running stack was
+ * started with (read from the container's compose label).
+ */
+export async function raiseStackLimit(limit: number): Promise<{ ok: boolean; detail: string }> {
+  const sc = await storageContainer();
+  if (!sc) return { ok: false, detail: "supabase-storage not running" };
+  const layer = new URL("../self-hosted-defaults/compose/docker-compose.storage-limit.yml", import.meta.url).pathname;
+  const files = [...sc.files.filter((f) => f !== layer), layer];
+  const tag = sc.image.split(":")[1] ?? "";
+  const args = ["docker", "compose", ...files.flatMap((f) => ["-f", f]), "up", "-d", "--wait", "--no-deps", "storage"];
+  const r = await shell(args, { STORAGE_FILE_SIZE_LIMIT: String(limit), STORAGE_IMAGE_TAG: tag }, sc.workdir);
+  const after = await storageContainer();
+  return { ok: r.code === 0 && after?.limit === String(limit), detail: `compose exit ${r.code}; FILE_SIZE_LIMIT now ${after?.limit ?? "?"}${r.code ? `; ${r.err.slice(-300)}` : ""}` };
+}
+
+/** psql as supabase_admin inside the stack's db container; rows as arrays of text. */
+export async function stackSql(query: string): Promise<{ ok: boolean; rows: string[][]; err: string }> {
+  const r = await shell(["docker", "exec", "supabase-db", "psql", "-U", "supabase_admin", "-d", "postgres", "-At", "-F", "\t", "-c", query]);
+  return { ok: r.code === 0, rows: r.out.split("\n").filter(Boolean).map((l) => l.split("\t")), err: r.err.trim().slice(0, 300) };
+}
+
+/** One canary command under Node; one JSON document back. */
+export async function canary<T = any>(script: string, input: unknown, timeoutMs = 3_600_000): Promise<T> {
+  await ensureCanaryDeps();
+  const proc = Bun.spawn(["node", script], { cwd: CANARY_DIR, stdin: new Blob([JSON.stringify(input)]), stdout: "pipe", stderr: "pipe" });
+  const timer = setTimeout(() => proc.kill("SIGKILL"), timeoutMs);
+  const [out, err] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text()]);
+  const code = await proc.exited;
+  clearTimeout(timer);
+  const last = out.trim().split("\n").at(-1) ?? "";
+  if (code !== 0 || !last) throw new Error(`${script} exited ${code}: ${err.slice(-400)}`);
+  return JSON.parse(last) as T;
+}
+
+/**
+ * A TUS upload in a child process that is SIGKILLed after `killAfter` chunks
+ * (0 = let it finish). Returns every JSON line the child printed.
+ */
+export async function tusChild(input: unknown, killAfter: number, timeoutMs = 3_600_000): Promise<{ lines: any[]; killed: boolean }> {
+  await ensureCanaryDeps();
+  const proc = Bun.spawn(["node", "upload.ts"], { cwd: CANARY_DIR, stdin: new Blob([JSON.stringify({ cmd: "tus", tus: input })]), stdout: "pipe", stderr: "pipe" });
+  const timer = setTimeout(() => proc.kill("SIGKILL"), timeoutMs);
+  const lines: any[] = [];
+  let killed = false;
+  const reader = proc.stdout.getReader();
+  const dec = new TextDecoder();
+  let buf = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    let i: number;
+    while ((i = buf.indexOf("\n")) >= 0) {
+      const l = buf.slice(0, i);
+      buf = buf.slice(i + 1);
+      try {
+        const j = JSON.parse(l);
+        lines.push(j);
+        if (killAfter > 0 && j.chunk >= killAfter && !killed) {
+          proc.kill("SIGKILL");
+          killed = true;
+        }
+      } catch {
+        /* not a JSON line */
+      }
+    }
+  }
+  await proc.exited;
+  clearTimeout(timer);
+  return { lines, killed };
+}
+
+/** Managed Storage config (Management API), raw JSON. */
+export async function storageConfig(ctx: Ctx, ref: string) {
+  return mgmtRetry(ctx, "GET", `/projects/${ref}/config/storage`);
 }

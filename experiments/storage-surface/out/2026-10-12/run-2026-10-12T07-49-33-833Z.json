@@ -1,0 +1,50 @@
+{
+  "startedAt": "2026-10-12T07:49:33.833Z",
+  "finishedAt": "2026-10-12T07:49:35.869Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "storage-surface",
+  "labCommit": "efbc422",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "SS07a",
+      "title": "SS07a: available regions for the Pro org",
+      "status": "info",
+      "detail": "HTTP 200; 17 specific regions (17 on 2026-08-20), 3 smart groups",
+      "measurements": {
+        "http": 200,
+        "specific_count": 17,
+        "specific_count_2026_08_20": 17,
+        "specific_codes": "ap-northeast-1,ap-northeast-2,ap-south-1,ap-southeast-1,ap-southeast-2,ca-central-1,eu-central-1,eu-central-2,eu-north-1,eu-west-1,eu-west-2,eu-west-3,sa-east-1,us-east-1,us-east-2,us-west-1,us-west-2",
+        "smart_group_codes": "americas,apac,emea",
+        "providers": "AWS",
+        "statuses": "-",
+        "recommendations_present": "true"
+      },
+      "durationMs": 2037
+    },
+    {
+      "id": "SS07b",
+      "title": "SS07b: key-management operations in the published OpenAPI document",
+      "status": "info",
+      "detail": "169 operations; 1 mention encryption / KMS / customer-managed keys; 14 have \"key\" in the path",
+      "measurements": {
+        "spec_http": 200,
+        "spec_version": "1.0.0",
+        "operations_total": 169,
+        "encryption_or_kms_operations": 1,
+        "encryption_or_kms_list": "PUT /v1/projects/{ref}/pgsodium",
+        "key_path_operations": 14,
+        "key_path_list": "GET /v1/projects/{ref}/api-keys; POST /v1/projects/{ref}/api-keys; GET /v1/projects/{ref}/api-keys/legacy; PUT /v1/projects/{ref}/api-keys/legacy; PATCH /v1/projects/{ref}/api-keys/{id}; GET /v1/projects/{ref}/api-keys/{id}; DELETE /v1/projects/{ref}/api-keys/{id}; POST /v1/projects/{ref}/config/auth/signing-keys/legacy; GET /v1/projects/{ref}/config/auth/signing-keys/legacy; POST /v1/projects/{ref}/config/auth/signing-keys; GET /v1/projects/{ref}/config/auth/signing-keys; GET /v1/projects/{ref}/config/auth/signing-keys/{id}; DELETE /v1/projects/{ref}/config/auth/signing-keys/{id}; PATCH /v1/projects/{ref}/config/auth/signing-keys/{id}"
+      },
+      "durationMs": 2037
+    }
+  ]
+}

@@ -15,6 +15,14 @@ ONLY ?= SD01,SD02,SD03,SD04,SD05,SD06,SD07,SD08
 # changed) and `up` writes db data under volumes/.
 COMPOSE := cd $(STACK) && docker compose
 
+# Extra compose layers for `up`, by name: an upstream override in docker/
+# (s3, logs, kong, ...) or one of this experiment's compose/ files
+# (storage-limit, storage-image, storage-volume, minio-hostdir).
+# `make up LAYERS="s3 minio-hostdir"`.
+# storage-surface SS03 uses this for its sh-file / sh-s3 targets.
+LAYERS ?=
+LAYER_FILES = $(foreach l,$(LAYERS),-f $(if $(wildcard compose/docker-compose.$(l).yml),$(abspath compose/docker-compose.$(l).yml),docker-compose.$(l).yml))
+
 .PHONY: fetch stack up probe logs down clean unit publish-evidence
 
 fetch:
@@ -37,7 +45,7 @@ stack: fetch
 
 up:
 	@test -f $(STACK)/.env || (echo "run 'make stack' first"; exit 1)
-	$(COMPOSE) up -d --wait
+	$(COMPOSE) -f docker-compose.yml $(LAYER_FILES) up -d --wait
 
 probe:
 	@test -f $(STACK)/.env || (echo "run 'make stack' first"; exit 1)
@@ -56,7 +64,7 @@ logs:
 # stack created, then drop the generated secrets. `down -v` leaves bind
 # mounts, so the data directories are removed by hand.
 down:
-	-$(COMPOSE) -f docker-compose.yml -f docker-compose.logs.yml -f docker-compose.kong.yml down -v --remove-orphans
+	-$(COMPOSE) -f docker-compose.yml -f docker-compose.logs.yml -f docker-compose.kong.yml -f docker-compose.s3.yml -f $(abspath compose/docker-compose.storage-volume.yml) down -v --remove-orphans
 	-rm -rf $(STACK)/volumes/db/data $(STACK)/volumes/storage
 
 clean: down

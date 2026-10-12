@@ -1,9 +1,11 @@
 # storage-surface
 
-Three Storage platform behaviours, measured on throwaway Pro-org projects
-(ap-southeast-1): the direct-SQL delete guard and what a SQL delete leaves
-behind, cursor versus offset listing, and the S3 endpoint's handling of
-special-character object keys.
+Storage platform behaviours, measured on throwaway Pro-org projects
+(ap-southeast-1) and, for SS03 to SS06, also on the local self-hosted stack:
+the direct-SQL delete guard and what a SQL delete leaves behind, cursor versus
+offset listing, the S3 endpoint's handling of special-character object keys,
+and the S3 / TUS contract on large and client-side encrypted objects, managed
+against self-hosted.
 
 Self-provisioning: each module creates a project named
 `ss-<tag>-<epoch>` through the Management API and deletes it in
@@ -25,6 +27,11 @@ https://supabase.com/docs/guides/storage/s3/authentication).
 | SS02f | Stored names equal the requested keys |
 | SS02g | PUT/GET/HEAD latency baseline |
 | SS02h | Wire control: request line the SDK sends and the path its signature covers |
+| SS03a-l | S3 contract on a 2 GiB object: multipart ETags and resume across processes, range reads on every read path and host, conditional reads and writes, checksums, CORS, error bodies, gzip-encoded and large objects through the CDN, SSE headers (one module, one target per run) |
+| SS04a-d | TUS resumable upload of the same object: chunk sizes, resume after SIGKILL from the stored URL (and on the other host), S3 read of the result, upload URL lifetime, `x-upsert` |
+| SS05a-d | A client-side AES-256-GCM object: chunk-aligned range reads decrypt, what `storage.objects` records, image render and content-type sniffing, an RLS policy on REST and on S3 with a user JWT |
+| SS06 | SS03-SS05 rows diffed across targets: managed, self-hosted `file` and `s3` (MinIO) backends, and self-hosted with the storage image at the managed version |
+| SS07a-b | Read only: the region catalogue for a Pro org; key-management operations in the published Management API OpenAPI document |
 
 ## Run
 
@@ -32,9 +39,26 @@ https://supabase.com/docs/guides/storage/s3/authentication).
 export PVLAB_ORG_PRO=<slug of a Pro org>
 sx SUPABASE_ACCESS_TOKEN -- make probe            # SS01 + SS02 (about 6 min)
 sx SUPABASE_ACCESS_TOKEN -- make probe MODS=SS02
+sx SUPABASE_ACCESS_TOKEN -- make probe MODS=SS03  # SS03-SS05 rows on a managed project (about 45 min; about 6 GB up and 40 GB down)
+sx SUPABASE_ACCESS_TOKEN -- make probe MODS=SS03 ROWS=SS03d,SS03k  # only those rows (setup and the uploads they read still run)
+make -C ../self-hosted-defaults clean stack up LAYERS=storage-volume       # sh-file
+make probe-sh                                      # the same rows on the self-hosted stack
+make -C ../self-hosted-defaults clean stack up LAYERS=s3                   # sh-s3 (MinIO)
+make -C ../self-hosted-defaults clean stack up LAYERS="s3 storage-image" STORAGE_IMAGE_TAG=v1.80.2
+make ss06 RUNS=out/<date>/run-a.json,out/<date>/run-b.json,...            # SS06 diff
+sx SUPABASE_ACCESS_TOKEN -- make probe MODS=SS07  # read only
+make clean-fixtures                                # the 2 GiB, 256 MiB and 64 MiB fixtures
 make sweep                                         # needs SUPABASE_ACCESS_TOKEN: lists leftovers
 make publish-evidence RUN=evidence/<ts>/run-<stamp>.json
 ```
+
+SS03 picks its target from the run context: with `PVLAB_ENDPOINT_STACK_DIR`
+and `PVLAB_ENDPOINT_GW` set (what `make probe-sh` does) it runs against the
+self-hosted rig of `experiments/self-hosted-defaults`; otherwise it creates a
+project. The canary scripts (`canary/upload.ts`, `canary/battery.ts`) are
+given the target on stdin and run under Node, so raw responses are read
+without fetch's decompression. Fixtures are generated from fixed seeds into
+the gitignored `evidence/fixtures/`.
 
 The harness runs from source here: the AWS SDK v3 is a dependency of this
 experiment only (`canary/package.json`), spawned as a child process, so the

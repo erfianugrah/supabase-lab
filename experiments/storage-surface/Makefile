@@ -5,29 +5,72 @@
 #   make probe                 # SS01 + SS02, one run each
 #   make probe MODS=SS02       # one module
 #   make sweep                 # list ss- projects left behind
+#   make probe MODS=SS03       # SS03-SS05 rows on a managed project
+#   make probe-sh              # the same rows on the local self-hosted stack (SS06 input)
+#   make probe MODS=SS03 ROWS=SS03d,SS03k   # only those rows (setup and uploads still run)
+#   make probe MODS=SS07       # read-only: region catalogue, key-management API surface
+#   make ss06 RUNS=a.json,b.json,c.json   # diff table from published run artifacts
+#   make clean-fixtures        # delete the 2 GiB / 64 MiB / 256 MiB fixtures
 #   make aws-control           # optional: dot-segment and double-slash keys against Amazon S3 (needs AWS credentials)
 #
 # Runs from source (bun harness/src/run.ts): the AWS SDK v3 lives in canary/
 # (own package.json), so it is not part of the compiled registry.
 ROOT := $(abspath ../..)
+comma := ,
 TS := $(shell date +%Y%m%d-%H%M%S)
 MODS ?= SS01,SS02
 
-.PHONY: probe sweep publish-evidence aws-control
+SH_RIG := $(ROOT)/experiments/self-hosted-defaults
+FIXTURES := evidence/fixtures
+.PHONY: probe probe-sh ss06 clean-fixtures sweep publish-evidence aws-control
 
 probe:
 	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "SUPABASE_ACCESS_TOKEN not set"; exit 1)
 	@test -n "$$PVLAB_ORG_PRO" || (echo "PVLAB_ORG_PRO not set (slug of a Pro org)"; exit 1)
 	@cd $(ROOT)/harness && bun scripts/gen-registry.ts >/dev/null
 	@mkdir -p evidence/$(TS)
-	@cd $(ROOT) && bun harness/src/run.ts --where local --experiment storage-surface \
+	@cd $(ROOT) && PVLAB_ENDPOINT_SS03_ROWS="$(ROWS)" bun harness/src/run.ts --where local --experiment storage-surface \
 		--only $(MODS) --destructive --out experiments/storage-surface/evidence/$(TS)
 	@echo "== evidence/$(TS) =="
 
+# SS03 against the self-hosted rig (bring it up first, e.g.
+# `make -C ../self-hosted-defaults stack up LAYERS=s3`). No PAT, no project.
+# The gateway is addressed as localhost, the host of the stack's
+# SUPABASE_PUBLIC_URL: the Storage server verifies S3 signatures against that
+# host, so 127.0.0.1 gets SignatureDoesNotMatch (SS03_target records both).
+probe-sh:
+	@test -f $(SH_RIG)/work/stack/.env || (echo "no rig: make -C ../self-hosted-defaults stack up [LAYERS=s3]"; exit 1)
+	@cd $(ROOT)/harness && bun scripts/gen-registry.ts >/dev/null
+	@mkdir -p evidence/$(TS)
+	@cd $(ROOT) && PVLAB_ENDPOINT_STACK_DIR="$(SH_RIG)/work/stack" PVLAB_ENDPOINT_GW="http://localhost:8000" PVLAB_ENDPOINT_SS03_ROWS="$(ROWS)" \
+		bun harness/src/run.ts --where local --experiment storage-surface \
+		--only SS03 --destructive --out experiments/storage-surface/evidence/$(TS)
+	@echo "== evidence/$(TS) =="
+
+# SS06: the row-by-row diff of SS03 runs (published artifacts, offline).
+#   make ss06 RUNS=out/<date>/run-a.json,out/<date>/run-b.json,...
+ss06:
+	@test -n "$(RUNS)" || (echo "RUNS=run1.json,run2.json,..."; exit 1)
+	@cd $(ROOT)/harness && bun scripts/gen-registry.ts >/dev/null
+	@mkdir -p evidence/$(TS)
+	@cd $(ROOT) && PVLAB_ENDPOINT_SS06_RUNS="$(foreach r,$(subst $(comma), ,$(RUNS)),$(abspath $(r)))" \
+		bun harness/src/run.ts --where local --experiment storage-surface \
+		--only SS06 --out experiments/storage-surface/evidence/$(TS)
+	@echo "== evidence/$(TS) =="
+
+# The fixture files by name (no recursive delete).
+clean-fixtures:
+	rm -f $(FIXTURES)/big.bin $(FIXTURES)/mid.bin $(FIXTURES)/gz.bin.gz $(FIXTURES)/solid.png $(FIXTURES)/manifest.json
+	-rmdir $(FIXTURES)
+
 # Orphan check: any project left behind by a crashed run carries this prefix.
+# Fails loudly when the API call fails: an empty list from a failed request
+# looked like a clean sweep once (2026-10-12).
 sweep:
-	@curl -s -H "Authorization: Bearer $$SUPABASE_ACCESS_TOKEN" https://api.supabase.com/v1/projects \
-		| jq -r '.[] | select(.name | startswith("ss-")) | .name'
+	@out=$$(curl -sSf -H "Authorization: Bearer $$SUPABASE_ACCESS_TOKEN" https://api.supabase.com/v1/projects) \
+		|| { echo "sweep: GET /v1/projects failed"; exit 1; }; \
+		echo "$$out" | jq -r '.[] | select(.name | startswith("ss-")) | "\(.name) \(.status)"'; \
+		echo "sweep: $$(echo "$$out" | jq '[.[] | select(.name | startswith("ss-"))] | length') ss- projects"
 
 # Redacted copy + facts into out/<date>/ (what the RUNLOG cites).
 #   make publish-evidence RUN=evidence/<ts>/run-<stamp>.json

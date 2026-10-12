@@ -1,0 +1,9 @@
+# Storage's global upload limit. docker-compose.yml hard-codes
+# FILE_SIZE_LIMIT: 52428800 (no variable), so an .env entry cannot raise it;
+# this override can. Unset, it keeps the pinned default. storage-surface SS03
+# records the refusal at the default first, then re-applies this layer with
+# STORAGE_FILE_SIZE_LIMIT set.
+services:
+  storage:
+    environment:
+      FILE_SIZE_LIMIT: ${STORAGE_FILE_SIZE_LIMIT:-52428800}
