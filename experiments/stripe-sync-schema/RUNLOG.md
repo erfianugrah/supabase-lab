@@ -9,8 +9,10 @@ many other fields are affected is still open, and nothing surfaces any of it.
 ## Status
 
 Scaffolded, not yet run against its own project. The mechanism is settled (see
-"The FDW is the control"); the SCOPE is not. `make seed` is a stub - the
-fixture matrix below is the next piece of work. Everything in **Prior
+"The FDW is the control"); the SCOPE is not. `make seed` exists
+(`seed/seed.ts`, 8fac68a) and covers most of the fixture matrix below; still
+missing are past_due, disputes and subscription_schedules, and the matrix has
+not been run on this experiment's own project (needs a Stripe test write key). Everything in **Prior
 observation** was measured on a pre-existing project and is what motivates the
 experiment; it is not a result of this experiment and is not sufficient on its
 own.
