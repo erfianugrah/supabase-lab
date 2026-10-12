@@ -1,0 +1,27 @@
+# client-keyed-objects: the per-target settings the self-hosted stack needs,
+# layered over the pinned docker-compose.yml (which is never edited apart from
+# the container_name / host-port rewrite in scripts/ck.ts that lets this
+# stack run next to another one).
+#
+#   storage   image pinned to the managed Storage version where published
+#             (CK_STORAGE_IMAGE); global upload limit raised (the pinned file
+#             hard-codes FILE_SIZE_LIMIT: 52428800, so .env cannot raise it)
+#   auth      custom access token hook, same URI as the managed config
+#   realtime  container_name is stripped, so keep the hostname Envoy routes to
+#   minio     (S3 backend only) data on a bind mount in the stack dir instead of
+#             a named volume, so 2 GiB objects land on the host disk rather
+#             than the Docker VM's (which a 58 GB VM can run out of)
+services:
+  storage:
+    image: ${CK_STORAGE_IMAGE:-supabase/storage-api:v1.74.0}
+    environment:
+      FILE_SIZE_LIMIT: ${CK_FILE_SIZE_LIMIT:-5368709120}
+  auth:
+    environment:
+      GOTRUE_HOOK_CUSTOM_ACCESS_TOKEN_ENABLED: "true"
+      GOTRUE_HOOK_CUSTOM_ACCESS_TOKEN_URI: pg-functions://postgres/app/custom_access_token_hook
+  realtime:
+    networks:
+      default:
+        aliases:
+          - realtime-dev.supabase-realtime

@@ -1,0 +1,7 @@
+# Layered after docker-compose.s3.yml for the S3-backend target only: MinIO
+# data in the stack dir (host disk), same container path as upstream: a
+# named volume lives on the Docker VM disk, which 2 GiB objects can fill.
+services:
+  minio:
+    volumes:
+      - ./volumes/minio:/data
