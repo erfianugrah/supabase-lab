@@ -1,0 +1,14 @@
+# Layered for the file-backend target only. The upstream ./volumes/storage
+# bind mount fails every upload on Docker Desktop for Mac ("The file system
+# does not support extended attributes": the file backend keeps object
+# metadata in xattrs), so the objects go to a named volume on the Docker VM
+# disk instead. Same container path as upstream.
+services:
+  storage:
+    volumes:
+      - storage-data:/var/lib/storage
+  imgproxy:
+    volumes:
+      - storage-data:/var/lib/storage
+volumes:
+  storage-data:
