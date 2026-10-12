@@ -2898,9 +2898,10 @@ not list the zone). Details: RUNLOG.md.
   returned new bytes despite the stale If-Match. Self-hosted 1.80.2 answers 412.
 - Ranges: single ranges are right everywhere; S3 GetObject has no
   `Accept-Ranges`; a multi-range or `Bytes=` (capital) request to S3 GetObject
-  returns the WHOLE object with 200 on managed and the s3 backend. Managed REST
-  answers multi-range with multipart/byteranges (the CDN). A REST range past
-  EOF is 500 on `sh-s3@v1.74.0`.
+  returns the WHOLE object with 200 on managed and the s3 backend (may be
+  MinIO's behaviour on the rig). Managed REST answers multi-range with
+  multipart/byteranges (CDN attribution inferred, not measured). A REST range
+  past EOF is 500 on `sh-s3@v1.74.0` (may be MinIO's behaviour).
 - CORS on managed: `Access-Control-Allow-Origin: *`, no
   Access-Control-Expose-Headers on GET responses (a browser cannot read ETag or
   Content-Range), `etag` exposed on UploadPart. Self-hosted Envoy echoes the
@@ -2923,7 +2924,8 @@ not list the zone). Details: RUNLOG.md.
   sniffing; image render refuses it (400); an owner-only RLS select policy holds
   on REST and on S3 with a user-JWT session token.
 - Self-hosted rig on macOS (operator facts): the file backend needs xattrs, so
-  the default `./volumes/storage` bind mount fails every upload (500 ENOTSUP;
+  the default `./volumes/storage` bind mount fails every upload (500
+  InternalError, "The file system does not support extended attributes";
   `storage-volume` layer); the server verifies SigV4 against the host of
   `STORAGE_PUBLIC_URL`, so `127.0.0.1:8000` gets SignatureDoesNotMatch where
   `localhost:8000` works; MinIO on a named volume hits its free-space threshold
@@ -3417,8 +3419,9 @@ partial rows: `experiments/client-keyed-objects/RUNLOG.md`; generated table
 - S3 multipart resume with a user session token needs a SELECT policy on
   `storage.s3_multipart_uploads_parts`: ListParts runs as the caller's role,
   the table has RLS and no policy, so without it ListParts returns no parts
-  and a client re-sends everything (first onprem run: 0 of 32 kept; with the
-  policy 13 of 32 on onprem and region-a). `supabase db push` as `postgres`
+  and a client re-sends everything (measured on onprem only, first run: 0 of
+  32 kept; the cause is a source read; managed without the policy was not
+  measured; with the policy 13 of 32 on onprem and region-a). `supabase db push` as `postgres`
   can create that policy on managed.
 - PostgREST accepts an expired token within its documented 30 s skew (200 at
   exp + 5 s), Auth does not (403); both refuse at exp + 45 s; same on managed
@@ -3444,8 +3447,10 @@ partial rows: `experiments/client-keyed-objects/RUNLOG.md`; generated table
   `./volumes/storage` bind mount fails every upload on Docker Desktop for Mac
   (file backend needs xattrs); PostgREST 14.17 once answered
   `PGRST303 JWT issued at future` to a fresh token (the client retries once).
-- Not measured: CK04 and CK06 on region-b (resume died during host sleep;
-  not re-run), CK04-CK06 on onprem-file (Docker VM disk), other vantages,
+- Not measured: CK04 and CK06 on region-b (the resume timed out while the
+  host was in maintenance sleep; cause not isolated, a platform cause is not
+  excluded; not re-run), CK04-CK06 on onprem-file (Docker VM disk), CK10 on
+  both self-hosted targets (needs two regions in one run), other vantages,
   repeat runs, Linux amd64.
 - Ops: own compose project `ck-<name>` on 8100/5532/6643 beside the
   self-hosted-defaults rig; `CK_SLOT=b` gives a second run dir, key service and
