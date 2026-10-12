@@ -2817,7 +2817,7 @@ not list the zone). Details: RUNLOG.md.
   `identity_data.custom_claims`. Docker container IPs are not routable from
   macOS, so resolver probes run `dig` inside the Unbound container.
 
-## experiments/storage-surface - key facts (validated 2026-10-10, Pro org, ap-southeast-1, n = 3 runs each)
+## experiments/storage-surface - key facts (SS01-SS02 2026-10-10, n = 3; SS03-SS07 2026-10-12, Pro org, ap-southeast-1, plus the local self-hosted rig)
 
 - storage-surface (SS01, SS02; 2026-10-10, Pro org, ap-southeast-1, n = 3 runs
   each; `experiments/storage-surface/RUNLOG.md`). Self-provisioning, projects
@@ -2863,6 +2863,74 @@ not list the zone). Details: RUNLOG.md.
 - Client action: restrict object keys to the 18-key class at upload; never
   send `//` or dot segments in a key; percent-encode path segments in REST
   calls (supabase-js with a plain `?` key lost the object under another name).
+- SS03-SS05 (2026-10-12; RUNLOG "2026-10-12 - SS03 to SS07"; managed n = 2,
+  each self-hosted variant n = 1) are ONE module, `SS03`, that emits the SS03,
+  SS04 and SS05 row ids against one target per run: a self-provisioned project
+  (`make probe MODS=SS03`), or the self-hosted-defaults rig when
+  `PVLAB_ENDPOINT_STACK_DIR` / `PVLAB_ENDPOINT_GW` are set (`make probe-sh`).
+  Same keys on every target, so SS06 (`make ss06 RUNS=...`) and `pvlab --diff`
+  line runs up. The canary (`canary/upload.ts`, `canary/battery.ts`) gets the
+  target on stdin and runs under Node with raw `node:http`, because fetch
+  decompresses gzip bodies. Fixtures (2 GiB, 64 MiB, 256 MiB gzip) are seeded
+  into the gitignored `evidence/fixtures/`; `make clean-fixtures`.
+- Versions: managed Storage 1.80.2; the pinned self-hosted compose 1.74.0. The
+  rig's `storage-image` layer runs 1.80.2 locally, which separated version
+  effects from backend effects.
+- ETag form follows the backend: managed and the self-hosted s3 backend give
+  the AWS multipart form (`-128` for 128 parts, `-4` even for a single 64 MiB
+  PutObject, `-342` for a 2 GiB TUS upload); the file backend gives the object
+  MD5. Per-part ETags equal the part MD5 everywhere; a multipart upload
+  resumes from a new process via ListMultipartUploads + ListParts.
+- Accepted and ignored on every target (docs mark most of them unsupported):
+  wrong `x-amz-checksum-*`, wrong Content-MD5, a wrong aws-chunked trailer
+  CRC32, PutObject `If-None-Match: *` and stale `If-Match` (overwrite),
+  CompleteMultipartUpload `If-None-Match: *`, UploadPartCopy copy-source
+  If-Match, and SSE-C / AES256 / aws:kms headers (the object is readable without
+  the SSE-C key). PutBucketCors on a new name creates a bucket; GetBucketCors and
+  GetBucketEncryption return a ListBucketResult; GetObjectAttributes returns the
+  object bytes; HEAD `?partNumber=1` returns the whole length.
+- Conditional reads: S3 GetObject enforces If-Match / If-Unmodified-Since at
+  1.80.2 (managed and local) and ignores them at 1.74.0; S3 HeadObject ignores
+  every conditional on every target. On managed REST paths (signed, public,
+  authenticated) a CDN HIT returns 200 for a wrong If-Match. After an overwrite,
+  managed `/object/authenticated` served the OLD bytes from cache for a ranged
+  If-Match on the old ETag (206 HIT, both runs), and `/object/public` on a MISS
+  returned new bytes despite the stale If-Match. Self-hosted 1.80.2 answers 412.
+- Ranges: single ranges are right everywhere; S3 GetObject has no
+  `Accept-Ranges`; a multi-range or `Bytes=` (capital) request to S3 GetObject
+  returns the WHOLE object with 200 on managed and the s3 backend. Managed REST
+  answers multi-range with multipart/byteranges (the CDN). A REST range past
+  EOF is 500 on `sh-s3@v1.74.0`.
+- CORS on managed: `Access-Control-Allow-Origin: *`, no
+  Access-Control-Expose-Headers on GET responses (a browser cannot read ETag or
+  Content-Range), `etag` exposed on UploadPart. Self-hosted Envoy echoes the
+  Origin and exposes `*`.
+- Large and gzip objects (SS03k): Content-Length and bytes intact on every
+  path, host and target, CDN-cached at 2 GiB; `Content-Encoding: gzip` comes
+  back at 1.80.2 and is dropped at 1.74.0.
+- CDN cache (SS03d/SS03k re-run with a fresh key per path and host; the first
+  design read already-warm keys, superseded): presigned S3 is DYNAMIC; signed
+  URL MISS then REVALIDATED (ranged) or mostly MISS (whole); public and
+  authenticated MISS then HIT, and they share one cache entry per host (a read
+  on either warms the other); the gateway and direct hosts do not share. A cold
+  1 KiB range of a 2 GiB object answers in under 2 s (no whole-object wait);
+  one repeat took 31.5 s as a MISS. Private-bucket sharing not tested.
+- TUS: 5 and 8 MiB chunks work (docs: 6 MiB only); resume after SIGKILL, also
+  gateway to direct host; `Upload-Expires` 24 h managed, 1 h self-hosted s3,
+  absent self-hosted file; an existing key without x-upsert is 409 (docs: 400).
+- SS05: a client-side AES-GCM object round-trips by chunk-aligned ranges; the
+  server records only size, type, ETag and cache settings; no content-type
+  sniffing; image render refuses it (400); an owner-only RLS select policy holds
+  on REST and on S3 with a user-JWT session token.
+- Self-hosted rig on macOS (operator facts): the file backend needs xattrs, so
+  the default `./volumes/storage` bind mount fails every upload (500 ENOTSUP;
+  `storage-volume` layer); the server verifies SigV4 against the host of
+  `STORAGE_PUBLIC_URL`, so `127.0.0.1:8000` gets SignatureDoesNotMatch where
+  `localhost:8000` works; MinIO on a named volume hits its free-space threshold
+  (507) on a small Docker disk (`minio-hostdir` layer).
+- SS07: 17 specific regions for a Pro org (same count as 2026-08-20); the
+  published OpenAPI document (169 operations) has no KMS or customer-managed
+  key operation; the only encryption match is `PUT /v1/projects/{ref}/pgsodium`.
 
 ## experiments/pipelines - key facts (validated 2026-10-10)
 
@@ -3247,6 +3315,12 @@ bun discovers the clone's own test files.
   redirect (SD06d-f). A real IdP assertion was not exercised.
 - Not measured: `sb_` keys against Realtime and Edge Functions, a Postgres 15 to
   17 upgrade, Linux amd64, image digests, repeat runs.
+- `make up LAYERS="..."` (added 2026-10-12 for storage-surface SS03) stacks
+  upstream overrides by name (`s3`, `logs`, `kong`) and this experiment's
+  `compose/` layers: `storage-limit` (FILE_SIZE_LIMIT is hard-coded in the pinned
+  compose file), `storage-image` (`STORAGE_IMAGE_TAG`), `storage-volume` and
+  `minio-hostdir` (see storage-surface for why). `make down` includes the s3 and
+  storage-volume files so their volumes go too.
 
 ## experiments/multigres - key facts (validated at runtime; see RUNLOG.md)
 

@@ -1,0 +1,10 @@
+# MinIO's data on a bind mount (work/stack/volumes/minio, removed by
+# `make clean`) instead of the s3 override's named volume. A named volume
+# lives on the Docker VM's disk, and MinIO refuses writes below its free-space
+# threshold ("minimum free drive threshold", HTTP 507) - on a small VM disk a
+# few GiB of test objects reach it. storage-surface SS03 uses this layer for
+# sh-s3 so the 2 GiB objects fit; the backend is the same MinIO either way.
+services:
+  minio:
+    volumes:
+      - ./volumes/minio:/data

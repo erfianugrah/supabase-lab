@@ -1,0 +1,17 @@
+# The file backend's data directory on a named Docker volume instead of the
+# ./volumes/storage bind mount. The file backend writes object metadata as
+# extended attributes; on Docker Desktop for macOS the bind mount refuses
+# them (ENOTSUP), so every upload fails with HTTP 500 there. A named volume
+# lives on the VM's own filesystem, which supports them. imgproxy reads the
+# same directory, so it gets the same volume. storage-surface SS03 records
+# the failure on the default mount before using this layer.
+services:
+  storage:
+    volumes:
+      - storage-data:/var/lib/storage
+  imgproxy:
+    volumes:
+      - storage-data:/var/lib/storage
+
+volumes:
+  storage-data:
