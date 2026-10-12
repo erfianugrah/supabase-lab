@@ -41,10 +41,12 @@ sx SUPABASE_ACCESS_TOKEN -- make probe            # SS01 + SS02 (about 6 min)
 sx SUPABASE_ACCESS_TOKEN -- make probe MODS=SS02
 sx SUPABASE_ACCESS_TOKEN -- make probe MODS=SS03  # SS03-SS05 rows on a managed project (about 45 min; about 6 GB up and 40 GB down)
 sx SUPABASE_ACCESS_TOKEN -- make probe MODS=SS03 ROWS=SS03d,SS03k  # only those rows (setup and the uploads they read still run)
-make -C ../self-hosted-defaults clean stack up LAYERS=storage-volume       # sh-file
+make -C ../self-hosted-defaults clean stack up LAYERS="storage-volume storage-limit"              # sh-file
 make probe-sh                                      # the same rows on the self-hosted stack
-make -C ../self-hosted-defaults clean stack up LAYERS=s3                   # sh-s3 (MinIO)
-make -C ../self-hosted-defaults clean stack up LAYERS="s3 storage-image" STORAGE_IMAGE_TAG=v1.80.2
+make -C ../self-hosted-defaults clean stack up LAYERS="s3 minio-hostdir storage-limit"            # sh-s3 (MinIO)
+make -C ../self-hosted-defaults clean stack up LAYERS="s3 minio-hostdir storage-limit storage-image" STORAGE_IMAGE_TAG=v1.80.2
+# storage-limit raises the hard-coded FILE_SIZE_LIMIT for the 64 MiB and 2 GiB fixtures;
+# minio-hostdir keeps MinIO off the small Docker VM volume (RUNLOG, "Self-hosted rig findings")
 make ss06 RUNS=out/<date>/run-a.json,out/<date>/run-b.json,...            # SS06 diff
 sx SUPABASE_ACCESS_TOKEN -- make probe MODS=SS07  # read only
 make clean-fixtures                                # the 2 GiB, 256 MiB and 64 MiB fixtures
