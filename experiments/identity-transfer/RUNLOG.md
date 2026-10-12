@@ -183,11 +183,13 @@ claim by that name travels the same path.
   address (ITL3d), unlike the unverified-email refusal in IT01e, which left an
   identity row and a user row with `email` NULL.
 
-Not settled here: the managed platform's side of the hook. That
-`hook_before_user_created_enabled`, `_uri` and `_secrets` are fields on
-`UpdateAuthConfigBody` is read from the published Management API document, not
-probed - IT02 and IT03 are the managed-vantage modules for that and have not
-been run. Nothing Apple-specific is settled either: the audience rule across a
+Not settled here: the managed platform's side of the hook. The config fields
+themselves (`hook_before_user_created_enabled`, `_uri`, `_secrets` on
+`UpdateAuthConfigBody`) were later driven on a managed project by
+security-lockdown S19d (2026-09-03): a Postgres-function hook refused a blocked
+domain, active 5 s after the PATCH. Still unprobed on managed: an HTTP hook URI,
+and whether the hook arms on CreateAccount only - IT02 and IT03 are the
+managed-vantage modules for that and have not been run. Nothing Apple-specific is settled either: the audience rule across a
 Services ID and a bundle ID, and Apple's own `/auth/usermigrationinfo`
 exchange, still need a real Apple team and app.
 

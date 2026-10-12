@@ -1014,13 +1014,16 @@ a throwaway probe Worker + two Hyperdrive configs via wrangler (account from
 
 ## Pending / gated work
 
-- O01c/d/e need `PVLAB_OAUTH_CLIENT_ID/SECRET/REFRESH_TOKEN` in
-  `.pi/oauth-drill.env` (gitignored); a green O01e burns the grant -
-  re-consent to re-run.
-- L01b needs `PVLAB_PAT2` in the same file.
-- M07 needs `PVLAB_INVOICE_PDF=<path>` (any Supabase invoice PDF).
-- M02/M04 need `GATEKEEPER_URL` + `GATEKEEPER_ADMIN_KEY` (sourced from
-  ~/gatekeeper/.env by the probes).
+- Ran, gated on re-run: O01c/d/e, L01b, M02, M04 and M07 all ran green on
+  2026-08-18 (byo-oauth and rate-limits RUNLOGs, dd77ae3, fee7a22). A re-run
+  needs the same inputs:
+  - O01c/d/e: `PVLAB_OAUTH_CLIENT_ID/SECRET/REFRESH_TOKEN` in
+    `.pi/oauth-drill.env` (gitignored); a green O01e burns the grant -
+    re-consent to re-run.
+  - L01b: `PVLAB_PAT2` in the same file.
+  - M07: `PVLAB_INVOICE_PDF=<path>` (any Supabase invoice PDF).
+  - M02/M04: `GATEKEEPER_URL` + `GATEKEEPER_ADMIN_KEY` (sourced from
+    ~/gatekeeper/.env by the probes).
 - The consent drill: dashboard org settings -> OAuth Apps -> add app,
   callback `http://localhost:54321/callback`, then run a listener on
   54321 and open the authorize URL. Steps in
