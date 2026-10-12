@@ -143,7 +143,10 @@ upgrade to.
 **And the conditions cannot be arranged.** `postgres_engine` and
 `release_channel` on `POST /v1/projects` are BOTH deprecated and typed `null` in
 the published schema, so a created project takes the current default and there
-is no way to ask for an older one. Measuring a real client-visible upgrade
+is no way to ask for an older one. (Correction, 2026-10-10: deprecated does not
+mean inert - orioledb OR01 sent `postgres_engine: "17-oriole"` and it was
+accepted and applied. Requesting an older Postgres major through it has not been
+tried, so the claim above is untested rather than settled.) Measuring a real client-visible upgrade
 window therefore requires a project that has aged past the current version -
 which means being willing to upgrade something real. That is the structural
 reason this number stays folklore, and it is worth stating plainly rather than
