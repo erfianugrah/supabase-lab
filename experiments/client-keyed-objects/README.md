@@ -79,8 +79,10 @@ transfers and skewed the Docker VM clock), and if it dies,
 
 The self-hosted stack runs as its own compose project (`ck-<name>`, no fixed
 container names) on host ports 8100, 5532 and 6643, so it can run beside the
-self-hosted-defaults rig on 8000 / 5432 / 6543. MinIO data and the file
-backend live in the stack directory on the host disk (`work/stacks/<name>/volumes`).
+self-hosted-defaults rig on 8000 / 5432 / 6543. MinIO data lives in the stack
+directory on the host disk (`work/stacks/<name>/volumes`); the file backend
+uses a named volume on the Docker VM disk (`compose/docker-compose.ck-file.yml`,
+the xattr finding in the RUNLOG).
 
 `work/` is gitignored and holds everything secret or large: the pinned
 clone, the stack copies and their generated `.env`, per-target configs with
