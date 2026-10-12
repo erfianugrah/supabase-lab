@@ -1002,9 +1002,12 @@ a throwaway probe Worker + two Hyperdrive configs via wrangler (account from
   (identical SQL + param, claims A warmed n=1, claims B got 0) - the doc's
   cache-blindness worst case was not reproduced; the split-binding rule
   stays as the documented control regardless.
-- Operational: Hyperdrive create races fresh-project Supavisor warmup
-  (ENOTFOUND tenant/user) - warm the pooler locally first and retry the
-  create. Probe worker needs `nodejs_compat` for postgres.js. The Management
+- Operational: Hyperdrive's create-time check hit ENOTFOUND tenant/user and
+  passed on retry with the same host and username, for `claims_user` created
+  seconds earlier (the local warm-up connected as `postgres.<ref>`, so it did
+  not test that role). Read it as a new role or project not yet known to the
+  shared pooler, not a wrong string; a persistent error is host or username.
+  Retry the create for about a minute. Probe worker needs `nodejs_compat` for postgres.js. The Management
   query endpoint wraps multi-statement SQL in one transaction, so fixture
   DDL that creates a function and a policy referencing it must run in
   separate calls (function first).
