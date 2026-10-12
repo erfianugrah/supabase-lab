@@ -41,7 +41,8 @@ sx SUPABASE_ACCESS_TOKEN -- make probe            # SS01 + SS02 (about 6 min)
 sx SUPABASE_ACCESS_TOKEN -- make probe MODS=SS02
 sx SUPABASE_ACCESS_TOKEN -- make probe MODS=SS03  # SS03-SS05 rows on a managed project (about 45 min; about 6 GB up and 40 GB down)
 sx SUPABASE_ACCESS_TOKEN -- make probe MODS=SS03 ROWS=SS03d,SS03k  # only those rows (setup and the uploads they read still run)
-make -C ../self-hosted-defaults clean stack up LAYERS="storage-volume storage-limit"              # sh-file
+make -C ../self-hosted-defaults clean stack up LAYERS="storage-volume storage-limit"              # sh-file (v1.74.0)
+make -C ../self-hosted-defaults clean stack up LAYERS="storage-volume storage-limit storage-image" STORAGE_IMAGE_TAG=v1.80.2   # sh-file at 1.80.2
 make probe-sh                                      # the same rows on the self-hosted stack
 make -C ../self-hosted-defaults clean stack up LAYERS="s3 minio-hostdir storage-limit"            # sh-s3 (MinIO)
 make -C ../self-hosted-defaults clean stack up LAYERS="s3 minio-hostdir storage-limit storage-image" STORAGE_IMAGE_TAG=v1.80.2
