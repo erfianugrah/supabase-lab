@@ -2863,7 +2863,7 @@ not list the zone). Details: RUNLOG.md.
 - Client action: restrict object keys to the 18-key class at upload; never
   send `//` or dot segments in a key; percent-encode path segments in REST
   calls (supabase-js with a plain `?` key lost the object under another name).
-- SS03-SS05 (2026-10-12; RUNLOG "2026-10-12 - SS03 to SS07"; managed n = 2,
+- SS03-SS05 (2026-10-12; RUNLOG "2026-10-12 - SS03 to SS07"; managed one full run plus a SS03d and SS03k re-run,
   each self-hosted variant n = 1) are ONE module, `SS03`, that emits the SS03,
   SS04 and SS05 row ids against one target per run: a self-provisioned project
   (`make probe MODS=SS03`), or the self-hosted-defaults rig when
@@ -2894,7 +2894,7 @@ not list the zone). Details: RUNLOG.md.
   every conditional on every target. On managed REST paths (signed, public,
   authenticated) a CDN HIT returns 200 for a wrong If-Match. After an overwrite,
   managed `/object/authenticated` served the OLD bytes from cache for a ranged
-  If-Match on the old ETag (206 HIT, both runs), and `/object/public` on a MISS
+  If-Match on the old ETag (206 HIT; also in the superseded run 1), and `/object/public` on a MISS
   returned new bytes despite the stale If-Match. Self-hosted 1.80.2 answers 412.
 - Ranges: single ranges are right everywhere; S3 GetObject has no
   `Accept-Ranges`; a multi-range or `Bytes=` (capital) request to S3 GetObject
@@ -2914,7 +2914,8 @@ not list the zone). Details: RUNLOG.md.
   URL MISS then REVALIDATED (ranged) or mostly MISS (whole); public and
   authenticated MISS then HIT, and they share one cache entry per host (a read
   on either warms the other); the gateway and direct hosts do not share. A cold
-  1 KiB range of a 2 GiB object answers in under 2 s (no whole-object wait);
+  1 KiB range of a 2 GiB object answered within 1,718 ms to headers (that no
+  whole-object fetch preceded it is inferred, not measured);
   one repeat took 31.5 s as a MISS. Private-bucket sharing not tested.
 - TUS: 5 and 8 MiB chunks work (docs: 6 MiB only); resume after SIGKILL, also
   gateway to direct host; `Upload-Expires` 24 h managed, 1 h self-hosted s3,
@@ -3440,8 +3441,9 @@ partial rows: `experiments/client-keyed-objects/RUNLOG.md`; generated table
   `*`). Matches storage-surface SS03h.
 - Region-a ranged reads through fresh signed URLs: `MISS:25`, p50 30479 ms;
   `/object/authenticated`: `MISS:1 HIT:24`, p50 548 ms (CK06, one vantage,
-  n = 1). Per-token cache keys plus a 2 GiB origin fetch is the likely cause,
-  not shown.
+  n = 1). Per-token cache keys fit it but are not shown; object size alone does
+  not explain it (storage-surface run 4 answered a cold 1 KiB signed-URL range
+  of a 2 GiB object in 272 ms).
 - Self-hosted only: S3 SigV4 is verified against the host of
   `STORAGE_PUBLIC_URL`, so clients must use that host; the upstream
   `./volumes/storage` bind mount fails every upload on Docker Desktop for Mac
