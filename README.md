@@ -328,8 +328,20 @@ facts):
   Cloudflare DNS and Docker. Measured 2026-10-10; see its RUNLOG.
 - `storage-surface` - the Storage direct-SQL delete guard and orphaned
   objects, list v1 against cursor v2 at depth, and S3-endpoint handling of
-  special-character keys with the AWS SDK v3. Self-provisioning; SS01, SS02.
-  Measured 2026-10-10; see its RUNLOG.
+  special-character keys with the AWS SDK v3 (SS01, SS02, measured
+  2026-10-10); then 2 GiB multipart and TUS upload and resume, the range
+  matrix per read path and host, conditionals, checksums, CORS, error bodies,
+  CDN cold and warm reads, SSE headers, a managed against self-hosted diff at
+  Storage 1.74.0 and 1.80.2, and a region and key-surface read (SS03-SS07,
+  measured 2026-10-12). Self-provisioning; the self-hosted rows need Docker.
+  See its RUNLOG.
+- `client-keyed-objects` - one envelope-encrypted reference app (AES-256-GCM
+  per 8 MiB chunk, data key wrapped by an external key service, Postgres
+  catalogue under RLS) with the same migrations and client on two managed
+  regions and a self-hosted stack: ranged reads over ciphertext, tamper
+  refusal, a ciphertext-only scan, key service down, user-token multipart
+  resume, a browser client, and error-shape parity (CK01-CK13).
+  Self-provisioning; needs Docker. Measured 2026-10-12; see its RUNLOG.
 - `pipelines` - Supabase Pipelines (public alpha): what a PAT can reach
   (nothing of the managed service), and replication behaviour of the
   open-source engine against a Pro project with a local DuckLake destination:

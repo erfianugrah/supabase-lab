@@ -646,7 +646,7 @@ whole object on three of four repeat reads; their ranged repeats in SS03d were
 | `sh-file@v1.74.0`, `sh-s3@v1.74.0` | `ce=-` (absent) |
 
 So at 1.74.0 a gzip object is served as opaque bytes with no encoding header,
-and a browser would not decode it; at 1.80.2 the header comes back. Neither the
+and a browser would presumably not decode it (not measured); at 1.80.2 the header comes back. Neither the
 edge nor the origin re-encoded or truncated anything. Not measured: objects
 past 2 GiB, CDN eviction, and a client that decodes (fetch, browsers), which
 would see the decompressed body as a client property.

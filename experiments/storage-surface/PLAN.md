@@ -1,7 +1,7 @@
 # storage-surface - plan for SS03-SS07 (large objects, S3 contract, managed vs self-hosted)
 
 Status: run 2026-10-12 - SS03 to SS05 on one managed Pro project per run
-(two runs) and on four self-hosted variants (file and s3 backends, storage
+(one full run plus a SS03d and SS03k re-run; four projects created in all) and on four self-hosted variants (file and s3 backends, storage
 1.74.0 and 1.80.2), SS06 diff and SS07 read; results in RUNLOG.md
 ("2026-10-12 - SS03 to SS07"). SS03k and SS03l were added to the battery during
 the run. The battery is one module, `SS03`, emitting the SS03, SS04 and SS05
@@ -106,10 +106,11 @@ self-hosted from the image tag).
   one the managed project is created in.
 - Self-hosted on Linux amd64, or behind a gateway other than Envoy.
 - Auth and PostgREST error-shape parity between managed and self-hosted:
-  candidate follow-up module, not part of this plan.
+  candidate follow-up module, not part of this plan (done since as
+  client-keyed-objects CK12).
 
 ## Cost and cleanup
 
-One Pro-org micro project for about an hour, a few GB of egress; deleted in
+One Pro-org micro project per run for about an hour (four on 2026-10-12), a few GB of egress; deleted in
 `finally`, checked with `make sweep`. Self-hosted runs are local
 (`make clean` in self-hosted-defaults removes volumes).
