@@ -3400,3 +3400,55 @@ partitions, other durability policies, a contended pool.
 - Not measured: other provider versions, Terraform, other regions or sizes,
   whether unlisted functions list later, how long a destroyed function keeps
   answering.
+
+## experiments/client-keyed-objects - key facts (validated 2026-10-12, local self-hosted stack + two Pro-org micro projects, ap-southeast-1 and eu-central-1)
+
+A reference application (catalogue + RLS + custom access token hook in
+Postgres, an operator-run key service in Docker, a TypeScript client doing
+chunked AES-256-GCM envelope encryption with S3-multipart and TUS uploads and
+ranged decrypting reads) and the CK01-CK13 suite, run unchanged against
+`onprem` (MinIO), `onprem-file`, `region-a` and `region-b`. Parity table and
+partial rows: `experiments/client-keyed-objects/RUNLOG.md`; generated table
+`out/2026-10-12/parity.md`.
+
+- Same migrations, same catalogue: fingerprint `de77a73c2298ee14` on all four
+  targets (CK01); the client and migrations carry no target branch (CK01-code
+  greps for one). Targets differ only in per-target config.
+- S3 multipart resume with a user session token needs a SELECT policy on
+  `storage.s3_multipart_uploads_parts`: ListParts runs as the caller's role,
+  the table has RLS and no policy, so without it ListParts returns no parts
+  and a client re-sends everything (first onprem run: 0 of 32 kept; with the
+  policy 13 of 32 on onprem and region-a). `supabase db push` as `postgres`
+  can create that policy on managed.
+- PostgREST accepts an expired token within its documented 30 s skew (200 at
+  exp + 5 s), Auth does not (403); both refuse at exp + 45 s; same on managed
+  and self-hosted (CK02).
+- Managed vs self-hosted differences (CK12), with versions (CK13: managed auth
+  v2.197.0 / rest 14.18 / storage 1.80.2 / postgres 17.11; self-hosted
+  v2.196.0 / 14.17 / 1.80.2 (raised from the pinned v1.74.0) / 17.6): Auth
+  without a bearer 401 `no_authorization` vs 403 `bad_jwt`; Data API without
+  apikey JSON `hint,message` vs Envoy `text/plain Unauthorized`; Storage REST
+  without auth `InvalidRequest` vs `NoSuchKey`; S3 errors `text/plain` vs
+  `application/xml` with the same XML body. The last two have no Storage
+  version gap: the edge or config, not the server version.
+- Browser (CK11): S3 multipart from a page works on all targets and part
+  ETags are readable from UploadPart; a ranged signed-URL GET exposes no
+  `Content-Range`/`ETag` to the page on managed (self-hosted Envoy exposes
+  `*`). Matches storage-surface SS03h.
+- Region-a ranged reads through fresh signed URLs: `MISS:25`, p50 30479 ms;
+  `/object/authenticated`: `MISS:1 HIT:24`, p50 548 ms (CK06, one vantage,
+  n = 1). Per-token cache keys plus a 2 GiB origin fetch is the likely cause,
+  not shown.
+- Self-hosted only: S3 SigV4 is verified against the host of
+  `STORAGE_PUBLIC_URL`, so clients must use that host; the upstream
+  `./volumes/storage` bind mount fails every upload on Docker Desktop for Mac
+  (file backend needs xattrs); PostgREST 14.17 once answered
+  `PGRST303 JWT issued at future` to a fresh token (the client retries once).
+- Not measured: CK04 and CK06 on region-b (resume died during host sleep;
+  not re-run), CK04-CK06 on onprem-file (Docker VM disk), other vantages,
+  repeat runs, Linux amd64.
+- Ops: own compose project `ck-<name>` on 8100/5532/6643 beside the
+  self-hosted-defaults rig; `CK_SLOT=b` gives a second run dir, key service and
+  port; run the managed suite detached under `caffeinate` (a laptop that
+  sleeps breaks long transfers and skews the Docker VM clock); `make sweep`
+  for `ck-` leftovers.
