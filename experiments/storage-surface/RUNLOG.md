@@ -325,8 +325,8 @@ Node, from one laptop vantage. Fixtures from fixed seeds: `big` 2 GiB (128
 parts of 16 MiB), `mid` 64 MiB, a gzip stream of 256 MiB of random bytes, and a
 64x64 PNG.
 
-Operator notes (not artifact-backed). Development runs between 07:45 and 09:03
-UTC are not cited; they found the harness bugs fixed before the cited runs (a
+Operator notes (not artifact-backed). Development runs made before the cited
+artifacts above are not cited; they found the harness bugs fixed before the cited runs (a
 2 GiB body hashed in one call, TUS dispatch, the error-cell format). Managed
 run 1 (`run-2026-10-12T08-01-48-370Z`) is superseded: it started before the
 first of those fixes reached `canary/battery.ts`, and the harness hashed a whole
@@ -346,7 +346,7 @@ SS03i), so that cell is not stable.
 | finding | measured | where |
 |---|---|---|
 | File backend on the default `./volumes/storage` bind mount, Docker Desktop for macOS | 1 KiB upload: S3 `500 InternalError`, REST `500 ... "The file system does not support extended attributes or has the feature disabled."` | SS03_target in `run-2026-10-12T07-49-15-587Z` (`preflight_s3_put_1KiB`, `preflight_rest_post_1KiB`) |
-| S3 ListBuckets at `http://127.0.0.1:8000` vs at the host of `SUPABASE_PUBLIC_URL` (`localhost:8000`) | `403 SignatureDoesNotMatch` vs `200 ok` | SS03_target, every self-hosted run |
+| S3 ListBuckets at `http://127.0.0.1:8000` vs at the host of `STORAGE_PUBLIC_URL` (the compose file sets it from `SUPABASE_PUBLIC_URL` in `.env`, `localhost:8000`) | `403 SignatureDoesNotMatch` vs `200 ok` | SS03_target, every self-hosted run |
 
 The file backend stores object metadata in extended attributes (the stack
 trace names `fs-xattr`), so the cited `sh-file` runs put the data directory on
