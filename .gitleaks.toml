@@ -37,4 +37,9 @@ regexes = [
   # prove a 401 from the sink does not undo the decision; generic-api-key
   # matches the literal on shape.
   '''put_integration_secret\('webhook_sink_secret', 'k04-wrong-secret'\)''',
+  # client-keyed-objects CK12 names each error-shape row by a dotted label
+  # and signs up with a throwaway password to provoke an invalid-email
+  # refusal; generic-api-key matches both literals on shape.
+  '''"s3\.no_such_bucket",''',
+  '''email: "not-an-email", password: "Abcdefgh1234"''',
 ]
