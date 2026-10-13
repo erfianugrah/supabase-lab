@@ -1,0 +1,52 @@
+{
+  "startedAt": "2026-08-18T04:43:40.236Z",
+  "finishedAt": "2026-08-18T04:48:17.901Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "instance-sizing",
+  "labCommit": "f0c4460",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "OpenSSL 3.6.3 9 Jun 2026 (Library: OpenSSL 3.6.3 9 Jun 2026)"
+  },
+  "results": [
+    {
+      "id": "I04-control",
+      "title": "I04-control: default create on a free org",
+      "status": "pass",
+      "measurements": {
+        "provision_s": 13,
+        "compute_selected": "none",
+        "ci_nano_available": 0,
+        "compute_variants_available": ""
+      },
+      "durationMs": 277674
+    },
+    {
+      "id": "I04a",
+      "title": "I04a: explicit nano create on a free org",
+      "status": "info",
+      "detail": "nano create ACCEPTED on the free org",
+      "measurements": {
+        "create_nano_status": 201
+      },
+      "durationMs": 277674
+    },
+    {
+      "id": "I04b",
+      "title": "I04b: pause/restore lifecycle on a free project",
+      "status": "info",
+      "detail": "while paused, data API: HTTP 540: Project paused. Please unpause the project before proceeding.",
+      "measurements": {
+        "pause_status": 200,
+        "reached_inactive": 1,
+        "wake_s": 182,
+        "final_status": "ACTIVE_HEALTHY"
+      },
+      "durationMs": 277674
+    }
+  ]
+}
