@@ -1732,7 +1732,8 @@ assumes prose quotes by paste.
 - `pvlab --facts run.json [--only EF08,EF09]` renders a run's measurements as
   markdown tables (offline, no credential). Quote from it.
 - `make publish-evidence RUN=evidence/<ts>/run-<stamp>.json` (per experiment)
-  redacts refs, project and pooler hostnames and emails and writes the artifact
+  redacts refs, project and pooler hostnames, emails and home-directory paths
+  (since 2026-10-13, 78b7f3e) and writes the artifact
   plus its facts.md to `out/<date>/`, which IS committed (`.gitignore` carves
   dated `experiments/*/out/20*/` directories out of `**/out/`; raw artifacts
   at an `out/` root stay ignored). edge-resilience's 14 raw runs from
@@ -1740,6 +1741,15 @@ assumes prose quotes by paste.
   and report per run under `out/2026-08-16/` and `out/2026-08-17/`; the raw
   originals moved to the ignored `evidence/raw-out/`). RUNLOGs and the docs
   site cite `out/`; `evidence/` stays private.
+- The redactor works on the raw JSON text, so a ref at the start of a line
+  inside a JSON string follows the two characters `\n` and read as a
+  21-letter token: three real refs passed it (and the "0 unredacted" count)
+  on 2026-10-13 before `REF_SHAPE` in `harness/scripts/publish-evidence.ts`
+  treated `\n`, `\t`, `\r`, `\b`, `\f` as boundaries; the leftover check and
+  `identifiers.test.ts` share that pattern. It still matches shapes only:
+  organisation names, project names and snippet titles inside an escaped
+  evidence string pass untouched (scoped-pats SP04 was withheld for exactly
+  that). Read an artifact that echoes an account listing before publishing.
 - `bun harness/scripts/check-doc-numbers.ts <doc> <run.json> ...` lists every
   number on a measured line of a doc that appears in none of the artifacts -
   the reviewer's hand check as a command. Judge each hit: a documented figure
