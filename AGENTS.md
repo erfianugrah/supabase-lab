@@ -2641,7 +2641,7 @@ because `harness/dist/pvlab` is a linux-x64 build.
 
 Self-provisioning (Management API create and delete, no OpenTofu state), one
 Micro project per run. IPv4-only vantage in Singapore. Raw artifacts are in the
-ignored `evidence/`; none published to `out/`. Details: RUNLOG.md.
+ignored `evidence/`; redacted copies in `out/2026-10-10/`. Details: RUNLOG.md.
 
 - **Transaction-pool exhaustion is a statement-time error, after 60 s.** With the
   effective pool (16 active backends on Micro, PC01b; the API reports
