@@ -17,8 +17,8 @@
  *          service_role and sb_secret reads: status, code, hint verbatim.
  *   DD01d  GRANT SELECT to anon; re-read: status and relacl.
  *
- * Not run here: the standing-project re-run after 2026-10-30 (a project
- * created before 2026-05-30, before and after the enforcement date).
+ * Not run here: the standing-project reading (a project created before
+ * 2026-05-30, before and after the enforcement date) is DD01S.
  *
  * Deletes nothing itself; DD99 deletes the project.
  */
