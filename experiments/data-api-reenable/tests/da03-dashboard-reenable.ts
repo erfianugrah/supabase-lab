@@ -12,9 +12,17 @@
  * back".
  *
  * DESTRUCTIVE: switches the Data API off. Restores the exact baseline config.
+ *
+ * pg_graphql (work-supabase-lab#129): new projects do not have it, and then
+ * `/graphql/v1` answers 200 with an errors envelope whether or not the Data
+ * API works, so the graphql column measured nothing. The module now reads
+ * `pg_extension` first; when pg_graphql is absent it installs it for the
+ * measurement (DD02b: served at the first poll) and drops it again in
+ * `finally` (DA03y).
  */
 import type { Ctx, TestModule, TestResult } from "../../../harness/src/types.js";
-import { fetchKeys } from "../../../harness/src/platform.js";
+import { pgGraphqlInstalled } from "../../../harness/src/graphql.js";
+import { fetchKeys, sql } from "../../../harness/src/platform.js";
 import {
   EXTRA_SCHEMA,
   TABLE,
@@ -68,8 +76,15 @@ const mod: TestModule = {
       EXTRA_SCHEMA,
     ].join(",");
     const out: TestResult[] = [];
+    const gqlAtStart = await pgGraphqlInstalled(ctx);
+    let gqlInstalledHere = false;
 
     try {
+      if (gqlAtStart === false) {
+        const c = await sql(ctx, "create extension pg_graphql");
+        gqlInstalledHere = c.status === 201;
+        ctx.log(`pg_graphql absent at start; create extension -> HTTP ${c.status}${c.error ? ` ${c.error}` : ""}`);
+      }
       await setSchemas(ctx, base, withExtra);
       const t0 = Date.now();
       let pre: Record<string, string> = {};
@@ -107,6 +122,8 @@ const mod: TestModule = {
         measurements: {
           db_schema_before: withExtra,
           db_schema_after: cfg.db_schema,
+          pg_graphql_at_start: gqlAtStart === null ? "unread" : gqlAtStart ? "yes" : "no",
+          pg_graphql_installed_by_module: gqlInstalledHere ? "yes" : "no",
           ...Object.fromEntries(Object.entries(after).map(([k, v]) => [`after_${k}`, v])),
         },
         evidence: on.paths.map(fmtTransitions).join("\n"),
@@ -119,6 +136,15 @@ const mod: TestModule = {
         status: back.status === 200 ? "pass" : "fail",
         detail: back.status === 200 ? "restored" : `restore HTTP ${back.status}`,
       });
+      if (gqlInstalledHere) {
+        const d = await sql(ctx, "drop extension pg_graphql");
+        out.push({
+          id: "DA03y",
+          title: "drop the pg_graphql this module installed",
+          status: d.status === 201 ? "pass" : "fail",
+          detail: d.status === 201 ? "dropped" : `drop HTTP ${d.status} ${d.error}`,
+        });
+      }
     }
     return out;
   },
