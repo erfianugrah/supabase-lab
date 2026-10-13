@@ -32,13 +32,20 @@ function cell(v: unknown): string {
   return String(v).replace(/\|/g, "\\|").replace(/\r?\n/g, " ").trim();
 }
 
+/** Which region an artifact can vouch for: the project's, or only the harness setting. */
+export function regionLabel(run: Pick<RunArtifact, "region" | "projectRegion">): string {
+  return run.projectRegion
+    ? `region ${run.projectRegion} (read from the project)`
+    : `harness region ${run.region} (not read from the project)`;
+}
+
 export function renderFacts(run: RunArtifact, opts: FactsOptions = {}): string {
   const out: string[] = [];
   const stamp = run.startedAt.slice(0, 19).replace("T", " ");
   out.push(`# Facts from ${run.experiment ?? "run"} - ${stamp} UTC`);
   out.push("");
   out.push(
-    `Source artifact: run started ${run.startedAt}, finished ${run.finishedAt}, vantage ${run.where}, region ${run.region}` +
+    `Source artifact: run started ${run.startedAt}, finished ${run.finishedAt}, vantage ${run.where}, ${regionLabel(run)}` +
       (run.labCommit ? `, lab commit ${run.labCommit}` : "") +
       ". Project ref omitted on purpose.",
   );
