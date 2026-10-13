@@ -5,7 +5,8 @@ IPv4-only workstation over the Management API and the shared pooler. Every
 project was named `rp-*` and deleted at the end of its module (or by
 hand when a run was killed); a final `GET /v1/projects` listed none (author's
 observation at the end of the session; no snapshot was saved). Raw
-artifacts carry project refs and stay off-repo (`evidence/`).
+artifacts carry project refs and stay off-repo (`evidence/`); redacted
+copies are listed under the run table.
 
 Sources for the claims under test, read 2026-10-10:
 
@@ -39,6 +40,21 @@ Everything below is measured unless it says "docs", "inference" or "not run".
 | R7 | RP03 | 01:30 | Free project, two pause/unpause cycles | 1 |
 | R8 | RP03 | 01:43 | as R7 | 1 |
 | R9 | RP03 | 02:19 | as R7, with the Management API SQL call fixed (R7 and R8 sent it with an empty project path) | 1 |
+
+Published artifacts (redacted, a `.facts.md` beside each):
+
+| run | artifact |
+|---|---|
+| RP01 first attempt (about 01:22) | `out/2026-10-10/run-2026-10-10T01-22-13-170Z.json` |
+| R1 | `out/2026-10-10/run-2026-10-10T01-27-07-341Z.json` |
+| R2 | `out/2026-10-10/run-2026-10-10T01-30-06-076Z.json` |
+| R3 | `out/2026-10-10/run-2026-10-10T01-42-15-008Z.json` |
+| R4 | `out/2026-10-10/run-2026-10-10T01-42-15-009Z.json` |
+| R5 | `out/2026-10-10/run-2026-10-10T01-57-31-964Z.json` |
+| R6 | `out/2026-10-10/run-2026-10-10T02-11-13-334Z.json` |
+| R7 | `out/2026-10-10/run-2026-10-10T01-30-06-076Z-rp03.json` (R2 and R7 started in the same millisecond; the suffix keeps R7 from overwriting R2) |
+| R8 | `out/2026-10-10/run-2026-10-10T01-43-58-645Z.json` |
+| R9 | `out/2026-10-10/run-2026-10-10T02-19-59-081Z.json` |
 
 An earlier RP02 attempt (about 01:24) was killed by the author before it wrote
 an artifact: the credential poller was trying a wrong password every 4 s and
@@ -85,8 +101,8 @@ available to this lab. Read that as "not run", not "not possible".
 
 A fresh Pro project listed one completed physical backup on the first read in
 R1. An earlier first attempt at RP01 (about 01:22, a replaced version of the
-module; artifact `rp01/run-2026-10-10T01-22-13-170Z.json` in the off-repo
-evidence copy, `fresh_physical_backups=0`) found the listing empty at the same
+module; artifact `out/2026-10-10/run-2026-10-10T01-22-13-170Z.json`,
+`fresh_physical_backups=0`) found the listing empty at the same
 point, so the first physical backup's arrival time is not pinned down. With
 `pitr_7` applied the listing is empty and `physical_backup_data` carries a
 window instead.

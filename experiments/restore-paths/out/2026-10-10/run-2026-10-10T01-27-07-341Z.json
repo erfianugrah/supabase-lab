@@ -1,0 +1,90 @@
+{
+  "startedAt": "2026-10-10T01:27:07.341Z",
+  "finishedAt": "2026-10-10T01:27:15.990Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "restore-paths",
+  "labCommit": "70e4244",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "RP01a",
+      "title": "entitlements and backup listing on a fresh Pro project",
+      "status": "info",
+      "detail": "entitlements http 200; physical backups listed 1",
+      "measurements": {
+        "ent_project_pausing": "false",
+        "ent_project_cloning": "true",
+        "ent_restore_to_new_project": "true",
+        "ent_project_restore_after_expiry": "true",
+        "ent_pitr_available_variants": "true",
+        "ent_backup_schedule": "false",
+        "backups_http": 200,
+        "pitr_enabled": "false",
+        "walg_enabled": "true",
+        "physical_backups_listed": 1
+      },
+      "durationMs": 8649
+    },
+    {
+      "id": "RP01b",
+      "title": "pause and unpause on an active Pro project",
+      "status": "info",
+      "detail": "pause 400; restore-on-active 400; list versions 400",
+      "measurements": {
+        "pause_http": 400,
+        "pause_body": "{\"message\":\"Project is not free-tier. Please downgrade it to free-tier first and try again.\"}",
+        "restore_on_active_http": 400,
+        "restore_on_active_body": "{\"message\":\"This project is no longer in a paused state, it is ACTIVE_HEALTHY, it may take a while to fully restore. Please open a ticket at",
+        "list_restore_versions_http": 400,
+        "list_restore_versions_body": "{\"message\":\"This project is not in a paused state.\"}"
+      },
+      "durationMs": 8649
+    },
+    {
+      "id": "RP01c",
+      "title": "in-place restore routes with no PITR add-on",
+      "status": "info",
+      "detail": "backups/restore 400; restore-point 400; restore-pitr 400",
+      "measurements": {
+        "listed_backup_id_used": "yes",
+        "backups_restore_http": 400,
+        "backups_restore_body": "{\"message\":\"This endpoint is unavailable at the moment\"}",
+        "restore_point_get_http": 400,
+        "restore_point_get_body": "{\"message\":\"This endpoint is unavailable at the moment\"}",
+        "restore_pitr_http": 400,
+        "restore_pitr_body": "{\"message\":\"PITR is not enabled for this project.\"}"
+      },
+      "durationMs": 8649
+    },
+    {
+      "id": "RP01d",
+      "title": "restore-to-new-project (clone): API surface",
+      "status": "info",
+      "detail": "openapi clone paths 0; dashboard route with PAT: HTTP 401 {\"message\":\"Unsupported access token\"}",
+      "measurements": {
+        "openapi_path_count": 115,
+        "openapi_clone_paths": 0,
+        "openapi_restore_pause_paths": 7,
+        "create_body_fields": "db_pass,name,organization_id,organization_slug,plan,region,region_selection,kps_enabled,desired_instance_size,template_url,release_channel,postgres_engine,high_availability",
+        "create_body_clone_like_fields": 0,
+        "v1_clone_route_http": 404,
+        "dashboard_clone_route_with_pat": "HTTP 401 {\"message\":\"Unsupported access token\"}"
+      },
+      "durationMs": 8649
+    },
+    {
+      "id": "RP01e",
+      "title": "cleanup: project deleted",
+      "status": "info",
+      "detail": "DELETE HTTP 200",
+      "durationMs": 8649
+    }
+  ]
+}
