@@ -10,7 +10,7 @@ TS := $(shell date +%Y%m%d-%H%M%S)
 # Ideally one Pro and one Team - the interesting rows are the ones that differ.
 ORGS ?=
 
-.PHONY: init fmt validate apply probe diff destroy
+.PHONY: init fmt validate apply probe fleet diff publish-evidence destroy
 
 init:
 	tofu init
@@ -44,6 +44,24 @@ probe:
 		$(ROOT)/harness/dist/pvlab --where local --only F01,F02,F03 --experiment platform-facts \
 		--out evidence/$(TS)
 	@echo "== evidence/$(TS)/ =="
+
+# F07 (work-supabase-lab#41): upgrade eligibility of every project in the
+# organizations given, read-only, no project ref or name in the output. Needs
+# no tofu project. Run from source: harness/dist/pvlab is linux-x64 only.
+#   make fleet ORGS=slug-a,slug-b   (PAT from SUPABASE_ACCESS_TOKEN)
+fleet:
+	@test -n "$(SUPABASE_ACCESS_TOKEN)" || (echo "export SUPABASE_ACCESS_TOKEN"; exit 1)
+	@test -n "$(ORGS)" || (echo "ORGS=slug-a,slug-b required (the lab organizations)"; exit 1)
+	@cd $(ROOT) && bun harness/scripts/gen-registry.ts >/dev/null
+	@mkdir -p evidence/$(TS)
+	cd $(ROOT) && PVLAB_ORG_SLUGS="$(ORGS)" bun harness/src/run.ts --where local --experiment platform-facts \
+		--only F07 --out experiments/platform-facts/evidence/$(TS)
+	@echo "== evidence/$(TS)/ =="
+
+# Redacted copy + facts table into out/<date>/ - what RUNLOG and docs cite.
+publish-evidence:
+	@test -n "$(RUN)" || (echo "RUN=evidence/<ts>/run-<stamp>.json required"; exit 1)
+	@cd $(ROOT)/harness && bun scripts/publish-evidence.ts $(abspath $(RUN)) $(abspath .) $(if $(PUBLISH_ONLY),--only $(PUBLISH_ONLY),)
 
 # Compare the two most recent runs. Offline: no PAT, no network - the diff is
 # a pure function over two artifacts.
