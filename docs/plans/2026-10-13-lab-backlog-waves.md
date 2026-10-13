@@ -3,7 +3,8 @@
 > **For agentic workers:** Execute this plan inline, task by task, in the current session. Steps use checkbox (`- [ ]`) syntax for tracking. Per-task subagents (subagent-driven-development) only if the user asks for them.
 
 > **STATUS 2026-10-13: PLANNED.** Covers every open card on the
-> `work-supabase-lab` board (92 To-Do plus #127 In Review = 93). W1 (offline)
+> `work-supabase-lab` board (90 To-Do plus #127 In Review = 91; two non-lab
+> cards moved to another project on 2026-10-13). W1 (offline)
 > and the offline half of #128 are written out in full and were dry-run on a
 > copy of the repo (see "Dry-run status" at the end). W2 to W5 are triage
 > entries only; each wave gets its own detailed plan when it starts.
@@ -124,7 +125,6 @@ plan upgrades or hours of runtime). Effort is hands-on time, not wall time.
 | #70 stale plan checkboxes | W1 | none | offline | 0.5 h |
 | #71 governed-starter-kit interactive confirm + Explorer | W3 | human MCP-client and Dashboard session | live-cheap | 2 h |
 | #73 platform-facts F03 header | W1 | none | offline | 0.1 h |
-| #75 internal assistant instructions check (not lab work) | W3 | chat and docs workspace session | none | 1 h |
 | #78 governed-starter-kit first-call 502 | W3 | the next fanout deploy | live-cheap | 1 h |
 | #83 edge-function-limits 30 requests per trace | W3 | none | live-cheap | 2 h |
 | #86 governed-starter-kit app: sharp advisory | W1 | `bun install` and `bun audit` fetch from the registry | offline + registry | 0.5 h |
@@ -152,7 +152,6 @@ plan upgrades or hours of runtime). Effort is hands-on time, not wall time.
 | #143 operate-with-confidence diff | W5 | none (reading first) | offline | 2 h |
 | #144 community supabase-audit checks | W5 | a lab project | live-cheap | 2 h |
 | #145 PrivateLink self-serve on a fresh Team org | W4 | #130 and a fresh Team org | live-paid | 2 h |
-| #148 internal write-up backfill (not lab work) | W3 | docs workspace session; source list kept outside the repo | none | 0.5 d |
 | #149 privatelink-aws RUNLOG follow-ups | W4 | #130 for the spin parts (wording and Makefile fixes are offline) | offline + live-paid | 2 h |
 | #150 lifecycle-ops cluster B runbook | W3 | none | live-cheap | 0.5 d |
 | #151 publish lifecycle-ops, data-api-defaults, scoped-pats | W1 | raw JSON survives only in an earlier session's `/private/tmp` scratchpad (tmpfs, lost on reboot) | offline | 1.5 h |
@@ -177,7 +176,7 @@ plan upgrades or hours of runtime). Effort is hands-on time, not wall time.
 | #172 harness region header | W1 | none | offline | 1 h |
 
 Counts: W1 18 (#43 #47 #54 #70 #73 #86 #87 #131 #132 #133 #134 #135 #136
-#137 #138 #151 #171 #172), W2 2 (#89 #128), W3 43, W4 22, W5 8. Total 93.
+#137 #138 #151 #171 #172), W2 2 (#89 #128), W3 41, W4 22, W5 8. Total 91.
 
 ### Duplicates, merges and batches
 
@@ -2686,8 +2685,6 @@ environment unless the entry says local.
   confirmation and paid-resource elicitation from capable and incapable
   clients, the Explorer query in the Dashboard, and the Claude OAuth consent
   step. Artifact: RUNLOG section per path.
-- **#75** (not lab work) internal assistant instructions check in its chat
-  and docs workspace. Artifact: notes outside this repo.
 - **#78** governed-starter-kit: on the next fanout deploy, record the first
   502's body (per-upstream status) and function logs. Artifact: RUNLOG line.
 - **#93 / #155** Pipelines managed: copy time, lag, paused billing and WAL
@@ -2697,8 +2694,6 @@ environment unless the entry says local.
 - **#129** graphql: apply the data-api-defaults fix (query a real type,
   check `pg_extension`) to data-api-reenable DA03 and privatelink-aws T22;
   re-run DA03 now, T22 after #130. Artifact: DA03 run.
-- **#148** (not lab work) internal write-up backfill from the ranked list
-  kept outside the repo. Artifact: entries in that workspace.
 - **#150** lifecycle-ops: build the cluster B detect-then-self-restart
   runbook and drill it once. Artifact: runbook plus drill RUNLOG entry.
 - **#152 / #63 / #158** Dashboard session batch: branch SQL Editor/Table
@@ -2830,9 +2825,10 @@ will in the real run.
 
 ## Self-review
 
-- Coverage: status banner (top); triage table with all 93 open cards, each
+- Coverage: status banner (top); triage table with all 93 open cards (91 after two
+  non-lab cards left the board on 2026-10-13), each
   once (checked by script against `vkctl ls work-supabase-lab --json`: same
-  set, no duplicates; W1 18, W2 2, W3 43, W4 22, W5 8); merges and batches;
+  set, no duplicates; W1 18, W2 2, W3 43 then 41, W4 22, W5 8); merges and batches;
   W1 in full (Tasks 1-19), #128's offline half in full (Task 20); W2-W5 as
   entries, each W3-W5 card present in its section (checked by script).
 - Placeholders: the remaining angle-bracket tokens are run-time values
