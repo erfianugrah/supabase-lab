@@ -37,8 +37,8 @@ wait-ready:
 	@test -n "$(REF)" || (echo "no project_ref output - run phase1 first"; exit 1)
 	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "export SUPABASE_ACCESS_TOKEN first"; exit 1)
 	@while true; do \
-		st=$$(curl -s "https://api.supabase.com/platform/projects/$(REF)/privatelink/associations" \
-			-H "Authorization: Bearer $$SUPABASE_ACCESS_TOKEN" \
+		st=$$(printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" \
+			| curl -s -H @- "https://api.supabase.com/platform/projects/$(REF)/privatelink/associations" \
 			| jq -r '.private_link_associations[0].status // "UNKNOWN"'); \
 		echo "$$(date +%H:%M:%S) $$st"; \
 		case "$$st" in \
@@ -163,8 +163,13 @@ lambda-zip:
 	cd lambda && bun install --production && mkdir -p dist && cp index.mjs dist/ && cp -r node_modules dist/ \
 		&& echo "dist ready - set enable_lambda=true and apply"
 
+# DBPW has no definition here; pass it to make. The aws CLI reads the
+# environment block from stdin so the password is not in its argv.
+lambda-secret: export DB_PASSWORD := $(DBPW)
 lambda-secret:
-	@aws lambda update-function-configuration --function-name supabase-lab-probe \
+	@printf '{"Variables":{"PGHOST":"%s","PGUSER":"postgres","PGDATABASE":"postgres","PGSSLMODE":"require","PGPASSWORD":"%s"}}' \
+		"$(shell tofu output -raw phz_host)" "$$DB_PASSWORD" \
+	| aws lambda update-function-configuration --function-name supabase-lab-probe \
 		--region $(shell grep aws_region experiment.tfvars | cut -d'"' -f2) \
-		--environment "Variables={PGHOST=$(shell tofu output -raw phz_host),PGUSER=postgres,PGDATABASE=postgres,PGSSLMODE=require,PGPASSWORD=$(DBPW)}" \
+		--environment file:///dev/stdin \
 		--query 'FunctionName' --output text && echo "PGPASSWORD set"

@@ -29,7 +29,7 @@ status:
 # (saves a create; LO05 then waits from LO04's first POST, see RUNLOG). The
 # runner is invoked from source because harness/dist/pvlab is linux-x64.
 run-destructive:
-	@test -n "$(SUPABASE_ACCESS_TOKEN)" || (echo "export SUPABASE_ACCESS_TOKEN"; exit 1)
+	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "export SUPABASE_ACCESS_TOKEN"; exit 1)
 	@test -n "$(PVLAB_ORG_PRO)" || (echo "export PVLAB_ORG_PRO=<pro org slug>"; exit 1)
 	@cd $(ROOT) && bun harness/scripts/gen-registry.ts >/dev/null
 	@cd $(ROOT) && bun harness/src/run.ts --where local --experiment lifecycle-ops \

@@ -31,33 +31,36 @@ validate:
 	@ls *.tf >/dev/null || (echo "no .tf files"; exit 1)
 	tofu validate
 
+apply: export TF_VAR_supabase_access_token := $(TOK)
 apply:
-	@tofu plan $(VARS) -var="supabase_access_token=$(TOK)" -out=tfplan
+	@tofu plan $(VARS) -out=tfplan
 	@tofu apply tfplan
 	@echo "project_ref = $$(tofu output -raw project_ref)"
 
+destroy: export TF_VAR_supabase_access_token := $(TOK)
 destroy:
-	@tofu plan -destroy $(VARS) -var="supabase_access_token=$(TOK)" -out=tfplan-destroy
+	@tofu plan -destroy $(VARS) -out=tfplan-destroy
 	@tofu apply tfplan-destroy
 
 # One repro run: provision user -> dart run against gotrue $(GOTRUE_VERSION)
 # -> delete user. Prints the RESULT block; verdict line is the differential.
+repro: export SUPABASE_ACCESS_TOKEN := $(TOK)
 repro:
 	@test -n "$(REF)" || (echo "no project_ref output - run 'make apply' first"; exit 1)
-	@test -n "$(TOK)" || (echo "no PAT"; exit 1)
-	@case "$(TOK)" in *REPLACE_ME*) echo "PAT is the committed placeholder"; exit 1;; esac
+	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "no PAT"; exit 1)
+	@case "$$SUPABASE_ACCESS_TOKEN" in *REPLACE_ME*) echo "PAT is the committed placeholder"; exit 1;; esac
 	$(eval TS := $(shell date +%Y%m%d-%H%M%S))
 	@mkdir -p evidence/$(TS)
-	@anon=$$(curl -s -H "Authorization: Bearer $(TOK)" \
+	@anon=$$(printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -s -H @- \
 		"https://api.supabase.com/v1/projects/$(REF)/api-keys" \
 		| jq -r '.[] | select(.name=="anon") | .api_key' | head -1); \
-	svc=$$(curl -s -H "Authorization: Bearer $(TOK)" \
+	svc=$$(printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -s -H @- \
 		"https://api.supabase.com/v1/projects/$(REF)/api-keys" \
 		| jq -r '.[] | select(.name=="service_role") | .api_key' | head -1); \
 	test -n "$$anon" -a -n "$$svc" || (echo "could not fetch api keys"; exit 1); \
 	email="repro-$(TS)@example.com"; password="Repro-$(TS)-pass!"; \
-	uid=$$(curl -s -X POST "https://$(REF).supabase.co/auth/v1/admin/users" \
-		-H "apikey: $$svc" -H "Authorization: Bearer $$svc" \
+	uid=$$(printf 'apikey: %s\nAuthorization: Bearer %s\n' "$$svc" "$$svc" | curl -s -X POST "https://$(REF).supabase.co/auth/v1/admin/users" \
+		-H @- \
 		-H "Content-Type: application/json" \
 		-d "{\"email\":\"$$email\",\"password\":\"$$password\",\"email_confirm\":true}" \
 		| jq -r '.id'); \
@@ -69,8 +72,8 @@ repro:
 		   TEST_EMAIL="$$email" TEST_PASSWORD="$$password" \
 		   $(DART) run bin/repro.dart stale-reuse $(REUSE_WINDOW_SEC) \
 		   2>&1 | tee ../evidence/$(TS)/stale-reuse-gotrue-$(GOTRUE_VERSION).log; \
-	curl -s -X DELETE "https://$(REF).supabase.co/auth/v1/admin/users/$$uid" \
-		-H "apikey: $$svc" -H "Authorization: Bearer $$svc" >/dev/null; \
+	printf 'apikey: %s\nAuthorization: Bearer %s\n' "$$svc" "$$svc" | curl -s -X DELETE "https://$(REF).supabase.co/auth/v1/admin/users/$$uid" \
+		-H @- >/dev/null; \
 	echo "evidence: evidence/$(TS)/"
 
 # The differential: same scenario, pre-fix vs post-fix gotrue.
@@ -94,8 +97,8 @@ repro-local:
 	anon=$$(echo "$$status" | jq -r '.ANON_KEY'); \
 	test -n "$$host" -a "$$host" != "null" || (echo "local stack not running"; exit 1); \
 	email="local-$(TS)@example.com"; password="Local-$(TS)-pass!"; \
-	uid=$$(curl -s -X POST "$$host/auth/v1/admin/users" \
-		-H "apikey: $$svc" -H "Authorization: Bearer $$svc" \
+	uid=$$(printf 'apikey: %s\nAuthorization: Bearer %s\n' "$$svc" "$$svc" | curl -s -X POST "$$host/auth/v1/admin/users" \
+		-H @- \
 		-H "Content-Type: application/json" \
 		-d "{\"email\":\"$$email\",\"password\":\"$$password\",\"email_confirm\":true}" \
 		| jq -r '.id'); \
@@ -107,8 +110,8 @@ repro-local:
 		   TEST_EMAIL="$$email" TEST_PASSWORD="$$password" \
 		   $(DART) run bin/repro.dart stale-reuse $(REUSE_WINDOW_SEC) \
 		   2>&1 | tee ../evidence/$(TS)/local-stale-reuse-gotrue-$(GOTRUE_VERSION).log; \
-	curl -s -X DELETE "$$host/auth/v1/admin/users/$$uid" \
-		-H "apikey: $$svc" -H "Authorization: Bearer $$svc" >/dev/null; \
+	printf 'apikey: %s\nAuthorization: Bearer %s\n' "$$svc" "$$svc" | curl -s -X DELETE "$$host/auth/v1/admin/users/$$uid" \
+		-H @- >/dev/null; \
 	echo "evidence: evidence/$(TS)/"
 
 repro-local-both:

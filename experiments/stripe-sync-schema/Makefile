@@ -7,8 +7,9 @@ PW   := $(shell grep -E '^db_password' $(ROOT)/secrets.tfvars 2>/dev/null | cut 
 TS   := $(shell date +%Y%m%d-%H%M%S)
 
 # Transaction pooler. Everything here is schema introspection, so the pooler is
-# fine and it is the only path that works over IPv4.
-PGURL = postgresql://postgres.$(REF):$(PW)@$(POOL):6543/postgres?connect_timeout=10
+# fine and it is the only path that works over IPv4. No password in the URL
+# (psql's argv): `gate` exports PGPASSWORD.
+PGURL = postgresql://postgres.$(REF)@$(POOL):6543/postgres?connect_timeout=10
 
 .PHONY: init fmt validate apply gate seed probe diff destroy
 
@@ -38,9 +39,10 @@ apply:
 # The Dashboard is evidently calling something, but it is unpublished, so
 # wiring this to a private endpoint would buy automation at the price of a
 # harness that breaks silently when the endpoint moves.
+gate: export PGPASSWORD := $(PW)
 gate:
 	@test -n "$(REF)" || (echo "no project_ref output - run 'make apply' first"; exit 1)
-	@test -n "$(PW)"  || (echo "no db_password in $(ROOT)/secrets.tfvars - run 'make secrets-decrypt' at the root"; exit 1)
+	@test -n "$$PGPASSWORD"  || (echo "no db_password in $(ROOT)/secrets.tfvars - run 'make secrets-decrypt' at the root"; exit 1)
 	@if psql "$(PGURL)" -tAc "select 1 from information_schema.schemata where schema_name='stripe'" 2>/dev/null | grep -q 1; then \
 		echo "stripe schema present - integration is installed. Next: make seed"; \
 	else \
@@ -65,14 +67,16 @@ seed:
 	@test -n "$$STRIPE_SECRET_KEY" || (echo "export STRIPE_SECRET_KEY=sk_test_... (a WRITE key) for the dedicated test account"; exit 1)
 	@cd $(ROOT) && bun run experiments/stripe-sync-schema/seed/seed.ts $(SEED_ARGS)
 
+probe: export SUPABASE_ACCESS_TOKEN := $(TOK)
+probe: export DB_PASSWORD := $(PW)
 probe:
 	@test -n "$(REF)" || (echo "no project_ref output - run 'make apply' first"; exit 1)
-	@test -n "$(TOK)" || (echo "no PAT in $(ROOT)/secrets.tfvars - run 'make secrets-decrypt' at the root"; exit 1)
+	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "no PAT in $(ROOT)/secrets.tfvars - run 'make secrets-decrypt' at the root"; exit 1)
 	@$(MAKE) --no-print-directory gate >/dev/null
 	@cd $(ROOT)/harness && bun run build >/dev/null
 	@mkdir -p evidence/$(TS)
-	@PVLAB_REF="$(REF)" SUPABASE_ACCESS_TOKEN="$(TOK)" \
-	 DB_PASSWORD="$(PW)" PVLAB_ENDPOINT_POOLER="$(POOL)" \
+	@PVLAB_REF="$(REF)" \
+	 PVLAB_ENDPOINT_POOLER="$(POOL)" \
 		$(ROOT)/harness/dist/pvlab --where local --only E01,E02,E03 \
 		--experiment stripe-sync-schema --out evidence/$(TS)
 	@echo "== evidence/$(TS)/ =="

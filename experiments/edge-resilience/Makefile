@@ -35,9 +35,10 @@ BATTERY := W01,W02,W03,W04,W05,W06,W07,W08,W09,W10,W11,W12,W13,W15,W16,W17,W18,W
 up: init validate apply keygen worker-deploy seed
 	@echo "lab up: primary=$$(tofu output -raw project_ref) standby=$$(tofu output -raw standby_ref)"
 
+down: export TF_VAR_supabase_access_token := $(TOK)
 down:
 	-wrangler delete --name edge-resilience-drill 2>/dev/null || true
-	@tofu plan -destroy $(VARS) -var="supabase_access_token=$(TOK)" -out=tfplan-destroy
+	@tofu plan -destroy $(VARS) -out=tfplan-destroy
 	@tofu apply tfplan-destroy
 
 battery: up
@@ -50,8 +51,9 @@ validate:
 	@ls *.tf >/dev/null || (echo "no .tf files - tofu validate returns Success on an EMPTY dir"; exit 1)
 	tofu validate
 
+apply: export TF_VAR_supabase_access_token := $(TOK)
 apply:
-	@tofu plan $(VARS) -var="supabase_access_token=$(TOK)" -out=tfplan
+	@tofu plan $(VARS) -out=tfplan
 	@tofu apply tfplan
 	@echo "project_ref = $$(tofu output -raw project_ref)"
 
@@ -77,25 +79,28 @@ worker-normal:
 
 # Probe table the JWT-skew module reads. Via the Management query endpoint so
 # the PAT is the only credential needed.
+seed: export SUPABASE_ACCESS_TOKEN := $(TOK)
 seed:
 	@test -n "$(REF)" || (echo "no project_ref output - run 'make apply' first"; exit 1)
-	@curl -sf -X POST -H "Authorization: Bearer $(TOK)" -H "Content-Type: application/json" \
+	@printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -sf -X POST -H @- -H "Content-Type: application/json" \
 		"https://api.supabase.com/v1/projects/$(REF)/database/query" \
 		-d '{"query":"create table if not exists public.w_probe(id int primary key); insert into public.w_probe values (1) on conflict do nothing; grant select, insert, update, delete on table public.w_probe to anon, authenticated, service_role;"}'
 	@echo " - w_probe seeded"
 
+probe: export SUPABASE_ACCESS_TOKEN := $(TOK)
+probe: export DB_PASSWORD := $(PW)
 probe:
 	@test -n "$(REF)" || (echo "no project_ref output - run 'make apply' first"; exit 1)
-	@test -n "$(TOK)" || (echo "no PAT - export SUPABASE_ACCESS_TOKEN or run 'make secrets-decrypt' at the root"; exit 1)
+	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "no PAT - export SUPABASE_ACCESS_TOKEN or run 'make secrets-decrypt' at the root"; exit 1)
 	@test -n "$(ONLY)" || (echo "refusing to run with an empty ONLY"; exit 1)
 	@cd $(ROOT)/harness && bun run build >/dev/null
 	@mkdir -p evidence/$(TS)
-	@pub=$$(curl -s -H "Authorization: Bearer $(TOK)" \
+	@pub=$$(printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -s -H @- \
 		"https://api.supabase.com/v1/projects/$(REF)/api-keys?reveal=true" \
 		| jq -r '.[] | select(.type=="publishable") | .api_key' | head -1); \
 	test -n "$$pub" || (echo "could not fetch the publishable key"; exit 1); \
 	edge=$$(bun -e 'console.log(JSON.parse(require("fs").readFileSync("wrangler.jsonc","utf8")).vars.EDGE_URL)' 2>/dev/null || true); \
-	PVLAB_REF="$(REF)" SUPABASE_ACCESS_TOKEN="$(TOK)" SUPABASE_ANON_KEY="$$pub" DB_PASSWORD="$(PW)" \
+	PVLAB_REF="$(REF)" SUPABASE_ANON_KEY="$$pub" \
 		AWS_REGION="$(REGION)" PVLAB_ENDPOINT_EDGE_URL="$$edge" \
 		PVLAB_ENDPOINT_JWKS_PRIV="$(CURDIR)/jwks/private.json" \
 		$(ROOT)/harness/dist/pvlab --where local --experiment edge-resilience \
@@ -116,6 +121,7 @@ publish-evidence:
 	@test -n "$(RUN)" || (echo "RUN=evidence/<ts>/run-<stamp>.json required"; exit 1)
 	@cd $(ROOT)/harness && bun scripts/publish-evidence.ts $(abspath $(RUN)) $(abspath .) $(if $(PUBLISH_ONLY),--only $(PUBLISH_ONLY),)
 
+destroy: export TF_VAR_supabase_access_token := $(TOK)
 destroy:
-	@tofu plan -destroy $(VARS) -var="supabase_access_token=$(TOK)" -out=tfplan-destroy
+	@tofu plan -destroy $(VARS) -out=tfplan-destroy
 	@tofu apply tfplan-destroy

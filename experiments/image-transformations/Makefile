@@ -25,17 +25,18 @@ apply:
 # only runs under probe-destructive. I10 additionally needs
 # PVLAB_PLATFORM_JWT (a dashboard user token - the platform API rejects
 # PATs); without it I10 self-skips with a reason.
+probe: export SUPABASE_ACCESS_TOKEN := $(TOK)
 probe:
 	@test -n "$(REF)" || (echo "no project_ref output - run 'make apply' first"; exit 1)
-	@test -n "$(TOK)" || (echo "no PAT in $(ROOT)/secrets.tfvars - run 'make secrets-decrypt' at the root"; exit 1)
+	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "no PAT in $(ROOT)/secrets.tfvars - run 'make secrets-decrypt' at the root"; exit 1)
 	@cd $(ROOT)/harness && bun run build >/dev/null
 	@mkdir -p evidence/$(TS)
-	@keys=$$(curl -s -H "Authorization: Bearer $(TOK)" \
+	@keys=$$(printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -s -H @- \
 		"https://api.supabase.com/v1/projects/$(REF)/api-keys"); \
 	anon=$$(echo "$$keys" | jq -r '.[] | select(.name=="anon") | .api_key' | head -1); \
 	svc=$$(echo "$$keys" | jq -r '.[] | select(.name=="service_role") | .api_key' | head -1); \
 	test -n "$$anon" -a -n "$$svc" || (echo "could not fetch project api keys"; exit 1); \
-	PVLAB_REF="$(REF)" SUPABASE_ACCESS_TOKEN="$(TOK)" \
+	PVLAB_REF="$(REF)" \
 		SUPABASE_ANON_KEY="$$anon" SUPABASE_SERVICE_ROLE_KEY="$$svc" \
 		PVLAB_ORG_SLUGS="$(ORG)" \
 		$(ROOT)/harness/dist/pvlab --where local --experiment image-transformations \
@@ -43,16 +44,17 @@ probe:
 		--out evidence/$(TS)
 	@echo "== evidence/$(TS) =="
 
+probe-destructive: export SUPABASE_ACCESS_TOKEN := $(TOK)
 probe-destructive:
 	@test -n "$(REF)" || (echo "no project_ref output - run 'make apply' first"; exit 1)
-	@test -n "$(TOK)" || (echo "no PAT in $(ROOT)/secrets.tfvars"; exit 1)
+	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "no PAT in $(ROOT)/secrets.tfvars"; exit 1)
 	@cd $(ROOT)/harness && bun run build >/dev/null
 	@mkdir -p evidence/$(TS)
-	@keys=$$(curl -s -H "Authorization: Bearer $(TOK)" \
+	@keys=$$(printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -s -H @- \
 		"https://api.supabase.com/v1/projects/$(REF)/api-keys"); \
 	anon=$$(echo "$$keys" | jq -r '.[] | select(.name=="anon") | .api_key' | head -1); \
 	svc=$$(echo "$$keys" | jq -r '.[] | select(.name=="service_role") | .api_key' | head -1); \
-	PVLAB_REF="$(REF)" SUPABASE_ACCESS_TOKEN="$(TOK)" \
+	PVLAB_REF="$(REF)" \
 		SUPABASE_ANON_KEY="$$anon" SUPABASE_SERVICE_ROLE_KEY="$$svc" \
 		PVLAB_ORG_SLUGS="$(ORG)" \
 		$(ROOT)/harness/dist/pvlab --where local --experiment image-transformations \
