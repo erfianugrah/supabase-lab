@@ -2,6 +2,11 @@
 
 > **For agentic workers:** Execute this plan inline, task by task, in the current session. Steps use checkbox (`- [ ]`) syntax for tracking. Per-task subagents (subagent-driven-development) only if the user asks for them.
 
+> **W1 + Task 20 SHIPPED 2026-10-13 (commits: see git log).** Tasks 1-17
+> and 20 (Steps 1-3) done; Task 18 took its no-release fallback; Task 19
+> Steps 2-4 and Task 20 Step 4 are open. Deviations are noted under each
+> task.
+>
 > **STATUS 2026-10-13: PLANNED.** Covers every open card on the
 > `work-supabase-lab` board (90 To-Do plus #127 In Review = 91; two non-lab
 > cards moved to another project on 2026-10-13). W1 (offline)
@@ -216,7 +221,7 @@ eu-central-1 project and its facts said ap-southeast-1). The fix adds
 `audit-integrity/tests/a12-rbac-roles.ts` already reads), and makes both
 renderers say which one they show.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 **Replace in `harness/src/ctx.test.ts`:**
 
@@ -316,7 +321,7 @@ describe("numbersIn", () => {
   test("a new test's measurements become columns with no renderer change", () => {
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `(cd harness && bun test src/ctx.test.ts src/facts.test.ts src/report.test.ts); echo "exit $?"`
 
@@ -325,7 +330,7 @@ Expected: `exit 1`, summary ` 10 pass`, ` 4 fail`, `1 error`. The error is
 (ctx.test.ts cannot load); the three new header tests fail on `toContain`
 (the header still says `region ap-southeast-1`).
 
-- [ ] **Step 3: Write the minimal implementation**
+- [x] **Step 3: Write the minimal implementation**
 
 **Replace in `harness/src/types.ts`:**
 
@@ -504,7 +509,7 @@ import { buildCtx, readProjectRegion, toolVersions } from "./ctx";
     ref: ctx.ref,
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `(cd harness && bun test src/ctx.test.ts src/facts.test.ts src/report.test.ts); echo "exit $?"`
 
@@ -518,7 +523,7 @@ Run: `bun harness/src/run.ts --facts experiments/data-api-defaults/out/2026-10-1
 
 Expected: `Source artifact: run started 2026-10-13T00:06:25.892Z, finished ... vantage local, harness region ap-southeast-1 (not read from the project), lab commit 91fe131. Project ref omitted on purpose.`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add harness/src/types.ts harness/src/ctx.ts harness/src/ctx.test.ts harness/src/facts.ts harness/src/facts.test.ts harness/src/report.ts harness/src/report.test.ts harness/src/run.ts
@@ -540,7 +545,7 @@ tracked file contains one today, and `redact()` knows only refs, project and
 pooler hosts, emails and PAT/OAuth ids. Fix it in the shared redactor, before
 any publish task runs.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 **Replace in `harness/src/redact.test.ts`:**
 
@@ -577,12 +582,12 @@ any publish task runs.
 ];
 ```
 
-- [ ] **Step 2: Run it to verify it fails**
+- [x] **Step 2: Run it to verify it fails**
 
 Run: `(cd harness && bun test src/redact.test.ts); echo "exit $?"`
 Expected: ` 15 pass`, ` 2 fail` (the two new cases: the path comes back unchanged), `exit 1`.
 
-- [ ] **Step 3: Write the minimal implementation**
+- [x] **Step 3: Write the minimal implementation**
 
 **Replace in `harness/scripts/publish-evidence.ts`:**
 
@@ -612,19 +617,33 @@ Expected: ` 15 pass`, ` 2 fail` (the two new cases: the path comes back unchange
  * email, and a home-directory prefix (macOS or Linux); plus, by literal,
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `(cd harness && bun test src/redact.test.ts); echo "exit $?"`
 Expected: ` 17 pass`, ` 0 fail`, `exit 0`.
 
 Run the sensors. Expected: `tsc exit 0`; `1605 pass`, ` 0 fail`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add harness/scripts/publish-evidence.ts harness/src/redact.test.ts
 git commit -m "fix(harness): publish-evidence redacts home-directory paths"
 ```
+
+> **Executed 2026-10-13, with an addition found in Task 11.** The first
+> usage-metering publish let three project refs through in M05a's evidence
+> (one ref per line inside a JSON string). `redact()` runs on the raw JSON
+> text, where a ref at the start of such a line follows the two characters
+> `\n` and reads as a 21-letter token; the publish script's leftover check
+> (`\b[a-z]{20}\b`) and `identifiers.test.ts` had the same blind spot, so
+> both reported clean. Fixed in this task's commit: one exported `REF_SHAPE`
+> in `publish-evidence.ts` that also treats a JSON escape (`\n`, `\t`, `\r`,
+> `\b`, `\f`) as a boundary, used by `redact()`, the leftover check and
+> `identifiers.test.ts`, plus two `redact.test.ts` cases (red 17 pass / 2 fail
+> against the old pattern, green 19 pass). Every pass count from Task 11 on is
+> 2 higher than written. No tracked file carried the pattern (scanned with the
+> new shape before the fix); the leak was caught before any commit.
 
 ---
 
@@ -639,7 +658,7 @@ au02-final, au03-run3, au04-final (headline), plus au01, au01-final,
 au02-run2, au03-run2, au04, au04-run2 (earlier runs named in the text).
 `au01/run-2026-10-09T23-57-18-992Z.json` is a skip-only run and is not cited.
 
-- [ ] **Step 1: Publish**
+- [x] **Step 1: Publish**
 
 ```bash
 make -C experiments/auth-providers publish-evidence RUN=evidence/au01/run-2026-10-09T23-57-24-149Z.json
@@ -659,7 +678,7 @@ Expected: ten `published ...` lines, result counts 11, 11, 11, 9, 9, 3, 7, 4,
 credential ids remain`. The first goes to `out/2026-10-09`, the rest to
 `out/2026-10-10`.
 
-- [ ] **Step 2: Re-cite in the RUNLOG**
+- [x] **Step 2: Re-cite in the RUNLOG**
 
 **Replace in `experiments/auth-providers/RUNLOG.md`:**
 
@@ -692,7 +711,7 @@ sections below use. Latencies are in milliseconds where a row says "in ms".
 | au04-final | `out/2026-10-10/run-2026-10-10T00-26-40-222Z.json` |
 ```
 
-- [ ] **Step 3: Verify**
+- [x] **Step 3: Verify**
 
 Run: `git status --short --untracked-files=all experiments/auth-providers/out | wc -l`
 Expected: `20`
@@ -705,7 +724,7 @@ Expected: `1` (the AU03 stack trace line, redacted by Task 1b), then no output.
 
 Run the sensors. Expected: `tsc exit 0`; `1625 pass`, ` 0 fail`.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add experiments/auth-providers/out experiments/auth-providers/RUNLOG.md
@@ -721,7 +740,7 @@ git commit -m "docs(auth-providers): publish the 2026-10-10 run artifacts and ci
 - Create: `experiments/hostname-path/out/2026-10-10/` (7 runs)
 - Modify: `experiments/hostname-path/RUNLOG.md:21-25`
 
-- [ ] **Step 1: Add the target (copied from `experiments/auth-providers/Makefile`)**
+- [x] **Step 1: Add the target (copied from `experiments/auth-providers/Makefile`)**
 
 **Append to `experiments/hostname-path/Makefile`:**
 
@@ -740,7 +759,7 @@ publish-evidence:
 Run: `make -C experiments/hostname-path publish-evidence 2>&1 | rg 'required'`
 Expected: `RUN=evidence/<ts>/run-<stamp>.json required`
 
-- [ ] **Step 2: Publish**
+- [x] **Step 2: Publish**
 
 ```bash
 make -C experiments/hostname-path publish-evidence RUN=evidence/20261010-122802/run-2026-10-10T04-28-02-410Z.json
@@ -755,7 +774,7 @@ make -C experiments/hostname-path publish-evidence RUN=evidence/20261010-124339/
 Expected: seven `published ... -> .../out/2026-10-10` lines, result counts
 5, 10, 2, 9, 6, 4, 1, all with 0 unredacted tokens and 0 credential ids.
 
-- [ ] **Step 3: Re-cite in the RUNLOG**
+- [x] **Step 3: Re-cite in the RUNLOG**
 
 **Replace in `experiments/hostname-path/RUNLOG.md`:**
 
@@ -784,14 +803,14 @@ repo; redacted copies, each with a `.facts.md` beside it, in `out/2026-10-10/`):
 | `20261010-124339` | HP09 | `out/2026-10-10/run-2026-10-10T04-43-39-984Z.json` |
 ```
 
-- [ ] **Step 4: Verify**
+- [x] **Step 4: Verify**
 
 Run: `git status --short --untracked-files=all experiments/hostname-path/out | wc -l`
 Expected: `14`
 
 Run the sensors. Expected: `tsc exit 0`; `1639 pass`, ` 0 fail`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add experiments/hostname-path/Makefile experiments/hostname-path/out experiments/hostname-path/RUNLOG.md
@@ -806,7 +825,7 @@ git commit -m "docs(hostname-path): add publish-evidence, publish the 2026-10-10
 - Create: `experiments/free-email-templates/out/2026-10-10/` (3 runs)
 - Modify: `experiments/free-email-templates/RUNLOG.md:3-7`
 
-- [ ] **Step 1: Publish**
+- [x] **Step 1: Publish**
 
 ```bash
 make -C experiments/free-email-templates publish-evidence RUN=evidence/run1/run-2026-10-10T07-20-50-952Z.json
@@ -818,7 +837,7 @@ Expected: three `published ... -> .../out/2026-10-10` lines, 8, 13 and 9
 results, 0 unredacted tokens and 0 credential ids. (This Makefile narrows with
 `ONLY`; leave it unset.)
 
-- [ ] **Step 2: Re-cite in the RUNLOG**
+- [x] **Step 2: Re-cite in the RUNLOG**
 
 **Replace in `experiments/free-email-templates/RUNLOG.md`:**
 
@@ -840,14 +859,14 @@ beside it: run 1 `out/2026-10-10/run-2026-10-10T07-20-50-952Z.json`, run 2
 `out/2026-10-10/run-2026-10-10T07-23-12-964Z.json`.
 ```
 
-- [ ] **Step 3: Verify**
+- [x] **Step 3: Verify**
 
 Run: `git status --short --untracked-files=all experiments/free-email-templates/out | wc -l`
 Expected: `6`
 
 Run the sensors. Expected: `tsc exit 0`; `1645 pass`, ` 0 fail`.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add experiments/free-email-templates/out experiments/free-email-templates/RUNLOG.md
@@ -862,7 +881,7 @@ git commit -m "docs(free-email-templates): publish the 2026-10-10 run artifacts 
 - Create: `experiments/jit-db-access/out/2026-10-10/` (6 runs)
 - Modify: `experiments/jit-db-access/RUNLOG.md:3-7`
 
-- [ ] **Step 1: Publish** (all six runs in the RUNLOG's run table, including the exploratory one)
+- [x] **Step 1: Publish** (all six runs in the RUNLOG's run table, including the exploratory one)
 
 ```bash
 make -C experiments/jit-db-access publish-evidence RUN=evidence/dry-reused/run-2026-10-10T01-28-01-903Z.json
@@ -876,7 +895,7 @@ make -C experiments/jit-db-access publish-evidence RUN=evidence/20261010-104116/
 Expected: six `published ... -> .../out/2026-10-10` lines, 12 results each,
 0 unredacted tokens and 0 credential ids.
 
-- [ ] **Step 2: Re-cite in the RUNLOG**
+- [x] **Step 2: Re-cite in the RUNLOG**
 
 **Replace in `experiments/jit-db-access/RUNLOG.md`:**
 
@@ -896,14 +915,14 @@ artifact stamp in the run table is published redacted as
 `out/2026-10-10/run-2026-10-10T<stamp>.json`, with a `.facts.md` beside it.
 ```
 
-- [ ] **Step 3: Verify**
+- [x] **Step 3: Verify**
 
 Run: `git status --short --untracked-files=all experiments/jit-db-access/out | wc -l`
 Expected: `12`
 
 Run the sensors. Expected: `tsc exit 0`; `1657 pass`, ` 0 fail`.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add experiments/jit-db-access/out experiments/jit-db-access/RUNLOG.md
@@ -928,7 +947,7 @@ when `RUN=` is omitted; rename it to `PVLAB`. And R2 (`rp02-run2`) and R7
 after the input file and would silently overwrite the first with the second.
 R7 is published from a suffixed copy.
 
-- [ ] **Step 1: Rename the command variable**
+- [x] **Step 1: Rename the command variable**
 
 **Replace in `experiments/restore-paths/Makefile`:**
 
@@ -950,7 +969,7 @@ Expected: `3`, then no output (exit 1).
 Run: `make -n -C experiments/restore-paths surface | tail -1`
 Expected: a line starting `cd /` and containing `bun harness/src/run.ts --tests experiments/restore-paths/tests --where local --experiment restore-paths --destructive --only RP01 --out experiments/restore-paths/evidence/`
 
-- [ ] **Step 2: Add the target (copied from `experiments/auth-providers/Makefile`)**
+- [x] **Step 2: Add the target (copied from `experiments/auth-providers/Makefile`)**
 
 **Append to `experiments/restore-paths/Makefile`:**
 
@@ -967,7 +986,7 @@ publish-evidence:
 Run: `make -C experiments/restore-paths publish-evidence 2>&1 | rg 'required'`
 Expected: `RUN=evidence/<ts>/run-<stamp>.json required`
 
-- [ ] **Step 3: Publish**
+- [x] **Step 3: Publish**
 
 ```bash
 cp experiments/restore-paths/evidence/rp03-run2/run-2026-10-10T01-30-06-076Z.json experiments/restore-paths/evidence/rp03-run2/run-2026-10-10T01-30-06-076Z-rp03.json
@@ -986,7 +1005,7 @@ make -C experiments/restore-paths publish-evidence RUN=evidence/rp03-run4/run-20
 Expected: ten `published ... -> .../out/2026-10-10` lines, result counts 3,
 5, 8, 8, 8, 8, 8, 7, 7, 7, 0 unredacted tokens and 0 credential ids.
 
-- [ ] **Step 4: Re-cite in the RUNLOG**
+- [x] **Step 4: Re-cite in the RUNLOG**
 
 **Replace in `experiments/restore-paths/RUNLOG.md`:**
 
@@ -1044,7 +1063,7 @@ module; artifact `out/2026-10-10/run-2026-10-10T01-22-13-170Z.json`,
 `fresh_physical_backups=0`) found the listing empty at the same
 ```
 
-- [ ] **Step 5: Verify**
+- [x] **Step 5: Verify**
 
 Run: `git status --short --untracked-files=all experiments/restore-paths/out | wc -l`
 Expected: `20`
@@ -1054,7 +1073,7 @@ Expected: `RP02a,RP02b,RP02c,RP02d,RP02e,RP02f,RP02f2,RP02g` then `RP03a,RP03b,R
 
 Run the sensors. Expected: `tsc exit 0`; `1677 pass`, ` 0 fail`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add experiments/restore-paths/Makefile experiments/restore-paths/out experiments/restore-paths/RUNLOG.md
@@ -1070,7 +1089,7 @@ git commit -m "docs(restore-paths): add publish-evidence, publish the 2026-10-10
 - Modify: `experiments/pooler-checkout/RUNLOG.md:16-30`
 - Modify: `AGENTS.md:2642-2644`
 
-- [ ] **Step 1: Publish**
+- [x] **Step 1: Publish**
 
 ```bash
 make -C experiments/pooler-checkout publish-evidence RUN=evidence/20261010-095322/run-2026-10-10T01-53-22-718Z.json
@@ -1085,7 +1104,7 @@ make -C experiments/pooler-checkout publish-evidence RUN=evidence/20261010-11464
 Expected: seven `published ... -> .../out/2026-10-10` lines, result counts
 32, 35, 11, 15, 5, 15, 5, 0 unredacted tokens and 0 credential ids.
 
-- [ ] **Step 2: Re-cite in the RUNLOG and AGENTS.md**
+- [x] **Step 2: Re-cite in the RUNLOG and AGENTS.md**
 
 **Replace in `experiments/pooler-checkout/RUNLOG.md`:**
 
@@ -1145,7 +1164,7 @@ Micro project per run. IPv4-only vantage in Singapore. Raw artifacts are in the
 ignored `evidence/`; redacted copies in `out/2026-10-10/`. Details: RUNLOG.md.
 ```
 
-- [ ] **Step 3: Verify**
+- [x] **Step 3: Verify**
 
 Run: `git status --short --untracked-files=all experiments/pooler-checkout/out | wc -l`
 Expected: `14`
@@ -1155,7 +1174,7 @@ Expected: no output (run 6's captured stderr had a home path; Task 1b redacts it
 
 Run the sensors. Expected: `tsc exit 0`; `1691 pass`, ` 0 fail`.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add experiments/pooler-checkout/out experiments/pooler-checkout/RUNLOG.md AGENTS.md
@@ -1181,7 +1200,7 @@ This experiment's own `.gitignore` lists `out/`, which overrides the root
 published files are written but `git add` silently skips them. The root rules
 already ignore anything at the `out/` root, so the line can go.
 
-- [ ] **Step 1: Add the target (copied from `experiments/auth-providers/Makefile`)**
+- [x] **Step 1: Add the target (copied from `experiments/auth-providers/Makefile`)**
 
 **Append to `experiments/pipelines/Makefile`:**
 
@@ -1199,7 +1218,7 @@ publish-evidence:
 Run: `make -C experiments/pipelines publish-evidence 2>&1 | rg 'required'`
 Expected: `RUN=evidence/<ts>/run-<stamp>.json required`
 
-- [ ] **Step 2: Stop the experiment's .gitignore from hiding the dated out/ dirs**
+- [x] **Step 2: Stop the experiment's .gitignore from hiding the dated out/ dirs**
 
 **Replace in `experiments/pipelines/.gitignore`:**
 
@@ -1217,7 +1236,7 @@ evidence/
 Run: `git check-ignore -v experiments/pipelines/out/2026-10-10/x.json; echo "rc=$?"`
 Expected: `rc=1` (not ignored; the path need not exist).
 
-- [ ] **Step 3: Publish**
+- [x] **Step 3: Publish**
 
 ```bash
 make -C experiments/pipelines publish-evidence RUN=evidence/final/run-2026-10-10T07-27-52-201Z.json
@@ -1229,7 +1248,7 @@ make -C experiments/pipelines publish-evidence RUN=evidence/dev/run-2026-10-10T0
 Expected: four `published ... -> .../out/2026-10-10` lines, 45, 6, 1 and 6
 results, 0 unredacted tokens and 0 credential ids.
 
-- [ ] **Step 4: Re-cite in the RUNLOG**
+- [x] **Step 4: Re-cite in the RUNLOG**
 
 **Replace in `experiments/pipelines/RUNLOG.md`:**
 
@@ -1250,14 +1269,14 @@ removed. No AWS or Cloudflare resource was created. Figures are pasted from
 PL07c quotes `out/2026-10-10/run-2026-10-10T07-16-05-316Z.json`.
 ```
 
-- [ ] **Step 5: Verify**
+- [x] **Step 5: Verify**
 
 Run: `git status --short --untracked-files=all experiments/pipelines/out | wc -l`
 Expected: `8`
 
 Run the sensors. Expected: `tsc exit 0`; `1699 pass`, ` 0 fail`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add experiments/pipelines/Makefile experiments/pipelines/.gitignore experiments/pipelines/out experiments/pipelines/RUNLOG.md
@@ -1280,7 +1299,7 @@ are side files, not run artifacts (`publish-evidence.ts` cannot read them);
 they stay in `evidence/`. As in pipelines, the experiment's own `.gitignore`
 lists `out/` and would hide the published files from `git add` (Step 2).
 
-- [ ] **Step 1: Add the target (copied from `experiments/auth-providers/Makefile`)**
+- [x] **Step 1: Add the target (copied from `experiments/auth-providers/Makefile`)**
 
 **Append to `experiments/observability-surface/Makefile`:**
 
@@ -1297,7 +1316,7 @@ publish-evidence:
 Run: `make -C experiments/observability-surface publish-evidence 2>&1 | rg 'required'`
 Expected: `RUN=evidence/<ts>/run-<stamp>.json required`
 
-- [ ] **Step 2: Stop the experiment's .gitignore from hiding the dated out/ dirs**
+- [x] **Step 2: Stop the experiment's .gitignore from hiding the dated out/ dirs**
 
 **Replace in `experiments/observability-surface/.gitignore`:**
 
@@ -1317,7 +1336,7 @@ evidence/
 Run: `git check-ignore -v experiments/observability-surface/out/2026-10-10/x.json; echo "rc=$?"`
 Expected: `rc=1`
 
-- [ ] **Step 3: Publish**
+- [x] **Step 3: Publish**
 
 ```bash
 make -C experiments/observability-surface publish-evidence RUN=evidence/run1/OB01/run-2026-10-10T00-36-30-860Z.json
@@ -1335,7 +1354,7 @@ make -C experiments/observability-surface publish-evidence RUN=evidence/run3/OB0
 Expected: ten `published ... -> .../out/2026-10-10` lines, result counts 40,
 11, 7, 5, 6, 41, 8, 6, 41, 5, 0 unredacted tokens and 0 credential ids.
 
-- [ ] **Step 4: Re-cite in the RUNLOG**
+- [x] **Step 4: Re-cite in the RUNLOG**
 
 **Replace in `experiments/observability-surface/RUNLOG.md`:**
 
@@ -1398,14 +1417,14 @@ Published artifacts (redacted, a `.facts.md` beside each, `out/2026-10-10/`):
   artifact (`out/2026-10-10/run-2026-10-10T00-39-42-004Z.json`). No drain was created, so OB04d (batch size, flush
 ```
 
-- [ ] **Step 5: Verify**
+- [x] **Step 5: Verify**
 
 Run: `git status --short --untracked-files=all experiments/observability-surface/out | wc -l`
 Expected: `20`
 
 Run the sensors. Expected: `tsc exit 0`; `1719 pass`, ` 0 fail`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add experiments/observability-surface/Makefile experiments/observability-surface/.gitignore experiments/observability-surface/out experiments/observability-surface/RUNLOG.md
@@ -1429,7 +1448,7 @@ published: `evidence/users-*.json` (seeded demo users per project),
 654, are no longer on disk (checked 2026-10-13) and stay cited as gitignored.
 Uncited K01 runs (2026-10-05 to 2026-10-09) stay in `evidence/`.
 
-- [ ] **Step 1: Add the target (copied from `experiments/auth-providers/Makefile`)**
+- [x] **Step 1: Add the target (copied from `experiments/auth-providers/Makefile`)**
 
 **Append to `experiments/governed-starter-kit/Makefile`:**
 
@@ -1446,7 +1465,7 @@ publish-evidence:
 Run: `make -C experiments/governed-starter-kit publish-evidence 2>&1 | rg 'required'`
 Expected: `RUN=evidence/<ts>/run-<stamp>.json required`
 
-- [ ] **Step 2: Publish**
+- [x] **Step 2: Publish**
 
 ```bash
 make -C experiments/governed-starter-kit publish-evidence RUN=evidence/20261008-202521/run-2026-10-08T12-25-21-378Z.json
@@ -1465,7 +1484,7 @@ Expected: ten `published ...` lines, 8 results each except the last (52);
 the first six go to `out/2026-10-08` (UTC start dates), the last four to
 `out/2026-10-09`; 0 unredacted tokens and 0 credential ids.
 
-- [ ] **Step 3: Re-cite in the RUNLOG**
+- [x] **Step 3: Re-cite in the RUNLOG**
 
 **Replace in `experiments/governed-starter-kit/RUNLOG.md`:**
 
@@ -1546,7 +1565,7 @@ the first six go to `out/2026-10-08` (UTC start dates), the last four to
   `out/2026-10-08/run-2026-10-08T12-26-28-545Z.json`.
 ```
 
-- [ ] **Step 4: Verify**
+- [x] **Step 4: Verify**
 
 Run: `git status --short --untracked-files=all experiments/governed-starter-kit/out | wc -l`
 Expected: `20`
@@ -1559,7 +1578,7 @@ Expected: no output.
 
 Run the sensors. Expected: `tsc exit 0`; `1739 pass`, ` 0 fail`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add experiments/governed-starter-kit/Makefile experiments/governed-starter-kit/out experiments/governed-starter-kit/RUNLOG.md
@@ -1581,7 +1600,7 @@ names, which redaction does not touch; its measurement figures are quoted from
 the facts render instead. The figures below were pasted from
 `bun harness/src/run.ts --facts experiments/usage-metering/evidence/<run>.json`.
 
-- [ ] **Step 1: Publish M04, M05 (two runs) and M06 (two runs)**
+- [x] **Step 1: Publish M04, M05 (two runs) and M06 (two runs)**
 
 ```bash
 (cd harness && bun scripts/publish-evidence.ts ../experiments/usage-metering/evidence/run-2026-08-18T06-31-21-134Z.json ../experiments/usage-metering)
@@ -1594,7 +1613,7 @@ the facts render instead. The figures below were pasted from
 Expected: five `published ... -> .../out/2026-08-18` lines with 4, 3, 3, 3,
 3 results, 0 unredacted tokens and 0 credential ids.
 
-- [ ] **Step 2: Append the RUNLOG entry**
+- [x] **Step 2: Append the RUNLOG entry**
 
 **Append to `experiments/usage-metering/RUNLOG.md`:**
 
@@ -1635,7 +1654,7 @@ artifact.
 | M07b | 4 reconciled rows; largest share of the billing window 98.7% | - |
 ```
 
-- [ ] **Step 3: Verify**
+- [x] **Step 3: Verify**
 
 Run: `git status --short --untracked-files=all experiments/usage-metering/out | wc -l`
 Expected: `10`
@@ -1649,12 +1668,18 @@ table row is flagged.
 
 Run the sensors. Expected: `tsc exit 0`; `1749 pass`, ` 0 fail`.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add experiments/usage-metering/out experiments/usage-metering/RUNLOG.md
 git commit -m "docs(usage-metering): RUNLOG entry for M03-M07 from the 2026-08-18 artifacts (#43)"
 ```
+
+> **Deviation 2026-10-13:** the first publish of
+> `run-2026-08-18T06-25-18-819Z.json` kept three refs (see the note under
+> Task 1b); re-published after the redactor fix, same five files.
+> `check-doc-numbers.ts` flagged exactly the five expected lines. Sensors
+> 1751 pass (plan 1749 + 2 redactor cases).
 
 ---
 
@@ -1671,7 +1696,7 @@ to connect"): image-transformations' module with the same id, which
 I04-control,I04a,I04b` drops it from the published copies. The 05:01
 artifact has no results and is not published.
 
-- [ ] **Step 1: Publish**
+- [x] **Step 1: Publish**
 
 ```bash
 (cd harness && bun scripts/publish-evidence.ts ../experiments/instance-sizing/evidence/run-2026-08-18T04-43-40-236Z.json ../experiments/instance-sizing --only I04-control,I04a,I04b)
@@ -1682,7 +1707,7 @@ artifact has no results and is not published.
 Expected: three `published ... -> .../out/2026-08-18` lines, 3 results
 each, 0 unredacted tokens and 0 credential ids.
 
-- [ ] **Step 2: Insert the RUNLOG entry**
+- [x] **Step 2: Insert the RUNLOG entry**
 
 **Replace in `experiments/instance-sizing/RUNLOG.md`:**
 
@@ -1721,7 +1746,7 @@ the project before proceeding.` (I04b detail in the 04:43 and 04:49 runs; the
 ## 2026-08-24/25 addendum - I01's "Nano absent" reading scoped by sfp-platforms
 ```
 
-- [ ] **Step 3: Verify**
+- [x] **Step 3: Verify**
 
 Run: `git status --short --untracked-files=all experiments/instance-sizing/out | wc -l`
 Expected: `6`
@@ -1734,12 +1759,15 @@ Expected: `every number on a measured line appears in an artifact`, exit 0.
 
 Run the sensors. Expected: `tsc exit 0`; `1755 pass`, ` 0 fail`.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add experiments/instance-sizing/out experiments/instance-sizing/RUNLOG.md
 git commit -m "docs(instance-sizing): RUNLOG entry for I04 from the 2026-08-18 artifacts (#47)"
 ```
+
+> **Executed 2026-10-13:** as written; sensors 1757 pass (plan 1755 + 2
+> redactor cases).
 
 ---
 
@@ -1803,7 +1831,7 @@ experiments/scoped-pats/evidence/recovered/20261010-run1/run-2026-10-10T07-18-10
 Then confirm `git status --short experiments/*/evidence` prints nothing
 (`evidence/` is gitignored).
 
-- [ ] **Step 2: Publish targets**
+- [x] **Step 2: Publish targets**
 
 **Append to `experiments/lifecycle-ops/Makefile`:**
 
@@ -1845,7 +1873,7 @@ Expected: `6`, then a line starting `bun /` and ending
 Run: `make -C experiments/lifecycle-ops publish-evidence 2>&1 | rg required; make -C experiments/scoped-pats publish-evidence 2>&1 | rg required`
 Expected: `RUN=evidence/<ts>/run-<stamp>.json required` twice.
 
-- [ ] **Step 3: Publish** (left out: `lo01-try*` (superseded tries), `lo02/...00-35-14-763Z` (no results), `dd01s-dry*` (skip-only))
+- [x] **Step 3: Publish** (left out: `lo01-try*` (superseded tries), `lo02/...00-35-14-763Z` (no results), `dd01s-dry*` (skip-only))
 
 ```bash
 make -C experiments/lifecycle-ops publish-evidence RUN=evidence/recovered/lo01/run-2026-10-10T00-43-34-355Z.json
@@ -1870,7 +1898,7 @@ before committing. scoped-pats SP01/SP06 evidence may carry the token's or
 profile's display name; any file that does is dropped (delete its pair from
 `out/`, keep the raw copy, and say so in the RUNLOG line below).
 
-- [ ] **Step 4: Cite in the RUNLOGs**
+- [x] **Step 4: Cite in the RUNLOGs**
 
 **Replace in `experiments/lifecycle-ops/RUNLOG.md`:**
 
@@ -1930,7 +1958,7 @@ run, one trial per probe. Postgres 17.11 on both projects. Published
 `out/2026-10-10/run-2026-10-10T00-00-27-688Z.json`, each with a `.facts.md`.
 ```
 
-- [ ] **Step 5: Verify**
+- [x] **Step 5: Verify**
 
 Run: `git status --short --untracked-files=all experiments/lifecycle-ops/out experiments/scoped-pats/out experiments/data-api-defaults/out | wc -l`
 Expected: `24` (10 + 10 + 4 new files; the four 2026-10-13 data-api-defaults files are already tracked).
@@ -1938,7 +1966,7 @@ Expected: `24` (10 + 10 + 4 new files; the four 2026-10-13 data-api-defaults fil
 Run the sensors. Expected: `tsc exit 0`; ` 0 fail`; pass count up by 24 from
 the previous task.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add experiments/lifecycle-ops/Makefile experiments/lifecycle-ops/out experiments/lifecycle-ops/RUNLOG.md experiments/scoped-pats/Makefile experiments/scoped-pats/out experiments/scoped-pats/RUNLOG.md experiments/data-api-defaults/out experiments/data-api-defaults/RUNLOG.md
@@ -1950,6 +1978,17 @@ three RUNLOGs, under its first dated section, the line
 `Raw artifacts were not retained (lost with a session scratchpad); the figures in this section cannot be re-checked against an artifact.`
 then commit with `docs: record that the #151 artifacts were not retained`.
 
+> **Deviation 2026-10-13:** 11 runs published, not 12. The SP04 artifact
+> (`run-2026-10-10T07-22-34-771Z`) was dropped after publishing, under Step
+> 3's rule: its SP04a evidence lists the account's organization names and a
+> saved SQL snippet's title and id, escaped inside an evidence string where
+> the `"name": "` check does not see them. The raw copy stays in
+> `evidence/recovered/`; the scoped-pats RUNLOG line names it as not
+> published. Step 5 count 22, not 24; sensors 1779 pass. In Step 2 the
+> append ran before the `sd` rename, which turned the new target's `$(RUN)`
+> into `$(PVLAB)`; restored by hand (`$(PVLAB)` count 6, both targets print
+> `required`).
+
 ---
 
 ### Task 14: platform-facts F03 header frames the PAT as classic (#73)
@@ -1957,7 +1996,7 @@ then commit with `docs: record that the #151 artifacts were not retained`.
 **Files:**
 - Modify: `experiments/platform-facts/tests/f03-pat-scope.ts:2-8`
 
-- [ ] **Step 1: Make the change**
+- [x] **Step 1: Make the change**
 
 **Replace in `experiments/platform-facts/tests/f03-pat-scope.ts`:**
 
@@ -1985,14 +2024,14 @@ then commit with `docs: record that the #151 artifacts were not retained`.
  * tokens (the 2026-10-07 note below) are created in the dashboard, not here.
 ```
 
-- [ ] **Step 2: Verify**
+- [x] **Step 2: Verify**
 
 Run: `rg -n 'still unscoped' experiments/platform-facts/tests/f03-pat-scope.ts`
 Expected: no output (exit 1).
 
 Run the sensors. Expected: `tsc exit 0`; ` 0 fail`, pass count unchanged.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add experiments/platform-facts/tests/f03-pat-scope.ts
@@ -2011,7 +2050,7 @@ API wedged via `PATCH .../postgrest` (db_schema=""), the private path keeps
 working: query over the PHZ host on 5432 and on 6543 both succeeded, and
 `db push --db-url` still applied migrations."
 
-- [ ] **Step 1: Make the change**
+- [x] **Step 1: Make the change**
 
 **Replace in `experiments/http-tier-lockdown/RUNLOG.md`:**
 
@@ -2032,12 +2071,12 @@ working: query over the PHZ host on 5432 and on 6543 both succeeded, and
   migrations (`experiments/privatelink-aws/RUNLOG.md`, run 9).
 ```
 
-- [ ] **Step 2: Verify**
+- [x] **Step 2: Verify**
 
 Run: `rg -n 'it is untested' experiments/http-tier-lockdown/RUNLOG.md`
 Expected: no output (exit 1).
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add experiments/http-tier-lockdown/RUNLOG.md
@@ -2064,7 +2103,7 @@ each gets a banner naming the commits that shipped it (checked against
 `2026-08-19-tenant-cost-ledger.md` already carries an ARCHIVED banner from
 the 2026-10-13 stocktake and is not touched.
 
-- [ ] **Step 1: Add the banners**
+- [x] **Step 1: Add the banners**
 
 **Replace in `docs/plans/2026-08-04-platform-downtime.md`:**
 
@@ -2188,7 +2227,7 @@ the 2026-10-13 stocktake and is not touched.
 > record.
 ```
 
-- [ ] **Step 2: Verify**
+- [x] **Step 2: Verify**
 
 Run: `rg -l 'STATUS \(stocktake 2026-10-13\)' docs/plans -g '!2026-10-13-*' | wc -l`
 Expected: `7` (this plan quotes the banners, hence the exclusion; the
@@ -2197,7 +2236,7 @@ not match it).
 
 Run the sensors. Expected: ` 0 fail`, pass count unchanged.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add docs/plans/2026-08-04-platform-downtime.md docs/plans/2026-08-04-platform-facts-diff-and-surface.md docs/plans/2026-08-04-pooler-semantics.md docs/plans/2026-08-10-pdf-corpus-graph-hardening.md docs/plans/2026-08-10-search-tier.md docs/plans/2026-08-14-pdf-corpus-graph-demo-readiness.md docs/plans/2026-08-25-sfp-coverage-closure.md
@@ -2220,7 +2259,7 @@ moves it. `sharp@0.35.5` exists: it is in the local bun cache
 honours the npm-style `overrides` field is recalled from bun's docs, not
 re-checked here; Step 3's lockfile check is what confirms it.
 
-- [ ] **Step 1: Baseline the app sensors (offline)**
+- [x] **Step 1: Baseline the app sensors (offline)**
 
 ```bash
 (cd experiments/governed-starter-kit/app && bunx tsc --noEmit -p .); echo "app tsc exit $?"
@@ -2230,7 +2269,7 @@ re-checked here; Step 3's lockfile check is what confirms it.
 Expected: `app tsc exit 0`, `$ eslint` with no findings and `app lint exit 0`.
 (The app has no unit tests; `next build` is the remaining sensor, Step 4.)
 
-- [ ] **Step 2: Add the override**
+- [x] **Step 2: Add the override**
 
 **Replace in `experiments/governed-starter-kit/app/package.json`:**
 
@@ -2258,7 +2297,7 @@ Expected: `app tsc exit 0`, `$ eslint` with no findings and `app lint exit 0`.
 Run: `jq -r '.overrides.sharp' experiments/governed-starter-kit/app/package.json`
 Expected: `0.35.5`
 
-- [ ] **Step 3: Install and audit (NETWORK: needs the npm registry)**
+- [x] **Step 3: Install and audit (NETWORK: needs the npm registry)**
 
 ```bash
 (cd experiments/governed-starter-kit/app && bun install); echo "install exit $?"
@@ -2273,7 +2312,7 @@ count (no `sharp@0.35.4` left; the `@img/sharp-*` platform packages move to
 still shows 0.35.4, bun ignored `overrides`: replace the key with
 `"resolutions"` (same body) and repeat this step.
 
-- [ ] **Step 4: Re-run the app sensors, then the build (NETWORK for the build if it fetches fonts)**
+- [x] **Step 4: Re-run the app sensors, then the build (NETWORK for the build if it fetches fonts)**
 
 ```bash
 (cd experiments/governed-starter-kit/app && bunx tsc --noEmit -p .); echo "app tsc exit $?"
@@ -2283,12 +2322,17 @@ still shows 0.35.4, bun ignored `overrides`: replace the key with
 
 Expected: all three exit 0.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add experiments/governed-starter-kit/app/package.json experiments/governed-starter-kit/app/bun.lock
 git commit -m "fix(governed-starter-kit): override sharp to 0.35.5 past the pinned 0.35.4 (#86)"
 ```
+
+> **Executed 2026-10-13:** bun 1.3.14 honoured `overrides`; no
+> `resolutions` fallback needed. Lockfile `sharp@0.35.5`, no `sharp@0.35.4`
+> left; `bun audit` lists only the braces advisory (GHSA-vfj7-8cjw-p6xm).
+> App tsc, lint and `next build` exit 0.
 
 ---
 
@@ -2305,7 +2349,7 @@ range below (`^3.0.4`) is a guess at the next patch release, not a known
 version: Step 1 checks the registry first, and if no such version exists the
 card stays open (Step 4).
 
-- [ ] **Step 1: Check a patched release exists (NETWORK)**
+- [x] **Step 1: Check a patched release exists (NETWORK)**
 
 Run: `bunx npm view braces versions --json | tail -3`
 Expected: a version above `3.0.3` in the list. If the last entry is
@@ -2357,11 +2401,15 @@ Remove the `"braces": "^3.0.4"` line (and the comma after `"0.35.5"`) if
 Step 2 was applied, and comment on the card:
 `vkctl comment work-supabase-lab#87 "No braces release above 3.0.3 on the registry as of $(date +%F); dev-time only (shadcn, eslint-config-next); re-check on the next dependency bump."`
 
+> **Fallback taken 2026-10-13:** `npm view braces versions` ends at `3.0.3`
+> (dist-tag `latest` 3.0.3), so Step 2 was not applied and the card stays
+> open. The Step 4 card comment goes in with Task 19's board update.
+
 ---
 
 ### Task 19: W1 close-out - full sensors, board, lexicanum follow-up
 
-- [ ] **Step 1: Full sensors and identifier scan**
+- [x] **Step 1: Full sensors and identifier scan**
 
 ```bash
 bunx tsc --noEmit -p harness/tsconfig.json; echo "tsc exit $?"
@@ -2408,6 +2456,12 @@ on these pages (from the cards):
 
 Run lexicanum's own tests before committing there (its AGENTS.md).
 
+> **2026-10-13:** Step 1 run: `tsc exit 0`, `1779 pass`, ` 0 fail` (1755 +
+> 22 from Task 13 + 2 redactor cases). The tree was not clean at that point
+> because the per-task commits were made afterwards in one series. Steps 2-4
+> (push, card moves, lexicanum) follow the push. For Step 3: #86 and #151
+> completed (#151 without SP04), #87 took its fallback.
+
 ---
 
 ## W2 - time-bound
@@ -2449,7 +2503,7 @@ replication only), and W27's `w27_locked` (revoked from anon and
 authenticated on purpose and read with an authenticated token, which the new
 default also leaves ungranted).
 
-- [ ] **Step 1: Make the changes**
+- [x] **Step 1: Make the changes**
 
 **Replace in `experiments/edge-resilience/Makefile`:**
 
@@ -2588,7 +2642,7 @@ default also leaves ungranted).
       `grant select, insert, update, delete on table ${PROBE_TABLE} to anon, authenticated, service_role;\n`,
 ```
 
-- [ ] **Step 2: Verify**
+- [x] **Step 2: Verify**
 
 Run: `rg -c -i 'to anon, authenticated, service_role' experiments/edge-resilience/Makefile experiments/edge-resilience/tests/w05-standby-replication.ts experiments/edge-resilience/tests/w15-ddl-during-replication.ts experiments/edge-resilience/tests/w16-sequence-resync.ts experiments/edge-resilience/tests/w12-realtime-probe.ts experiments/compute-disk/tests/d09-compute-resize-timing.ts experiments/s2z-wake/tests/z01-get-surface-wake.ts experiments/usage-metering/tests/m05-control-plane-store.ts experiments/usage-metering/tests/m01-diy-usage-metering.ts experiments/byo-oauth/tests/o03-auth-idp-client-id-rls.ts experiments/privatelink-aws/tests/t22-dataapi-disable.ts`
 
@@ -2597,7 +2651,7 @@ every other file `1`.
 
 Run the sensors. Expected: `tsc exit 0`; ` 0 fail`, pass count unchanged.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add experiments/edge-resilience experiments/compute-disk/tests/d09-compute-resize-timing.ts experiments/s2z-wake/tests/z01-get-surface-wake.ts experiments/usage-metering/tests experiments/byo-oauth/tests/o03-auth-idp-client-id-rls.ts experiments/privatelink-aws/tests/t22-dataapi-disable.ts
@@ -2611,6 +2665,10 @@ project), compute-disk D09, s2z-wake Z01 (about 35 min), usage-metering M01
 and M05, byo-oauth O03. privatelink-aws T22 waits for #130. Expected: each
 module's result matches its last RUNLOG entry; any 42501 on the Data API is a
 missed grant. Record a RUNLOG line per re-run.
+
+> **Executed 2026-10-13 (Steps 1-3):** offline edits only. The GRANT
+> statements were not executed against Postgres; their runtime effect stays
+> unverified until Step 4.
 
 ### #89 - Data API grants after the 2026-10-30 flip
 
