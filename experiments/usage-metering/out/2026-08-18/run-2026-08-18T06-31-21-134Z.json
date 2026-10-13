@@ -1,0 +1,63 @@
+{
+  "startedAt": "2026-08-18T06:31:21.134Z",
+  "finishedAt": "2026-08-18T06:33:55.907Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "usage-metering",
+  "labCommit": "5bce8da",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "OpenSSL 3.6.3 9 Jun 2026 (Library: OpenSSL 3.6.3 9 Jun 2026)"
+  },
+  "results": [
+    {
+      "id": "M04-control",
+      "title": "gateway reachable",
+      "status": "pass",
+      "measurements": {
+        "status": 200
+      },
+      "durationMs": 154780
+    },
+    {
+      "id": "M04a",
+      "title": "setup: project + upstream + two scoped keys",
+      "status": "pass",
+      "measurements": {
+        "provision_s": 137
+      },
+      "durationMs": 154780
+    },
+    {
+      "id": "M04b",
+      "title": "counted proxied calls",
+      "status": "info",
+      "measurements": {
+        "calls_a_sent": 7,
+        "calls_a_200": 7,
+        "calls_b_sent": 5,
+        "calls_b_200": 5
+      },
+      "durationMs": 154780
+    },
+    {
+      "id": "M04c",
+      "title": "events feed exactness",
+      "status": "info",
+      "measurements": {
+        "events_a": 7,
+        "events_a_expected": 7,
+        "events_a_correct_ref": 7,
+        "events_a_status_200": 7,
+        "events_b": 5,
+        "events_b_expected": 5,
+        "events_b_correct_ref": 5,
+        "events_b_status_200": 5
+      },
+      "durationMs": 154780
+    }
+  ]
+}

@@ -75,3 +75,37 @@ DIY metering verdict strengthens: the analytics signal is exact at
 minute-scale lag, ground truth (pg_database_size, storage listing) is
 exact to the byte, and the Prometheus endpoint (text/plain, 326 families)
 answers a plain PAT. M01c now records the real Content-Type header.
+
+## 2026-08-18 - M03 to M07, written up from the run artifacts (work-supabase-lab#43)
+
+The modules landed in fee7a22 ("M03-M07 green") on 2026-08-18 with no RUNLOG
+entry. Figures are pasted from `pvlab --facts` of the local artifacts. The lab
+commit stamped in them (5bce8da) predates the history rewrites and does not
+resolve. Vantage local; every project in ap-southeast-1 on the Pro org,
+provisioned and deleted by its module; n = 1 run per module unless a row
+gives two.
+
+Published (redacted, a `.facts.md` beside each), `out/2026-08-18/`:
+`run-2026-08-18T06-31-21-134Z.json` (M04), `run-2026-08-18T06-21-24-941Z.json`
+and `run-2026-08-18T06-25-18-819Z.json` (M05),
+`run-2026-08-18T06-36-29-484Z.json` and `run-2026-08-18T06-39-38-374Z.json`
+(M06). Not published: M07's artifact (`evidence/run-2026-08-18T06-44-26-417Z.json`),
+because its evidence lists the account's own project names. M03 left no
+artifact.
+
+| Probe | Result | Read |
+|---|---|---|
+| M03 | no artifact in `evidence/` | the M03 figures in AGENTS.md (3 projects, $29.43/mo compute) come from the fee7a22 commit message and cannot be checked against a run |
+| M04-control | gateway 200 | - |
+| M04a | throwaway project provisioned in 137 s; upstream and two scoped keys set up (pass) | - |
+| M04b | key A: 7 sent, 7 answered 200; key B: 5 sent, 5 answered 200 | - |
+| M04c | events feed, key A: 7 events of 7 expected, 7 with the right project ref, 7 with status 200; key B: 5 of 5, 5, 5 | the feed matched the sent count for both keys in this run |
+| M05-control | store provisioned in 135 s, schema 201 (both runs) | - |
+| M05a | 06:21 run: 4 org projects, 0 rows inserted, own row absent, 0 read back. 06:25 run: 4 projects, 4 rows inserted, own row present, 4 read back | the second run is the self-inclusion result; why the first inserted nothing is not recorded in its artifact |
+| M05b | tenant t-a 100 rows, t-b 25 rows; payload bytes 100400 and 25100 (both runs) | module detail: exact for variable-width columns via `pg_column_size`, an estimate for fixed-width |
+| M06-control | provisioned in 134 s (both runs) | - |
+| M06a | 06:36 run: fail, 2 rollup windows (`t-0@00h=500 t-1@01h=500`), identical after re-flush. 06:39 run: pass, 4 windows of 250 (`t-0` and `t-1` in 00h and 01h), identical after re-flush | the first run's seed put each tenant in one window; the change between the runs is not recorded |
+| M06b | late insert 201; closed window moved by 5 (expected 5); duplicate idempotency key rejected; other windows unchanged (both runs) | - |
+| M07-control | invoice PDF parsed: 91 per-ref lines | the compute-line count and hour total are in the local facts render, not copied here: they describe the account's billing, not the method |
+| M07a | 32 invoiced refs; 3 live projects, 3 matched; 29 deleted since the invoice | - |
+| M07b | 4 reconciled rows; largest share of the billing window 98.7% | - |
