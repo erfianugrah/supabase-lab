@@ -13,7 +13,7 @@ ONLY ?= L02
 .PHONY: probe publish-evidence
 
 probe:
-	@test -n "$(SUPABASE_ACCESS_TOKEN)" || (echo "export SUPABASE_ACCESS_TOKEN"; exit 1)
+	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "export SUPABASE_ACCESS_TOKEN"; exit 1)
 	@test -n "$(PVLAB_REF)" || (echo "export PVLAB_REF=<a project ref the token can read>"; exit 1)
 	@cd $(ROOT) && bun harness/scripts/gen-registry.ts >/dev/null
 	@mkdir -p evidence/$(TS)

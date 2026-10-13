@@ -13,7 +13,7 @@ TS := $(shell date +%Y%m%d-%H%M%S)
 .PHONY: run reuse publish-evidence
 
 run:
-	@test -n "$(SUPABASE_ACCESS_TOKEN)" || (echo "export SUPABASE_ACCESS_TOKEN"; exit 1)
+	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "export SUPABASE_ACCESS_TOKEN"; exit 1)
 	@test -n "$(PVLAB_ORG_PRO)" || (echo "export PVLAB_ORG_PRO=<pro org slug>"; exit 1)
 	@cd $(ROOT)/harness && bun scripts/gen-registry.ts >/dev/null
 	@mkdir -p evidence/$(TS)

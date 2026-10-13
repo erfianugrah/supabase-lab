@@ -29,16 +29,17 @@ apply:
 # Needs the anon key (apikey header for the data + auth endpoints) and the
 # service_role key (admin-create for the native-GoTrue check in TPA03). The
 # external IdP is generated in-process; no pooler, no container.
+probe: export SUPABASE_ACCESS_TOKEN := $(TOK)
 probe:
 	@test -n "$(REF)" || (echo "no project_ref output - run 'make apply' first"; exit 1)
-	@test -n "$(TOK)" || (echo "no PAT in $(ROOT)/secrets.tfvars - run 'make secrets-decrypt' at the root"; exit 1)
+	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "no PAT in $(ROOT)/secrets.tfvars - run 'make secrets-decrypt' at the root"; exit 1)
 	@cd $(ROOT)/harness && bun run build >/dev/null
 	@mkdir -p evidence/$(TS)
-	@keys=$$(curl -s -H "Authorization: Bearer $(TOK)" "https://api.supabase.com/v1/projects/$(REF)/api-keys?reveal=true"); \
+	@keys=$$(printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -s -H @- "https://api.supabase.com/v1/projects/$(REF)/api-keys?reveal=true"); \
 	anon=$$(echo "$$keys" | jq -r '.[]|select(.name=="anon")|.api_key' | head -1); \
 	svc=$$(echo "$$keys" | jq -r '.[]|select(.name=="service_role")|.api_key' | head -1); \
 	test -n "$$anon" -a -n "$$svc" || (echo "could not fetch anon/service_role keys"; exit 1); \
-	PVLAB_REF="$(REF)" SUPABASE_ACCESS_TOKEN="$(TOK)" SUPABASE_ANON_KEY="$$anon" SUPABASE_SERVICE_ROLE_KEY="$$svc" \
+	PVLAB_REF="$(REF)" SUPABASE_ANON_KEY="$$anon" SUPABASE_SERVICE_ROLE_KEY="$$svc" \
 		$(ROOT)/harness/dist/pvlab --where local --experiment third-party-auth \
 		--destructive --only "$(IDS)" --out evidence/$(TS)
 	@echo "== evidence/$(TS)/ =="

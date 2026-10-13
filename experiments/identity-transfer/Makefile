@@ -31,8 +31,9 @@ validate:
 	@ls *.tf >/dev/null || (echo "no .tf files - tofu validate returns Success on an EMPTY dir"; exit 1)
 	tofu validate
 
+apply: export TF_VAR_supabase_access_token := $(TOK)
 apply:
-	@tofu plan $(VARS) -var="supabase_access_token=$(TOK)" -out=tfplan
+	@tofu plan $(VARS) -out=tfplan
 	@tofu apply tfplan
 	@echo "project_ref = $$(tofu output -raw project_ref)"
 
@@ -49,17 +50,19 @@ issuer-delete:
 	-wrangler delete --name identity-transfer-issuer --force 2>/dev/null || true
 	@rm -f .issuer-url
 
+probe: export SUPABASE_ACCESS_TOKEN := $(TOK)
+probe: export DB_PASSWORD := $(PW)
 probe:
 	@test -n "$(REF)" || (echo "no project_ref output - run 'make apply' first"; exit 1)
-	@test -n "$(TOK)" || (echo "no PAT - export SUPABASE_ACCESS_TOKEN or run 'make secrets-decrypt' at the root"; exit 1)
+	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "no PAT - export SUPABASE_ACCESS_TOKEN or run 'make secrets-decrypt' at the root"; exit 1)
 	@test -n "$(ISSUER)" || (echo "no .issuer-url - run 'make issuer-deploy' first"; exit 1)
 	@cd $(ROOT)/harness && bun run build >/dev/null
 	@mkdir -p evidence/$(TS)
-	@pub=$$(curl -s -H "Authorization: Bearer $(TOK)" \
+	@pub=$$(printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -s -H @- \
 		"https://api.supabase.com/v1/projects/$(REF)/api-keys?reveal=true" \
 		| jq -r '.[] | select(.type=="publishable") | .api_key' | head -1); \
 	test -n "$$pub" || (echo "could not fetch the publishable key"; exit 1); \
-	PVLAB_REF="$(REF)" SUPABASE_ACCESS_TOKEN="$(TOK)" SUPABASE_ANON_KEY="$$pub" DB_PASSWORD="$(PW)" \
+	PVLAB_REF="$(REF)" SUPABASE_ANON_KEY="$$pub" \
 		AWS_REGION="$(REGION)" PVLAB_ENDPOINT_ISSUER="$(ISSUER)" \
 		$(ROOT)/harness/dist/pvlab --where local --experiment identity-transfer \
 		--only $(ONLY) $(RUNNER_FLAGS) --out evidence/$(TS)
@@ -70,8 +73,9 @@ publish-evidence:
 	@test -n "$(RUN)" || (echo "RUN=evidence/<ts>/run-<stamp>.json required"; exit 1)
 	@cd $(ROOT)/harness && bun scripts/publish-evidence.ts $(abspath $(RUN)) $(abspath .) $(if $(PUBLISH_ONLY),--only $(PUBLISH_ONLY),)
 
+destroy: export TF_VAR_supabase_access_token := $(TOK)
 destroy:
-	@tofu plan -destroy $(VARS) -var="supabase_access_token=$(TOK)" -out=tfplan-destroy
+	@tofu plan -destroy $(VARS) -out=tfplan-destroy
 	@tofu apply tfplan-destroy
 
 # ---------------------------------------------------------------------------

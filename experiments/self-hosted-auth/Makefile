@@ -66,26 +66,30 @@ unit:
 # by both managed verifiers in plain mode (project 1) and in JWKS mode with
 # this default kid-less oct key (project 3, evidence 20260902-150030). Pass
 # OCT_KID=platform to reproduce the rejection.
+# The JWT secret, the key set and the DB URL reach docker as bare `-e NAME`
+# (value from its environment), never as `-e NAME=value` arguments.
+gotrue-up: export SUPABASE_ACCESS_TOKEN := $(TOK)
+gotrue-up: export DB_PASSWORD := $(PW)
 gotrue-up:
 	@test -n "$(REF)" || (echo "no project_ref - run 'make apply' first"; exit 1)
-	@test -n "$(TOK)" || (echo "no PAT in $(ROOT)/secrets.tfvars"; exit 1)
+	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "no PAT in $(ROOT)/secrets.tfvars"; exit 1)
 	@mkdir -p evidence
-	@jwt=$$(curl -s -H "Authorization: Bearer $(TOK)" "https://api.supabase.com/v1/projects/$(REF)/postgrest" | jq -r .jwt_secret); \
+	@jwt=$$(printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -s -H @- "https://api.supabase.com/v1/projects/$(REF)/postgrest" | jq -r .jwt_secret); \
 	test -n "$$jwt" -a "$$jwt" != null || (echo "could not read the project's jwt_secret"; exit 1); \
 	pooler="aws-0-$(REGION).pooler.supabase.com"; \
 	keysenv=""; mode=plain; \
 	if [ "$(OWNKEY)" = "1" ]; then \
 	  bun lib/keygen.ts evidence/ownkey >/dev/null; \
 	  priv=$$(cat evidence/ownkey/own-es256.private.json); \
-	  anon=$$(curl -s -H "Authorization: Bearer $(TOK)" "https://api.supabase.com/v1/projects/$(REF)/api-keys" | jq -r '.[] | select(.name=="anon") | .api_key'); \
+	  anon=$$(printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -s -H @- "https://api.supabase.com/v1/projects/$(REF)/api-keys" | jq -r '.[] | select(.name=="anon") | .api_key'); \
 	  pub=$$(curl -s -H "apikey: $$anon" "https://$(REF).supabase.co/auth/v1/.well-known/jwks.json" | jq -c '[.keys[] | . + {key_ops:["verify"]}]'); \
 	  octv=$$(printf '%s' "$$jwt" | basenc --base64url -w0 | tr -d '=' | jq -Rc '{kty:"oct",k:.,alg:"HS256",key_ops:["verify"]}'); \
 	  keysenv=$$(jq -cn --argjson o "$$priv" --argjson p "$$pub" --argjson h "$$octv" '[$$o] + $$p + [$$h]'); mode=ownkey; \
 	elif [ "$(JWKS)" = "1" ]; then \
-	  anon=$$(curl -s -H "Authorization: Bearer $(TOK)" "https://api.supabase.com/v1/projects/$(REF)/api-keys" | jq -r '.[] | select(.name=="anon") | .api_key'); \
+	  anon=$$(printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -s -H @- "https://api.supabase.com/v1/projects/$(REF)/api-keys" | jq -r '.[] | select(.name=="anon") | .api_key'); \
 	  pub=$$(curl -s -H "apikey: $$anon" "https://$(REF).supabase.co/auth/v1/.well-known/jwks.json" | jq -c '[.keys[] | . + {key_ops:["verify"]}]'); \
 	  if [ "$(OCT_KID)" = "platform" ]; then \
-	    hskid=$$(curl -s -H "Authorization: Bearer $(TOK)" "https://api.supabase.com/v1/projects/$(REF)/config/auth/signing-keys" | jq -r '.keys[] | select(.algorithm=="HS256") | .id' | head -1); \
+	    hskid=$$(printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -s -H @- "https://api.supabase.com/v1/projects/$(REF)/config/auth/signing-keys" | jq -r '.keys[] | select(.algorithm=="HS256") | .id' | head -1); \
 	    test -n "$$hskid" || (echo "OCT_KID=platform needs an HS256 signing key on the project to take its id from; none found"; exit 1); \
 	    oct=$$(printf '%s' "$$jwt" | basenc --base64url -w0 | tr -d '=' | jq -Rc --arg kid "$$hskid" '{kty:"oct",k:.,alg:"HS256",kid:$$kid,key_ops:["sign","verify"]}'); \
 	  else \
@@ -95,15 +99,17 @@ gotrue-up:
 	fi; \
 	echo "$$mode" > evidence/.gotrue-mode; \
 	docker rm -f $(GOTRUE_NAME) >/dev/null 2>&1 || true; \
+	GOTRUE_JWT_KEYS="$$keysenv" GOTRUE_JWT_SECRET="$$jwt" \
+	GOTRUE_DB_DATABASE_URL="postgres://postgres.$(REF):$$DB_PASSWORD@$$pooler:5432/postgres?search_path=auth" \
 	docker run -d --name $(GOTRUE_NAME) -p $(GOTRUE_PORT):9999 \
-		$${keysenv:+-e GOTRUE_JWT_KEYS="$$keysenv"} \
+		$${keysenv:+-e GOTRUE_JWT_KEYS} \
 		-e GOTRUE_API_HOST=0.0.0.0 -e GOTRUE_API_PORT=9999 \
 		-e API_EXTERNAL_URL="https://$(REF).supabase.co/auth/v1" \
 		-e GOTRUE_DB_DRIVER=postgres \
-		-e GOTRUE_DB_DATABASE_URL="postgres://postgres.$(REF):$(PW)@$$pooler:5432/postgres?search_path=auth" \
+		-e GOTRUE_DB_DATABASE_URL \
 		-e GOTRUE_DB_NAMESPACE=auth \
 		-e GOTRUE_SITE_URL=http://localhost:3000 \
-		-e GOTRUE_JWT_SECRET="$$jwt" \
+		-e GOTRUE_JWT_SECRET \
 		-e GOTRUE_JWT_ISSUER="https://$(REF).supabase.co/auth/v1" \
 		-e GOTRUE_JWT_AUD=authenticated -e GOTRUE_JWT_DEFAULT_GROUP_NAME=authenticated \
 		-e GOTRUE_JWT_ADMIN_ROLES=service_role -e GOTRUE_JWT_EXP=3600 \
@@ -124,18 +130,20 @@ gotrue-down:
 # from that binary (Linux refuses to overwrite a running executable).
 RUNNER ?= $(ROOT)/harness/dist/pvlab
 BUILD ?= 1
+probe: export SUPABASE_ACCESS_TOKEN := $(TOK)
+probe: export DB_PASSWORD := $(PW)
 probe:
 	@test -n "$(REF)" || (echo "no project_ref - run 'make apply' first"; exit 1)
-	@test -n "$(TOK)" || (echo "no PAT in $(ROOT)/secrets.tfvars"; exit 1)
+	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "no PAT in $(ROOT)/secrets.tfvars"; exit 1)
 	@if [ "$(BUILD)" = "1" ]; then cd $(ROOT)/harness && bun run build >/dev/null; else cd $(ROOT)/harness && bun run gen >/dev/null; fi
 	@mkdir -p evidence/$(TS)
-	@keys=$$(curl -s -H "Authorization: Bearer $(TOK)" "https://api.supabase.com/v1/projects/$(REF)/api-keys?reveal=true"); \
+	@keys=$$(printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -s -H @- "https://api.supabase.com/v1/projects/$(REF)/api-keys?reveal=true"); \
 	anon=$$(echo "$$keys" | jq -r '.[] | select(.name=="anon") | .api_key' | head -1); \
 	svc=$$(echo "$$keys" | jq -r '.[] | select(.name=="service_role") | .api_key' | head -1); \
 	gotrue=""; docker inspect $(GOTRUE_NAME) >/dev/null 2>&1 && gotrue="http://localhost:$(GOTRUE_PORT)"; \
 	mode=$$(cat evidence/.gotrue-mode 2>/dev/null || echo plain); \
 	ownpub=""; test -f evidence/ownkey/own-es256.public.json && ownpub=$$(base64 -w0 < evidence/ownkey/own-es256.public.json); \
-	PVLAB_REF="$(REF)" SUPABASE_ACCESS_TOKEN="$(TOK)" DB_PASSWORD="$(PW)" \
+	PVLAB_REF="$(REF)" \
 		SUPABASE_ANON_KEY="$$anon" SUPABASE_SERVICE_ROLE_KEY="$$svc" \
 		PVLAB_ENDPOINT_SELFHOSTED_GOTRUE="$$gotrue" \
 		PVLAB_ENDPOINT_SELFHOSTED_GOTRUE_MODE="$$mode" \

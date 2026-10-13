@@ -67,7 +67,7 @@ clean-fixtures:
 # Fails loudly when the API call fails: an empty list from a failed request
 # looked like a clean sweep once (2026-10-12).
 sweep:
-	@out=$$(curl -sSf -H "Authorization: Bearer $$SUPABASE_ACCESS_TOKEN" https://api.supabase.com/v1/projects) \
+	@out=$$(printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -sSf -H @- https://api.supabase.com/v1/projects) \
 		|| { echo "sweep: GET /v1/projects failed"; exit 1; }; \
 		echo "$$out" | jq -r '.[] | select(.name | startswith("ss-")) | "\(.name) \(.status)"'; \
 		echo "sweep: $$(echo "$$out" | jq '[.[] | select(.name | startswith("ss-"))] | length') ss- projects"

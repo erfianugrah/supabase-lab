@@ -26,7 +26,9 @@ EXPERIMENT ?= medium-serverless
 # passed in rather than constructed. POOLER_TXN is the DEDICATED pooler
 # (db.<ref>.supabase.co:6543, user `postgres`); SHARED_TXN / POOLER_SESSION
 # are Supavisor (aws-<n>-<region>.pooler.supabase.com, user postgres.<ref>).
-POOLER ?= $(shell curl -s -H "Authorization: Bearer $(TOK)" "https://api.supabase.com/v1/projects/$(REF)/config/database/pooler" 2>/dev/null | jq -r '[.[] | select(.database_type=="PRIMARY")][0].db_host // empty')
+# The token is resolved INSIDE the shell (same env-over-file rule as TOK) and
+# fed to curl on stdin: $(TOK) here would put it in this shell's argv.
+POOLER ?= $(shell tok="$${SUPABASE_ACCESS_TOKEN:-$$(grep -E '^supabase_access_token' $(ROOT)/secrets.tfvars 2>/dev/null | cut -d'"' -f2)}"; printf 'Authorization: Bearer %s\n' "$$tok" | curl -s -H @- "https://api.supabase.com/v1/projects/$(REF)/config/database/pooler" 2>/dev/null | jq -r '[.[] | select(.database_type=="PRIMARY")][0].db_host // empty')
 POOLER_USER ?= postgres.$(REF)
 POOLER_SESSION ?= $(POOLER):5432
 SHARED_TXN ?= $(POOLER):6543
@@ -47,40 +49,45 @@ validate:
 
 # Recipe lines silenced (@): make would otherwise echo the command line, PAT
 # included, into whatever the run is logged to.
+apply: export TF_VAR_supabase_access_token := $(TOK)
 apply:
-	@tofu plan $(VARS) -var="supabase_access_token=$(TOK)" -out=tfplan
+	@tofu plan $(VARS) -out=tfplan
 	@tofu apply tfplan
 	@echo "project_ref = $$(tofu output -raw project_ref)"
 
+pooler-config: export SUPABASE_ACCESS_TOKEN := $(TOK)
 pooler-config:
 	@test -n "$(REF)" || (echo "no project_ref output - run 'make apply' first"; exit 1)
 	@echo "== /v1/projects/$(REF)/config/database/pooler =="
-	@curl -s -H "Authorization: Bearer $(TOK)" "https://api.supabase.com/v1/projects/$(REF)/config/database/pooler" | jq 'map(del(.connection_string, .connectionString))'
+	@printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -s -H @- "https://api.supabase.com/v1/projects/$(REF)/config/database/pooler" | jq 'map(del(.connection_string, .connectionString))'
 	@echo "== /v1/projects/$(REF)/config/database/pgbouncer =="
-	@curl -s -H "Authorization: Bearer $(TOK)" "https://api.supabase.com/v1/projects/$(REF)/config/database/pgbouncer" | jq 'del(.connection_string)'
+	@printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -s -H @- "https://api.supabase.com/v1/projects/$(REF)/config/database/pgbouncer" | jq 'del(.connection_string)'
 	@echo "== addons =="
-	@curl -s -H "Authorization: Bearer $(TOK)" "https://api.supabase.com/v1/projects/$(REF)/billing/addons" | jq '{selected: [.selected_addons[] | {type, variant: .variant.id}], available: [.available_addons[] | .type]}'
+	@printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -s -H @- "https://api.supabase.com/v1/projects/$(REF)/billing/addons" | jq '{selected: [.selected_addons[] | {type, variant: .variant.id}], available: [.available_addons[] | .type]}'
 
 # One-time; DROPS pgbench_* in the project. Runs on the direct host, which
 # needs the IPv4 add-on from this vantage (MS02 puts it on).
 BENCH_SCALE ?= 10
+bench-init: export PGPASSWORD := $(PW)
 bench-init:
 	@test -n "$(REF)" || (echo "no project_ref output - run 'make apply' first"; exit 1)
-	@PGSSLMODE=require PGCONNECT_TIMEOUT=10 pgbench -i -s $(BENCH_SCALE) "postgres://postgres:$(PW)@db.$(REF).supabase.co:5432/postgres"
+	@PGSSLMODE=require PGCONNECT_TIMEOUT=10 pgbench -i -s $(BENCH_SCALE) "postgres://postgres@db.$(REF).supabase.co:5432/postgres"
 
+probe: export SUPABASE_ACCESS_TOKEN := $(TOK)
+probe: export DB_PASSWORD := $(PW)
 probe:
 	@test -n "$(REF)" || (echo "no project_ref output - run 'make apply' first"; exit 1)
-	@test -n "$(TOK)" || (echo "no PAT - export SUPABASE_ACCESS_TOKEN"; exit 1)
-	@case "$(TOK)" in *REPLACE_ME*) echo "PAT is the committed placeholder - export SUPABASE_ACCESS_TOKEN"; exit 1;; esac
+	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "no PAT - export SUPABASE_ACCESS_TOKEN"; exit 1)
+	@case "$$SUPABASE_ACCESS_TOKEN" in *REPLACE_ME*) echo "PAT is the committed placeholder - export SUPABASE_ACCESS_TOKEN"; exit 1;; esac
 	@test -n "$(ONLY)" || (echo "refusing to run with an empty ONLY - see the comment above"; exit 1)
 	@cd $(ROOT)/harness && bun run build >/dev/null
 	@mkdir -p evidence/$(TS)
-	@keys=$$(curl -s -H "Authorization: Bearer $(TOK)" "https://api.supabase.com/v1/projects/$(REF)/api-keys?reveal=true"); \
+	@keys=$$(printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -s -H @- "https://api.supabase.com/v1/projects/$(REF)/api-keys?reveal=true"); \
 	anon=$$(echo "$$keys" | jq -r '.[] | select(.name=="anon") | .api_key' | head -1); \
 	svc=$$(echo "$$keys" | jq -r '.[] | select(.name=="service_role") | .api_key' | head -1); \
 	test -n "$$anon" || (echo "could not fetch the anon key"; exit 1); \
-	PVLAB_REF="$(REF)" AWS_REGION="$(REGION)" SUPABASE_ACCESS_TOKEN="$(TOK)" \
-		SUPABASE_ANON_KEY="$$anon" SUPABASE_SERVICE_ROLE_KEY="$$svc" DB_PASSWORD="$(PW)" \
+	PVLAB_REF="$(REF)" AWS_REGION="$(REGION)" \
+		SUPABASE_ANON_KEY="$$anon" SUPABASE_SERVICE_ROLE_KEY="$$svc" \
 		PVLAB_ENDPOINT_POOLER="$(POOLER)" PVLAB_ENDPOINT_POOLER_SESSION="$(POOLER_SESSION)" \
 		PVLAB_ENDPOINT_POOLER_TXN="$(POOLER_TXN)" PVLAB_ENDPOINT_POOLER_TXN_USER="$(POOLER_TXN_USER)" \
 		PVLAB_ENDPOINT_SHARED_TXN="$(SHARED_TXN)" PVLAB_ENDPOINT_POOLER_USER="$(POOLER_USER)" \
@@ -103,6 +110,7 @@ publish-evidence:
 	@test -n "$(RUN)" || (echo "RUN=evidence/<ts>/run-<stamp>.json required"; exit 1)
 	@cd $(ROOT)/harness && bun scripts/publish-evidence.ts $(abspath $(RUN)) $(abspath .) $(if $(ONLY),--only $(ONLY),)
 
+destroy: export TF_VAR_supabase_access_token := $(TOK)
 destroy:
-	@tofu plan -destroy $(VARS) -var="supabase_access_token=$(TOK)" -out=tfplan-destroy
+	@tofu plan -destroy $(VARS) -out=tfplan-destroy
 	@tofu apply tfplan-destroy

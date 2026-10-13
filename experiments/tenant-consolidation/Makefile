@@ -30,15 +30,15 @@ apply:
 #
 # All destructive: every test writes schema, users, or both, on all three
 # projects. Without --destructive the suite plans zero tests.
+probe: export SUPABASE_ACCESS_TOKEN := $(TOK)
 probe:
 	@test -n "$(SHARED)" || (echo "no shared_ref output - run 'make apply' first"; exit 1)
 	@test -n "$(SRCA)" || (echo "no src_a_ref output - run 'make apply' first"; exit 1)
 	@test -n "$(SRCB)" || (echo "no src_b_ref output - run 'make apply' first"; exit 1)
-	@test -n "$(TOK)" || (echo "no PAT in $(ROOT)/secrets.tfvars - run 'make secrets-decrypt' at the root"; exit 1)
+	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "no PAT in $(ROOT)/secrets.tfvars - run 'make secrets-decrypt' at the root"; exit 1)
 	@cd $(ROOT)/harness && bun run build >/dev/null
 	@mkdir -p evidence/$(TS)
 	@PVLAB_REF="$(SHARED)" PVLAB_PEER_SRC_A="$(SRCA)" PVLAB_PEER_SRC_B="$(SRCB)" \
-		SUPABASE_ACCESS_TOKEN="$(TOK)" \
 		$(ROOT)/harness/dist/pvlab --where local --destructive --only C01,C02,C03,C04,C05 \
 		--experiment tenant-consolidation --out evidence/$(TS)
 	@echo "== evidence/$(TS)/REPORT.md =="

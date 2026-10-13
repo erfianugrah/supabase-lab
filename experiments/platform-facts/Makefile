@@ -34,13 +34,14 @@ apply:
 # commit and per-test durations, so every re-run diffs dirty and the one
 # entitlement that moved is buried. `make diff` compares at the measurement
 # level instead.
+probe: export SUPABASE_ACCESS_TOKEN := $(TOK)
 probe:
 	@test -n "$(REF)" || (echo "no project_ref output - run 'make apply' first"; exit 1)
-	@test -n "$(TOK)" || (echo "no PAT in $(ROOT)/secrets.tfvars - run 'make secrets-decrypt' at the root"; exit 1)
+	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "no PAT in $(ROOT)/secrets.tfvars - run 'make secrets-decrypt' at the root"; exit 1)
 	@test -n "$(ORGS)" || echo "note: ORGS empty - F01 will skip. Re-run with 'make probe ORGS=slug-a,slug-b'"
 	@cd $(ROOT)/harness && bun run build >/dev/null
 	@mkdir -p evidence/$(TS)
-	@PVLAB_REF="$(REF)" SUPABASE_ACCESS_TOKEN="$(TOK)" PVLAB_ORG_SLUGS="$(ORGS)" \
+	@PVLAB_REF="$(REF)" PVLAB_ORG_SLUGS="$(ORGS)" \
 		$(ROOT)/harness/dist/pvlab --where local --only F01,F02,F03 --experiment platform-facts \
 		--out evidence/$(TS)
 	@echo "== evidence/$(TS)/ =="
@@ -50,7 +51,7 @@ probe:
 # no tofu project. Run from source: harness/dist/pvlab is linux-x64 only.
 #   make fleet ORGS=slug-a,slug-b   (PAT from SUPABASE_ACCESS_TOKEN)
 fleet:
-	@test -n "$(SUPABASE_ACCESS_TOKEN)" || (echo "export SUPABASE_ACCESS_TOKEN"; exit 1)
+	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "export SUPABASE_ACCESS_TOKEN"; exit 1)
 	@test -n "$(ORGS)" || (echo "ORGS=slug-a,slug-b required (the lab organizations)"; exit 1)
 	@cd $(ROOT) && bun harness/scripts/gen-registry.ts >/dev/null
 	@mkdir -p evidence/$(TS)

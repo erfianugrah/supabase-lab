@@ -28,14 +28,16 @@ apply:
 # it the suite plans zero tests. Ordering is load-bearing and the planner
 # preserves it - V02 establishes "cannot decrypt without the key" BEFORE V03
 # applies one.
+probe: export SUPABASE_ACCESS_TOKEN := $(TOK)
+probe: export DB_PASSWORD := $(PW)
 probe:
 	@test -n "$(SRC)" || (echo "no source_ref output - run 'make apply' first"; exit 1)
 	@test -n "$(DST)" || (echo "no target_ref output - run 'make apply' first"; exit 1)
-	@test -n "$(TOK)" || (echo "no PAT in $(ROOT)/secrets.tfvars - run 'make secrets-decrypt' at the root"; exit 1)
-	@test -n "$(PW)" || (echo "no db_password in $(ROOT)/secrets.tfvars"; exit 1)
+	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "no PAT in $(ROOT)/secrets.tfvars - run 'make secrets-decrypt' at the root"; exit 1)
+	@test -n "$$DB_PASSWORD" || (echo "no db_password in $(ROOT)/secrets.tfvars"; exit 1)
 	@cd $(ROOT)/harness && bun run build >/dev/null
 	@mkdir -p evidence/$(TS)
-	@PVLAB_REF="$(SRC)" PVLAB_PEER_TARGET="$(DST)" SUPABASE_ACCESS_TOKEN="$(TOK)" DB_PASSWORD="$(PW)" \
+	@PVLAB_REF="$(SRC)" PVLAB_PEER_TARGET="$(DST)" \
 		$(ROOT)/harness/dist/pvlab --where local --destructive --only V01,V02,V03 --experiment vault-root-key \
 		--out evidence/$(TS)
 	@echo "== evidence/$(TS)/ =="
@@ -45,6 +47,7 @@ probe:
 # stays truthful and 'make destroy' afterwards is still a clean no-drift run.
 # The ref is captured BEFORE the destroy - afterwards the output is empty, and
 # probing an empty ref would return a meaningless 404.
+probe-deleted-source: export SUPABASE_ACCESS_TOKEN := $(TOK)
 probe-deleted-source:
 	@test -n "$(SRC)" || (echo "no source_ref output - nothing to delete"; exit 1)
 	@echo "capturing dead ref: $(SRC)"
@@ -52,7 +55,7 @@ probe-deleted-source:
 	tofu apply tfplan-destroy-source
 	@cd $(ROOT)/harness && bun run build >/dev/null
 	@mkdir -p evidence/$(TS)-deleted
-	@PVLAB_REF="$(DST)" PVLAB_DEAD_REF="$(SRC)" SUPABASE_ACCESS_TOKEN="$(TOK)" \
+	@PVLAB_REF="$(DST)" PVLAB_DEAD_REF="$(SRC)" \
 		$(ROOT)/harness/dist/pvlab --where local --destructive --only V04 --experiment vault-root-key \
 		--out evidence/$(TS)-deleted
 	@echo "== evidence/$(TS)-deleted/ =="

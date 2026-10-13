@@ -37,7 +37,9 @@ aws s3 cp "$ROOT/harness/dist/pvlab" "s3://$BUCKET/bin/pvlab" --quiet
 GET_URL=$(aws s3 presign "s3://$BUCKET/bin/pvlab" --expires-in 3600 --region "$REGION")
 PUT_URL="s3://$BUCKET/artifacts/runner-$TS.json"   # runner writes with its instance role
 
-ANON=$(curl -s -H "Authorization: Bearer $TOK" \
+# Credentials stay out of argv (ps-visible): curl reads the auth header from
+# stdin and jq reads the secrets from its environment ($ENV), not --arg.
+ANON=$(printf 'Authorization: Bearer %s\n' "$TOK" | curl -s -H @- \
 	"https://api.supabase.com/v1/projects/$REF/api-keys" | jq -r '.[] | select(.name=="anon") | .api_key' | head -1)
 
 ssm() { # <commands-json-file> <label>
@@ -72,7 +74,9 @@ done
 
 SVCNET_DNS=$(tofu output -raw service_network_dns 2>/dev/null || true)
 
-jq -n --arg get "$GET_URL" --arg put "$PUT_URL" --arg dbpw "$DBPW" --arg anon "$ANON" --arg tok "$TOK" --arg d "$DESTRUCTIVE" --arg svcnet "$SVCNET_DNS" '{
+JQ_DBPW="$DBPW" JQ_TOK="$TOK" JQ_ANON="$ANON" \
+jq -n --arg get "$GET_URL" --arg put "$PUT_URL" --arg d "$DESTRUCTIVE" --arg svcnet "$SVCNET_DNS" \
+	'$ENV.JQ_DBPW as $dbpw | $ENV.JQ_TOK as $tok | $ENV.JQ_ANON as $anon | {
   commands: [
     "cloud-init status --wait >/dev/null 2>&1 || true",
     "curl -sL \"" + $get + "\" -o /usr/local/bin/pvlab && chmod 755 /usr/local/bin/pvlab",

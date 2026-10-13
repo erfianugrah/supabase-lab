@@ -36,16 +36,20 @@ for v in REF PW TOK CF_ACC; do
 done
 
 API="https://api.supabase.com/v1"
-auth=(-H "Authorization: Bearer $TOK")
+# Credentials travel by environment and stdin, never argv (ps-visible): curl
+# reads the auth header from stdin, psql reads PGPASSWORD. Every child below
+# (bash -c, load-au-corpus.ts, its `make pgurl` + psql) inherits PGPASSWORD.
+mgmt() { printf 'Authorization: Bearer %s\n' "$TOK" | curl -H @- "$@"; }
+export PGPASSWORD="$PW"
 
 pgurl() {
   local pooler
-  pooler="$(curl -s "${auth[@]}" "$API/projects/$REF/config/database/pooler" \
+  pooler="$(mgmt -s "$API/projects/$REF/config/database/pooler" \
     | jq -r '[.[]|select(.database_type=="PRIMARY")][0].db_host // empty')"
   # PGOPTIONS does not survive the transaction pooler, so timeouts cannot go
   # through it. Large TOAST writes belong on 5432, but this script runs over the
   # pooler for parity with the probes.
-  echo "postgresql://postgres.$REF:${PW}@${pooler}:6543/postgres?connect_timeout=15"
+  echo "postgresql://postgres.$REF@${pooler}:6543/postgres?connect_timeout=15"
 }
 PG="$(pgurl)"
 
@@ -141,7 +145,7 @@ fi
 t "security (RLS etc.)" psql "$PG" -qAt -v ON_ERROR_STOP=1 -f "$EXP_DIR/db/05-security.sql"
 
 echo "== 6/7 expose demo to PostgREST =="
-t "postgrest schema" curl -s -X PATCH "$API/projects/$REF/postgrest" "${auth[@]}" \
+t "postgrest schema" mgmt -s -X PATCH "$API/projects/$REF/postgrest" \
   -H 'Content-Type: application/json' \
   -d '{"db_schema":"public, graphql_public, demo","db_extra_search_path":"public, extensions, demo"}'
 # PostgREST caches its schema; force a reload or the new schema 404s for a while.
@@ -151,7 +155,7 @@ t "postgrest schema" curl -s -X PATCH "$API/projects/$REF/postgrest" "${auth[@]}
 # function answers, rather than assuming a sleep is enough.
 t "schema cache reload" psql "$PG" -qAt -c "notify pgrst, 'reload schema'"
 echo -n "    waiting for PostgREST to see demo.stats"
-ANON_TMP="$(curl -s "${auth[@]}" "$API/projects/$REF/api-keys" | jq -r '.[]|select(.name=="anon")|.api_key')"
+ANON_TMP="$(mgmt -s "$API/projects/$REF/api-keys" | jq -r '.[]|select(.name=="anon")|.api_key')"
 for i in $(seq 1 30); do
   code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "https://$REF.supabase.co/rest/v1/rpc/stats" \
     -H "apikey: $ANON_TMP" -H 'Content-Type: application/json' -H 'Content-Profile: demo' -d '{}')
@@ -161,7 +165,7 @@ done
 
 echo "== 7/7 build + deploy UI =="
 # .env is generated, not committed: the project ref and anon key change on rebuild.
-ANON="$(curl -s "${auth[@]}" "$API/projects/$REF/api-keys" | jq -r '.[]|select(.name=="anon")|.api_key')"
+ANON="$(mgmt -s "$API/projects/$REF/api-keys" | jq -r '.[]|select(.name=="anon")|.api_key')"
 printf 'PUBLIC_SUPABASE_URL=https://%s.supabase.co\nPUBLIC_SUPABASE_ANON_KEY=%s\n' "$REF" "$ANON" > "$EXP_DIR/demo/.env"
 t "bun install" bash -c "cd '$EXP_DIR/demo' && bun install >/dev/null 2>&1"
 t "build" bash -c "cd '$EXP_DIR/demo' && bun run build >/dev/null"

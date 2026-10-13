@@ -38,11 +38,11 @@ list: gen
 # ob-surface- (a name filter, so unrelated projects are untouched) and list what
 # is left.
 cleanup:
-	@curl -s https://api.supabase.com/v1/projects -H "Authorization: Bearer $$SUPABASE_ACCESS_TOKEN" \
+	@printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -s https://api.supabase.com/v1/projects -H @- \
 	  | jq -r '.[] | select(.name | startswith("ob-surface-")) | .id' \
 	  | while read r; do echo "deleting $$r"; \
-	      curl -s -o /dev/null -w "%{http_code}\n" -X DELETE https://api.supabase.com/v1/projects/$$r -H "Authorization: Bearer $$SUPABASE_ACCESS_TOKEN"; done
-	@curl -s https://api.supabase.com/v1/projects -H "Authorization: Bearer $$SUPABASE_ACCESS_TOKEN" \
+	      printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -s -o /dev/null -w "%{http_code}\n" -X DELETE https://api.supabase.com/v1/projects/$$r -H @-; done
+	@printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -s https://api.supabase.com/v1/projects -H @- \
 	  | jq -r '[.[] | select(.name | startswith("ob-surface-"))] | length | "ob-surface- projects left: \(.)"'
 
 .PHONY: publish-evidence

@@ -20,7 +20,7 @@ test:
 # Runs from source (run.ts scans the registry), from this directory so the
 # drivers/ path resolves.
 probe:
-	@test -n "$(SUPABASE_ACCESS_TOKEN)" || (echo "export SUPABASE_ACCESS_TOKEN"; exit 1)
+	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "export SUPABASE_ACCESS_TOKEN"; exit 1)
 	@test -n "$(PVLAB_ORG_PRO)" || (echo "export PVLAB_ORG_PRO (a Pro org slug)"; exit 1)
 	@cd $(ROOT) && bun harness/scripts/gen-registry.ts >/dev/null
 	@mkdir -p evidence/$(TS)
@@ -30,10 +30,10 @@ probe:
 
 # Delete any project left behind by a run that died before PC09.
 sweep:
-	@test -n "$(SUPABASE_ACCESS_TOKEN)" || (echo "export SUPABASE_ACCESS_TOKEN"; exit 1)
-	@curl -s -H "Authorization: Bearer $(SUPABASE_ACCESS_TOKEN)" https://api.supabase.com/v1/projects \
+	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "export SUPABASE_ACCESS_TOKEN"; exit 1)
+	@printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -s -H @- https://api.supabase.com/v1/projects \
 		| jq -r '.[] | select(.name | startswith("$(PREFIX)")) | .id' \
-		| while read -r ref; do echo "deleting $$ref"; curl -s -o /dev/null -w "%{http_code}\n" -X DELETE -H "Authorization: Bearer $(SUPABASE_ACCESS_TOKEN)" https://api.supabase.com/v1/projects/$$ref; done
+		| while read -r ref; do echo "deleting $$ref"; printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -s -o /dev/null -w "%{http_code}\n" -X DELETE -H @- https://api.supabase.com/v1/projects/$$ref; done
 
 # Flag aws-0 pooler hosts under the given paths (default: the repo root).
 lint:
