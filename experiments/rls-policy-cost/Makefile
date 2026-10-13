@@ -24,7 +24,7 @@ apply: guard-tok
 	tofu apply tfplan
 
 guard-tok:
-	@test -n "$(TOK)" || (echo "no SUPABASE_ACCESS_TOKEN in env"; exit 1)
+	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "no SUPABASE_ACCESS_TOKEN in env"; exit 1)
 
 wait-ready: guard-tok
 	@test -n "$(REF)" || (echo "no project_ref - run 'make apply' first"; exit 1)
@@ -33,21 +33,24 @@ wait-ready: guard-tok
 	@sleep 15
 
 health:
-	@curl -s -H "Authorization: Bearer $(TOK)" \
+	@printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -s -H @- \
 	  "https://api.supabase.com/v1/projects/$(REF)/health?services=db" \
 	  | jq -r '.[0].status // empty'
 
 pooler:
-	@curl -s -H "Authorization: Bearer $(TOK)" \
+	@printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -s -H @- \
 	  "https://api.supabase.com/v1/projects/$(REF)/config/database/pooler" \
 	  | jq -r '[.[] | select(.database_type=="PRIMARY")][0].db_host // empty'
 
 # Session mode (5432), NOT transaction mode (6543): the test matrix relies on
 # SET ROLE + request.jwt.claims, which are session-scoped GUCs and would not
 # survive a Supavisor transaction-mode backend handoff.
+# No password in the URL: it would land in psql's argv. `test` exports
+# PGPASSWORD; for a manual psql, set PGPASSWORD yourself.
 pgurl:
-	@echo "postgresql://postgres.$(REF):$(PW)@$$($(MAKE) --no-print-directory pooler):5432/postgres?connect_timeout=15"
+	@echo "postgresql://postgres.$(REF)@$$($(MAKE) --no-print-directory pooler):5432/postgres?connect_timeout=15"
 
+test: export PGPASSWORD := $(PW)
 test: guard-tok
 	@mkdir -p evidence/$(TS)
 	@PGCONNECT_TIMEOUT=15 PGSSLMODE=require psql "$$($(MAKE) --no-print-directory pgurl)" \

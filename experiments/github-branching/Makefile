@@ -27,8 +27,9 @@ validate:
 	@ls *.tf >/dev/null || (echo "no .tf files"; exit 1)
 	tofu validate
 
+apply: export TF_VAR_supabase_access_token := $(TOK)
 apply:
-	@tofu plan $(VARS) -var="supabase_access_token=$(TOK)" $(ORG_VAR) -out=tfplan
+	@tofu plan $(VARS) $(ORG_VAR) -out=tfplan
 	@tofu apply tfplan
 	@echo "A=$$(tofu output -raw project_ref) B=$$(tofu output -raw project_b_ref)"
 
@@ -49,13 +50,14 @@ push-ci:
 
 # Everything runs from this machine: the Management API, the v2 connections
 # endpoint, and GitHub through the operator's gh login.
+probe: export SUPABASE_ACCESS_TOKEN := $(TOK)
 probe:
 	@test -n "$(REF)" -a -n "$(REF_B)" || (echo "no project refs - run 'make apply' first"; exit 1)
-	@test -n "$(TOK)" || (echo "no PAT - export SUPABASE_ACCESS_TOKEN"; exit 1)
+	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "no PAT - export SUPABASE_ACCESS_TOKEN"; exit 1)
 	@test -n "$(REPO)" || (echo "REPO=owner/name required"; exit 1)
 	@cd $(ROOT)/harness && bun run build >/dev/null
 	@mkdir -p evidence/$(TS)
-	@PVLAB_REF="$(REF)" PVLAB_PEER_B="$(REF_B)" PVLAB_ENDPOINT_REPO="$(REPO)" SUPABASE_ACCESS_TOKEN="$(TOK)" \
+	@PVLAB_REF="$(REF)" PVLAB_PEER_B="$(REF_B)" PVLAB_ENDPOINT_REPO="$(REPO)" \
 		$(ROOT)/harness/dist/pvlab --where local --experiment github-branching \
 		--only "$(ONLY)" --destructive --out evidence/$(TS)
 	@echo "== evidence/$(TS)/ =="
@@ -69,6 +71,7 @@ publish-evidence:
 	@grep -rlF "$(REPO)" out/ 2>/dev/null | xargs -r sed -i "s#$(REPO)#<repo>#g"
 	@! grep -rqF "$(REPO)" out/ || (echo "repository name still present in out/"; exit 1)
 
+destroy: export TF_VAR_supabase_access_token := $(TOK)
 destroy:
-	@tofu plan -destroy $(VARS) -var="supabase_access_token=$(TOK)" $(ORG_VAR) -out=tfplan-destroy
+	@tofu plan -destroy $(VARS) $(ORG_VAR) -out=tfplan-destroy
 	@tofu apply tfplan-destroy

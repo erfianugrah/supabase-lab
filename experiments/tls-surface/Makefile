@@ -33,24 +33,27 @@ validate:
 	tofu validate
 
 # Recipe lines silenced (@): make would otherwise echo the PAT into the log.
+apply: export TF_VAR_supabase_access_token := $(TOK)
 apply:
-	@tofu plan $(VARS) -var="supabase_access_token=$(TOK)" -out=tfplan
+	@tofu plan $(VARS) -out=tfplan
 	@tofu apply tfplan
 	@echo "project_ref = $$(tofu output -raw project_ref)"
 
+probe: export SUPABASE_ACCESS_TOKEN := $(TOK)
+probe: export DB_PASSWORD := $(PW)
 probe:
 	@test -n "$(REF)" || (echo "no project_ref output - run 'make apply' first"; exit 1)
-	@test -n "$(TOK)" || (echo "no PAT - export SUPABASE_ACCESS_TOKEN"; exit 1)
-	@case "$(TOK)" in *REPLACE_ME*) echo "PAT is the committed placeholder - export SUPABASE_ACCESS_TOKEN"; exit 1;; esac
+	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "no PAT - export SUPABASE_ACCESS_TOKEN"; exit 1)
+	@case "$$SUPABASE_ACCESS_TOKEN" in *REPLACE_ME*) echo "PAT is the committed placeholder - export SUPABASE_ACCESS_TOKEN"; exit 1;; esac
 	@test -n "$(ONLY)" || (echo "refusing to run with an empty ONLY: the registry spans every experiment"; exit 1)
 	@cd $(ROOT)/harness && bun run build >/dev/null
 	@mkdir -p evidence/$(TS)
-	@keys=$$(curl -s -H "Authorization: Bearer $(TOK)" "https://api.supabase.com/v1/projects/$(REF)/api-keys?reveal=true"); \
+	@keys=$$(printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -s -H @- "https://api.supabase.com/v1/projects/$(REF)/api-keys?reveal=true"); \
 	anon=$$(echo "$$keys" | jq -r '.[] | select(.name=="anon") | .api_key' | head -1); \
 	svc=$$(echo "$$keys" | jq -r '.[] | select(.name=="service_role") | .api_key' | head -1); \
 	test -n "$$anon" || (echo "could not fetch the anon key"; exit 1); \
-	PVLAB_REF="$(REF)" AWS_REGION="$(REGION)" SUPABASE_ACCESS_TOKEN="$(TOK)" \
-		SUPABASE_ANON_KEY="$$anon" SUPABASE_SERVICE_ROLE_KEY="$$svc" DB_PASSWORD="$(PW)" \
+	PVLAB_REF="$(REF)" AWS_REGION="$(REGION)" \
+		SUPABASE_ANON_KEY="$$anon" SUPABASE_SERVICE_ROLE_KEY="$$svc" \
 		PVLAB_ENDPOINT_CUSTOM_HOST="$(CUSTOM_HOST)" \
 		$(ROOT)/harness/dist/pvlab --where local --experiment tls-surface \
 		--only $(ONLY) $(RUNNER_FLAGS) --out evidence/$(TS)
@@ -89,6 +92,7 @@ publish-evidence:
 	@test -n "$(RUN)" || (echo "RUN=evidence/<ts>/run-<stamp>.json required"; exit 1)
 	@cd $(ROOT)/harness && bun scripts/publish-evidence.ts $(abspath $(RUN)) $(abspath .) $(if $(ONLY),--only $(ONLY),)
 
+destroy: export TF_VAR_supabase_access_token := $(TOK)
 destroy:
-	@tofu plan -destroy $(VARS) -var="supabase_access_token=$(TOK)" -out=tfplan-destroy
+	@tofu plan -destroy $(VARS) -out=tfplan-destroy
 	@tofu apply tfplan-destroy

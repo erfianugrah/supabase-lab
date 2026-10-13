@@ -118,6 +118,17 @@ platform behaviour or writing it into docs
   Makefile exports the same two values for the `aws` CLI calls it shells out
   to, so tofu and the CLI share one source of truth; empty exports are
   ignored by the CLI and neutralise an inherited stale pair.
+- Secrets reach recipes and their children through the environment, never
+  argv: make runs each recipe line as `sh -c '<expanded line>'`, so a `$(TOK)`
+  or `$(PW)` in a recipe is visible to `ps` for the whole run (2026-10-13: a
+  `pgrep -fl` put the PAT and db_password into a transcript; both rotated).
+  Use `<target>: export SUPABASE_ACCESS_TOKEN := $(TOK)` and read
+  `$$SUPABASE_ACCESS_TOKEN`, `TF_VAR_supabase_access_token` instead of
+  `-var=`, `PGPASSWORD` instead of a password in a DSN, and
+  `printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -H @-`
+  for auth headers. `make -n <target>` then prints no credential (it still
+  EXECUTES any line that contains `$(MAKE)`). `harness/src/makefile-secrets.test.ts`
+  enforces this on every Makefile.
 - Secrets reach the runner only at invocation time, inside the SSM
   `send-command` payload (`suite.sh` reads them from `secrets.tfvars`).
   Nothing secret is baked into user_data or the AMI, and the runner holds

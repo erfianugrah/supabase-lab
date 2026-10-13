@@ -42,7 +42,8 @@ if [ -z "$REF" ] || [ -z "$PW" ] || [ -z "${SUPABASE_ACCESS_TOKEN:-}" ]; then
   exit 1
 fi
 
-POOLER="$(curl -s -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+# Auth header on stdin, not in curl's argv (ps-visible).
+POOLER="$(printf 'Authorization: Bearer %s\n' "$SUPABASE_ACCESS_TOKEN" | curl -s -H @- \
   "https://api.supabase.com/v1/projects/$REF/config/database/pooler" \
   | jq -r '[.[] | select(.database_type=="PRIMARY")][0].db_host // empty')"
 

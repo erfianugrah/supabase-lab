@@ -35,11 +35,12 @@ unit:
 # (ideally one per plan) so the plan table gets one row per plan:
 #   make probe ORGS=slug-free,slug-pro,slug-team
 ORGS ?= $(ORG)
+probe: export SUPABASE_ACCESS_TOKEN := $(TOK)
 probe:
-	@test -n "$(TOK)" || (echo "no PAT in $(ROOT)/secrets.tfvars - run 'make secrets-decrypt' at the root"; exit 1)
+	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "no PAT in $(ROOT)/secrets.tfvars - run 'make secrets-decrypt' at the root"; exit 1)
 	@cd $(ROOT)/harness && bun run build >/dev/null
 	@mkdir -p evidence/$(TS)
-	@PVLAB_REF="$(REF)" SUPABASE_ACCESS_TOKEN="$(TOK)" PVLAB_ORG_SLUGS="$(ORGS)" \
+	@PVLAB_REF="$(REF)" PVLAB_ORG_SLUGS="$(ORGS)" \
 		$(ROOT)/harness/dist/pvlab --where local --experiment edge-function-limits \
 		--only $(READONLY) --out evidence/$(TS)
 	@echo "== evidence/$(TS) =="
@@ -51,15 +52,16 @@ probe:
 ONLY ?= $(DESTRUCTIVE)
 RUNNER ?= $(ROOT)/harness/dist/pvlab
 BUILD ?= 1
+probe-destructive: export SUPABASE_ACCESS_TOKEN := $(TOK)
 probe-destructive:
 	@test -n "$(REF)" || (echo "no project_ref output - run 'make apply' first"; exit 1)
-	@test -n "$(TOK)" || (echo "no PAT in $(ROOT)/secrets.tfvars"; exit 1)
+	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "no PAT in $(ROOT)/secrets.tfvars"; exit 1)
 	@if [ "$(BUILD)" = "1" ]; then cd $(ROOT)/harness && bun run build >/dev/null; else cd $(ROOT)/harness && bun run gen >/dev/null; fi
 	@mkdir -p evidence/$(TS)
-	@keys=$$(curl -s -H "Authorization: Bearer $(TOK)" \
+	@keys=$$(printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -s -H @- \
 		"https://api.supabase.com/v1/projects/$(REF)/api-keys"); \
 	anon=$$(echo "$$keys" | jq -r '.[] | select(.name=="anon") | .api_key' | head -1); \
-	PVLAB_REF="$(REF)" SUPABASE_ACCESS_TOKEN="$(TOK)" SUPABASE_ANON_KEY="$$anon" \
+	PVLAB_REF="$(REF)" SUPABASE_ANON_KEY="$$anon" \
 		PVLAB_ORG_SLUGS="$(ORGS)" \
 		$(RUNNER) --where local --experiment edge-function-limits \
 		--destructive --only $(ONLY) --out evidence/$(TS)

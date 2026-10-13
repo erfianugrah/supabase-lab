@@ -24,17 +24,18 @@ apply:
 # All L modules run from the local vantage against the shared tofu project.
 # L01 is read-only; L02-L07 are destructive-but-restoring and sort after it,
 # so one `--only L01..L07 --destructive` run executes them in id order.
+probe: export SUPABASE_ACCESS_TOKEN := $(TOK)
 probe:
 	@test -n "$(REF)" || (echo "no project_ref output - run 'make apply' first"; exit 1)
-	@test -n "$(TOK)" || (echo "no PAT in $(ROOT)/secrets.tfvars - run 'make secrets-decrypt' at the root"; exit 1)
+	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "no PAT in $(ROOT)/secrets.tfvars - run 'make secrets-decrypt' at the root"; exit 1)
 	@cd $(ROOT)/harness && bun run build >/dev/null
 	@mkdir -p evidence/$(TS)
-	@keys=$$(curl -s -H "Authorization: Bearer $(TOK)" \
+	@keys=$$(printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -s -H @- \
 		"https://api.supabase.com/v1/projects/$(REF)/api-keys?reveal=true"); \
 	anon=$$(echo "$$keys" | jq -r '.[] | select(.name=="anon") | .api_key' | head -1); \
 	svc=$$(echo "$$keys" | jq -r '.[] | select(.name=="service_role") | .api_key' | head -1); \
 	test -n "$$anon" -a -n "$$svc" || (echo "could not fetch anon/service_role keys"; exit 1); \
-	PVLAB_REF="$(REF)" SUPABASE_ACCESS_TOKEN="$(TOK)" \
+	PVLAB_REF="$(REF)" \
 		SUPABASE_ANON_KEY="$$anon" SUPABASE_SERVICE_ROLE_KEY="$$svc" \
 		PVLAB_ENDPOINT_OIDC_ISSUER="$$(tofu output -raw oidc_issuer_url 2>/dev/null)" \
 		PVLAB_ENDPOINT_WORKER="https://$$(tofu output -raw proxy_hostname 2>/dev/null)" \
@@ -52,11 +53,12 @@ destroy:
 # --- Phase B: L11 proxy Worker (wrangler). Access apps come from tofu
 # (enable_cloudflare). Deploy pushes the per-run project host + service key,
 # neither of which is committed. Route hostname comes from the tofu output. ---
+worker-deploy: export SUPABASE_ACCESS_TOKEN := $(TOK)
 worker-deploy:
 	@test -n "$(REF)" || (echo "no project_ref - run 'make apply' first"; exit 1)
 	@host=$$(tofu output -raw proxy_hostname); \
 	test -n "$$host" || (echo "no proxy_hostname output - is enable_cloudflare=true?"; exit 1); \
-	svc=$$(curl -s -H "Authorization: Bearer $(TOK)" \
+	svc=$$(printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -s -H @- \
 		"https://api.supabase.com/v1/projects/$(REF)/api-keys?reveal=true" \
 		| jq -r '.[]|select(.name=="service_role")|.api_key'); \
 	test -n "$$svc" || (echo "could not fetch service_role key"; exit 1); \

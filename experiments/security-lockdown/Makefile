@@ -31,13 +31,16 @@ apply:
 # Connects through the session pooler (IPv4). The pre-request function is
 # installed by the S04 module; this target just runs the container.
 # Pinned to the verified latest stable image tag (oci_tags, 2026-08-28).
+# The DSN carries the password, so docker gets it as `-e PGRST_DB_URI` (value
+# from its environment), not as an argument.
+postgrest-up: export DB_PASSWORD := $(PW)
 postgrest-up:
 	@test -n "$(REF)" || (echo "no project_ref - run 'make apply' first"; exit 1)
 	@pooler="aws-0-$$(tofu output -raw region).pooler.supabase.com"; \
-	uri="postgres://postgres.$(REF):$(PW)@$$pooler:5432/postgres"; \
 	docker rm -f sec-postgrest >/dev/null 2>&1 || true; \
+	PGRST_DB_URI="postgres://postgres.$(REF):$$DB_PASSWORD@$$pooler:5432/postgres" \
 	docker run -d --name sec-postgrest -p $(PGRST_PORT):3000 \
-		-e PGRST_DB_URI="$$uri" \
+		-e PGRST_DB_URI \
 		-e PGRST_DB_SCHEMAS=public \
 		-e PGRST_DB_ANON_ROLE=anon \
 		-e PGRST_DB_PRE_REQUEST=public.sec_ip_filter \
@@ -81,19 +84,20 @@ edge-up:
 edge-down:
 	-docker rm -f sec-edge >/dev/null 2>&1 && echo "edge down"
 
+probe: export SUPABASE_ACCESS_TOKEN := $(TOK)
+probe: export PVLAB_DB_PASSWORD := $(PW)
 probe:
 	@test -n "$(REF)" || (echo "no project_ref output - run 'make apply' first"; exit 1)
-	@test -n "$(TOK)" || (echo "no PAT in $(ROOT)/secrets.tfvars"; exit 1)
+	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "no PAT in $(ROOT)/secrets.tfvars"; exit 1)
 	@cd $(ROOT)/harness && bun run build >/dev/null
 	@mkdir -p evidence/$(TS)
-	@keys=$$(curl -s -H "Authorization: Bearer $(TOK)" \
+	@keys=$$(printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -s -H @- \
 		"https://api.supabase.com/v1/projects/$(REF)/api-keys?reveal=true"); \
 	anon=$$(echo "$$keys" | jq -r '.[] | select(.name=="anon") | .api_key' | head -1); \
 	svc=$$(echo "$$keys" | jq -r '.[] | select(.name=="service_role") | .api_key' | head -1); \
 	test -n "$$anon" -a -n "$$svc" || (echo "could not fetch anon/service_role keys"; exit 1); \
-	PVLAB_REF="$(REF)" SUPABASE_ACCESS_TOKEN="$(TOK)" \
+	PVLAB_REF="$(REF)" \
 		SUPABASE_ANON_KEY="$$anon" SUPABASE_SERVICE_ROLE_KEY="$$svc" \
-		PVLAB_DB_PASSWORD="$(PW)" \
 		PVLAB_ENDPOINT_SELFHOSTED_POSTGREST="http://localhost:$(PGRST_PORT)" \
 		PVLAB_ENDPOINT_RATELIMIT="http://localhost:$(RL_PORT)" \
 		PVLAB_ENDPOINT_RATELIMIT_WORKER="http://localhost:$(RLW_PORT)" \

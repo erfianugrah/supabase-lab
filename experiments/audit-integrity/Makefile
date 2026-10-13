@@ -33,8 +33,9 @@ validate:
 	@ls *.tf >/dev/null || (echo "no .tf files - tofu validate returns Success on an EMPTY dir"; exit 1)
 	tofu validate
 
+apply: export TF_VAR_supabase_access_token := $(TOK)
 apply:
-	@tofu plan $(VARS) -var="supabase_access_token=$(TOK)" $(if $(PVLAB_ORG_TEAM),-var="team_org_id=$(PVLAB_ORG_TEAM)",) -out=tfplan
+	@tofu plan $(VARS) $(if $(PVLAB_ORG_TEAM),-var="team_org_id=$(PVLAB_ORG_TEAM)",) -out=tfplan
 	@tofu apply tfplan
 	@echo "project_ref = $$(tofu output -raw project_ref)"
 
@@ -44,17 +45,19 @@ apply:
 # PVLAB_ORG_PRO/TEAM/FREE gate A07 (entitlements per plan). They come from
 # .pi/probe-audit-integrity.sh, which is gitignored - an org slug is an account
 # identifier and the identifiers test scans tracked source for exactly that.
+probe: export SUPABASE_ACCESS_TOKEN := $(TOK)
+probe: export PVLAB_DB_PASSWORD := $(PW)
 probe:
 	@test -n "$(REF)" || (echo "no project_ref output - run 'make apply' first"; exit 1)
-	@test -n "$(TOK)" || (echo "no PAT - export SUPABASE_ACCESS_TOKEN or run 'make secrets-decrypt' at the root"; exit 1)
+	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "no PAT - export SUPABASE_ACCESS_TOKEN or run 'make secrets-decrypt' at the root"; exit 1)
 	@cd $(ROOT)/harness && bun run build >/dev/null
 	@mkdir -p evidence/$(TS)-$(ORG)
-	@keys=$$(curl -s -H "Authorization: Bearer $(TOK)" \
+	@keys=$$(printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -s -H @- \
 		"https://api.supabase.com/v1/projects/$(REF)/api-keys?reveal=true"); \
 	anon=$$(echo "$$keys" | jq -r '.[] | select(.name=="anon") | .api_key' | head -1); \
 	test -n "$$anon" || (echo "could not fetch the anon key"; exit 1); \
-	PVLAB_REF="$(REF)" SUPABASE_ACCESS_TOKEN="$(TOK)" SUPABASE_ANON_KEY="$$anon" \
-		PVLAB_DB_PASSWORD="$(PW)" AWS_REGION="$(REGION)" \
+	PVLAB_REF="$(REF)" SUPABASE_ANON_KEY="$$anon" \
+		AWS_REGION="$(REGION)" \
 		$(ROOT)/harness/dist/pvlab --where local --experiment audit-integrity \
 		--only "$(ONLY)" $(RUNNER_FLAGS) --out evidence/$(TS)-$(ORG)
 	@echo "== evidence/$(TS)-$(ORG)/ =="
@@ -64,6 +67,7 @@ publish-evidence:
 	@test -n "$(RUN)" || (echo "RUN=evidence/<ts>/run-<stamp>.json required"; exit 1)
 	@cd $(ROOT)/harness && bun scripts/publish-evidence.ts $(abspath $(RUN)) $(abspath .) $(if $(PUBLISH_ONLY),--only $(PUBLISH_ONLY),)
 
+destroy: export TF_VAR_supabase_access_token := $(TOK)
 destroy:
-	@tofu plan -destroy $(VARS) -var="supabase_access_token=$(TOK)" $(if $(PVLAB_ORG_TEAM),-var="team_org_id=$(PVLAB_ORG_TEAM)",) -out=tfplan-destroy
+	@tofu plan -destroy $(VARS) $(if $(PVLAB_ORG_TEAM),-var="team_org_id=$(PVLAB_ORG_TEAM)",) -out=tfplan-destroy
 	@tofu apply tfplan-destroy

@@ -31,19 +31,21 @@ apply:
 # would break by moving the backend between statements, so port 5432. Anon key
 # for the sign-in observable, service_role for admin user creation, DB password
 # for the pg connections, pooler host derived from the region output.
+probe: export SUPABASE_ACCESS_TOKEN := $(TOK)
+probe: export DB_PASSWORD := $(PW)
 probe:
 	@test -n "$(REF)" || (echo "no project_ref output - run 'make apply' first"; exit 1)
-	@test -n "$(TOK)" || (echo "no PAT in $(ROOT)/secrets.tfvars - run 'make secrets-decrypt' at the root"; exit 1)
+	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "no PAT in $(ROOT)/secrets.tfvars - run 'make secrets-decrypt' at the root"; exit 1)
 	@cd $(ROOT)/harness && bun run build >/dev/null
 	@mkdir -p evidence/$(TS)
 	@pooler="aws-0-$$(tofu output -raw region).pooler.supabase.com"; \
-	keys=$$(curl -s -H "Authorization: Bearer $(TOK)" "https://api.supabase.com/v1/projects/$(REF)/api-keys?reveal=true"); \
+	keys=$$(printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -s -H @- "https://api.supabase.com/v1/projects/$(REF)/api-keys?reveal=true"); \
 	anon=$$(echo "$$keys" | jq -r '.[] | select(.name=="anon") | .api_key' | head -1); \
 	svc=$$(echo "$$keys" | jq -r '.[] | select(.name=="service_role") | .api_key' | head -1); \
 	test -n "$$anon" -a -n "$$svc" || (echo "could not fetch anon/service_role keys"; exit 1); \
-	PVLAB_REF="$(REF)" SUPABASE_ACCESS_TOKEN="$(TOK)" \
+	PVLAB_REF="$(REF)" \
 		SUPABASE_ANON_KEY="$$anon" SUPABASE_SERVICE_ROLE_KEY="$$svc" \
-		DB_PASSWORD="$(PW)" PVLAB_ENDPOINT_POOLER="$$pooler" \
+		PVLAB_ENDPOINT_POOLER="$$pooler" \
 		$(ROOT)/harness/dist/pvlab --where local --experiment auth-users-locks \
 		--destructive --only "$(IDS)" --out evidence/$(TS)
 	@echo "== evidence/$(TS)/ =="

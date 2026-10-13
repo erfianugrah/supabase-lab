@@ -29,30 +29,32 @@ apply:
 # Fetches anon + service_role + publishable + secret keys: AR01/AR02 need the
 # anon key for the public endpoints, AR02 needs the sb_secret_ key for
 # forwarding, AR03 needs service_role for admin-create.
-KEYS = keys=$$(curl -s -H "Authorization: Bearer $(TOK)" "https://api.supabase.com/v1/projects/$(REF)/api-keys?reveal=true"); \
+KEYS = keys=$$(printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -s -H @- "https://api.supabase.com/v1/projects/$(REF)/api-keys?reveal=true"); \
 	anon=$$(echo "$$keys" | jq -r '.[] | select(.name=="anon") | .api_key' | head -1); \
 	svc=$$(echo "$$keys" | jq -r '.[] | select(.name=="service_role") | .api_key' | head -1)
 
+probe: export SUPABASE_ACCESS_TOKEN := $(TOK)
 probe:
-	@test -n "$(TOK)" || (echo "no PAT in $(ROOT)/secrets.tfvars - run 'make secrets-decrypt' at the root"; exit 1)
+	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "no PAT in $(ROOT)/secrets.tfvars - run 'make secrets-decrypt' at the root"; exit 1)
 	@cd $(ROOT)/harness && bun run build >/dev/null
 	@mkdir -p evidence/$(TS)
 	@$(KEYS); \
-	PVLAB_REF="$(REF)" SUPABASE_ACCESS_TOKEN="$(TOK)" SUPABASE_ANON_KEY="$$anon" SUPABASE_SERVICE_ROLE_KEY="$$svc" \
+	PVLAB_REF="$(REF)" SUPABASE_ANON_KEY="$$anon" SUPABASE_SERVICE_ROLE_KEY="$$svc" \
 		$(ROOT)/harness/dist/pvlab --where local --experiment auth-rate-limits \
 		--only $(READONLY) --out evidence/$(TS)
 	@echo "== evidence/$(TS)/ =="
 
 # The bursts, admin-creates and config PATCHes. ONLY=AR01 narrows it.
 ONLY ?= $(DESTRUCTIVE)
+probe-destructive: export SUPABASE_ACCESS_TOKEN := $(TOK)
 probe-destructive:
 	@test -n "$(REF)" || (echo "no project_ref output - run 'make apply' first"; exit 1)
-	@test -n "$(TOK)" || (echo "no PAT in $(ROOT)/secrets.tfvars"; exit 1)
+	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "no PAT in $(ROOT)/secrets.tfvars"; exit 1)
 	@cd $(ROOT)/harness && bun run build >/dev/null
 	@mkdir -p evidence/$(TS)
 	@$(KEYS); \
 	test -n "$$anon" -a -n "$$svc" || (echo "could not fetch anon/service_role keys"; exit 1); \
-	PVLAB_REF="$(REF)" SUPABASE_ACCESS_TOKEN="$(TOK)" SUPABASE_ANON_KEY="$$anon" SUPABASE_SERVICE_ROLE_KEY="$$svc" \
+	PVLAB_REF="$(REF)" SUPABASE_ANON_KEY="$$anon" SUPABASE_SERVICE_ROLE_KEY="$$svc" \
 		$(ROOT)/harness/dist/pvlab --where local --experiment auth-rate-limits \
 		--destructive --only $(ONLY) --out evidence/$(TS)
 	@echo "== evidence/$(TS)/ =="

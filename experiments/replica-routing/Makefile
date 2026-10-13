@@ -29,4 +29,4 @@ publish:
 
 # After a run, confirm nothing is left billing:
 leftovers:
-	@curl -s -H "Authorization: Bearer $(SUPABASE_ACCESS_TOKEN)" https://api.supabase.com/v1/projects | jq -r '.[] | select(.name | startswith("rr-")) | .name'
+	@printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -s -H @- https://api.supabase.com/v1/projects | jq -r '.[] | select(.name | startswith("rr-")) | .name'

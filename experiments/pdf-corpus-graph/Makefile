@@ -41,7 +41,7 @@ apply: guard-tok
 	@echo "project_ref = $$(tofu output -raw project_ref)"
 
 guard-tok:
-	@test -n "$(TOK)" || (echo "no SUPABASE_ACCESS_TOKEN in the environment - export a live PAT (the one in secrets.tfvars is a placeholder by design)"; exit 1)
+	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "no SUPABASE_ACCESS_TOKEN in the environment - export a live PAT (the one in secrets.tfvars is a placeholder by design)"; exit 1)
 
 # ACTIVE_HEALTHY on the aggregate status is not readiness, and neither is the
 # first per-service health poll - AGENTS.md records two of two fresh projects
@@ -51,7 +51,7 @@ wait-ready: guard-tok
 	@test -n "$(REF)" || (echo "no project_ref - run 'make apply' first"; exit 1)
 	@printf 'waiting for services'
 	@for i in $$(seq 1 60); do \
-		s=$$(curl -s -H "Authorization: Bearer $(TOK)" \
+		s=$$(printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -s -H @- \
 			"https://api.supabase.com/v1/projects/$(REF)/health?services=db&services=rest&services=auth" \
 			| jq -r '[.[].status] | unique | join(",")' 2>/dev/null); \
 		if [ "$$s" = "ACTIVE_HEALTHY" ]; then printf ' healthy\n'; sleep 20; exit 0; fi; \
@@ -68,15 +68,18 @@ wait-ready: guard-tok
 # replica - `.connection_string` on the array yields a jq type error, and
 # `.[0]` would silently pick whichever the API happened to order first.
 pooler:
-	@curl -s -H "Authorization: Bearer $(TOK)" \
+	@printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -s -H @- \
 		"https://api.supabase.com/v1/projects/$(REF)/config/database/pooler" \
 		| jq -r '[.[] | select(.database_type=="PRIMARY")][0].db_host // empty'
 
+schema: export PGPASSWORD := $(PW)
 schema:
 	@psql "$$($(MAKE) --no-print-directory pgurl)" -v ON_ERROR_STOP=1 -f sql/schema.sql
 
+# No password in the URL: it would land in psql's argv. Callers set
+# PGPASSWORD (schema exports it, scripts/seed.sh exports it for its children).
 pgurl:
-	@echo "postgresql://postgres.$(REF):$(PW)@$$($(MAKE) --no-print-directory pooler):6543/postgres?connect_timeout=15"
+	@echo "postgresql://postgres.$(REF)@$$($(MAKE) --no-print-directory pooler):6543/postgres?connect_timeout=15"
 
 # Rebuild the whole demo from scratch on an already-applied project.
 seed: guard-tok
@@ -90,12 +93,12 @@ up: guard-tok
 	$(MAKE) wait-ready
 	$(MAKE) seed
 
+probe: export DB_PASSWORD := $(PW)
 probe: guard-tok
 	@test -n "$(REF)" || (echo "no project_ref - run 'make apply' first"; exit 1)
 	@cd $(ROOT)/harness && bun run build >/dev/null
 	@mkdir -p evidence/$(TS)
-	@PVLAB_REF="$(REF)" SUPABASE_ACCESS_TOKEN="$(TOK)" \
-	 DB_PASSWORD="$(PW)" PVLAB_REGION="$(REGION)" \
+	@PVLAB_REF="$(REF)" PVLAB_REGION="$(REGION)" \
 	 PVLAB_ENDPOINT_POOLER="$$($(MAKE) --no-print-directory pooler)" \
 	 PVLAB_INSTANCE_SIZE="$(SIZE)" \
 		$(ROOT)/harness/dist/pvlab --where local $(ONLY) \

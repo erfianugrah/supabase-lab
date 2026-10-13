@@ -15,7 +15,7 @@ ONLY ?= CR01,CR02,CR03
 .PHONY: probe unit publish-evidence
 
 probe:
-	@test -n "$(SUPABASE_ACCESS_TOKEN)" || (echo "export SUPABASE_ACCESS_TOKEN"; exit 1)
+	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "export SUPABASE_ACCESS_TOKEN"; exit 1)
 	@mkdir -p evidence/$(TS)
 	cd $(ROOT) && bun harness/scripts/gen-registry.ts > /dev/null
 	cd $(ROOT) && bun harness/src/run.ts --where local --experiment client-retries \

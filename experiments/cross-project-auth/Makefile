@@ -28,13 +28,14 @@ apply:
 #
 # Both are `destructive` because they write auth config, schema and users, so
 # --destructive is not optional: without it the suite plans zero tests.
+probe: export SUPABASE_ACCESS_TOKEN := $(TOK)
 probe:
 	@test -n "$(HUB)" || (echo "no hub_ref output - run 'make apply' first"; exit 1)
 	@test -n "$(SPOKE)" || (echo "no spoke_ref output - run 'make apply' first"; exit 1)
-	@test -n "$(TOK)" || (echo "no PAT in $(ROOT)/secrets.tfvars - run 'make secrets-decrypt' at the root"; exit 1)
+	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "no PAT in $(ROOT)/secrets.tfvars - run 'make secrets-decrypt' at the root"; exit 1)
 	@cd $(ROOT)/harness && bun run build >/dev/null
 	@mkdir -p evidence/$(TS)
-	@PVLAB_REF="$(HUB)" PVLAB_PEER_SPOKE="$(SPOKE)" SUPABASE_ACCESS_TOKEN="$(TOK)" \
+	@PVLAB_REF="$(HUB)" PVLAB_PEER_SPOKE="$(SPOKE)" \
 		$(ROOT)/harness/dist/pvlab --where local --destructive --only X01,X02 --experiment cross-project-auth \
 		--out evidence/$(TS)
 	@echo "== evidence/$(TS)/REPORT.md =="

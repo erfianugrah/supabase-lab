@@ -14,7 +14,7 @@ ONLY ?= DD01,DD02,DD03,DD04,DD99
 .PHONY: run run-standing clean list publish-evidence
 
 run:
-	@test -n "$(SUPABASE_ACCESS_TOKEN)" || (echo "export SUPABASE_ACCESS_TOKEN"; exit 1)
+	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "export SUPABASE_ACCESS_TOKEN"; exit 1)
 	@test -n "$(PVLAB_ORG_PRO)" || (echo "export PVLAB_ORG_PRO (and PVLAB_ORG_SLUGS to the same slug)"; exit 1)
 	@cd $(ROOT)/harness && bun run gen >/dev/null
 	@mkdir -p evidence/$(TS)
@@ -27,7 +27,7 @@ run:
 # no ALTER DEFAULT PRIVILEGES, nothing else touched. Run once before
 # 2026-10-30 and once after; `--diff` the two artifacts.
 run-standing:
-	@test -n "$(SUPABASE_ACCESS_TOKEN)" || (echo "export SUPABASE_ACCESS_TOKEN"; exit 1)
+	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "export SUPABASE_ACCESS_TOKEN"; exit 1)
 	@test -n "$(PVLAB_REF)" || (echo "export PVLAB_REF=<ref of a project created before 2026-05-30>"; exit 1)
 	@cd $(ROOT)/harness && bun run gen >/dev/null
 	@mkdir -p evidence/$(TS)
@@ -37,7 +37,7 @@ run-standing:
 
 # List (no --delete) or delete (DELETE=1) projects left behind by a run that died.
 clean:
-	@test -n "$(SUPABASE_ACCESS_TOKEN)" || (echo "export SUPABASE_ACCESS_TOKEN"; exit 1)
+	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "export SUPABASE_ACCESS_TOKEN"; exit 1)
 	cd $(ROOT)/experiments/data-api-defaults && bun lib/cleanup.ts $(if $(DELETE),--delete,)
 
 # Redacted copy + facts table into out/<date>/ - what RUNLOG and docs cite.
