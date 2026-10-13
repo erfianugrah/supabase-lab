@@ -1,0 +1,108 @@
+{
+  "startedAt": "2026-10-10T04:41:47.267Z",
+  "finishedAt": "2026-10-10T04:43:03.294Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "hostname-path",
+  "labCommit": "70e4244",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "HP03a",
+      "title": "custom_domain add-on and custom-hostname/initialize",
+      "status": "pass",
+      "detail": "add-on PATCH HTTP 200; initialize HTTP 201, status 2_initiated, 1 TXT record(s) asked for",
+      "measurements": {
+        "addon_http": 200,
+        "initialize_http": 201,
+        "initialize_status": "2_initiated"
+      },
+      "durationMs": 75085
+    },
+    {
+      "id": "HP03b",
+      "title": "DNS written as asked; reverify polled to 3_challenge_verified",
+      "status": "pass",
+      "detail": "CNAME 200, TXT _cf-custom-hostname 200 at 2s; verified after 66s (status 4_origin_setup_completed)",
+      "measurements": {
+        "verified_s": 66,
+        "status_after_verify": "4_origin_setup_completed",
+        "dns_writes": 2
+      },
+      "durationMs": 75085
+    },
+    {
+      "id": "HP03c",
+      "title": "activate to 5_services_reconfigured; the host serves",
+      "status": "pass",
+      "detail": "origin setup (4_) after 0s; activate first HTTP 201, 1 attempt(s), last HTTP 201; reconfigured 0s; function ping through the custom host (curl pinned to 1.1.1.1's answer) 200 after 1s; system resolver answers NOERROR with 3 record(s)",
+      "measurements": {
+        "origin_setup_s": 0,
+        "activate_attempts": 1,
+        "activate_first": "HTTP 201",
+        "active_s": 0,
+        "serving_s": 1,
+        "ping_status": 200,
+        "system_resolver_rcode": "NOERROR"
+      },
+      "durationMs": 75085
+    },
+    {
+      "id": "HP03d",
+      "title": "seconds from 5_services_reconfigured until the Auth redirect_uri carries the custom host",
+      "status": "pass",
+      "detail": "transitions (seconds counted from the API reporting 5_services_reconfigured): 1s origin-entry:origin custom-entry:origin | 6s origin-entry:custom custom-entry:custom",
+      "measurements": {
+        "redirect_uri_custom_after_s": 6,
+        "transitions": "1s origin-entry:origin custom-entry:origin | 6s origin-entry:custom custom-entry:custom"
+      },
+      "durationMs": 75085
+    },
+    {
+      "id": "HP04a",
+      "title": "OAuth round trip entering at custom (custom domain active)",
+      "status": "pass",
+      "detail": "authorize built client-side at custom; redirect_uri to the issuer custom/auth/v1/callback; issuer sent the browser to custom; landed localhost:3000; token iss origin/auth/v1; redirect_uri in the token request custom/auth/v1/callback; /auth/v1/user with the token {\"origin\":\"200\",\"custom\":\"200\"}",
+      "measurements": {
+        "entry": "custom",
+        "hops": "302>302>302",
+        "redirect_uri_host": "custom",
+        "redirect_uri_path": "/auth/v1/callback",
+        "callback_host": "custom",
+        "landing_host": "localhost:3000",
+        "iss_host": "origin",
+        "iss_path": "/auth/v1",
+        "token_request_redirect_host": "custom",
+        "user_on": "{\"origin\":\"200\",\"custom\":\"200\"}",
+        "sub_present": "yes"
+      },
+      "durationMs": 941
+    },
+    {
+      "id": "HP04b",
+      "title": "OAuth round trip entering at origin (custom domain active)",
+      "status": "pass",
+      "detail": "authorize built client-side at origin; redirect_uri to the issuer custom/auth/v1/callback; issuer sent the browser to custom; landed localhost:3000; token iss origin/auth/v1; redirect_uri in the token request custom/auth/v1/callback; /auth/v1/user with the token {\"origin\":\"200\",\"custom\":\"200\"}",
+      "measurements": {
+        "entry": "origin",
+        "hops": "302>302>302",
+        "redirect_uri_host": "custom",
+        "redirect_uri_path": "/auth/v1/callback",
+        "callback_host": "custom",
+        "landing_host": "localhost:3000",
+        "iss_host": "origin",
+        "iss_path": "/auth/v1",
+        "token_request_redirect_host": "custom",
+        "user_on": "{\"origin\":\"200\",\"custom\":\"200\"}",
+        "sub_present": "yes"
+      },
+      "durationMs": 941
+    }
+  ]
+}

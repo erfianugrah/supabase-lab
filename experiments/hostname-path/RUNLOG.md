@@ -18,11 +18,18 @@ VM. DNS for the custom hostname went through the Cloudflare v4 API in a zone on
 the operator's own account (global key; the scoped API token from the vault did
 not list that zone on this date - an unrecorded observation, no artifact). The hostname and the project are deleted.
 
-Artifacts (gitignored `evidence/<ts>/`, copies kept outside the repo; not yet
-published to `out/`): `20261010-122802` (HP01, HP02 first pass),
-`20261010-122852` (HP02, HP03 first cycle, HP04, HP05), `20261010-123323` (HP04
-re-run), `20261010-123430` (HP06, HP07, HP08), `20261010-124147` (HP03 second
-cycle, HP04), `20261010-124315` (HP05 with HP05d), `20261010-124339` (HP09).
+Artifacts (raw in the gitignored `evidence/<ts>/`, copies kept outside the
+repo; redacted copies, each with a `.facts.md` beside it, in `out/2026-10-10/`):
+
+| evidence dir | modules | published artifact |
+|---|---|---|
+| `20261010-122802` | HP01, HP02 first pass | `out/2026-10-10/run-2026-10-10T04-28-02-410Z.json` |
+| `20261010-122852` | HP02, HP03 first cycle, HP04, HP05 | `out/2026-10-10/run-2026-10-10T04-28-53-141Z.json` |
+| `20261010-123323` | HP04 re-run | `out/2026-10-10/run-2026-10-10T04-33-23-282Z.json` |
+| `20261010-123430` | HP06, HP07, HP08 | `out/2026-10-10/run-2026-10-10T04-34-30-810Z.json` |
+| `20261010-124147` | HP03 second cycle, HP04 | `out/2026-10-10/run-2026-10-10T04-41-47-267Z.json` |
+| `20261010-124315` | HP05 with HP05d | `out/2026-10-10/run-2026-10-10T04-43-15-504Z.json` |
+| `20261010-124339` | HP09 | `out/2026-10-10/run-2026-10-10T04-43-39-984Z.json` |
 
 Measured values below are from those artifacts. "Docs" marks a claim from the
 public pages above that the run did not test.
