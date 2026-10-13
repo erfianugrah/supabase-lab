@@ -1,5 +1,11 @@
 # SFP Coverage Closure - Tracking & Implementation Plan
 
+> **STATUS (stocktake 2026-10-13):** Tasks 1-15 DONE 2026-08-25 per the
+> tracking ledger below. Task 16 (M5, M6) is blocked on entitlement
+> enablement and Task 17 (U1-U6) is track-only; both are carried by board card
+> work-supabase-lab#3. The checkboxes were never ticked; the ledger is the
+> record.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use subagent-driven-development (recommended) or implement this plan task-by-task in-session. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Close every documentation error and measurement gap found in the 2026-08-25 SFP review across supabase-lab, erfibase, and lexicanum, so the corpus carries one consistent, fully-measured model of the `platform` plan.

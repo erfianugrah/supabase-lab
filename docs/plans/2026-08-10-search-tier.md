@@ -1,5 +1,10 @@
 # search tier: document search + cross-document discovery
 
+> **STATUS (stocktake 2026-10-13): SHIPPED** 2026-08-11 in 834dfa5
+> (`search_documents`, `cross_document_entities`, the UI panel); loop outcome
+> in f55d768. The checkboxes below were never ticked;
+> `experiments/pdf-corpus-graph/RUNLOG.md` is the record.
+
 > **For agentic workers:** Steps use checkbox (`- [ ]`) syntax for tracking.
 > Built by hand (Anthropic API is usage-limited until 2026-09-01, so no loop).
 > `experiments/pdf-corpus-graph/GUIDE.md` is binding: a probe asserts that it
