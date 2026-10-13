@@ -12,7 +12,7 @@
  * is a defect that reached a published file or would have.
  */
 import { describe, expect, test } from "bun:test";
-import { redact } from "../scripts/publish-evidence";
+import { REF_SHAPE, redact } from "../scripts/publish-evidence";
 
 const CASES: { name: string; input: string; expected: string }[] = [
   {
@@ -67,6 +67,28 @@ const CASES: { name: string; input: string; expected: string }[] = [
     input: "-- user: oauth:0a1b2c3d-4e5f-6a7b-8c9d-0e1f2a3b4c5d",
     expected: "-- user: oauth:<id>",
   },
+  // Stack traces and captured stderr name the operator's home directory
+  // (auth-providers AU03, pooler-checkout PC03, 2026-10-10); caught by the
+  // 2026-10-13 backlog plan's dry-run before either was published.
+  {
+    name: "macOS home directory in a stack trace",
+    input: "at run (/Users/someone/work/lab/tests/x.ts:10:5)",
+    expected: "at run (~/work/lab/tests/x.ts:10:5)",
+  },
+  {
+    name: "Linux home directory",
+    input: "open /home/someone/.cache/x failed",
+    expected: "open ~/.cache/x failed",
+  },
+  // redact() runs on the raw JSON text, where a newline inside a string is
+  // the two characters `\n`: the ref after it read as a 21-letter token and
+  // survived, in usage-metering M05a's per-project list (one ref per line),
+  // caught by hand before publishing on 2026-10-13.
+  {
+    name: "ref after a JSON-escaped newline or tab",
+    input: '"<ref> $9.81/mo\\nabcdefghijklmnopqrst $9.81/mo\\tabcdefghijklmnopqrst"',
+    expected: '"<ref> $9.81/mo\\n<ref> $9.81/mo\\t<ref>"',
+  },
 ];
 
 describe("redact removes every identifier class from a published artifact", () => {
@@ -75,6 +97,12 @@ describe("redact removes every identifier class from a published artifact", () =
       expect(redact(c.input)).toBe(c.expected);
     });
   }
+
+  test("the leftover check and the identifier scan see a ref behind a JSON escape", () => {
+    expect('x\\nabcdefghijklmnopqrst y'.match(REF_SHAPE)).toEqual(["abcdefghijklmnopqrst"]);
+    expect("postgres_abcdefghijklmnopqrst".match(REF_SHAPE)).toEqual(["abcdefghijklmnopqrst"]);
+    expect("nabcdefghijklmnopqrst".match(REF_SHAPE)).toBeNull();
+  });
 
   test("a full provenance footer survives with nothing identifying left", () => {
     const footer = [

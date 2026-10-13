@@ -18,6 +18,7 @@
 import { describe, expect, test } from "bun:test";
 import { $ } from "bun";
 import { resolve } from "node:path";
+import { REF_SHAPE } from "../scripts/publish-evidence";
 
 const ROOT = resolve(import.meta.dir, "../..");
 
@@ -33,9 +34,9 @@ const ALLOW = new Set<string>([
   "aaaaaaaaaaaaaaaaaaaa",
 ]);
 
-// Bounded on letters and digits, not `\b`: `_` is a word character, so `\b`
-// missed `postgres_<ref>`-style keys (work-supabase-lab#10).
-const REF = /(?<![A-Za-z0-9])[a-z]{20}(?![A-Za-z0-9])/g;
+// The redactor's own pattern (letter/digit bounded, JSON escapes count as a
+// boundary), so the scan cannot miss what redaction missed or vice versa.
+const REF = REF_SHAPE;
 /**
  * Credential identifiers the PLATFORM writes into its own output, which no
  * hand-written redaction list anticipated. The Management API appends a
