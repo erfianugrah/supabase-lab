@@ -57,7 +57,12 @@ created by PL02, 4 pass, 1 fail, rest info. Run 2: PL07 alone on the same
 project. PL99 deleted the project; `GET /v1/projects` then listed none with the
 `pl-` prefix (PL99: DELETE 200, 0 left). Local containers and volumes
 removed. No AWS or Cloudflare resource was created. Figures are pasted from
-`pvlab --facts` of the run artifacts (untracked `evidence/`).
+`pvlab --facts` of the run artifacts (raw copies in the untracked
+`evidence/`). Redacted copies, each with a `.facts.md` beside it: run 1
+`out/2026-10-10/run-2026-10-10T07-27-52-201Z.json`, run 2
+`out/2026-10-10/run-2026-10-10T08-36-43-666Z.json`, PL99
+`out/2026-10-10/run-2026-10-10T08-48-48-931Z.json`, and the development run
+PL07c quotes `out/2026-10-10/run-2026-10-10T07-16-05-316Z.json`.
 
 ### PL01 - API surface (n = 1 probe per route)
 
