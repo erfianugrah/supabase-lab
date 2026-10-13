@@ -2,7 +2,9 @@
 
 > **For agentic workers:** Execute this plan inline, task by task, in the current session. Steps use checkbox (`- [ ]`) syntax for tracking. Per-task subagents (subagent-driven-development) only if the user asks for them.
 
-> **STATUS 2026-10-13: PLANNED, nothing executed.** Covers the 41 W3 cards of
+> **STATUS 2026-10-13: O1-O5, B01 and B02 EXECUTED; every other batch
+> planned, not run.** Each executed task carries an "Executed" note with its
+> deviations; commits and card moves are the operator's. Covers the 41 W3 cards of
 > `docs/plans/2026-10-13-lab-backlog-waves.md` (section "W3 - unblocked live
 > work"; #75 and #148 left the board, so W3 is 41). Offline prep (Tasks O1-O5)
 > and the first two live-cheap batches (B01, B02) are written out in full; the
@@ -180,7 +182,7 @@ goes with which stop on 17.x (`not properly shut down` with a stats reset;
 `was shut down at` with stats kept). D01 now records both; its verdict is
 unchanged (per-path outage).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 **Create `experiments/platform-downtime/lib/signal.test.ts`:**
 
@@ -332,7 +334,7 @@ describe("classifyShutdownLog", () => {
 });
 ```
 
-- [ ] **Step 2: Run it to make sure it fails**
+- [x] **Step 2: Run it to make sure it fails**
 
 Run: `bun test experiments/platform-downtime/lib; echo "exit $?"`
 
@@ -340,7 +342,7 @@ Expected: `exit 1`, with `error: Cannot find module './signal' from '<repo>/expe
 under "Unhandled error between tests" and the summary ` 0 pass`, ` 1 fail`,
 ` 1 error`.
 
-- [ ] **Step 3: Write the pure helpers**
+- [x] **Step 3: Write the pure helpers**
 
 **Create `experiments/platform-downtime/lib/signal.ts`:**
 
@@ -473,13 +475,13 @@ export function shutdownMeasurements(r: ShutdownReading): Record<string, string 
 }
 ```
 
-- [ ] **Step 4: Run the tests to make sure they pass**
+- [x] **Step 4: Run the tests to make sure they pass**
 
 Run: `bun test experiments/platform-downtime/lib; echo "exit $?"`
 
 Expected: ` 13 pass`, ` 0 fail`, `exit 0`.
 
-- [ ] **Step 5: The logs read in `lib/setup.ts`**
+- [x] **Step 5: The logs read in `lib/setup.ts`**
 
 **Replace in `experiments/platform-downtime/lib/setup.ts`:**
 
@@ -546,7 +548,7 @@ export async function readShutdownLog(
  * `PATCH /v1/projects/{ref}/database/password` - verified against the LIVE
 ```
 
-- [ ] **Step 6: D01 reads both, around the restart**
+- [x] **Step 6: D01 reads both, around the restart**
 
 **Write `experiments/platform-downtime/tests/d01-restart.ts` (whole file):**
 
@@ -649,7 +651,7 @@ const mod: TestModule = {
 export default mod;
 ```
 
-- [ ] **Step 7: Makefile runs from source off Linux and can publish**
+- [x] **Step 7: Makefile runs from source off Linux and can publish**
 
 **Replace in `experiments/platform-downtime/Makefile`:**
 
@@ -728,7 +730,7 @@ destroy:
 	@tofu plan -destroy
 ```
 
-- [ ] **Step 8: Verify**
+- [x] **Step 8: Verify**
 
 Run:
 
@@ -758,6 +760,13 @@ git add experiments/platform-downtime/lib/signal.ts experiments/platform-downtim
 git commit -m "feat(platform-downtime): D01 reads the restart signal and postgres_logs stop lines"
 ```
 
+Executed 2026-10-13: Steps 1-8 as written (red `Cannot find module`,
+0 pass / 1 fail / 1 error; green 13 pass; `tsc exit 0`; 1782 pass; D01 skip
+`missing capability: pat, anon-key`; `make -n` names `bun <repo>/harness/src/run.ts`).
+Deviation: Step 9, plan said `git add` + `git commit`; the agent session
+cannot commit, so the operator's commit script commits these paths with the
+same subject (pathspec commit, nothing else in the tree swept in).
+
 ### Task O2: pg_graphql-aware GraphQL reads in DA03 and T22 (#129)
 
 **Files:**
@@ -777,7 +786,7 @@ installs it for the measurement and drops it in `finally`. T22 sent a bare
 and records `graphqlState` (the DD02e fix, moved into the harness so both
 modules share it).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 **Create `harness/src/graphql.test.ts`:**
 
@@ -811,7 +820,7 @@ describe("graphqlState", () => {
 });
 ```
 
-- [ ] **Step 2: Run it to make sure it fails**
+- [x] **Step 2: Run it to make sure it fails**
 
 Run: `(cd harness && bun test src/graphql.test.ts; echo "exit $?")`
 
@@ -819,7 +828,7 @@ Expected: `exit 1`, with `error: Cannot find module './graphql' from '<repo>/har
 under "Unhandled error between tests" and the summary ` 0 pass`, ` 1 fail`,
 ` 1 error`.
 
-- [ ] **Step 3: Write the helper**
+- [x] **Step 3: Write the helper**
 
 **Create `harness/src/graphql.ts`:**
 
@@ -870,13 +879,13 @@ export async function pgGraphqlInstalled(ctx: Ctx): Promise<boolean | null> {
 }
 ```
 
-- [ ] **Step 4: Run the tests to make sure they pass**
+- [x] **Step 4: Run the tests to make sure they pass**
 
 Run: `(cd harness && bun test src/graphql.test.ts; echo "exit $?")`
 
 Expected: ` 4 pass`, ` 0 fail`, `exit 0`.
 
-- [ ] **Step 5: DA03 checks pg_extension and installs pg_graphql for the measurement**
+- [x] **Step 5: DA03 checks pg_extension and installs pg_graphql for the measurement**
 
 **Replace in `experiments/data-api-reenable/tests/da03-dashboard-reenable.ts`:**
 
@@ -968,7 +977,7 @@ import { fetchKeys, sql } from "../../../harness/src/platform.js";
     }
 ```
 
-- [ ] **Step 6: T22 POSTs `{ __typename }` and records what the body says**
+- [x] **Step 6: T22 POSTs `{ __typename }` and records what the body says**
 
 **Replace in `experiments/privatelink-aws/tests/t22-dataapi-disable.ts`:**
 
@@ -1100,7 +1109,7 @@ async function snapshot(ctx: Ctx): Promise<Snapshot> {
           graphql_state: graphqlState(held.graphql.status, held.graphql.body),
 ```
 
-- [ ] **Step 7: data-api-reenable Makefile runs from source off Linux**
+- [x] **Step 7: data-api-reenable Makefile runs from source off Linux**
 
 **Replace in `experiments/data-api-reenable/Makefile`:**
 
@@ -1148,7 +1157,7 @@ endif
 		$(RUNNER) --where local --experiment data-api-reenable \
 ```
 
-- [ ] **Step 8: Record the unrun T22 change**
+- [x] **Step 8: Record the unrun T22 change**
 
 **Append to `experiments/privatelink-aws/RUNLOG.md`:**
 
@@ -1160,7 +1169,7 @@ endif
       typechecked, not run.
 ```
 
-- [ ] **Step 9: Verify**
+- [x] **Step 9: Verify**
 
 Run:
 
@@ -1191,6 +1200,11 @@ git add harness/src/graphql.ts harness/src/graphql.test.ts \
 git commit -m "fix(data-api-reenable,privatelink-aws): read GraphQL by body and pg_extension, not status"
 ```
 
+Executed 2026-10-13: Steps 1-9 as written (red `Cannot find module`; green
+4 pass; `tsc exit 0`; 1788 pass; DA03 and T22 skip details as expected;
+`make -n` names `bun <repo>/harness/src/run.ts`). Deviation: Step 10 goes
+to the operator's commit script (agent commits blocked), same paths and subject.
+
 ### Task O3: platform-facts F07, eligibility across the lab orgs (#41)
 
 **Files:**
@@ -1208,7 +1222,7 @@ oldest first and orgs are labelled by role, so the artifact carries no ref,
 slug or name. It lists by org (`/organizations/{slug}/projects`) instead of
 `GET /v1/projects`, so it never reads a project outside the lab orgs.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 **Create `experiments/platform-facts/lib/eligibility.test.ts`:**
 
@@ -1322,7 +1336,7 @@ describe("summarise", () => {
 });
 ```
 
-- [ ] **Step 2: Run it to make sure it fails**
+- [x] **Step 2: Run it to make sure it fails**
 
 Run: `bun test experiments/platform-facts/lib; echo "exit $?"`
 
@@ -1330,7 +1344,7 @@ Expected: `exit 1`, with `error: Cannot find module './eligibility' from '<repo>
 under "Unhandled error between tests" and the summary ` 0 pass`, ` 1 fail`,
 ` 1 error`.
 
-- [ ] **Step 3: Write the pure helpers**
+- [x] **Step 3: Write the pure helpers**
 
 **Create `experiments/platform-facts/lib/eligibility.ts`:**
 
@@ -1469,13 +1483,13 @@ export function rowLine(r: EligibilityRow): string {
 }
 ```
 
-- [ ] **Step 4: Run the tests to make sure they pass**
+- [x] **Step 4: Run the tests to make sure they pass**
 
 Run: `bun test experiments/platform-facts/lib; echo "exit $?"`
 
 Expected: ` 9 pass`, ` 0 fail`, `exit 0`.
 
-- [ ] **Step 5: The module**
+- [x] **Step 5: The module**
 
 **Create `experiments/platform-facts/tests/f07-eligibility-fleet.ts`:**
 
@@ -1592,7 +1606,7 @@ const mod: TestModule = {
 export default mod;
 ```
 
-- [ ] **Step 6: Makefile targets**
+- [x] **Step 6: Makefile targets**
 
 **Replace in `experiments/platform-facts/Makefile`:**
 
@@ -1636,7 +1650,7 @@ publish-evidence:
 # Compare the two most recent runs.
 ```
 
-- [ ] **Step 7: Verify**
+- [x] **Step 7: Verify**
 
 Run:
 
@@ -1663,6 +1677,11 @@ git add experiments/platform-facts/lib/eligibility.ts experiments/platform-facts
 git commit -m "feat(platform-facts): F07 reads upgrade eligibility across the lab orgs"
 ```
 
+Executed 2026-10-13: Steps 1-7 as written (red `Cannot find module`; green
+9 pass; `tsc exit 0`; 1791 pass; F07 skip `missing capability: pat, org`;
+the `make -n fleet` line as expected). Deviation: Step 8 goes to the
+operator's commit script (agent commits blocked), same paths and subject.
+
 ### Task O4: rate-limits L02, the breach shape per endpoint and burst (#42)
 
 **Files:**
@@ -1679,7 +1698,7 @@ whether a 2xx comes back after a 65 s cooldown. The rate-limits experiment
 has no Makefile; its RUNLOG names `.pi/probe-rate-limits.sh`, which is
 gitignored local tooling and is not on disk.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 **Create `experiments/rate-limits/lib/burst.test.ts`:**
 
@@ -1763,7 +1782,7 @@ describe("SHAPES", () => {
 });
 ```
 
-- [ ] **Step 2: Run it to make sure it fails**
+- [x] **Step 2: Run it to make sure it fails**
 
 Run: `bun test experiments/rate-limits/lib; echo "exit $?"`
 
@@ -1771,7 +1790,7 @@ Expected: `exit 1`, with `error: Cannot find module './burst' from '<repo>/exper
 under "Unhandled error between tests" and the summary ` 0 pass`, ` 1 fail`,
 ` 1 error`.
 
-- [ ] **Step 3: Write the pure helpers**
+- [x] **Step 3: Write the pure helpers**
 
 **Create `experiments/rate-limits/lib/burst.ts`:**
 
@@ -1860,13 +1879,13 @@ export const SHAPES: Record<Shape, { max: number; concurrency: number; stopOnFir
 };
 ```
 
-- [ ] **Step 4: Run the tests to make sure they pass**
+- [x] **Step 4: Run the tests to make sure they pass**
 
 Run: `bun test experiments/rate-limits/lib; echo "exit $?"`
 
 Expected: ` 7 pass`, ` 0 fail`, `exit 0`.
 
-- [ ] **Step 5: The module**
+- [x] **Step 5: The module**
 
 **Create `experiments/rate-limits/tests/l02-burst-shapes.ts`:**
 
@@ -2005,7 +2024,7 @@ const mod: TestModule = {
 export default mod;
 ```
 
-- [ ] **Step 6: A Makefile, and the RUNLOG's run instruction**
+- [x] **Step 6: A Makefile, and the RUNLOG's run instruction**
 
 **Create `experiments/rate-limits/Makefile`:**
 
@@ -2060,7 +2079,7 @@ sx SUPABASE_ACCESS_TOKEN -- make probe ONLY=L01 PVLAB_REF=<any project ref>
 ```
 ~~~
 
-- [ ] **Step 7: Verify**
+- [x] **Step 7: Verify**
 
 Run:
 
@@ -2087,9 +2106,14 @@ git add experiments/rate-limits/lib/burst.ts experiments/rate-limits/lib/burst.t
 git commit -m "feat(rate-limits): L02 breach shape per endpoint and burst, and a Makefile"
 ```
 
+Executed 2026-10-13: Steps 1-7 as written (red `Cannot find module`; green
+7 pass; `tsc exit 0`; 1795 pass; L02 skip `missing capability: pat`; the
+`make -n probe` line as expected). Deviation: Step 8 goes to the operator's
+commit script (agent commits blocked), same paths and subject.
+
 ### Task O5: offline close-out
 
-- [ ] **Step 1: Full sensors and every experiment test touched**
+- [x] **Step 1: Full sensors and every experiment test touched**
 
 ```bash
 bunx tsc --noEmit -p harness/tsconfig.json; echo "tsc exit $?"
@@ -2102,7 +2126,7 @@ Expected: `tsc exit 0`; ` 1795 pass`, ` 0 fail`, `bun test exit 0`;
 ` 29 pass`, ` 0 fail`, `exit 0` for the three lib directories (13 + 9 + 7);
 `git status` clean after the four commits.
 
-- [ ] **Step 2: Board comments (code ready, not run)**
+- [x] **Step 2: Board comments (code ready, not run)**
 
 ```bash
 vkctl comment work-supabase-lab#20 "Code ready (W3 plan Task O1): D01 reads pg_postmaster_start_time and stats_reset around POST /restart. Runs in batch B01."
@@ -2111,6 +2135,12 @@ vkctl comment work-supabase-lab#129 "Code ready (W3 plan Task O2): harness/src/g
 vkctl comment work-supabase-lab#41 "Code ready (W3 plan Task O3): platform-facts F07, make fleet ORGS=... Runs in batch B02."
 vkctl comment work-supabase-lab#42 "Code ready (W3 plan Task O4): rate-limits L02 burst matrix and a Makefile. Runs in batch B02."
 ```
+
+Executed 2026-10-13: Step 1 `tsc exit 0`, 1795 pass / 0 fail, lib
+directories 29 pass / 0 fail. Deviation: `git status` was not clean, because
+the four commits are in the operator's commit script rather than made by the
+agent; the tree held exactly the O1-O4 paths plus this plan file. Step 2: the
+five comments posted.
 
 ---
 
@@ -2121,7 +2151,7 @@ for about 90 minutes, three restarts. Kept up for B02 if B02 starts within the h
 
 ### Task B01-1: Pre-flight
 
-- [ ] **Step 1: Tree, secrets, tofu**
+- [x] **Step 1: Tree, secrets, tofu**
 
 ```bash
 git pull --ff-only; git status --short
@@ -2134,7 +2164,7 @@ Expected: `git status` prints nothing; `secrets.tfvars written (gitignored)`;
 the key list includes `db_password`, `supabase_access_token` and
 `supabase_org_id`; `OpenTofu has been successfully initialized!`.
 
-- [ ] **Step 2: Status-page gate for the region**
+- [x] **Step 2: Status-page gate for the region**
 
 ```bash
 mkdir -p ~/.local/state/agent-work/w3-b01
@@ -2147,9 +2177,19 @@ Expected: `[LO01]` result lines; read LO01c's decision for
 stop and reschedule: an incident inside the restart window makes the run
 uninterpretable.
 
+Executed 2026-10-13: `secrets.tfvars` was already byte-identical to the
+decrypted `secrets.enc.tfvars` (checked with `cmp`, nothing printed);
+`make secrets-decrypt` rewrote the same bytes; tofu initialized. LO01c:
+`ap-southeast-1 restart: proceed (region status operational, 11 components,
+0 blockers, 2 warnings)`; the two warnings were open region-less incidents
+(Edge Function degradation, Realtime latency, both monitoring, minor).
+Deviations: `git status` was not empty (the O1-O4 changes and this file,
+uncommitted, see O5); the key list shows `supabase_access_token` commented
+out, so the token comes from `sx` only, as every step here passes it.
+
 ### Task B01-2: Provision and wait for readiness
 
-- [ ] **Step 1: Apply**
+- [x] **Step 1: Apply**
 
 ```bash
 sx SUPABASE_ACCESS_TOKEN -- make -C experiments/platform-downtime apply
@@ -2158,7 +2198,7 @@ sx SUPABASE_ACCESS_TOKEN -- make -C experiments/platform-downtime apply
 Expected: tofu `Apply complete! Resources: 1 added, 0 changed, 0 destroyed.`
 then `project_ref = <20 lowercase letters>`.
 
-- [ ] **Step 2: Wait for per-service health, then one more minute**
+- [x] **Step 2: Wait for per-service health, then one more minute**
 
 ```bash
 REF=$(tofu -chdir=experiments/platform-downtime output -raw project_ref)
@@ -2173,9 +2213,19 @@ sleep 60
 Expected: a line `<n> ACTIVE_HEALTHY` within about 3 minutes (AGENTS.md
 "ACTIVE_HEALTHY is not readiness": the extra minute is deliberate).
 
+Executed 2026-10-13. Deviation, Step 1: plan said `make apply` into a Pro
+org; `secrets.tfvars`'s `supabase_org_id` is the lab's Team-plan org (read
+with `GET /v1/organizations/{slug}`, plan only), so the apply overrode it on
+the command line (`VARS="... -var=supabase_org_id=<pro slug from the API
+listing>"`), which kept the batch's Pro-org cost class. `Creation complete
+after 4s`; the project's `created_at` was about 12 minutes before the apply
+and it answered `ACTIVE_HEALTHY` at the first health poll, so the platform
+handed over an already-provisioned instance (not investigated further).
+Step 2: `1 ACTIVE_HEALTHY`, then the minute.
+
 ### Task B01-3: Three D01 runs
 
-- [ ] **Step 1: Run**
+- [x] **Step 1: Run**
 
 ```bash
 for i in 1 2 3; do
@@ -2201,9 +2251,20 @@ with "path(s) already failing" (wait 2 minutes, run that iteration again);
 or the detail carries `logs error:` on every poll (the logs endpoint is
 refusing; the counters still answer #20).
 
+Executed 2026-10-13: three passes (outage auth/storage/pooler 78/82/185 s,
+46/45/46 s, 45/45/43 s), restart confirmed on all three, no `logs error:`.
+Deviations: each run was its own `caffeinate -i sx ... make
+probe-destructive ONLY=D01` invocation with its own log (`d01.log`,
+`d01-run2.log`, `d01-run3.log`) so each result could be read before the next
+restart; the gaps between runs were about 70 s and 30 s, not 120 s (each
+started after the previous one's log polling had ended). After runs 1, 2 and
+3 a read-only diagnostic query of `postgres_logs` (wider patterns, session
+scratch) was run, because D01's own patterns had found nothing on run 1; its
+lines are in the platform-downtime RUNLOG.
+
 ### Task B01-4: Read the three runs
 
-- [ ] **Step 1: Facts and log lines**
+- [x] **Step 1: Facts and log lines**
 
 ```bash
 for f in $(ls -t experiments/platform-downtime/evidence/*/run-*.json | head -3); do
@@ -2218,7 +2279,7 @@ Expected: per run a facts table with `restart_confirmed`,
 `log_shut_down`, `log_next_boot`, the per-path `*_window_s`, and the
 timestamped log lines.
 
-- [ ] **Step 2: Decide what the runs say** (checkpointer-reset key facts give the 17.x pairing)
+- [x] **Step 2: Decide what the runs say** (checkpointer-reset key facts give the 17.x pairing)
 
 | reading (all three runs agree) | #20 | #67 |
 |---|---|---|
@@ -2228,9 +2289,17 @@ timestamped log lines.
 | `log_next_boot` `not-logged` on every run | counters still answer #20 | no managed-side signal in `postgres_logs`; #67 stays open with that negative (scoped: one project, one region, one day) |
 | runs disagree | report the split with n=3 | same; do not average |
 
+Executed 2026-10-13. Deviation, Step 1: `ls -t` in the agent's shell is
+aliased to a replacement that rejects `-t`; the loop ran with `command ls -t`
+(same for B01-5). Step 2: the runs agree on #20 (stats_reset unchanged 3/3)
+and on next boot `not-logged` 3/3, so row 4 applies: #67 has no next-boot
+signal. They disagree on the stop line (`fast` on run 2 only); the wider
+diagnostic read showed the fast-shutdown opening (`terminating connection
+due to administrator command`) on all three, recorded as a partial signal.
+
 ### Task B01-5: Publish
 
-- [ ] **Step 1: Publish the three runs**
+- [x] **Step 1: Publish the three runs**
 
 ```bash
 for f in $(ls -t experiments/platform-downtime/evidence/*/run-*.json | head -3); do
@@ -2244,14 +2313,21 @@ git status --short --untracked-files=all experiments/platform-downtime/out | wc 
 Expected: three lines `published run-<stamp>.json -> <repo>/experiments/platform-downtime/out/<date> (1 results; 0 unredacted ref-shaped tokens remain; 0 unredacted credential ids remain)`;
 no output from either `rg`; `6`.
 
-- [ ] **Step 2: Sensors**
+- [x] **Step 2: Sensors**
 
 Run the two sensors. Expected: `tsc exit 0`; ` 1801 pass` (1795 + 6
 published files), ` 0 fail`.
 
+Executed 2026-10-13 as written: three `published ... (1 results; 0
+unredacted ref-shaped tokens remain; 0 unredacted credential ids remain)`,
+both `rg` empty, `6`; an extra scan of the six files (20-letter lowercase
+runs without word boundaries, emails, home paths, the account's project and
+org identifiers and names, token and hex-password shapes) found 0 of each.
+Sensors: `tsc exit 0`, 1801 pass / 0 fail.
+
 ### Task B01-6: Write it down, commit, board
 
-- [ ] **Step 1: RUNLOG entries**
+- [x] **Step 1: RUNLOG entries**
 
 **Append to `experiments/platform-downtime/RUNLOG.md`:**
 
@@ -2292,7 +2368,7 @@ is the <row> shape. <One sentence on the grace period, or that no signal was
 logged.>
 ```
 
-- [ ] **Step 2: AGENTS.md key fact**
+- [x] **Step 2: AGENTS.md key fact**
 
 **Replace in `AGENTS.md`:**
 
@@ -2325,6 +2401,16 @@ vkctl mv work-supabase-lab#20 work-supabase-lab#67 review
 Move #67 to review only if the logs gave a signal; otherwise comment the
 negative and leave it in To-Do.
 
+Executed 2026-10-13: Steps 1-2 filled from the facts tables and the
+diagnostic read (dates, values; the `lab commit` slot names 1a7158f plus the
+uncommitted O1 change, which is what the artifacts record). Deviations,
+Step 3: the commit is in the operator's commit script (agent commits
+blocked), with `AGENTS.md` as it stood at the end of B01 so B02's AGENTS.md
+lines land in the B02 commit; the two comments were posted without a sha
+("commit pending"); no card was moved (the session was told not to move
+cards). Step 4: skipped, B02 started at once and B02-3 tears the project
+down.
+
 - [ ] **Step 4: Teardown, unless B02 starts within the hour**
 
 ```bash
@@ -2344,7 +2430,7 @@ token can read otherwise). Run nothing else with the same token during L02.
 
 ### Task B02-1: F07, eligibility across the lab orgs
 
-- [ ] **Step 1: Run**
+- [x] **Step 1: Run**
 
 ```bash
 sx SUPABASE_ACCESS_TOKEN -- make -C experiments/platform-facts fleet \
@@ -2364,7 +2450,7 @@ wrote experiments/platform-facts/evidence/<ts>/run-<stamp>.{json,md} - 0 pass, 0
 this run, the state that produced it on 2026-08-04 is not present now; record
 that and keep #41 open only if the user wants a watch.
 
-- [ ] **Step 2: Read it**
+- [x] **Step 2: Read it**
 
 ```bash
 F=$(ls -t experiments/platform-facts/evidence/*/run-*.json | head -1)
@@ -2377,9 +2463,18 @@ paused project answers; null rows `ACTIVE_HEALTHY` with no version keys ->
 still unexplained, record `null_payload_keys`; null rows with version fields
 -> eligibility not computable for that version pair, record the pair.
 
+Executed 2026-10-13. Deviation, Step 1: `PVLAB_ORG_*` were not in the
+agent's environment; they were set for the command from
+`GET /v1/organizations` plus `GET /v1/organizations/{slug}` (`plan`), never
+printed. The account has four orgs (Pro, Team, two Free), so `ORGS` named
+all four (`PVLAB_ORG_FREE2` for the second Free) instead of three. Result:
+`4 project(s): eligible true 3, false 1, null 0`, all four in the Pro org.
+Step 2: null is 0, so none of the three decisions applies; recorded as "the
+2026-08-04 state is not present now".
+
 ### Task B02-2: L02, the burst matrix
 
-- [ ] **Step 1: Run** (about 20 minutes)
+- [x] **Step 1: Run** (about 20 minutes)
 
 ```bash
 REF=$(tofu -chdir=experiments/platform-downtime output -raw project_ref)
@@ -2393,7 +2488,7 @@ then `wrote experiments/rate-limits/evidence/<ts>/run-<stamp>.{json,md} - 0 pass
 A `recovered_s` of `timeout` means the token was still refused 185 s after
 the cell; let the next cells run (they record their own state) and note it.
 
-- [ ] **Step 2: Read it**
+- [x] **Step 2: Read it**
 
 ```bash
 F=$(ls -t experiments/rate-limits/evidence/*/run-*.json | head -1)
@@ -2403,9 +2498,14 @@ bun harness/src/run.ts --facts "$F" --only L02
 The finding is the endpoint x shape table of `first_non2xx_class`
 (`json-throttler`, `html`, ...), `retry_after` and `recovered_s`.
 
+Executed 2026-10-13 as written (wrapped in `caffeinate -i`, log to
+`l02.log` without `tee`): 15 `-> info:` lines, every one `429
+json-throttler`, `retry-after` 59 or 60, `2xx again after 65 s`; about 18
+minutes. Step 2 read with `command ls -t` (see B01-4).
+
 ### Task B02-3: Teardown B01's project
 
-- [ ] **Step 1: Destroy**
+- [x] **Step 1: Destroy**
 
 ```bash
 sx SUPABASE_ACCESS_TOKEN -- make -C experiments/platform-downtime destroy
@@ -2413,9 +2513,15 @@ sx SUPABASE_ACCESS_TOKEN -- make -C experiments/platform-downtime destroy
 
 Expected: `Destroy complete! Resources: 1 destroyed.`
 
+Executed 2026-10-13 with the same `supabase_org_id` override as the apply.
+Deviation in the output only: tofu printed `Apply complete! Resources: 0
+added, 0 changed, 1 destroyed.` (the Makefile applies a saved destroy plan).
+Confirmed: state holds 0 resources, `GET /v1/projects/{ref}` answers 404, and
+`GET /v1/projects` lists the same three projects as before B01.
+
 ### Task B02-4: Publish, write down, commit
 
-- [ ] **Step 1: Publish both runs**
+- [x] **Step 1: Publish both runs**
 
 ```bash
 make -C experiments/platform-facts publish-evidence RUN="$(cd experiments/platform-facts && ls -t evidence/*/run-*.json | head -1)"
@@ -2431,7 +2537,13 @@ Expected: `published ... (1 results; 0 ... ; 0 ...)` for F07 and
 `(15 results; ...)` for L02; no `rg` output; `2` and `2`. Sensors:
 ` 1805 pass` (1801 + 4), ` 0 fail`.
 
-- [ ] **Step 2: RUNLOG entries**
+Executed 2026-10-13 as written (with `command ls -t`): both `published`
+lines with 0 and 0, no `rg` output, `2` and `2`; the extra scan (as in
+B01-5) found 0 of each class in the four files, and the F07 artifact was
+read whole: no project or org name, ref or slug. Sensors `tsc exit 0`,
+1805 pass / 0 fail.
+
+- [x] **Step 2: RUNLOG entries**
 
 **Append to `experiments/platform-facts/RUNLOG.md`:**
 
@@ -2468,7 +2580,7 @@ every endpoint; recovery>. Not settled: one token, one vantage, one day; write
 endpoints were not burst.
 ```
 
-- [ ] **Step 3: AGENTS.md key facts**
+- [x] **Step 3: AGENTS.md key facts**
 
 **Replace in `AGENTS.md`:**
 
@@ -2508,6 +2620,12 @@ vkctl comment work-supabase-lab#41 "B02 ran <date>: <one line>, commit <sha>."
 vkctl comment work-supabase-lab#42 "B02 ran <date>: <one line>, commit <sha>."
 vkctl mv work-supabase-lab#41 work-supabase-lab#42 review
 ```
+
+Deviation, Step 4: the commit is in the operator's commit script (agent
+commits blocked), with this commit taking `AGENTS.md` whole (B01's commit
+carries its snapshot from the end of B01); the two comments were posted
+without a sha ("commit pending"); no card was moved (the session was told
+not to move cards).
 
 ---
 
