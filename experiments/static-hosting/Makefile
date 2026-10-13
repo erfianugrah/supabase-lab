@@ -20,7 +20,7 @@ validate:
 	tofu validate
 
 apply:
-	@test -n "$(TOK)" || (echo "no PAT - run under: sx SUPABASE_ACCESS_TOKEN -- make apply"; exit 1)
+	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "no PAT - run under: sx SUPABASE_ACCESS_TOKEN -- make apply"; exit 1)
 	tofu plan $(VARS) -out=tfplan
 	tofu apply tfplan
 	@echo "project_ref = $$(tofu output -raw project_ref)"
@@ -36,7 +36,7 @@ unit:
 site:
 	@test -n "$(REF)" || (echo "no project_ref output - run 'make apply' first"; exit 1)
 	@cd site && bun install --frozen-lockfile >/dev/null
-	@anon=$$(curl -s -H "Authorization: Bearer $(TOK)" "https://api.supabase.com/v1/projects/$(REF)/api-keys" \
+	@anon=$$(printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -s -H @- "https://api.supabase.com/v1/projects/$(REF)/api-keys" \
 		| jq -r '.[] | select(.name=="anon") | .api_key' | head -1); \
 	cd site && for t in "root|/" "storage|/storage/v1/object/public/astro" "fn|/functions/v1/pvlab-hs-astro"; do \
 		name=$${t%%|*}; base=$${t#*|}; \
@@ -57,10 +57,10 @@ RUNNER ?= bun $(ROOT)/harness/src/run.ts
 BUILD ?= 0
 probe:
 	@test -n "$(REF)" || (echo "no project_ref output - run 'make apply' first"; exit 1)
-	@test -n "$(TOK)" || (echo "no PAT - run under: sx SUPABASE_ACCESS_TOKEN -- make probe"; exit 1)
+	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "no PAT - run under: sx SUPABASE_ACCESS_TOKEN -- make probe"; exit 1)
 	@if [ "$(BUILD)" = "1" ]; then cd $(ROOT)/harness && bun run build >/dev/null; else cd $(ROOT)/harness && bun run gen >/dev/null; fi
 	@mkdir -p evidence/$(TS)
-	@PVLAB_REF="$(REF)" SUPABASE_ACCESS_TOKEN="$(TOK)" PVLAB_ENDPOINT_CUSTOM_DOMAIN="$(DOMAIN)" PVLAB_ENDPOINT_SITE_STORAGE="$(SITE_STORAGE)" PVLAB_ENDPOINT_SITE_FN="$(SITE_FN)" PVLAB_SHOTS="evidence/$(TS)/screens" PVLAB_KEEP_DEPLOYED="$(KEEP)" \
+	@PVLAB_REF="$(REF)" PVLAB_ENDPOINT_CUSTOM_DOMAIN="$(DOMAIN)" PVLAB_ENDPOINT_SITE_STORAGE="$(SITE_STORAGE)" PVLAB_ENDPOINT_SITE_FN="$(SITE_FN)" PVLAB_SHOTS="evidence/$(TS)/screens" PVLAB_KEEP_DEPLOYED="$(KEEP)" \
 		$(RUNNER) --where local --experiment static-hosting \
 		--destructive --only $(ONLY) --out evidence/$(TS)
 	@echo "== evidence/$(TS) =="
@@ -102,6 +102,6 @@ publish-evidence:
 	@cd $(ROOT)/harness && bun scripts/publish-evidence.ts $(abspath $(RUN)) $(abspath .) $(if $(PUBLISH_ONLY),--only $(PUBLISH_ONLY),)
 
 destroy:
-	@test -n "$(TOK)" || (echo "no PAT - run under: sx SUPABASE_ACCESS_TOKEN -- make destroy"; exit 1)
+	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "no PAT - run under: sx SUPABASE_ACCESS_TOKEN -- make destroy"; exit 1)
 	tofu plan -destroy $(VARS) -out=tfplan-destroy
 	tofu apply tfplan-destroy

@@ -23,7 +23,7 @@ probe:
 
 # Confirm nothing this experiment creates is left behind.
 sweep:
-	@curl -s -H "Authorization: Bearer $$SUPABASE_ACCESS_TOKEN" https://api.supabase.com/v1/projects \
+	@printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -s -H @- https://api.supabase.com/v1/projects \
 		| jq -r '.[] | select(.name | startswith("au-")) | .name' ; echo "(empty above = clean)"
 	@wrangler delete --help >/dev/null 2>&1 && echo "workers named au-iss-* must be removed in the Cloudflare dashboard or with: wrangler delete --name <name> --force"
 

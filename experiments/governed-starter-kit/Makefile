@@ -49,7 +49,7 @@ apply: guard-tok
 	@echo "ready_ref = $$(tofu output -raw ready_ref)"
 
 guard-tok:
-	@test -n "$(TOK)" || (echo "no SUPABASE_ACCESS_TOKEN in the environment - export a live PAT (the one in secrets.tfvars is a placeholder by design)"; exit 1)
+	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "no SUPABASE_ACCESS_TOKEN in the environment - export a live PAT (the one in secrets.tfvars is a placeholder by design)"; exit 1)
 
 # Per-service health, then a pause past the first-write window (AGENTS.md,
 # "ACTIVE_HEALTHY is not readiness"). Both projects.
@@ -58,7 +58,7 @@ wait-ready: guard-tok
 	@for ref in $(LIVE) $(READY); do \
 		printf "waiting for $$ref"; \
 		for i in $$(seq 1 60); do \
-			s=$$(curl -s -H "Authorization: Bearer $(TOK)" \
+			s=$$(printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -s -H @- \
 				"https://api.supabase.com/v1/projects/$$ref/health?services=db&services=rest&services=auth" \
 				| jq -r '[.[].status] | unique | join(",")' 2>/dev/null); \
 			if [ "$$s" = "ACTIVE_HEALTHY" ]; then printf ' healthy\n'; break; fi; \
@@ -94,17 +94,17 @@ kb-embed: guard-tok
 # Array response, one entry per database - select the PRIMARY (see
 # pdf-corpus-graph/Makefile).
 pooler:
-	@curl -s -H "Authorization: Bearer $(TOK)" \
+	@printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -s -H @- \
 		"https://api.supabase.com/v1/projects/$(READY)/config/database/pooler" \
 		| jq -r '[.[] | select(.database_type=="PRIMARY")][0].db_host // empty'
 
 # The RLS matrix runs against the ready project.
+probe: export DB_PASSWORD := $(PW)
 probe: guard-tok
 	@test -n "$(READY)" || (echo "no ready_ref - run 'make apply' first"; exit 1)
 	@$(BUILD)
 	@mkdir -p evidence/$(TS)
-	@PVLAB_REF="$(READY)" SUPABASE_ACCESS_TOKEN="$(TOK)" \
-	 DB_PASSWORD="$(PW)" PVLAB_REGION="$(REGION)" \
+	@PVLAB_REF="$(READY)" PVLAB_REGION="$(REGION)" \
 	 PVLAB_ENDPOINT_POOLER="$$($(MAKE) --no-print-directory pooler)" \
 		$(RUNNER) --where local $(ONLY) \
 		--experiment governed-starter-kit --out evidence/$(TS)
@@ -129,7 +129,6 @@ mcp-probe: guard-tok
 	@mkdir -p evidence/$(TS)
 	@PVLAB_REF=none PVLAB_ORG_TEAM="$(ORG_TEAM)" PVLAB_PROJECT_PREFIX="$(PROJECT_PREFIX)" \
 	 $(if $(PEER_MCP),PVLAB_PEER_MCP="$(PEER_MCP)",) $(if $(MCP_CLAUDE),PVLAB_K_CLAUDE=1,) \
-	 SUPABASE_ACCESS_TOKEN="$(TOK)" \
 		$(RUNNER) --where local --only $(if $(ONLY),$(ONLY),K06$(COMMA)K07) --destructive \
 		--experiment governed-starter-kit --out evidence/$(TS)
 	@echo "== evidence/$(TS)/ =="
@@ -230,7 +229,7 @@ fn-secret: guard-tok
 		'test -n "$$ANTHROPIC_API_KEY" || { echo "vault item is empty"; exit 1; }; \
 		 printf "ANTHROPIC_API_KEY=%s\n" "$$ANTHROPIC_API_KEY" \
 		   | supabase secrets set --env-file /dev/stdin --project-ref "$$0" >/dev/null' $(READY)
-	@curl -s -H "Authorization: Bearer $$SUPABASE_ACCESS_TOKEN" \
+	@printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -s -H @- \
 		"https://api.supabase.com/v1/projects/$(READY)/secrets" \
 		| jq -e 'any(.[]; .name == "ANTHROPIC_API_KEY")' >/dev/null \
 		&& echo "ANTHROPIC_API_KEY set on the ready project" \
@@ -255,19 +254,21 @@ integrations: guard-tok
 	@sh -c 'set -e; s=$$(openssl rand -hex 32); \
 		printf "WEBHOOK_SINK_SECRET=%s\n" "$$s" \
 		  | supabase secrets set --env-file /dev/stdin --project-ref "$$0" >/dev/null; \
+		printf "Authorization: Bearer %s\n" "$$SUPABASE_ACCESS_TOKEN" | { \
 		printf "https://%s.supabase.co/functions/v1/webhook-sink\n%s\n" "$$0" "$$s" \
 		  | jq -Rn "([39]|implode) as \$$q | [inputs] | {query: (\"select private.put_integration_secret(\" + \$$q + \"webhook_sink_url\" + \$$q + \", \" + \$$q + .[0] + \$$q + \"), private.put_integration_secret(\" + \$$q + \"webhook_sink_secret\" + \$$q + \", \" + \$$q + .[1] + \$$q + \")\")}" \
-		  | curl -sf -o /dev/null -X POST -H "Authorization: Bearer $$SUPABASE_ACCESS_TOKEN" \
+		  | curl -sf -o /dev/null -X POST -H @/dev/fd/3 \
 		      -H "Content-Type: application/json" --data-binary @- \
-		      "https://api.supabase.com/v1/projects/$$0/database/query"' $(READY)
-	@curl -s -H "Authorization: Bearer $$SUPABASE_ACCESS_TOKEN" \
+		      "https://api.supabase.com/v1/projects/$$0/database/query"; } 3<&0' $(READY)
+	@printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -s -H @- \
 		"https://api.supabase.com/v1/projects/$(READY)/secrets" \
 		| jq -e 'any(.[]; .name == "WEBHOOK_SINK_SECRET")' >/dev/null \
 		&& echo "WEBHOOK_SINK_SECRET set on the ready project" \
 		|| (echo "WEBHOOK_SINK_SECRET not listed after set"; exit 1)
-	@jq -n '([39]|implode) as $$q | {query: ("select count(*) as n from vault.secrets where name in (" + $$q + "webhook_sink_url" + $$q + ", " + $$q + "webhook_sink_secret" + $$q + ")")}' \
-		| curl -s -X POST -H "Authorization: Bearer $$SUPABASE_ACCESS_TOKEN" -H "Content-Type: application/json" \
-		  --data-binary @- "https://api.supabase.com/v1/projects/$(READY)/database/query" \
+	@printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | { \
+	jq -n '([39]|implode) as $$q | {query: ("select count(*) as n from vault.secrets where name in (" + $$q + "webhook_sink_url" + $$q + ", " + $$q + "webhook_sink_secret" + $$q + ")")}' \
+		| curl -s -X POST -H @/dev/fd/3 -H "Content-Type: application/json" \
+		  --data-binary @- "https://api.supabase.com/v1/projects/$(READY)/database/query"; } 3<&0 \
 		| jq -e '.[0].n == 2' >/dev/null \
 		&& echo "webhook_sink_url and webhook_sink_secret in Vault" \
 		|| (echo "Vault entries missing"; exit 1)
@@ -338,7 +339,7 @@ app-ready: guard-tok guard-name
 	test -n "$$ref" || { echo "no app $(NAME) in state - make apps"; exit 1; }; \
 	printf "waiting for health"; \
 	for i in $$(seq 1 60); do \
-		s=$$(curl -s -H "Authorization: Bearer $(TOK)" \
+		s=$$(printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -s -H @- \
 			"$(MGMT)/$$ref/health?services=db&services=rest&services=auth" \
 			| jq -r '[.[].status] | unique | join(",")' 2>/dev/null); \
 		if [ "$$s" = "ACTIVE_HEALTHY" ]; then printf ' healthy\n'; break; fi; \
@@ -346,13 +347,14 @@ app-ready: guard-tok guard-name
 		if [ $$i -eq 60 ]; then printf '\ntimed out\n'; exit 1; fi; \
 	done; \
 	bun scripts/kit.ts schema $$ref $(BASE) || exit 1; \
-	rls=$$(jq -n --arg q "$(RLS_SQL)" '{query: $$q}' \
-		| curl -s -X POST -H "Authorization: Bearer $(TOK)" -H "Content-Type: application/json" \
-			--data-binary @- "$(MGMT)/$$ref/database/query" \
+	rls=$$(printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | { \
+		jq -n --arg q "$(RLS_SQL)" '{query: $$q}' \
+		| curl -s -X POST -H @/dev/fd/3 -H "Content-Type: application/json" \
+			--data-binary @- "$(MGMT)/$$ref/database/query"; } 3<&0 \
 		| jq -r '.[0] | "\(.rls_on)/\(.tables)"'); \
 	echo "baseline: RLS on $$rls public tables"; \
 	[ "$${rls%/*}" = "$${rls#*/}" ] && [ "$${rls#*/}" != "0" ] || { echo "baseline check FAILED"; exit 1; }; \
-	pub=$$(curl -s -H "Authorization: Bearer $(TOK)" "$(MGMT)/$$ref/api-keys?reveal=true" \
+	pub=$$(printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -s -H @- "$(MGMT)/$$ref/api-keys?reveal=true" \
 		| jq -r '[.[] | select(.type == "publishable")][0].api_key // empty'); \
 	echo "project:          kit-app-$(NAME)"; \
 	echo "url:              https://$$ref.supabase.co"; \
@@ -452,8 +454,9 @@ fault-check: guard-tok guard-live
 	@$(FAULT_RUN) check $(READY) --wait
 
 # EXPLAIN ANALYZE as alice/bob, as injected and with the fix (rolled back).
+fault-timing: export DB_PASSWORD := $(PW)
 fault-timing: guard-tok guard-live
-	@DB_PASSWORD="$(PW)" POOLER_HOST="$$($(MAKE) --no-print-directory pooler)" $(FAULT_RUN) timing $(READY)
+	@POOLER_HOST="$$($(MAKE) --no-print-directory pooler)" $(FAULT_RUN) timing $(READY)
 
 fault-clear: guard-tok guard-live
 	@$(FAULT_RUN) clear $(READY)
@@ -521,7 +524,7 @@ bff-deploy: guard-tok
 	@sh -c 'set -e; k=$$(openssl rand -hex 32); \
 		printf "UPSTREAM_API_KEY=%s\nUPSTREAM_BASE_URL=https://%s.supabase.co/functions/v1/upstream-mock\n" "$$k" "$$0" \
 		  | supabase secrets set --env-file /dev/stdin --project-ref "$$0" >/dev/null' $(READY)
-	@curl -s -H "Authorization: Bearer $$SUPABASE_ACCESS_TOKEN" \
+	@printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -s -H @- \
 		"https://api.supabase.com/v1/projects/$(READY)/secrets" \
 		| jq -e '[.[].name] | contains(["UPSTREAM_API_KEY", "UPSTREAM_BASE_URL"])' >/dev/null \
 		&& echo "UPSTREAM_API_KEY and UPSTREAM_BASE_URL set on the ready project" \

@@ -26,16 +26,17 @@ apply:
 # VPC, so the flag is the test's declared vantage, not a claim about this
 # machine. Without `db` capability T22 self-skips its private-path rows and
 # still answers the lever question, which is the whole point of this dir.
+probe: export SUPABASE_ACCESS_TOKEN := $(TOK)
 probe:
 	@test -n "$(REF)" || (echo "no project_ref output - run 'make apply' first"; exit 1)
-	@test -n "$(TOK)" || (echo "no PAT in $(ROOT)/secrets.tfvars - run 'make secrets-decrypt' at the root"; exit 1)
+	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "no PAT in $(ROOT)/secrets.tfvars - run 'make secrets-decrypt' at the root"; exit 1)
 	@cd $(ROOT)/harness && bun run build >/dev/null
 	@mkdir -p evidence/$(TS)
-	@anon=$$(curl -s -H "Authorization: Bearer $(TOK)" \
+	@anon=$$(printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -s -H @- \
 		"https://api.supabase.com/v1/projects/$(REF)/api-keys" \
 		| jq -r '.[] | select(.name=="anon") | .api_key' | head -1); \
 	test -n "$$anon" || (echo "could not fetch the anon key"; exit 1); \
-	PVLAB_REF="$(REF)" SUPABASE_ACCESS_TOKEN="$(TOK)" SUPABASE_ANON_KEY="$$anon" \
+	PVLAB_REF="$(REF)" SUPABASE_ANON_KEY="$$anon" \
 		$(ROOT)/harness/dist/pvlab --where runner --destructive --only T22,T23 \
 		--out evidence/$(TS)
 	@echo "== evidence/$(TS)/run-<stamp>.md =="

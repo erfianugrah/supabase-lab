@@ -22,6 +22,9 @@
  *   bun scripts/load-au-corpus.ts            # fetch + extract + load
  *   PGURL=... bun scripts/load-au-corpus.ts  # explicit connection string
  *   CACHE_DIR=/path bun scripts/load-au-corpus.ts
+ *
+ * `make pgurl` prints the URL WITHOUT the password (it would sit in psql's
+ * argv); psql takes it from PGPASSWORD, which scripts/seed.sh exports.
  */
 import { $ } from "bun";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
