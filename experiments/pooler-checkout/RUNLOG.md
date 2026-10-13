@@ -13,21 +13,21 @@ each artifact's `toolVersions`, and the driver versions are the exact pins in
 `drivers/package.json` (read back from `node_modules` after install). The
 toxiproxy image tag is the `IMAGE` constant in `tests/pc03-driver-reset.ts`.
 Project: compute `ci_micro`, `ap-southeast-1` unless a row says otherwise,
-`max_connections` 60. Raw artifacts are in the ignored `evidence/<ts>/` and are
-not published to `out/` here, so the figures below were quoted by hand from those
-artifacts and have no tracked copy.
+`max_connections` 60. Raw artifacts are in the ignored `evidence/<ts>/`; the
+figures below were quoted by hand from them. Redacted copies, each with a
+`.facts.md` beside it, are in the run table's last column.
 
 Runs (all 2026-10-10, UTC stamps in the artifact names):
 
-| Run | Evidence dir | Modules | Note |
-|---|---|---|---|
-| 1 | `20261010-095322` | PC01-PC04, PC09 | PC02 void: the laptop idle-slept mid-module (below). PC01, PC03, PC04 rows are valid |
-| 2 | `20261010-104011` | PC01-PC04, PC09 | run under `caffeinate`; adds the host clock rows |
-| 3 | `20261010-110914` | PC02, PC09 | adds PC02h |
-| 4 | `20261010-112056` | PC03, PC09 | probe retry delay 300 ms (runs 1 and 2 retried at 0 ms) |
-| 5 | `20261010-113309` | PC04, PC09 | adds PC04d |
-| 6 | `20261010-113347` | PC03, PC09 | as run 4, plus the head of a crashed process's stderr |
-| 7 | `20261010-114645` | PC04, PC09 | project in `us-east-1` |
+| Run | Evidence dir | Modules | Note | Published artifact |
+|---|---|---|---|---|
+| 1 | `20261010-095322` | PC01-PC04, PC09 | PC02 void: the laptop idle-slept mid-module (below). PC01, PC03, PC04 rows are valid | `out/2026-10-10/run-2026-10-10T01-53-22-718Z.json` |
+| 2 | `20261010-104011` | PC01-PC04, PC09 | run under `caffeinate`; adds the host clock rows | `out/2026-10-10/run-2026-10-10T02-40-11-359Z.json` |
+| 3 | `20261010-110914` | PC02, PC09 | adds PC02h | `out/2026-10-10/run-2026-10-10T03-09-14-920Z.json` |
+| 4 | `20261010-112056` | PC03, PC09 | probe retry delay 300 ms (runs 1 and 2 retried at 0 ms) | `out/2026-10-10/run-2026-10-10T03-20-56-512Z.json` |
+| 5 | `20261010-113309` | PC04, PC09 | adds PC04d | `out/2026-10-10/run-2026-10-10T03-33-09-220Z.json` |
+| 6 | `20261010-113347` | PC03, PC09 | as run 4, plus the head of a crashed process's stderr | `out/2026-10-10/run-2026-10-10T03-33-47-691Z.json` |
+| 7 | `20261010-114645` | PC04, PC09 | project in `us-east-1` (the facts header shows the harness region) | `out/2026-10-10/run-2026-10-10T03-46-45-971Z.json` |
 
 ## Run 1 voided PC02: the machine slept
 

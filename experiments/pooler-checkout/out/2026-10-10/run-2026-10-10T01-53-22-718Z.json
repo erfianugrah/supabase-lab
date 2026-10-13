@@ -1,0 +1,647 @@
+{
+  "startedAt": "2026-10-10T01:53:22.718Z",
+  "finishedAt": "2026-10-10T02:20:01.381Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "pooler-checkout",
+  "labCommit": "70e4244",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "PC01a",
+      "title": "PC01a: project surface",
+      "status": "info",
+      "detail": "compute ci_micro, pooler host prefix aws-0, healthy 12 s after create",
+      "measurements": {
+        "compute": "ci_micro",
+        "region": "ap-southeast-1",
+        "pooler_prefix": "aws-0",
+        "pooler_mode": "transaction",
+        "api_default_pool_size": "null",
+        "api_max_client_conn": "null",
+        "max_connections": "60",
+        "create_to_healthy_s": 12
+      },
+      "durationMs": 353538
+    },
+    {
+      "id": "PC01b",
+      "title": "PC01b: effective pool size under 40 concurrent pg_sleep(25) clients",
+      "status": "info",
+      "detail": "16 active sleeping backends at t+6 s (read via the Management API); completion waves: 16 done at ~25s, 16 done at ~50s, 8 done at ~75s; 0 of 40 clients errored",
+      "measurements": {
+        "clients": 40,
+        "active_sleepers_at_6s": 16,
+        "idle_sleepers_at_6s": 0,
+        "clients_ok": 40,
+        "clients_errored": 0,
+        "longest_queue_wait_that_succeeded_s": 50,
+        "first_error": "none",
+        "wall_s": 75
+      },
+      "durationMs": 353539
+    },
+    {
+      "id": "PC01c-1",
+      "title": "PC01c trial 1: client N+1 (N=16) while 16 backends are held 75 s",
+      "status": "pass",
+      "detail": "connect ok in 43 ms; statement failed after 60008 ms: XX000 (ECHECKOUTTIMEOUT) unable to check out connection from the pool after 60000ms in Transaction mode",
+      "measurements": {
+        "trial": 1,
+        "holders_active": 16,
+        "n_plus_1_connect_ms": 43,
+        "n_plus_1_ok": "no",
+        "n_plus_1_query_ms": 60008,
+        "error_code": "XX000",
+        "error_text": "(ECHECKOUTTIMEOUT) unable to check out connection from the pool after 60000ms in Transaction mode",
+        "select1_after_holders_ended_ms": 8,
+        "recovery_wait_s": 11
+      },
+      "durationMs": 353539
+    },
+    {
+      "id": "PC01c-2",
+      "title": "PC01c trial 2: client N+1 (N=16) while 16 backends are held 75 s",
+      "status": "pass",
+      "detail": "connect ok in 49 ms; statement failed after 60007 ms: XX000 (ECHECKOUTTIMEOUT) unable to check out connection from the pool after 60000ms in Transaction mode",
+      "measurements": {
+        "trial": 2,
+        "holders_active": 16,
+        "n_plus_1_connect_ms": 49,
+        "n_plus_1_ok": "no",
+        "n_plus_1_query_ms": 60007,
+        "error_code": "XX000",
+        "error_text": "(ECHECKOUTTIMEOUT) unable to check out connection from the pool after 60000ms in Transaction mode",
+        "select1_after_holders_ended_ms": 8,
+        "recovery_wait_s": 11
+      },
+      "durationMs": 353539
+    },
+    {
+      "id": "PC01c-3",
+      "title": "PC01c trial 3: client N+1 (N=16) while 16 backends are held 75 s",
+      "status": "pass",
+      "detail": "connect ok in 49 ms; statement failed after 60007 ms: XX000 (ECHECKOUTTIMEOUT) unable to check out connection from the pool after 60000ms in Transaction mode",
+      "measurements": {
+        "trial": 3,
+        "holders_active": 16,
+        "n_plus_1_connect_ms": 49,
+        "n_plus_1_ok": "no",
+        "n_plus_1_query_ms": 60007,
+        "error_code": "XX000",
+        "error_text": "(ECHECKOUTTIMEOUT) unable to check out connection from the pool after 60000ms in Transaction mode",
+        "select1_after_holders_ended_ms": 8,
+        "recovery_wait_s": 11
+      },
+      "durationMs": 353539
+    },
+    {
+      "id": "PC01d-1",
+      "title": "PC01d trial 1: client N+1 queues behind 8 s holders",
+      "status": "pass",
+      "detail": "served after queueing 6020 ms (holders had ~6 s left)",
+      "measurements": {
+        "trial": 1,
+        "queue_wait_ms": 6020,
+        "ok": "yes",
+        "error": "none"
+      },
+      "durationMs": 353539
+    },
+    {
+      "id": "PC01d-2",
+      "title": "PC01d trial 2: client N+1 queues behind 8 s holders",
+      "status": "pass",
+      "detail": "served after queueing 6018 ms (holders had ~6 s left)",
+      "measurements": {
+        "trial": 2,
+        "queue_wait_ms": 6018,
+        "ok": "yes",
+        "error": "none"
+      },
+      "durationMs": 353539
+    },
+    {
+      "id": "PC02-hold",
+      "title": "PC02: primary pool held",
+      "status": "info",
+      "detail": "16 of 16 backends active under pg_sleep(100) before the fallback trials",
+      "measurements": {
+        "pool_size": 16,
+        "held_backends": 16
+      },
+      "durationMs": 184987
+    },
+    {
+      "id": "PC02a",
+      "title": "PC02a: 3000 ms client deadline on 6543, fall back to session pooler 5432",
+      "status": "pass",
+      "detail": "3/3 fallbacks to supavisor_session_5432 answered; switch ms 54-67; primary outcome CLIENT_DEADLINE",
+      "measurements": {
+        "fallback": "supavisor_session_5432",
+        "trials": 3,
+        "fallback_ok": 3,
+        "switch_ms_min": 54,
+        "switch_ms_max": 67,
+        "total_ms_min": 3105,
+        "total_ms_max": 3122,
+        "primary_codes": "CLIENT_DEADLINE",
+        "primary_ms_first": 3001,
+        "fallback_error": "none"
+      },
+      "durationMs": 184987
+    },
+    {
+      "id": "PC02b",
+      "title": "PC02b: 3000 ms client deadline on 6543, fall back to direct 5432 (no IPv4 add-on)",
+      "status": "fail",
+      "detail": "0/3 fallbacks to direct_5432 answered; switch ms n/a; primary outcome CLIENT_DEADLINE; fallback error ENOTFOUND getaddrinfo ENOTFOUND",
+      "measurements": {
+        "fallback": "direct_5432",
+        "trials": 3,
+        "fallback_ok": 0,
+        "switch_ms_min": "n/a",
+        "switch_ms_max": "n/a",
+        "total_ms_min": "n/a",
+        "total_ms_max": "n/a",
+        "primary_codes": "CLIENT_DEADLINE",
+        "primary_ms_first": 3001,
+        "fallback_error": "ENOTFOUND: getaddrinfo ENOTFOUND",
+        "direct_host_ipv4_addresses": 0,
+        "direct_host_ipv6_addresses": 0
+      },
+      "durationMs": 184987
+    },
+    {
+      "id": "PC02c",
+      "title": "PC02c: wait for the server's ECHECKOUTTIMEOUT, then fall back to session pooler 5432",
+      "status": "pass",
+      "detail": "1/1 fallbacks to supavisor_session_5432 answered; switch ms 617-617; primary outcome CLIENT_DEADLINE",
+      "measurements": {
+        "fallback": "supavisor_session_5432",
+        "trials": 1,
+        "fallback_ok": 1,
+        "switch_ms_min": 617,
+        "switch_ms_max": 617,
+        "total_ms_min": 242264,
+        "total_ms_max": 242264,
+        "primary_codes": "CLIENT_DEADLINE",
+        "primary_ms_first": 241600,
+        "fallback_error": "none"
+      },
+      "durationMs": 184987
+    },
+    {
+      "id": "PC02d",
+      "title": "PC02d: IPv4 add-on switched on - time until db.<ref> is reachable from an IPv4-only client",
+      "status": "info",
+      "detail": "PATCH billing/addons HTTP 200; IPv4 address after 112 s; dedicated 6543 answered after 112 s; direct 5432 after 112 s (poll step 5 s plus probe time)",
+      "measurements": {
+        "patch_status": 200,
+        "ipv4_address_s": 112,
+        "dedicated_6543_s": 112,
+        "direct_5432_s": 112
+      },
+      "durationMs": 184987
+    },
+    {
+      "id": "PC02e",
+      "title": "PC02e: 3000 ms client deadline on 6543, fall back to dedicated pooler 6543 (add-on on)",
+      "status": "pass",
+      "detail": "3/3 fallbacks to dedicated_6543 answered; switch ms 110-393; primary outcome CLIENT_DEADLINE",
+      "measurements": {
+        "fallback": "dedicated_6543",
+        "trials": 3,
+        "fallback_ok": 3,
+        "switch_ms_min": 110,
+        "switch_ms_max": 393,
+        "total_ms_min": 3157,
+        "total_ms_max": 3436,
+        "primary_codes": "CLIENT_DEADLINE",
+        "primary_ms_first": 3001,
+        "fallback_error": "none",
+        "held_backends": 16
+      },
+      "durationMs": 184987
+    },
+    {
+      "id": "PC02f",
+      "title": "PC02f: 3000 ms client deadline on 6543, fall back to direct 5432 (add-on on)",
+      "status": "pass",
+      "detail": "3/3 fallbacks to direct_5432 answered; switch ms 113-356; primary outcome CLIENT_DEADLINE",
+      "measurements": {
+        "fallback": "direct_5432",
+        "trials": 3,
+        "fallback_ok": 3,
+        "switch_ms_min": 113,
+        "switch_ms_max": 356,
+        "total_ms_min": 3170,
+        "total_ms_max": 3554,
+        "primary_codes": "CLIENT_DEADLINE",
+        "primary_ms_first": 3001,
+        "fallback_error": "none"
+      },
+      "durationMs": 184987
+    },
+    {
+      "id": "PC02g",
+      "title": "PC02g: IPv4 add-on removed",
+      "status": "info",
+      "detail": "DELETE billing/addons/ipv4_default HTTP 200; ipv4 still selected: false",
+      "measurements": {
+        "delete_status": 200,
+        "ipv4_selected_after": "no"
+      },
+      "durationMs": 184987
+    },
+    {
+      "id": "PC03-control-pg",
+      "title": "PC03 control: pg through the proxy, no fault, 10 s",
+      "status": "pass",
+      "detail": "240 statements, 0 failed, exit 0",
+      "measurements": {
+        "driver": "pg",
+        "node": "v26.11.1",
+        "attempts": 240,
+        "failed": 0,
+        "max_ms": 12
+      },
+      "durationMs": 717402
+    },
+    {
+      "id": "PC03-control-postgresjs",
+      "title": "PC03 control: postgresjs through the proxy, no fault, 10 s",
+      "status": "pass",
+      "detail": "240 statements, 0 failed, exit 0",
+      "measurements": {
+        "driver": "postgresjs",
+        "node": "v26.11.1",
+        "attempts": 240,
+        "failed": 0,
+        "max_ms": 14
+      },
+      "durationMs": 717402
+    },
+    {
+      "id": "PC03-control-prisma",
+      "title": "PC03 control: prisma through the proxy, no fault, 10 s",
+      "status": "pass",
+      "detail": "210 statements, 0 failed, exit 0",
+      "measurements": {
+        "driver": "prisma",
+        "node": "v26.11.1",
+        "attempts": 210,
+        "failed": 0,
+        "max_ms": 49
+      },
+      "durationMs": 717402
+    },
+    {
+      "id": "PC03-pg-reset",
+      "title": "PC03 pg (pg), reset for 2000 ms, 3 runs",
+      "status": "info",
+      "detail": "failed in window 40/41/41, failed after clear 0/0/0, retry-once rescued 0/0/1 of failed 40/41/41, crashed 0 of 3; top errors: 122x Error: Connection terminated unexpectedly",
+      "measurements": {
+        "driver": "pg",
+        "fault": "reset",
+        "runs": 3,
+        "attempts": "524/525/525",
+        "failed_total": "40/41/41",
+        "failed_in_window": "40/41/41",
+        "failed_after_clear": "0/0/0",
+        "first_fail_after_fault_ms": "194/186/177",
+        "last_fail_after_clear_ms": "none/none/none",
+        "first_ok_after_clear_ms": "2/47/2",
+        "retry_rescued": "0/0/1",
+        "retry_failed": "40/41/40",
+        "app_timeouts": "0/0/0",
+        "max_ms": "67/64/59",
+        "pool_error_events": "0/0/0",
+        "crashed_runs": 0,
+        "exit_codes": "0/0/0",
+        "top_errors": "122x Error: Connection terminated unexpectedly",
+        "stderr_tail_if_crashed": "n/a"
+      },
+      "evidence": "[\n {\n  \"attempts\": 524,\n  \"attempts_in_window\": 40,\n  \"failed_total\": 40,\n  \"failed_in_window\": 40,\n  \"failed_after_clear\": 0,\n  \"last_fail_after_clear_ms\": null,\n  \"first_ok_after_clear_ms\": 2,\n  \"first_fail_after_fault_ms\": 194,\n  \"retry_rescued\": 0,\n  \"retry_failed\": 40,\n  \"app_timeouts\": 0,\n  \"max_ms\": 67,\n  \"errors\": {\n   \"Error: Connection terminated unexpectedly\": 40\n  },\n  \"exit\": 0,\n  \"crashed\": false,\n  \"pool_errors\": 0\n },\n {\n  \"attempts\": 525,\n  \"attempts_in_window\": 42,\n  \"failed_total\": 41,\n  \"failed_in_window\": 41,\n  \"failed_after_clear\": 0,\n  \"last_fail_after_clear_ms\": null,\n  \"first_ok_after_clear_ms\": 47,\n  \"first_fail_after_fault_ms\": 186,\n  \"retry_rescued\": 0,\n  \"retry_failed\": 41,\n  \"app_timeouts\": 0,\n  \"max_ms\": 64,\n  \"errors\": {\n   \"Error: Connection terminated unexpectedly\": 41\n  },\n  \"exit\": 0,\n  \"crashed\": false,\n  \"pool_errors\": 0\n },\n {\n  \"attempts\": 525,\n  \"attempts_in_window\": 41,\n  \"failed_total\": 41,\n  \"failed_in_window\": 41,\n  \"failed_after_clear\": 0,\n  \"last_fail_after_clear_ms\": null,\n  \"first_ok_after_clear_ms\": 2,\n  \"first_fail_after_fault_ms\": 177,\n  \"retry_rescued\": 1,\n  \"retry_failed\": 40,\n  \"app_timeouts\": 0,\n  \"max_ms\": 59,\n  \"errors\": {\n   \"Error: Connection terminated unexpectedly\": 41\n  },\n  \"exit\": 0,\n  \"crashed\": false,\n  \"pool_errors\": 0\n }\n]",
+      "durationMs": 717402
+    },
+    {
+      "id": "PC03-pg-cut",
+      "title": "PC03 pg (pg), cut for 2000 ms, 3 runs",
+      "status": "info",
+      "detail": "failed in window 45/45/50, failed after clear 0/0/0, retry-once rescued 0/0/0 of failed 45/45/50, crashed 0 of 3; top errors: 140x Error: Connection terminated unexpectedly",
+      "measurements": {
+        "driver": "pg",
+        "fault": "cut",
+        "runs": 3,
+        "attempts": "530/525/525",
+        "failed_total": "45/45/50",
+        "failed_in_window": "45/45/50",
+        "failed_after_clear": "0/0/0",
+        "first_fail_after_fault_ms": "186/177/3",
+        "last_fail_after_clear_ms": "none/none/none",
+        "first_ok_after_clear_ms": "62/49/79",
+        "retry_rescued": "0/0/0",
+        "retry_failed": "45/45/50",
+        "app_timeouts": "0/0/0",
+        "max_ms": "93/84/99",
+        "pool_error_events": "5/5/1",
+        "crashed_runs": 0,
+        "exit_codes": "0/0/0",
+        "top_errors": "140x Error: Connection terminated unexpectedly",
+        "stderr_tail_if_crashed": "n/a"
+      },
+      "evidence": "[\n {\n  \"attempts\": 530,\n  \"attempts_in_window\": 45,\n  \"failed_total\": 45,\n  \"failed_in_window\": 45,\n  \"failed_after_clear\": 0,\n  \"last_fail_after_clear_ms\": null,\n  \"first_ok_after_clear_ms\": 62,\n  \"first_fail_after_fault_ms\": 186,\n  \"retry_rescued\": 0,\n  \"retry_failed\": 45,\n  \"app_timeouts\": 0,\n  \"max_ms\": 93,\n  \"errors\": {\n   \"Error: Connection terminated unexpectedly\": 45\n  },\n  \"exit\": 0,\n  \"crashed\": false,\n  \"pool_errors\": 5\n },\n {\n  \"attempts\": 525,\n  \"attempts_in_window\": 45,\n  \"failed_total\": 45,\n  \"failed_in_window\": 45,\n  \"failed_after_clear\": 0,\n  \"last_fail_after_clear_ms\": null,\n  \"first_ok_after_clear_ms\": 49,\n  \"first_fail_after_fault_ms\": 177,\n  \"retry_rescued\": 0,\n  \"retry_failed\": 45,\n  \"app_timeouts\": 0,\n  \"max_ms\": 84,\n  \"errors\": {\n   \"Error: Connection terminated unexpectedly\": 45\n  },\n  \"exit\": 0,\n  \"crashed\": false,\n  \"pool_errors\": 5\n },\n {\n  \"attempts\": 525,\n  \"attempts_in_window\": 50,\n  \"failed_total\": 50,\n  \"failed_in_window\": 50,\n  \"failed_after_clear\": 0,\n  \"last_fail_after_clear_ms\": null,\n  \"first_ok_after_clear_ms\": 79,\n  \"first_fail_after_fault_ms\": 3,\n  \"retry_rescued\": 0,\n  \"retry_failed\": 50,\n  \"app_timeouts\": 0,\n  \"max_ms\": 99,\n  \"errors\": {\n   \"Error: Connection terminated unexpectedly\": 50\n  },\n  \"exit\": 0,\n  \"crashed\": false,\n  \"pool_errors\": 1\n }\n]",
+      "durationMs": 717402
+    },
+    {
+      "id": "PC03-pg-noerr-cut",
+      "title": "PC03 pg-noerr (pg-nohandler), cut for 2000 ms, 3 runs",
+      "status": "info",
+      "detail": "failed in window 0/0/50, failed after clear 0/0/0, retry-once rescued 0/0/0 of failed 0/0/50, crashed 2 of 3; top errors: 50x Error: Connection terminated unexpectedly",
+      "measurements": {
+        "driver": "pg-nohandler",
+        "fault": "cut",
+        "runs": 3,
+        "attempts": "100/100/525",
+        "failed_total": "0/0/50",
+        "failed_in_window": "0/0/50",
+        "failed_after_clear": "0/0/0",
+        "first_fail_after_fault_ms": "none/none/0",
+        "last_fail_after_clear_ms": "none/none/none",
+        "first_ok_after_clear_ms": "none/none/75",
+        "retry_rescued": "0/0/0",
+        "retry_failed": "0/0/50",
+        "app_timeouts": "0/0/0",
+        "max_ms": "12/11/91",
+        "pool_error_events": "0/0/0",
+        "crashed_runs": 2,
+        "exit_codes": "1/1/0",
+        "top_errors": "50x Error: Connection terminated unexpectedly",
+        "stderr_tail_if_crashed": "mbol(kAsyncContextFrame): undefined }, saslSession: null, release: [Function (anonymous)], activeQuery: null, readyForQuery: true, hasExecuted: true, _poolUseCount: 21, Symbol(shapeMode): false, Symbol(kCapture): false } } Node.js v26.11.1 "
+      },
+      "evidence": "[\n {\n  \"attempts\": 100,\n  \"attempts_in_window\": 0,\n  \"failed_total\": 0,\n  \"failed_in_window\": 0,\n  \"failed_after_clear\": 0,\n  \"last_fail_after_clear_ms\": null,\n  \"first_ok_after_clear_ms\": null,\n  \"first_fail_after_fault_ms\": null,\n  \"retry_rescued\": 0,\n  \"retry_failed\": 0,\n  \"app_timeouts\": 0,\n  \"max_ms\": 12,\n  \"errors\": {},\n  \"exit\": 1,\n  \"crashed\": true,\n  \"pool_errors\": 0\n },\n {\n  \"attempts\": 100,\n  \"attempts_in_window\": 0,\n  \"failed_total\": 0,\n  \"failed_in_window\": 0,\n  \"failed_after_clear\": 0,\n  \"last_fail_after_clear_ms\": null,\n  \"first_ok_after_clear_ms\": null,\n  \"first_fail_after_fault_ms\": null,\n  \"retry_rescued\": 0,\n  \"retry_failed\": 0,\n  \"app_timeouts\": 0,\n  \"max_ms\": 11,\n  \"errors\": {},\n  \"exit\": 1,\n  \"crashed\": true,\n  \"pool_errors\": 0\n },\n {\n  \"attempts\": 525,\n  \"attempts_in_window\": 50,\n  \"failed_total\": 50,\n  \"failed_in_window\": 50,\n  \"failed_after_clear\": 0,\n  \"last_fail_after_clear_ms\": null,\n  \"first_ok_after_clear_ms\": 75,\n  \"first_fail_after_fault_ms\": 0,\n  \"retry_rescued\": 0,\n  \"retry_failed\": 50,\n  \"app_timeouts\": 0,\n  \"max_ms\": 91,\n  \"errors\": {\n   \"Error: Connection terminated unexpectedly\": 50\n  },\n  \"exit\": 0,\n  \"crashed\": false,\n  \"pool_errors\": 0\n }\n]",
+      "durationMs": 717402
+    },
+    {
+      "id": "PC03-postgresjs-reset",
+      "title": "PC03 postgresjs (postgresjs), reset for 2000 ms, 3 runs",
+      "status": "info",
+      "detail": "failed in window 0/5/5, failed after clear 0/0/0, retry-once rescued 5/5/5 of failed 5/5/5, crashed 0 of 3; top errors: 15x CONNECTION_CLOSED: write CONNECTION_CLOSED 127.0.0.1:16543",
+      "measurements": {
+        "driver": "postgresjs",
+        "fault": "reset",
+        "runs": 3,
+        "attempts": "475/475/480",
+        "failed_total": "5/5/5",
+        "failed_in_window": "0/5/5",
+        "failed_after_clear": "0/0/0",
+        "first_fail_after_fault_ms": "none/1/197",
+        "last_fail_after_clear_ms": "none/none/none",
+        "first_ok_after_clear_ms": "259/262/268",
+        "retry_rescued": "5/5/5",
+        "retry_failed": "0/0/0",
+        "app_timeouts": "0/0/0",
+        "max_ms": "124/17/14",
+        "pool_error_events": "0/0/0",
+        "crashed_runs": 0,
+        "exit_codes": "0/0/0",
+        "top_errors": "15x CONNECTION_CLOSED: write CONNECTION_CLOSED 127.0.0.1:16543",
+        "stderr_tail_if_crashed": "n/a"
+      },
+      "evidence": "[\n {\n  \"attempts\": 475,\n  \"attempts_in_window\": 0,\n  \"failed_total\": 5,\n  \"failed_in_window\": 0,\n  \"failed_after_clear\": 0,\n  \"last_fail_after_clear_ms\": null,\n  \"first_ok_after_clear_ms\": 259,\n  \"first_fail_after_fault_ms\": null,\n  \"retry_rescued\": 5,\n  \"retry_failed\": 0,\n  \"app_timeouts\": 0,\n  \"max_ms\": 124,\n  \"errors\": {\n   \"CONNECTION_CLOSED: write CONNECTION_CLOSED 127.0.0.1:16543\": 5\n  },\n  \"exit\": 0,\n  \"crashed\": false,\n  \"pool_errors\": 0\n },\n {\n  \"attempts\": 475,\n  \"attempts_in_window\": 5,\n  \"failed_total\": 5,\n  \"failed_in_window\": 5,\n  \"failed_after_clear\": 0,\n  \"last_fail_after_clear_ms\": null,\n  \"first_ok_after_clear_ms\": 262,\n  \"first_fail_after_fault_ms\": 1,\n  \"retry_rescued\": 5,\n  \"retry_failed\": 0,\n  \"app_timeouts\": 0,\n  \"max_ms\": 17,\n  \"errors\": {\n   \"CONNECTION_CLOSED: write CONNECTION_CLOSED 127.0.0.1:16543\": 5\n  },\n  \"exit\": 0,\n  \"crashed\": false,\n  \"pool_errors\": 0\n },\n {\n  \"attempts\": 480,\n  \"attempts_in_window\": 5,\n  \"failed_total\": 5,\n  \"failed_in_window\": 5,\n  \"failed_after_clear\": 0,\n  \"last_fail_after_clear_ms\": null,\n  \"first_ok_after_clear_ms\": 268,\n  \"first_fail_after_fault_ms\": 197,\n  \"retry_rescued\": 5,\n  \"retry_failed\": 0,\n  \"app_timeouts\": 0,\n  \"max_ms\": 14,\n  \"errors\": {\n   \"CONNECTION_CLOSED: write CONNECTION_CLOSED 127.0.0.1:16543\": 5\n  },\n  \"exit\": 0,\n  \"crashed\": false,\n  \"pool_errors\": 0\n }\n]",
+      "durationMs": 717402
+    },
+    {
+      "id": "PC03-postgresjs-cut",
+      "title": "PC03 postgresjs (postgresjs), cut for 2000 ms, 3 runs",
+      "status": "info",
+      "detail": "failed in window 0/0/0, failed after clear 0/0/0, retry-once rescued 0/5/0 of failed 0/5/0, crashed 0 of 3; top errors: 5x CONNECTION_CLOSED: write CONNECTION_CLOSED 127.0.0.1:16543",
+      "measurements": {
+        "driver": "postgresjs",
+        "fault": "cut",
+        "runs": 3,
+        "attempts": "480/475/475",
+        "failed_total": "0/5/0",
+        "failed_in_window": "0/0/0",
+        "failed_after_clear": "0/0/0",
+        "first_fail_after_fault_ms": "none/none/none",
+        "last_fail_after_clear_ms": "none/none/none",
+        "first_ok_after_clear_ms": "264/267/273",
+        "retry_rescued": "0/5/0",
+        "retry_failed": "0/0/0",
+        "app_timeouts": "0/0/0",
+        "max_ms": "1902/121/2092",
+        "pool_error_events": "0/0/0",
+        "crashed_runs": 0,
+        "exit_codes": "0/0/0",
+        "top_errors": "5x CONNECTION_CLOSED: write CONNECTION_CLOSED 127.0.0.1:16543",
+        "stderr_tail_if_crashed": "n/a"
+      },
+      "evidence": "[\n {\n  \"attempts\": 480,\n  \"attempts_in_window\": 5,\n  \"failed_total\": 0,\n  \"failed_in_window\": 0,\n  \"failed_after_clear\": 0,\n  \"last_fail_after_clear_ms\": null,\n  \"first_ok_after_clear_ms\": 264,\n  \"first_fail_after_fault_ms\": null,\n  \"retry_rescued\": 0,\n  \"retry_failed\": 0,\n  \"app_timeouts\": 0,\n  \"max_ms\": 1902,\n  \"errors\": {},\n  \"exit\": 0,\n  \"crashed\": false,\n  \"pool_errors\": 0\n },\n {\n  \"attempts\": 475,\n  \"attempts_in_window\": 0,\n  \"failed_total\": 5,\n  \"failed_in_window\": 0,\n  \"failed_after_clear\": 0,\n  \"last_fail_after_clear_ms\": null,\n  \"first_ok_after_clear_ms\": 267,\n  \"first_fail_after_fault_ms\": null,\n  \"retry_rescued\": 5,\n  \"retry_failed\": 0,\n  \"app_timeouts\": 0,\n  \"max_ms\": 121,\n  \"errors\": {\n   \"CONNECTION_CLOSED: write CONNECTION_CLOSED 127.0.0.1:16543\": 5\n  },\n  \"exit\": 0,\n  \"crashed\": false,\n  \"pool_errors\": 0\n },\n {\n  \"attempts\": 475,\n  \"attempts_in_window\": 5,\n  \"failed_total\": 0,\n  \"failed_in_window\": 0,\n  \"failed_after_clear\": 0,\n  \"last_fail_after_clear_ms\": null,\n  \"first_ok_after_clear_ms\": 273,\n  \"first_fail_after_fault_ms\": null,\n  \"retry_rescued\": 0,\n  \"retry_failed\": 0,\n  \"app_timeouts\": 0,\n  \"max_ms\": 2092,\n  \"errors\": {},\n  \"exit\": 0,\n  \"crashed\": false,\n  \"pool_errors\": 0\n }\n]",
+      "durationMs": 717402
+    },
+    {
+      "id": "PC03-prisma-reset",
+      "title": "PC03 prisma (prisma), reset for 2000 ms, 3 runs",
+      "status": "info",
+      "detail": "failed in window 45/43/43, failed after clear 0/0/0, retry-once rescued 2/0/0 of failed 45/43/43, crashed 0 of 3; top errors: 119x P1001:  Invalid `prisma.$queryRaw()` invocation: Can't reach database server at `127.0. | 12x P1017:  Invalid `prisma.$queryRaw()` invocation: Server has closed the connection.",
+      "measurements": {
+        "driver": "prisma",
+        "fault": "reset",
+        "runs": 3,
+        "attempts": "458/460/463",
+        "failed_total": "45/43/43",
+        "failed_in_window": "45/43/43",
+        "failed_after_clear": "0/0/0",
+        "first_fail_after_fault_ms": "86/127/38",
+        "last_fail_after_clear_ms": "none/none/none",
+        "first_ok_after_clear_ms": "124/143/16",
+        "retry_rescued": "2/0/0",
+        "retry_failed": "43/43/43",
+        "app_timeouts": "0/0/0",
+        "max_ms": "118/124/244",
+        "pool_error_events": "0/0/0",
+        "crashed_runs": 0,
+        "exit_codes": "0/0/0",
+        "top_errors": "119x P1001:  Invalid `prisma.$queryRaw()` invocation: Can't reach database server at `127.0. | 12x P1017:  Invalid `prisma.$queryRaw()` invocation: Server has closed the connection.",
+        "stderr_tail_if_crashed": "n/a"
+      },
+      "evidence": "[\n {\n  \"attempts\": 458,\n  \"attempts_in_window\": 45,\n  \"failed_total\": 45,\n  \"failed_in_window\": 45,\n  \"failed_after_clear\": 0,\n  \"last_fail_after_clear_ms\": null,\n  \"first_ok_after_clear_ms\": 124,\n  \"first_fail_after_fault_ms\": 86,\n  \"retry_rescued\": 2,\n  \"retry_failed\": 43,\n  \"app_timeouts\": 0,\n  \"max_ms\": 118,\n  \"errors\": {\n   \"P1017:  Invalid `prisma.$queryRaw()` invocation: Server has closed the connection.\": 4,\n   \"P1001:  Invalid `prisma.$queryRaw()` invocation: Can't reach database server at `127.0.\": 41\n  },\n  \"exit\": 0,\n  \"crashed\": false,\n  \"pool_errors\": 0\n },\n {\n  \"attempts\": 460,\n  \"attempts_in_window\": 45,\n  \"failed_total\": 43,\n  \"failed_in_window\": 43,\n  \"failed_after_clear\": 0,\n  \"last_fail_after_clear_ms\": null,\n  \"first_ok_after_clear_ms\": 143,\n  \"first_fail_after_fault_ms\": 127,\n  \"retry_rescued\": 0,\n  \"retry_failed\": 43,\n  \"app_timeouts\": 0,\n  \"max_ms\": 124,\n  \"errors\": {\n   \"P1017:  Invalid `prisma.$queryRaw()` invocation: Server has closed the connection.\": 5,\n   \"P1001:  Invalid `prisma.$queryRaw()` invocation: Can't reach database server at `127.0.\": 38\n  },\n  \"exit\": 0,\n  \"crashed\": false,\n  \"pool_errors\": 0\n },\n {\n  \"attempts\": 463,\n  \"attempts_in_window\": 44,\n  \"failed_total\": 43,\n  \"failed_in_window\": 43,\n  \"failed_after_clear\": 0,\n  \"last_fail_after_clear_ms\": null,\n  \"first_ok_after_clear_ms\": 16,\n  \"first_fail_after_fault_ms\": 38,\n  \"retry_rescued\": 0,\n  \"retry_failed\": 43,\n  \"app_timeouts\": 0,\n  \"max_ms\": 244,\n  \"errors\": {\n   \"P1017:  Invalid `prisma.$queryRaw()` invocation: Server has closed the connection.\": 3,\n   \"P1001:  Invalid `prisma.$queryRaw()` invocation: Can't reach database server at `127.0.\": 40\n  },\n  \"exit\": 0,\n  \"crashed\": false,\n  \"pool_errors\": 0\n }\n]",
+      "durationMs": 717403
+    },
+    {
+      "id": "PC03-prisma-cut",
+      "title": "PC03 prisma (prisma), cut for 2000 ms, 3 runs",
+      "status": "info",
+      "detail": "failed in window 50/50/50, failed after clear 0/0/0, retry-once rescued 0/0/0 of failed 50/50/50, crashed 0 of 3; top errors: 136x P1001:  Invalid `prisma.$queryRaw()` invocation: Can't reach database server at `127.0. | 14x P1017:  Invalid `prisma.$queryRaw()` invocation: Server has closed the connection.",
+      "measurements": {
+        "driver": "prisma",
+        "fault": "cut",
+        "runs": 3,
+        "attempts": "465/469/445",
+        "failed_total": "50/50/50",
+        "failed_in_window": "50/50/50",
+        "failed_after_clear": "0/0/0",
+        "first_fail_after_fault_ms": "23/59/92",
+        "last_fail_after_clear_ms": "none/none/none",
+        "first_ok_after_clear_ms": "103/131/179",
+        "retry_rescued": "0/0/0",
+        "retry_failed": "50/50/50",
+        "app_timeouts": "0/0/0",
+        "max_ms": "134/280/976",
+        "pool_error_events": "0/0/0",
+        "crashed_runs": 0,
+        "exit_codes": "0/0/0",
+        "top_errors": "136x P1001:  Invalid `prisma.$queryRaw()` invocation: Can't reach database server at `127.0. | 14x P1017:  Invalid `prisma.$queryRaw()` invocation: Server has closed the connection.",
+        "stderr_tail_if_crashed": "n/a"
+      },
+      "evidence": "[\n {\n  \"attempts\": 465,\n  \"attempts_in_window\": 50,\n  \"failed_total\": 50,\n  \"failed_in_window\": 50,\n  \"failed_after_clear\": 0,\n  \"last_fail_after_clear_ms\": null,\n  \"first_ok_after_clear_ms\": 103,\n  \"first_fail_after_fault_ms\": 23,\n  \"retry_rescued\": 0,\n  \"retry_failed\": 50,\n  \"app_timeouts\": 0,\n  \"max_ms\": 134,\n  \"errors\": {\n   \"P1017:  Invalid `prisma.$queryRaw()` invocation: Server has closed the connection.\": 5,\n   \"P1001:  Invalid `prisma.$queryRaw()` invocation: Can't reach database server at `127.0.\": 45\n  },\n  \"exit\": 0,\n  \"crashed\": false,\n  \"pool_errors\": 0\n },\n {\n  \"attempts\": 469,\n  \"attempts_in_window\": 50,\n  \"failed_total\": 50,\n  \"failed_in_window\": 50,\n  \"failed_after_clear\": 0,\n  \"last_fail_after_clear_ms\": null,\n  \"first_ok_after_clear_ms\": 131,\n  \"first_fail_after_fault_ms\": 59,\n  \"retry_rescued\": 0,\n  \"retry_failed\": 50,\n  \"app_timeouts\": 0,\n  \"max_ms\": 280,\n  \"errors\": {\n   \"P1017:  Invalid `prisma.$queryRaw()` invocation: Server has closed the connection.\": 4,\n   \"P1001:  Invalid `prisma.$queryRaw()` invocation: Can't reach database server at `127.0.\": 46\n  },\n  \"exit\": 0,\n  \"crashed\": false,\n  \"pool_errors\": 0\n },\n {\n  \"attempts\": 445,\n  \"attempts_in_window\": 50,\n  \"failed_total\": 50,\n  \"failed_in_window\": 50,\n  \"failed_after_clear\": 0,\n  \"last_fail_after_clear_ms\": null,\n  \"first_ok_after_clear_ms\": 179,\n  \"first_fail_after_fault_ms\": 92,\n  \"retry_rescued\": 0,\n  \"retry_failed\": 50,\n  \"app_timeouts\": 0,\n  \"max_ms\": 976,\n  \"errors\": {\n   \"P1017:  Invalid `prisma.$queryRaw()` invocation: Server has closed the connection.\": 5,\n   \"P1001:  Invalid `prisma.$queryRaw()` invocation: Can't reach database server at `127.0.\": 45\n  },\n  \"exit\": 0,\n  \"crashed\": false,\n  \"pool_errors\": 0\n }\n]",
+      "durationMs": 717403
+    },
+    {
+      "id": "PC03-pg-flap",
+      "title": "PC03 pg (pg), flap for 150 ms, 3 runs",
+      "status": "info",
+      "detail": "failed in window 0/5/5, failed after clear 0/0/0, retry-once rescued 0/0/0 of failed 5/5/5, crashed 0 of 3; top errors: 15x Error: Connection terminated unexpectedly",
+      "measurements": {
+        "driver": "pg",
+        "fault": "flap",
+        "runs": 3,
+        "attempts": "525/525/525",
+        "failed_total": "5/5/5",
+        "failed_in_window": "0/5/5",
+        "failed_after_clear": "0/0/0",
+        "first_fail_after_fault_ms": "none/2/7",
+        "last_fail_after_clear_ms": "none/none/none",
+        "first_ok_after_clear_ms": "59/59/60",
+        "retry_rescued": "0/0/0",
+        "retry_failed": "5/5/5",
+        "app_timeouts": "0/0/0",
+        "max_ms": "97/83/103",
+        "pool_error_events": "0/1/1",
+        "crashed_runs": 0,
+        "exit_codes": "0/0/0",
+        "top_errors": "15x Error: Connection terminated unexpectedly",
+        "stderr_tail_if_crashed": "n/a"
+      },
+      "evidence": "[\n {\n  \"attempts\": 525,\n  \"attempts_in_window\": 0,\n  \"failed_total\": 5,\n  \"failed_in_window\": 0,\n  \"failed_after_clear\": 0,\n  \"last_fail_after_clear_ms\": null,\n  \"first_ok_after_clear_ms\": 59,\n  \"first_fail_after_fault_ms\": null,\n  \"retry_rescued\": 0,\n  \"retry_failed\": 5,\n  \"app_timeouts\": 0,\n  \"max_ms\": 97,\n  \"errors\": {\n   \"Error: Connection terminated unexpectedly\": 5\n  },\n  \"exit\": 0,\n  \"crashed\": false,\n  \"pool_errors\": 0\n },\n {\n  \"attempts\": 525,\n  \"attempts_in_window\": 5,\n  \"failed_total\": 5,\n  \"failed_in_window\": 5,\n  \"failed_after_clear\": 0,\n  \"last_fail_after_clear_ms\": null,\n  \"first_ok_after_clear_ms\": 59,\n  \"first_fail_after_fault_ms\": 2,\n  \"retry_rescued\": 0,\n  \"retry_failed\": 5,\n  \"app_timeouts\": 0,\n  \"max_ms\": 83,\n  \"errors\": {\n   \"Error: Connection terminated unexpectedly\": 5\n  },\n  \"exit\": 0,\n  \"crashed\": false,\n  \"pool_errors\": 1\n },\n {\n  \"attempts\": 525,\n  \"attempts_in_window\": 5,\n  \"failed_total\": 5,\n  \"failed_in_window\": 5,\n  \"failed_after_clear\": 0,\n  \"last_fail_after_clear_ms\": null,\n  \"first_ok_after_clear_ms\": 60,\n  \"first_fail_after_fault_ms\": 7,\n  \"retry_rescued\": 0,\n  \"retry_failed\": 5,\n  \"app_timeouts\": 0,\n  \"max_ms\": 103,\n  \"errors\": {\n   \"Error: Connection terminated unexpectedly\": 5\n  },\n  \"exit\": 0,\n  \"crashed\": false,\n  \"pool_errors\": 1\n }\n]",
+      "durationMs": 717403
+    },
+    {
+      "id": "PC03-postgresjs-flap",
+      "title": "PC03 postgresjs (postgresjs), flap for 150 ms, 3 runs",
+      "status": "info",
+      "detail": "failed in window 0/0/5, failed after clear 0/0/0, retry-once rescued 0/5/5 of failed 0/5/5, crashed 0 of 3; top errors: 10x CONNECTION_CLOSED: write CONNECTION_CLOSED 127.0.0.1:16543",
+      "measurements": {
+        "driver": "postgresjs",
+        "fault": "flap",
+        "runs": 3,
+        "attempts": "520/520/520",
+        "failed_total": "0/5/5",
+        "failed_in_window": "0/0/5",
+        "failed_after_clear": "0/0/0",
+        "first_fail_after_fault_ms": "none/none/2",
+        "last_fail_after_clear_ms": "none/none/none",
+        "first_ok_after_clear_ms": "274/275/267",
+        "retry_rescued": "0/5/5",
+        "retry_failed": "0/0/0",
+        "app_timeouts": "0/0/0",
+        "max_ms": "242/33/13",
+        "pool_error_events": "0/0/0",
+        "crashed_runs": 0,
+        "exit_codes": "0/0/0",
+        "top_errors": "10x CONNECTION_CLOSED: write CONNECTION_CLOSED 127.0.0.1:16543",
+        "stderr_tail_if_crashed": "n/a"
+      },
+      "evidence": "[\n {\n  \"attempts\": 520,\n  \"attempts_in_window\": 5,\n  \"failed_total\": 0,\n  \"failed_in_window\": 0,\n  \"failed_after_clear\": 0,\n  \"last_fail_after_clear_ms\": null,\n  \"first_ok_after_clear_ms\": 274,\n  \"first_fail_after_fault_ms\": null,\n  \"retry_rescued\": 0,\n  \"retry_failed\": 0,\n  \"app_timeouts\": 0,\n  \"max_ms\": 242,\n  \"errors\": {},\n  \"exit\": 0,\n  \"crashed\": false,\n  \"pool_errors\": 0\n },\n {\n  \"attempts\": 520,\n  \"attempts_in_window\": 0,\n  \"failed_total\": 5,\n  \"failed_in_window\": 0,\n  \"failed_after_clear\": 0,\n  \"last_fail_after_clear_ms\": null,\n  \"first_ok_after_clear_ms\": 275,\n  \"first_fail_after_fault_ms\": null,\n  \"retry_rescued\": 5,\n  \"retry_failed\": 0,\n  \"app_timeouts\": 0,\n  \"max_ms\": 33,\n  \"errors\": {\n   \"CONNECTION_CLOSED: write CONNECTION_CLOSED 127.0.0.1:16543\": 5\n  },\n  \"exit\": 0,\n  \"crashed\": false,\n  \"pool_errors\": 0\n },\n {\n  \"attempts\": 520,\n  \"attempts_in_window\": 5,\n  \"failed_total\": 5,\n  \"failed_in_window\": 5,\n  \"failed_after_clear\": 0,\n  \"last_fail_after_clear_ms\": null,\n  \"first_ok_after_clear_ms\": 267,\n  \"first_fail_after_fault_ms\": 2,\n  \"retry_rescued\": 5,\n  \"retry_failed\": 0,\n  \"app_timeouts\": 0,\n  \"max_ms\": 13,\n  \"errors\": {\n   \"CONNECTION_CLOSED: write CONNECTION_CLOSED 127.0.0.1:16543\": 5\n  },\n  \"exit\": 0,\n  \"crashed\": false,\n  \"pool_errors\": 0\n }\n]",
+      "durationMs": 717403
+    },
+    {
+      "id": "PC03-prisma-flap",
+      "title": "PC03 prisma (prisma), flap for 150 ms, 3 runs",
+      "status": "info",
+      "detail": "failed in window 5/5/5, failed after clear 0/0/0, retry-once rescued 0/0/0 of failed 5/5/5, crashed 0 of 3; top errors: 11x P1017:  Invalid `prisma.$queryRaw()` invocation: Server has closed the connection. | 4x P1001:  Invalid `prisma.$queryRaw()` invocation: Can't reach database server at `127.0.",
+      "measurements": {
+        "driver": "prisma",
+        "fault": "flap",
+        "runs": 3,
+        "attempts": "460/465/455",
+        "failed_total": "5/5/5",
+        "failed_in_window": "5/5/5",
+        "failed_after_clear": "0/0/0",
+        "first_fail_after_fault_ms": "105/53/74",
+        "last_fail_after_clear_ms": "none/none/none",
+        "first_ok_after_clear_ms": "160/112/126",
+        "retry_rescued": "0/0/0",
+        "retry_failed": "5/5/5",
+        "app_timeouts": "0/0/0",
+        "max_ms": "137/142/379",
+        "pool_error_events": "0/0/0",
+        "crashed_runs": 0,
+        "exit_codes": "0/0/0",
+        "top_errors": "11x P1017:  Invalid `prisma.$queryRaw()` invocation: Server has closed the connection. | 4x P1001:  Invalid `prisma.$queryRaw()` invocation: Can't reach database server at `127.0.",
+        "stderr_tail_if_crashed": "n/a"
+      },
+      "evidence": "[\n {\n  \"attempts\": 460,\n  \"attempts_in_window\": 5,\n  \"failed_total\": 5,\n  \"failed_in_window\": 5,\n  \"failed_after_clear\": 0,\n  \"last_fail_after_clear_ms\": null,\n  \"first_ok_after_clear_ms\": 160,\n  \"first_fail_after_fault_ms\": 105,\n  \"retry_rescued\": 0,\n  \"retry_failed\": 5,\n  \"app_timeouts\": 0,\n  \"max_ms\": 137,\n  \"errors\": {\n   \"P1017:  Invalid `prisma.$queryRaw()` invocation: Server has closed the connection.\": 3,\n   \"P1001:  Invalid `prisma.$queryRaw()` invocation: Can't reach database server at `127.0.\": 2\n  },\n  \"exit\": 0,\n  \"crashed\": false,\n  \"pool_errors\": 0\n },\n {\n  \"attempts\": 465,\n  \"attempts_in_window\": 5,\n  \"failed_total\": 5,\n  \"failed_in_window\": 5,\n  \"failed_after_clear\": 0,\n  \"last_fail_after_clear_ms\": null,\n  \"first_ok_after_clear_ms\": 112,\n  \"first_fail_after_fault_ms\": 53,\n  \"retry_rescued\": 0,\n  \"retry_failed\": 5,\n  \"app_timeouts\": 0,\n  \"max_ms\": 142,\n  \"errors\": {\n   \"P1017:  Invalid `prisma.$queryRaw()` invocation: Server has closed the connection.\": 5\n  },\n  \"exit\": 0,\n  \"crashed\": false,\n  \"pool_errors\": 0\n },\n {\n  \"attempts\": 455,\n  \"attempts_in_window\": 5,\n  \"failed_total\": 5,\n  \"failed_in_window\": 5,\n  \"failed_after_clear\": 0,\n  \"last_fail_after_clear_ms\": null,\n  \"first_ok_after_clear_ms\": 126,\n  \"first_fail_after_fault_ms\": 74,\n  \"retry_rescued\": 0,\n  \"retry_failed\": 5,\n  \"app_timeouts\": 0,\n  \"max_ms\": 379,\n  \"errors\": {\n   \"P1017:  Invalid `prisma.$queryRaw()` invocation: Server has closed the connection.\": 3,\n   \"P1001:  Invalid `prisma.$queryRaw()` invocation: Can't reach database server at `127.0.\": 2\n  },\n  \"exit\": 0,\n  \"crashed\": false,\n  \"pool_errors\": 0\n }\n]",
+      "durationMs": 717403
+    },
+    {
+      "id": "PC04a",
+      "title": "PC04a: pooler host the API reports for a fresh project",
+      "status": "info",
+      "detail": "db_host prefix aws-0, region ap-southeast-1, port 6543, user shape postgres.<ref>",
+      "measurements": {
+        "api_prefix": "aws-0",
+        "region": "ap-southeast-1",
+        "api_db_port": 6543
+      },
+      "durationMs": 1409
+    },
+    {
+      "id": "PC04b",
+      "title": "PC04b: the same tenant on aws-0 and aws-1 hosts",
+      "status": "info",
+      "detail": "aws-0 :5432 -> ok 60 ms; aws-0 :6543 -> ok 53 ms; aws-1 :5432 -> XX000 after 588 ms: (ENOTFOUND) tenant/user postgres.<ref> not found; aws-1 :6543 -> XX000 after 535 ms: (ENOTFOUND) tenant/user postgres.<ref> not found",
+      "measurements": {
+        "aws0_5432": "ok 60 ms",
+        "aws0_6543": "ok 53 ms",
+        "aws1_5432": "XX000 after 588 ms: (ENOTFOUND) tenant/user postgres.<ref> not found",
+        "aws1_6543": "XX000 after 535 ms: (ENOTFOUND) tenant/user postgres.<ref> not found",
+        "api_prefix_answers": "yes"
+      },
+      "durationMs": 1409
+    },
+    {
+      "id": "PC04c",
+      "title": "PC04c: lint-pooler-hosts on fixtures and on this repository",
+      "status": "pass",
+      "detail": "fixtures: 2 aws-0 literals expected, 2 flagged (3 with --all-prefixes, 3 expected); this repo's tree: 8 aws-0 literal(s) in 6 file(s)",
+      "measurements": {
+        "fixture_flagged": 2,
+        "fixture_flagged_all_prefixes": 3,
+        "repo_literals": 8,
+        "repo_files": 6
+      },
+      "durationMs": 1409
+    },
+    {
+      "id": "PC09",
+      "title": "Teardown: delete the shared project, confirm it left the project list",
+      "status": "pass",
+      "detail": "DELETE HTTP 200; project absent from GET /projects; 0 project(s) with prefix gap-pooler-",
+      "measurements": {
+        "delete_status": 200,
+        "gone": "yes",
+        "projects_with_prefix": 0
+      },
+      "durationMs": 7835
+    }
+  ]
+}
