@@ -193,7 +193,8 @@ anon change.
 
 Harness: `make run-standing`, module DD01S only, `--destructive` (one probe
 table created and dropped; no GRANT, REVOKE or ALTER sent), lab commit 91fe131
-plus the staged tree that adds DD01S. n = 1 existing project, created
+plus the staged tree that adds DD01S (second reading at lab commit 471375b).
+Two readings 15 minutes apart (00:06Z and 00:21Z) on n = 1 existing project, created
 2026-04-07 (before the 2026-05-30 new-project default), Postgres 17.6, not a
 lab-provisioned project. Published: `out/2026-10-13/`. The artifact header's
 region is the harness default, not the project's region.
@@ -201,8 +202,12 @@ region is the harness default, not the project's region.
 | step | measured |
 |---|---|
 | DD01Sa `pg_default_acl`, schema `public`, roles `postgres` and `supabase_admin` | tables: `anon`, `authenticated`, `service_role` each `arwdDxtm`; sequences `rwU`; functions `X` - the same legacy grants DD01a read on the 2026-10-10 API-created project |
-| DD01Sb table made in SQL, anon GET | 200 `[{"id":1}]` after 1 s; publishable key 200 |
+| DD01Sb table made in SQL, anon GET | 200 `[{"id":1}]` after 1 s (second reading: 0 s); publishable key 200 |
 | DD01Sb drop | dropped, `to_regclass` null |
+
+`pvlab --diff` of the two readings: 32 of 33 measurements unchanged; only
+the schema-cache wait moved (1 s to 0 s), so the baseline repeats and a later
+change in the grants or the anon status is not run-to-run noise.
 
 This is the pre-enforcement half of #89. Re-run the same target on the same
 project on or after 2026-10-30 and diff the two artifacts (README,
