@@ -13,6 +13,14 @@ Creates on 2026-10-10: 6 (one failed first draft of the restart module, three
 in LO03, one in LO04, one in LO05). All deleted; `GET /v1/projects` showed no
 project with the `lo-` prefix at 01:06 UTC.
 
+Published artifacts (redacted, a `.facts.md` beside each, `out/2026-10-10/`;
+the raw copies were recovered from a session scratchpad on 2026-10-13 and sit
+in the gitignored `evidence/recovered/`): LO01
+`run-2026-10-10T00-43-34-355Z.json`; the failed first draft of the restart
+module, run under the id LO02, `run-2026-10-10T00-35-35-776Z.json`; LO03
+`run-2026-10-10T00-36-15-870Z.json`; LO04 with LO05
+`run-2026-10-10T00-43-31-013Z.json`; LO05 `run-2026-10-10T00-46-09-369Z.json`.
+
 Sources for the docs' claims, kept separate from the measurements below:
 
 - Status page: https://status.supabase.com/ (JSON under `/api/v2/`).
