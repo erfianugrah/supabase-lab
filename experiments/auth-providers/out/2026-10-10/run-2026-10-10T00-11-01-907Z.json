@@ -1,0 +1,82 @@
+{
+  "startedAt": "2026-10-10T00:11:01.907Z",
+  "finishedAt": "2026-10-10T00:11:26.339Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "auth-providers",
+  "labCommit": "70e4244",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "AU04a",
+      "title": "AU04a: enable SAML, create SSO provider from metadata XML",
+      "status": "pass",
+      "detail": "saml_enabled patch HTTP 200 settled=true; provider create HTTP 201; SP metadata HTTP 200",
+      "measurements": {
+        "saml_enabled_patch_status": 200,
+        "saml_enabled_settled": "true",
+        "provider_create_status": 201,
+        "provider_response_keys": "created_at,disabled,domains,id,saml,updated_at",
+        "sp_metadata_status": 200,
+        "sp_entity_id_matches_project_url": "true",
+        "acs_matches_project_url": "true"
+      },
+      "durationMs": 24432
+    },
+    {
+      "id": "AU04b",
+      "title": "AU04b: SP-initiated sign-in with a valid signed assertion; replay",
+      "status": "pass",
+      "detail": "first: session (sso:e37c6067-8596-4483-9e83-e0c0eb2c12c1); replay of the same Response: 303 saml_relay_state_not_found SAML RelayState does not exist, try logging in again?",
+      "measurements": {
+        "sso_redirect_status": 200,
+        "acs_post_ms_first": 63,
+        "acs_post_ms_max_of_4": 70,
+        "signins_attempted": 4,
+        "same_user_every_time": "true",
+        "app_metadata_provider": "sso:e37c6067-8596-4483-9e83-e0c0eb2c12c1",
+        "user_email": "<email>",
+        "identity_provider": "sso:e37c6067-8596-4483-9e83-e0c0eb2c12c1",
+        "replay_signed_in": "false",
+        "replay_error": "SAML RelayState does not exist, try logging in again?"
+      },
+      "durationMs": 24432
+    },
+    {
+      "id": "AU04c",
+      "title": "AU04c: SAML negative controls (signature, audience, expiry, recipient, IdP-initiated)",
+      "status": "info",
+      "detail": "badsig: 303 validation_failed SAML Assertion is not valid <samlp:Response xmlns:samlp=\"urn:oasis:names:tc:SAML:2.0:protocol\" xmlns:saml=\"urn:oasis:names:tc:SAML:2.0:ass | unsigned: 303 validation_failed SAML Assertion is not valid <samlp:Response xmlns:samlp=\"urn:oasis:names:tc:SAML:2.0:protocol\" xmlns:saml=\"urn:oasis:names:tc:SAML:2.0:ass | wrongaud: 303 validation_failed SAML Assertion is not valid <samlp:Response xmlns:samlp=\"urn:oasis:names:tc:SAML:2.0:protocol\" xmlns:saml=\"urn:oasis:names:tc:SAML:2.0:ass | expired: 303 validation_failed SAML Assertion is not valid <samlp:Response xmlns:samlp=\"urn:oasis:names:tc:SAML:2.0:protocol\" xmlns:saml=\"urn:oasis:names:tc:SAML:2.0:ass | wrongrecipient: 303 validation_failed SAML Assertion is not valid <samlp:Response xmlns:samlp=\"urn:oasis:names:tc:SAML:2.0:protocol\" xmlns:saml=\"urn:oasis:names:tc:SAML:2.0:ass | other-domain email: session (sso:e37c6067-8596-4483-9e83-e0c0eb2c12c1) | IdP-initiated: session (sso:e37c6067-8596-4483-9e83-e0c0eb2c12c1)",
+      "measurements": {
+        "badsig_signed_in": "false",
+        "badsig_outcome": "303 validation_failed SAML Assertion is not valid <samlp:Response xmlns:samlp=\"urn:oasis:names:tc:SAML:2.0:protocol\" xml",
+        "unsigned_signed_in": "false",
+        "unsigned_outcome": "303 validation_failed SAML Assertion is not valid <samlp:Response xmlns:samlp=\"urn:oasis:names:tc:SAML:2.0:protocol\" xml",
+        "wrongaud_signed_in": "false",
+        "wrongaud_outcome": "303 validation_failed SAML Assertion is not valid <samlp:Response xmlns:samlp=\"urn:oasis:names:tc:SAML:2.0:protocol\" xml",
+        "expired_signed_in": "false",
+        "expired_outcome": "303 validation_failed SAML Assertion is not valid <samlp:Response xmlns:samlp=\"urn:oasis:names:tc:SAML:2.0:protocol\" xml",
+        "wrongrecipient_signed_in": "false",
+        "wrongrecipient_outcome": "303 validation_failed SAML Assertion is not valid <samlp:Response xmlns:samlp=\"urn:oasis:names:tc:SAML:2.0:protocol\" xml",
+        "other_domain_email_signed_in": "true",
+        "other_domain_email_outcome": "session (sso:e37c6067-8596-4483-9e83-e0c0eb2c12c1)",
+        "idp_initiated_signed_in": "true",
+        "idp_initiated_outcome": "session (sso:e37c6067-8596-4483-9e83-e0c0eb2c12c1)"
+      },
+      "durationMs": 24432
+    },
+    {
+      "id": "AU04z",
+      "title": "AU04z: cleanup",
+      "status": "info",
+      "detail": "project delete HTTP 200; scratch dir removed",
+      "durationMs": 24432
+    }
+  ]
+}

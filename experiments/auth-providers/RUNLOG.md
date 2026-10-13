@@ -12,10 +12,23 @@ its build in the `chromium` measurement.
 All runs 2026-10-10 (UTC 00:09 to 00:27 for the artifacts cited below). n is
 1 run per row unless a row says otherwise; each module created its own
 `au-*` project on the Pro org (AU01 also one on a Free org) and
-deleted it in `finally`. Artifacts are in the gitignored `evidence/`; they
-are not published to `out/` yet (`make publish-evidence`), so the numbers
-below are pasted from the harness's facts renders and the publish step is
-open. Latencies are in milliseconds where a row says "in ms".
+deleted it in `finally`. The numbers below are pasted from the harness's
+facts renders. Raw artifacts stay in the gitignored `evidence/`; the redacted
+copies, each with a `.facts.md` beside it, are listed by the labels the
+sections below use. Latencies are in milliseconds where a row says "in ms".
+
+| label | published artifact |
+|---|---|
+| au01 | `out/2026-10-09/run-2026-10-09T23-57-24-149Z.json` |
+| au01-final | `out/2026-10-10/run-2026-10-10T00-13-52-726Z.json` |
+| au01-final2 | `out/2026-10-10/run-2026-10-10T00-14-53-112Z.json` |
+| au02-run2 | `out/2026-10-10/run-2026-10-10T00-01-30-351Z.json` |
+| au02-final | `out/2026-10-10/run-2026-10-10T00-13-16-939Z.json` |
+| au03-run2 | `out/2026-10-10/run-2026-10-10T00-08-26-464Z.json` |
+| au03-run3 | `out/2026-10-10/run-2026-10-10T00-09-32-436Z.json` |
+| au04 | `out/2026-10-10/run-2026-10-10T00-11-01-907Z.json` |
+| au04-run2 | `out/2026-10-10/run-2026-10-10T00-11-41-807Z.json` |
+| au04-final | `out/2026-10-10/run-2026-10-10T00-26-40-222Z.json` |
 
 Sources for the "docs say" column (read 2026-10-10 through the Supabase docs
 search tool, not the blog post): https://supabase.com/docs/guides/auth/custom-oauth-providers,
