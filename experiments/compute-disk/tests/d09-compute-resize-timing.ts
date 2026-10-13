@@ -143,7 +143,7 @@ const mod: TestModule = {
 
       // warm the DB (first SQL still races ACTIVE_HEALTHY)
       for (let i = 0; i < 12; i += 1) {
-        const q0 = await sql(ctx, ref, "create table if not exists public.dpython_probe(id int primary key);");
+        const q0 = await sql(ctx, ref, "create table if not exists public.dpython_probe(id int primary key); grant select, insert, update, delete on table public.dpython_probe to anon, authenticated, service_role;");
         if (q0 < 300) break;
         await sleep(5_000);
       }

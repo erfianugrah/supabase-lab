@@ -90,6 +90,7 @@ const mod: TestModule = {
       const stmts = [
         "select 1",
         "create table if not exists public.metering_hourly (ts timestamptz default now(), project_ref text, name text, status text, sku text, monthly_usd numeric)",
+        "grant select, insert, update, delete on table public.metering_hourly to anon, authenticated, service_role",
         "create table if not exists public.items (id bigint generated always as identity primary key, tenant_id text, payload text)",
         "insert into public.items (tenant_id, payload) select 't-a', repeat('a', 1000) from generate_series(1, 100)",
         "insert into public.items (tenant_id, payload) select 't-b', repeat('b', 1000) from generate_series(1, 25)",

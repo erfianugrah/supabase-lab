@@ -73,7 +73,7 @@ const mod: TestModule = {
       await runSql(primary, `CREATE PUBLICATION w15_pub FOR TABLE public.w_repl`);
 
       // 1b. Standby: same table DDL.
-      await runSql(standby, `DROP TABLE IF EXISTS public.w_repl; CREATE TABLE public.w_repl(id serial primary key, val text)`);
+      await runSql(standby, `DROP TABLE IF EXISTS public.w_repl; CREATE TABLE public.w_repl(id serial primary key, val text); GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.w_repl TO anon, authenticated, service_role`);
 
       // 1c. Single-statement CREATE SUBSCRIPTION (mandatory - rejected inside a transaction).
       const directConn = `host=db.${primary}.supabase.co port=5432 dbname=postgres user=postgres password=${dbPw} sslmode=require connect_timeout=15`;

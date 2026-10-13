@@ -79,8 +79,8 @@ const mod: TestModule = {
       await runSql(primary, `DROP PUBLICATION IF EXISTS w05_pub`);
       await runSql(primary, `CREATE PUBLICATION w05_pub FOR TABLE public.w_repl`);
       await runSql(standby, `DROP SUBSCRIPTION IF EXISTS w05_sub`);
-      await runSql(standby, `DROP TABLE IF EXISTS public.w_repl; CREATE TABLE public.w_repl(id serial primary key, val text)`);
-      await runSql(standby, `CREATE TABLE IF NOT EXISTS public.w_probe(id int primary key); INSERT INTO public.w_probe VALUES (1) ON CONFLICT DO NOTHING`);
+      await runSql(standby, `DROP TABLE IF EXISTS public.w_repl; CREATE TABLE public.w_repl(id serial primary key, val text); GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.w_repl TO anon, authenticated, service_role`);
+      await runSql(standby, `CREATE TABLE IF NOT EXISTS public.w_probe(id int primary key); INSERT INTO public.w_probe VALUES (1) ON CONFLICT DO NOTHING; GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.w_probe TO anon, authenticated, service_role`);
       measurements["ddl_applied_both_sides"] = "true";
 
       // 3. Gate A (direct host): single-statement CREATE SUBSCRIPTION.
