@@ -2421,13 +2421,19 @@ Expected: `tsc exit 0`; ` 0 fail` with `1755 pass` after Tasks 1-12 and
 14-16 (plus 24 if Task 13 ran); `git status` clean after the per-task
 commits.
 
-- [ ] **Step 2: Push** (the commit ids lexicanum links pin to must exist on the remote)
+- [x] **Step 2: Push** (the commit ids lexicanum links pin to must exist on the remote)
+
+> Done 2026-10-13: 20 commits 6cee831..89b018f pushed; the public mirror shows 89b018f.
 
 ```bash
 git push
 ```
 
-- [ ] **Step 3: Move the cards**
+- [x] **Step 3: Move the cards**
+
+> Done 2026-10-13: 17 cards to In Review with their commit ids (#172 #131-#138
+> #171 #43 #47 #151 #73 #54 #70 #86). #87 stays open (fallback: no braces
+> release past 3.0.3). #128 stays open until the live check (Task 20 Step 4).
 
 ```bash
 vkctl mv work-supabase-lab#172 work-supabase-lab#131 work-supabase-lab#132 work-supabase-lab#133 work-supabase-lab#134 work-supabase-lab#135 work-supabase-lab#136 work-supabase-lab#137 work-supabase-lab#138 work-supabase-lab#171 work-supabase-lab#43 work-supabase-lab#47 work-supabase-lab#73 work-supabase-lab#54 work-supabase-lab#70 review
