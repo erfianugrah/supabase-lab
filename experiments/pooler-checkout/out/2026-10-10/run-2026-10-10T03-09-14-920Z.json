@@ -1,0 +1,186 @@
+{
+  "startedAt": "2026-10-10T03:09:14.920Z",
+  "finishedAt": "2026-10-10T03:20:44.682Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "pooler-checkout",
+  "labCommit": "70e4244",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "PC02-hold",
+      "title": "PC02: primary pool held",
+      "status": "info",
+      "detail": "16 of 16 backends active under pg_sleep(40) before the fallback trials",
+      "measurements": {
+        "pool_size": 16,
+        "held_backends": 16
+      },
+      "durationMs": 682829
+    },
+    {
+      "id": "PC02a",
+      "title": "PC02a: 3000 ms client deadline on 6543, fall back to session pooler 5432",
+      "status": "pass",
+      "detail": "3/3 fallbacks to supavisor_session_5432 answered; switch ms 59-70; primary outcome CLIENT_DEADLINE",
+      "measurements": {
+        "fallback": "supavisor_session_5432",
+        "trials": 3,
+        "fallback_ok": 3,
+        "switch_ms_min": 59,
+        "switch_ms_max": 70,
+        "total_ms_min": 3114,
+        "total_ms_max": 3131,
+        "primary_codes": "CLIENT_DEADLINE",
+        "primary_ms_first": 3004,
+        "fallback_error": "none"
+      },
+      "durationMs": 682829
+    },
+    {
+      "id": "PC02b",
+      "title": "PC02b: 3000 ms client deadline on 6543, fall back to direct 5432 (no IPv4 add-on)",
+      "status": "fail",
+      "detail": "0/3 fallbacks to direct_5432 answered; switch ms n/a; primary outcome CLIENT_DEADLINE; fallback error ENOTFOUND getaddrinfo ENOTFOUND",
+      "measurements": {
+        "fallback": "direct_5432",
+        "trials": 3,
+        "fallback_ok": 0,
+        "switch_ms_min": "n/a",
+        "switch_ms_max": "n/a",
+        "total_ms_min": "n/a",
+        "total_ms_max": "n/a",
+        "primary_codes": "CLIENT_DEADLINE",
+        "primary_ms_first": 3002,
+        "fallback_error": "ENOTFOUND: getaddrinfo ENOTFOUND",
+        "direct_host_ipv4_addresses": 0,
+        "direct_host_ipv6_addresses": 0
+      },
+      "durationMs": 682830
+    },
+    {
+      "id": "PC02h",
+      "title": "PC02h: 16 transaction-mode backends held plus one session-mode client running pg_sleep(15)",
+      "status": "info",
+      "detail": "17 active pg_sleep backends with both modes busy (16 from 6543 + 1 from 5432 if the pools are separate); the session-mode client completed",
+      "measurements": {
+        "pool_size": 16,
+        "active_sleepers_both_modes": 17,
+        "session_client_ok": "yes",
+        "session_client_total_ms": 15114,
+        "session_client_connect_ms": 50
+      },
+      "durationMs": 682830
+    },
+    {
+      "id": "PC02c",
+      "title": "PC02c: wait for the server's ECHECKOUTTIMEOUT (no client deadline), then fall back to session pooler 5432",
+      "status": "pass",
+      "detail": "3/3 fallbacks to supavisor_session_5432 answered; switch ms 62-117; primary outcome XX000",
+      "measurements": {
+        "fallback": "supavisor_session_5432",
+        "trials": 3,
+        "fallback_ok": 3,
+        "switch_ms_min": 62,
+        "switch_ms_max": 117,
+        "total_ms_min": 60172,
+        "total_ms_max": 60359,
+        "primary_codes": "XX000",
+        "primary_ms_first": 60005,
+        "fallback_error": "none"
+      },
+      "durationMs": 682830
+    },
+    {
+      "id": "PC02d",
+      "title": "PC02d: IPv4 add-on switched on - time until db.<ref> is reachable from an IPv4-only client",
+      "status": "info",
+      "detail": "PATCH billing/addons HTTP 200; IPv4 address after 80 s; dedicated 6543 answered after 80 s; direct 5432 after 81 s (poll step 5 s plus probe time)",
+      "measurements": {
+        "patch_status": 200,
+        "ipv4_address_s": 80,
+        "dedicated_6543_s": 80,
+        "direct_5432_s": 81
+      },
+      "durationMs": 682830
+    },
+    {
+      "id": "PC02e",
+      "title": "PC02e: 3000 ms client deadline on 6543, fall back to dedicated pooler 6543 (add-on on)",
+      "status": "pass",
+      "detail": "3/3 fallbacks to dedicated_6543 answered; switch ms 126-167; primary outcome CLIENT_DEADLINE",
+      "measurements": {
+        "fallback": "dedicated_6543",
+        "trials": 3,
+        "fallback_ok": 3,
+        "switch_ms_min": 126,
+        "switch_ms_max": 167,
+        "total_ms_min": 3180,
+        "total_ms_max": 3222,
+        "primary_codes": "CLIENT_DEADLINE",
+        "primary_ms_first": 3001,
+        "fallback_error": "none",
+        "held_backends": 16
+      },
+      "durationMs": 682830
+    },
+    {
+      "id": "PC02f",
+      "title": "PC02f: 3000 ms client deadline on 6543, fall back to direct 5432 (add-on on)",
+      "status": "pass",
+      "detail": "3/3 fallbacks to direct_5432 answered; switch ms 142-168; primary outcome CLIENT_DEADLINE",
+      "measurements": {
+        "fallback": "direct_5432",
+        "trials": 3,
+        "fallback_ok": 3,
+        "switch_ms_min": 142,
+        "switch_ms_max": 168,
+        "total_ms_min": 3193,
+        "total_ms_max": 3220,
+        "primary_codes": "CLIENT_DEADLINE",
+        "primary_ms_first": 3003,
+        "fallback_error": "none"
+      },
+      "durationMs": 682830
+    },
+    {
+      "id": "PC02g",
+      "title": "PC02g: IPv4 add-on removed",
+      "status": "info",
+      "detail": "DELETE billing/addons/ipv4_default HTTP 200; ipv4 still selected: false",
+      "measurements": {
+        "delete_status": 200,
+        "ipv4_selected_after": "no"
+      },
+      "durationMs": 682830
+    },
+    {
+      "id": "PC02-clock",
+      "title": "PC02: host clock check (wall clock minus monotonic clock over the module)",
+      "status": "pass",
+      "detail": "no host sleep detected (-4 ms drift)",
+      "measurements": {
+        "wall_minus_monotonic_ms": -4
+      },
+      "durationMs": 682830
+    },
+    {
+      "id": "PC09",
+      "title": "Teardown: delete the shared project, confirm it left the project list",
+      "status": "pass",
+      "detail": "DELETE HTTP 200; project absent from GET /projects; 0 project(s) with prefix gap-pooler-",
+      "measurements": {
+        "delete_status": 200,
+        "gone": "yes",
+        "projects_with_prefix": 0
+      },
+      "durationMs": 6936
+    }
+  ]
+}
