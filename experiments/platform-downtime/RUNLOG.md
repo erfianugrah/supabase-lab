@@ -281,3 +281,61 @@ run to take up to `MAX_WAIT_MS` (7 minutes) if the outage never recovers, plus
 the restore step; budget D05 alone, not stacked with D03/D04 in the same
 invocation, because both mutate project-level state that a second concurrent
 module could race.
+
+## 2026-10-13 - D01 x3 with the restart signal and the stop path (work-supabase-lab#20, #67)
+
+Harness: `make probe-destructive ONLY=D01`, three runs on one Micro project
+in ap-southeast-1 (Pro org), started 04:50, 04:57 and 05:01 UTC. The
+artifacts record lab commit 1a7158f; the D01 change from the W3 plan's Task
+O1 was in the working tree, uncommitted, and is the commit before this
+entry. Published: `out/2026-10-13/run-<stamp>.facts.md` for each run
+(stamps `2026-10-13T04-50-42-266Z`, `2026-10-13T04-57-36-867Z`,
+`2026-10-13T05-01-37-966Z`).
+
+| run | restart confirmed | stats_reset changed | log stop | shutdown checkpoint | "shut down" logged | next boot | auth / storage / pooler window (s) |
+|---|---|---|---|---|---|---|---|
+| 1 | yes | no | not-logged | no | no | not-logged | 78 / 82 / 185 |
+| 2 | yes | no | fast | no | no | not-logged | 46 / 45 / 46 |
+| 3 | yes | no | not-logged | no | no | not-logged | 45 / 45 / 43 |
+
+REST and Realtime had no failed sample in any run (500 ms interval).
+`pg_stat_checkpointer.stats_reset` read `2026-10-02T17:53:10.203Z` before and
+after all three restarts, on a project created that day, so it also survived
+the project's first boot (the D05 side observation of 2026-10-01 again).
+
+Read (the W3 plan's B01 decision table, row "`log_next_boot` `not-logged` on
+every run"): a managed `POST /restart` kept the checkpointer's `stats_reset`
+on 3 of 3 restarts, which answers #20 for this path. D01's log columns found
+no shutdown checkpoint, no "database system is shut down" and no startup line
+on any run, so they give no request-to-"shut down" figure.
+
+D01's query matches only the lines in `lib/signal.ts`. A wider read-only
+query of `postgres_logs` after the runs (session scratch, not a module; the
+lines below are its output, timestamps UTC) showed what the logs do hold for
+each stop:
+
+- run 1, 04:50:45.776: two `terminating connection due to administrator
+  command`, then `the database system is shutting down` x2; no `received ...
+  shutdown request` row.
+- run 2, 04:57:39.275: `received fast shutdown request`, `aborting any active
+  transactions`, three `terminating connection due to administrator command`,
+  `the database system is shutting down` x2; at 04:58:24.051 `the database
+  system is starting up` x2.
+- run 3, 05:01:40.377: two `terminating connection due to administrator
+  command`, `the database system is shutting down` x5; no request row.
+- The project's provisioning restart at 04:38:14.549 logged the same opening
+  as run 2.
+
+Per run, the first stop line to the new `pg_postmaster_start_time()`:
+75.9 s, 44.7 s, 43.3 s. In run 1 the pooler window ran past the database's
+return: from +66 s the pooler answered `(ECIRCUITBREAKER) too many
+authentication failures` until it recovered at +188 s.
+
+Not settled: one project, one region, one day, an idle cluster (the
+checkpointer-reset rig showed a slow shutdown checkpoint changes the
+outcome). Whether the shutdown checkpoint ran is inferred from the kept
+`stats_reset`, not logged. Why the request line is missing on runs 1 and 3
+and why no line after `shutting down` or before `starting up` reaches
+`postgres_logs` (log shipping stopped across the restart, or lines dropped)
+was not separated. Integration-provisioned projects were not run. The status
+page had an open region-less Realtime latency incident during the runs.
