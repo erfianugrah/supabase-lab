@@ -1,0 +1,53 @@
+{
+  "startedAt": "2026-08-18T06:21:24.941Z",
+  "finishedAt": "2026-08-18T06:23:42.185Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "usage-metering",
+  "labCommit": "5bce8da",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "OpenSSL 3.6.3 9 Jun 2026 (Library: OpenSSL 3.6.3 9 Jun 2026)"
+  },
+  "results": [
+    {
+      "id": "M05-control",
+      "title": "M05-control: provision store + install schema",
+      "status": "pass",
+      "measurements": {
+        "provision_s": 135,
+        "schema_status": 201
+      },
+      "durationMs": 137250
+    },
+    {
+      "id": "M05a",
+      "title": "M05a: poller pass into the store, self-inclusion",
+      "status": "info",
+      "measurements": {
+        "org_projects": 4,
+        "rows_inserted": 0,
+        "self_row_present": 0,
+        "readback_rows": 0
+      },
+      "evidence": "",
+      "durationMs": 137250
+    },
+    {
+      "id": "M05b",
+      "title": "M05b: per-tenant attribution inside a shared schema",
+      "status": "info",
+      "detail": "per-tenant rows exact; payload_bytes exact for variable-width columns via pg_column_size - an estimate for fixed-width, but the API can see NEITHER",
+      "measurements": {
+        "t_a_rows": 100,
+        "t_b_rows": 25,
+        "t_a_payload_bytes": 100400,
+        "t_b_payload_bytes": 25100
+      },
+      "durationMs": 137250
+    }
+  ]
+}
