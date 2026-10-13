@@ -2682,7 +2682,8 @@ git commit -m "fix: explicit Data API grants on SQL-created tables before the 20
 > is now a silent degrader missing from `SILENT_DEGRADERS`. Not verified:
 > O03 fails at O03b (`consent=404`, 2 of 2 runs) before O03c's grant runs;
 > W12 not run, because edge-resilience's tofu state is empty and `make up`
-> provisions two projects and a Worker; T22 waits for #130. D09 surfaced an
+> provisions two projects and a Worker (later the same day: W12 ran on one
+> API-created project instead and passed, 67c7d9c, #176); T22 waits for #130. D09 surfaced an
 > outage-accounting gap in the module (compute-disk RUNLOG). Artifacts stay
 > in `evidence/` (none of the four experiments has a `publish-evidence`
 > target).
