@@ -2236,7 +2236,11 @@ Numbers: `RUNLOG.md`, artifacts `out/2026-10-08/`.
   no field for the setting. The 2026-05-30 default in the public notice (github
   discussion 45329) was therefore not seen on an API-created project; whether
   that is the creation path or the gradual rollout is not separated. The
-  standing-project re-run after 2026-10-30 is not done. The existing key-facts
+  existing-project half: DD01S read a project created 2026-04-07 twice on
+  2026-10-13 (before the 2026-10-30 enforcement) - same legacy `arwdDxtm`
+  grants, a SQL-created table anon-readable (200), 32 of 33 measurements equal
+  across the two readings (RUNLOG 2026-10-13, out/2026-10-13/). The re-run on
+  or after 2026-10-30 is not done (work-supabase-lab#89). The existing key-facts
   line "SQL-created tables get anon SELECT via default privileges" holds for this
   project and is the state the opt-in below ends.
 - After the notice's `alter default privileges for role postgres in schema public
