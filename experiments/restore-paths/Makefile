@@ -9,7 +9,7 @@
 ROOT := $(abspath ../..)
 TS := $(shell date +%Y%m%d-%H%M%S)
 OUT ?= evidence/$(TS)
-RUN := cd $(ROOT) && bun harness/src/run.ts --tests experiments/restore-paths/tests --where local --experiment restore-paths --destructive
+PVLAB := cd $(ROOT) && bun harness/src/run.ts --tests experiments/restore-paths/tests --where local --experiment restore-paths --destructive
 
 .PHONY: gen surface pitr pause all
 
@@ -19,14 +19,21 @@ gen:
 
 # RP01: Pro surface (pause, restore, clone, backups/restore, restore-pitr without PITR). Minutes, no add-on.
 surface: gen
-	$(RUN) --only RP01 --out experiments/restore-paths/$(OUT)
+	$(PVLAB) --only RP01 --out experiments/restore-paths/$(OUT)
 
 # RP02: PITR restore (pitr_7 on a Small project for roughly 30-60 minutes).
 pitr: gen
-	$(RUN) --only RP02 --out experiments/restore-paths/$(OUT)
+	$(PVLAB) --only RP02 --out experiments/restore-paths/$(OUT)
 
 # RP03: Free-plan pause/unpause, two cycles.
 pause: gen
-	$(RUN) --only RP03 --out experiments/restore-paths/$(OUT)
+	$(PVLAB) --only RP03 --out experiments/restore-paths/$(OUT)
 
 all: surface pitr pause
+
+.PHONY: publish-evidence
+
+# Redacted copy of a run artifact plus its facts.md into out/<date>/ (committed).
+publish-evidence:
+	@test -n "$(RUN)" || (echo "RUN=evidence/<ts>/run-<stamp>.json required"; exit 1)
+	@cd $(ROOT)/harness && bun scripts/publish-evidence.ts $(abspath $(RUN)) $(abspath .) $(if $(PUBLISH_ONLY),--only $(PUBLISH_ONLY),)
