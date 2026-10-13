@@ -9,8 +9,9 @@
 import type { Ctx, TestResult } from "../../../harness/src/types";
 import type { PathWindow, Probe } from "../../../harness/src/sampler";
 import { mgmt } from "../../../harness/src/mgmt";
-import { sql } from "../../../harness/src/platform";
+import { logsQuery, sql } from "../../../harness/src/platform";
 import { restProbe, authProbe, storageProbe, realtimeProbe, poolerProbe } from "./probes";
+import { bootLogged, classifyShutdownLog, type ShutdownReading } from "./signal";
 
 /** Verified 200 on a fresh project 2026-08-04; /auth/v1/settings also answers. */
 export const AUTH_PATH = "/auth/v1/health";
@@ -248,6 +249,42 @@ export async function readRestartSignalRetrying(
     await Bun.sleep(delayMs);
   }
   return last;
+}
+
+/**
+ * #67: Postgres's own account of a stop and the next boot, from
+ * `postgres_logs` (the query shape jit-db-access JA01 used to find "received
+ * fast shutdown request" on a managed project). Ingestion lags the event, so
+ * this polls until the next boot is logged or `polls` reads have been spent;
+ * the logs endpoint allows few requests per window, so keep `polls` small.
+ * Never throws: a logs error is returned for the caller to record.
+ */
+export const SHUTDOWN_LOG_SQL =
+  "select timestamp, event_message from logs where source = 'postgres_logs' and (" +
+  "event_message like '%shutdown request%' or event_message like '%checkpoint starting: shutdown%' or " +
+  "event_message like '%database system is shut down%' or event_message like '%database system was %') " +
+  "order by timestamp asc limit 100";
+
+export async function readShutdownLog(
+  ctx: Ctx,
+  sinceMs: number,
+  polls = 8,
+  everyMs = 20_000,
+): Promise<{ reading: ShutdownReading; error: string }> {
+  let reading = classifyShutdownLog([], sinceMs);
+  let error = "";
+  for (let i = 0; i < polls; i++) {
+    const r = await logsQuery(ctx, SHUTDOWN_LOG_SQL, 1).catch((e: unknown) => ({
+      status: 0,
+      rows: [],
+      error: e instanceof Error ? e.message : String(e),
+    }));
+    error = r.error;
+    if (!r.error) reading = classifyShutdownLog(r.rows, sinceMs);
+    if (bootLogged(reading)) break;
+    if (i < polls - 1) await Bun.sleep(everyMs);
+  }
+  return { reading, error };
 }
 
 /**
