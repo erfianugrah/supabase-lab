@@ -1,0 +1,149 @@
+{
+  "startedAt": "2026-10-10T00:09:32.436Z",
+  "finishedAt": "2026-10-10T00:20:01.797Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "auth-providers",
+  "labCommit": "70e4244",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "AU03-setup",
+      "title": "AU03-setup: project, user, custom provider",
+      "status": "info",
+      "detail": "custom provider create HTTP 201",
+      "measurements": {
+        "provision_s": 12,
+        "issuer_resolvable_after_s": 0,
+        "create_attempts": 1
+      },
+      "durationMs": 629354
+    },
+    {
+      "id": "AU03a",
+      "title": "AU03a: per-method canary (password, id_token, browser flow)",
+      "status": "pass",
+      "detail": "password statuses 200; id_token statuses 200; flow ok 4/4",
+      "measurements": {
+        "password_n": 10,
+        "password_ok": 10,
+        "password_p50_ms": 104,
+        "password_max_ms": 223,
+        "id_token_n": 10,
+        "id_token_ok": 10,
+        "id_token_p50_ms": 43,
+        "id_token_max_ms": 80,
+        "flow_n": 4,
+        "flow_ok": 4,
+        "flow_p50_ms": 111,
+        "flow_max_ms": 126,
+        "vantage": "one workstation, ap-southeast-1 project"
+      },
+      "durationMs": 629357
+    },
+    {
+      "id": "AU03b",
+      "title": "AU03b: negative controls, error class per failure",
+      "status": "info",
+      "detail": "wrong_password: 400 invalid_credentials \"Invalid login credentials\" | unknown_user: 400 invalid_credentials \"Invalid login credentials\" | bad_signature: 400 invalid request \"Bad ID token\" | expired: 400 invalid request \"Bad ID token\" | wrong_aud: 400 invalid request \"Unacceptable audience in id_token: [someone-else]\" | wrong_iss: 400 invalid request \"Bad ID token\" | unknown_provider: 400 validation_failed \"Custom provider \"custom:nope\" not found\" | provider_disabled: 400 provider_disabled \"Custom provider \"custom:canary\" is disabled\"",
+      "measurements": {
+        "wrong_password_status": 400,
+        "wrong_password_code": "invalid_credentials",
+        "unknown_user_status": 400,
+        "unknown_user_code": "invalid_credentials",
+        "bad_signature_status": 400,
+        "bad_signature_code": "invalid request",
+        "expired_status": 400,
+        "expired_code": "invalid request",
+        "wrong_aud_status": 400,
+        "wrong_aud_code": "invalid request",
+        "wrong_iss_status": 400,
+        "wrong_iss_code": "invalid request",
+        "unknown_provider_status": 400,
+        "unknown_provider_code": "validation_failed",
+        "provider_disabled_status": 400,
+        "provider_disabled_code": "provider_disabled"
+      },
+      "durationMs": 629357
+    },
+    {
+      "id": "AU03c",
+      "title": "AU03c: existing session with the client cut off from /auth/v1",
+      "status": "pass",
+      "detail": "jwt_exp patch HTTP 200; token lifetime 60s; before expiry: REST 200, getSession session; 8 s after expiry: REST 200, first rejected 38 s after expiry (401 {\"code\":\"PGRST303\",\"details\":null,\"hint\":null,\"message\":\"JWT expired\"}), getSession null fetch failed (simulated: Auth unreachable); after unblock: refresh ok, REST 200",
+      "measurements": {
+        "table_create_status": 201,
+        "jwt_exp_patch_status": 200,
+        "token_lifetime_s": 60,
+        "warm_getclaims_ok": "true",
+        "before_expiry_rest_status": 200,
+        "before_expiry_getsession_has_session": "true",
+        "before_expiry_getclaims_ok": "true",
+        "before_expiry_getuser_ok": "false",
+        "before_expiry_getuser_error": "fetch failed (simulated: Auth unreachable)",
+        "rest_status_8s_after_expiry": 200,
+        "rest_first_rejected_s_after_expiry": 38,
+        "rest_rejected_status": 401,
+        "rest_rejected_body": "{\"code\":\"PGRST303\",\"details\":null,\"hint\":null,\"message\":\"JWT expired\"}",
+        "after_expiry_getsession_has_session": "false",
+        "after_expiry_getsession_error": "fetch failed (simulated: Auth unreachable)",
+        "after_expiry_getclaims_ok": "false",
+        "storage_kept_session_after_failed_refresh": "true",
+        "auth_calls_blocked": 15,
+        "blocked_paths": "/token,/user",
+        "refresh_after_unblock_ok": "true",
+        "rest_after_unblock_status": 200
+      },
+      "durationMs": 629357
+    },
+    {
+      "id": "AU03d",
+      "title": "AU03d: global sign-out vs the access token already issued",
+      "status": "info",
+      "detail": "logout HTTP 204; REST with that access token: 200 before, 200 after; GET /user 403 session_not_found; refresh 400 refresh_token_not_found",
+      "measurements": {
+        "logout_status": 204,
+        "rest_before_logout": 200,
+        "rest_after_logout": 200,
+        "user_after_logout_status": 403,
+        "user_after_logout_code": "session_not_found",
+        "refresh_after_logout_status": 400,
+        "refresh_after_logout_code": "refresh_token_not_found"
+      },
+      "durationMs": 629357
+    },
+    {
+      "id": "AU03e",
+      "title": "AU03e: IdP outage (issuer Worker deleted): fallback and caching",
+      "status": "info",
+      "detail": "issuer delete ok; id_token series: t+0s 200/75ms reuse=200 | t+30s 200/47ms reuse=200 | t+60s 200/46ms reuse=200 | t+90s 200/49ms reuse=200 | t+120s 200/50ms reuse=200 | t+151s 200/226ms reuse=200 | t+181s 200/43ms reuse=200 | t+211s 200/43ms reuse=200 | t+241s 200/43ms reuse=200 | t+271s 200/221ms reuse=200 | t+301s 200/52ms reuse=200 | t+331s 200/46ms reuse=200 | t+362s 200/47ms reuse=200 | t+392s 200/218ms reuse=200 | t+422s 200/46ms reuse=200 | t+452s 200/42ms reuse=200 | t+482s 200/54ms reuse=200; browser flow: issuer issuer did not redirect: HTTP 404 ; password: 200 in 106ms",
+      "measurements": {
+        "before_outage_id_token_status": 200,
+        "before_outage_flow_ok": "true",
+        "issuer_deleted": "true",
+        "first_failed_id_token_s": -1,
+        "polls": 17,
+        "flow_during_outage_ok": "false",
+        "flow_during_outage_error": "issuer did not redirect: HTTP 404",
+        "flow_during_outage_ms": 89,
+        "password_during_outage_status": 200,
+        "password_during_outage_ms": 106
+      },
+      "evidence": "t+0s 200/75ms reuse=200\nt+30s 200/47ms reuse=200\nt+60s 200/46ms reuse=200\nt+90s 200/49ms reuse=200\nt+120s 200/50ms reuse=200\nt+151s 200/226ms reuse=200\nt+181s 200/43ms reuse=200\nt+211s 200/43ms reuse=200\nt+241s 200/43ms reuse=200\nt+271s 200/221ms reuse=200\nt+301s 200/52ms reuse=200\nt+331s 200/46ms reuse=200\nt+362s 200/47ms reuse=200\nt+392s 200/218ms reuse=200\nt+422s 200/46ms reuse=200\nt+452s 200/42ms reuse=200\nt+482s 200/54ms reuse=200",
+      "durationMs": 629357
+    },
+    {
+      "id": "AU03z",
+      "title": "AU03z: cleanup",
+      "status": "info",
+      "detail": "project delete HTTP 200; worker deleted during AU03e",
+      "durationMs": 629357
+    }
+  ]
+}

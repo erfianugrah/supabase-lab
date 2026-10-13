@@ -1,0 +1,167 @@
+{
+  "startedAt": "2026-10-10T00:13:52.726Z",
+  "finishedAt": "2026-10-10T00:14:42.046Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "auth-providers",
+  "labCommit": "70e4244",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "AU01-setup",
+      "title": "AU01-setup: throwaway Pro project + lab issuer",
+      "status": "info",
+      "measurements": {
+        "provision_s": 12
+      },
+      "durationMs": 49319
+    },
+    {
+      "id": "AU01a",
+      "title": "AU01a: create (unresolvable issuer, then valid)",
+      "status": "pass",
+      "detail": "bad issuer: HTTP 400 validation_failed \"Unable to resolve hostname\"; valid: HTTP 201",
+      "measurements": {
+        "bad_issuer_status": 400,
+        "bad_issuer_code": "validation_failed",
+        "create_status": 201,
+        "issuer_resolvable_after_s": 0,
+        "secret_echoed": "false",
+        "pkce_enabled_default": "true",
+        "email_optional_default": "false",
+        "skip_nonce_check_default": "false",
+        "response_keys": "acceptable_client_ids,attribute_mapping,authorization_params,client_id,created_at,custom_claims_allowlist,discovery_document,email_optional,enabled,id,identifier,issuer,name,pkce_enabled,provider_type,scopes,skip_nonce_check,updated_at"
+      },
+      "durationMs": 49319
+    },
+    {
+      "id": "AU01c",
+      "title": "AU01c: provider_type and identifier on update",
+      "status": "info",
+      "detail": "type change HTTP 200 ; identifier change HTTP 200 ; name change HTTP 200",
+      "measurements": {
+        "type_change_status": 200,
+        "identifier_change_status": 200,
+        "name_change_status": 200,
+        "type_after": "oidc",
+        "identifier_after": "custom:au-1",
+        "name_after": "AU 1 renamed"
+      },
+      "evidence": "{\"id\":\"4653c216-9092-4c6f-a979-536aa8275a77\",\"provider_type\":\"oidc\",\"identifier\":\"custom:au-1\",\"name\":\"AU 1\",\"client_id\":\"cid-1\",\"acceptable_client_ids\":[],\"scopes\":[\"openid\",\"email\",\"profile\"],\"pkce_enabled\":true,\"attribute_mapping\":{},\"cu | {\"id\":\"4653c216-9092-4c6f-a979-536aa8275a77\",\"provider_type\":\"oidc\",\"identifier\":\"custom:au-1\",\"name\":\"AU 1\",\"client_id\":\"cid-1\",\"acceptable_client_ids\":[],\"scopes\":[\"openid\",\"email\",\"profile\"],\"pkce_enabled\":true,\"attribute_mapping\":{},\"cu",
+      "durationMs": 49319
+    },
+    {
+      "id": "AU01d",
+      "title": "AU01d: provider-side PKCE default and pkce_enabled=false",
+      "status": "pass",
+      "detail": "default: session for user 7fd9bee5... email=\"<email>\" provider=custom:au-1; pkce off: session for user 970f0fff... email=\"<email>\" provider=custom:au-1",
+      "measurements": {
+        "default_code_challenge_present": "true",
+        "default_code_challenge_method": "S256",
+        "default_issuer_saw": "S256-verified",
+        "default_nonce_param_on_authorize": "false",
+        "default_state_present": "true",
+        "off_code_challenge_present": "false",
+        "off_issuer_saw": "none",
+        "secret_presented_as": "basic",
+        "authorize_scope": "openid email profile"
+      },
+      "durationMs": 49319
+    },
+    {
+      "id": "AU01e",
+      "title": "AU01e: sign-in with an email claim",
+      "status": "pass",
+      "detail": "session for user 0cb01fe5... email=\"<email>\" provider=custom:au-1",
+      "measurements": {
+        "same_user_second_signin": "true",
+        "app_metadata_provider": "custom:au-1",
+        "identity_provider": "custom:au-1",
+        "identity_provider_id": "-",
+        "user_email": "<email>"
+      },
+      "durationMs": 49319
+    },
+    {
+      "id": "AU01f",
+      "title": "AU01f: no email claim, email_optional false then true",
+      "status": "pass",
+      "detail": "optional=false: no session: stage=landed error=server_error code=unexpected_failure \"Error getting user email from external provider\"; optional=true: session for user 2bc46828... email=\"\" provider=custom:au-1",
+      "measurements": {
+        "default_refused": "true",
+        "default_error_code": "unexpected_failure",
+        "default_error_description": "Error getting user email from external provider",
+        "optional_signed_in": "true",
+        "optional_user_email": "-",
+        "optional_app_metadata_provider": "custom:au-1",
+        "optional_second_signin_same_user": "true"
+      },
+      "evidence": "server_error Error getting user email from external provider",
+      "durationMs": 49319
+    },
+    {
+      "id": "AU01g",
+      "title": "AU01g: aud vs client_id and acceptable_client_ids",
+      "status": "pass",
+      "detail": "code flow wrong aud: no session: stage=landed error=server_error code=unexpected_failure \"Error getting user profile from external provider\"; id_token wrong aud: HTTP 400 invalid request \"Unacceptable audience in id_token: [stranger-client]\"",
+      "measurements": {
+        "code_wrong_aud_refused": "true",
+        "code_wrong_aud_error": "Error getting user profile from external provider",
+        "idtoken_right_aud_status": 200,
+        "idtoken_wrong_aud_status": 400,
+        "idtoken_wrong_aud_code": "invalid request",
+        "listed_code_flow_signed_in": "true",
+        "listed_idtoken_status": 200
+      },
+      "durationMs": 49319
+    },
+    {
+      "id": "AU01b-pro",
+      "title": "AU01b-pro: provider quota",
+      "status": "info",
+      "detail": "provider 3 refused: HTTP 400 over_custom_provider_quota \"Maximum number of custom OAuth/OIDC providers reached\"",
+      "measurements": {
+        "plan_org": "pro",
+        "created_before_refusal": 2,
+        "first_refused_index": 3
+      },
+      "evidence": "201 201 400:over_custom_provider_quota",
+      "durationMs": 49319
+    },
+    {
+      "id": "AU01-setup-free",
+      "title": "AU01-setup-free: throwaway Free project",
+      "status": "info",
+      "measurements": {
+        "provision_s": 12
+      },
+      "durationMs": 49319
+    },
+    {
+      "id": "AU01b-free",
+      "title": "AU01b-free: provider quota",
+      "status": "info",
+      "detail": "provider 4 refused: HTTP 400 over_custom_provider_quota \"Maximum number of custom OAuth/OIDC providers reached\"",
+      "measurements": {
+        "plan_org": "free",
+        "created_before_refusal": 3,
+        "first_refused_index": 4
+      },
+      "evidence": "201 201 201 400:over_custom_provider_quota",
+      "durationMs": 49319
+    },
+    {
+      "id": "AU01z",
+      "title": "AU01z: cleanup",
+      "status": "info",
+      "detail": "project delete HTTP 200; project delete HTTP 200; worker delete ok",
+      "durationMs": 49319
+    }
+  ]
+}
