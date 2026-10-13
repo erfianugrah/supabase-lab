@@ -14,8 +14,8 @@
  *
  * Redaction is by shape, not by a list: any 20-lowercase-letter token (the
  * project ref shape), `<ref>.supabase.co` and `db.<ref>.supabase.co`, the
- * `aws-N-<region>.pooler.supabase.com` hosts, and anything that looks like an
- * email; plus, by literal, the publishing vantage's own public address. The gitignore carves experiments/<name>/out/ out of the global out/
+ * `aws-N-<region>.pooler.supabase.com` hosts, anything that looks like an
+ * email, and a home-directory prefix (macOS or Linux); plus, by literal, the publishing vantage's own public address. The gitignore carves experiments/<name>/out/ out of the global out/
  * rule (the literal patterns are in .gitignore; a star-slash here would close
  * this comment).
  */
@@ -23,6 +23,17 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
 import { renderFacts } from "../src/facts";
 import type { RunArtifact } from "../src/types";
+
+/**
+ * The project-ref shape, for redaction, the leftover check below and
+ * identifiers.test.ts. Bounded on letters and digits, not `\b`: `_` is a word
+ * character, so `\b` let `postgres_<ref>` and `<ref>_ok` through
+ * (work-supabase-lab#10). A JSON escape (`\n`, `\t`, ...) also counts as a
+ * boundary: redaction runs on the raw JSON text, where a ref at the start of a
+ * line inside a string follows the two characters `\n` and otherwise reads as
+ * a 21-letter token.
+ */
+export const REF_SHAPE = /(?:(?<=\\[nrtbf])|(?<![A-Za-z0-9]))[a-z]{20}(?![A-Za-z0-9])/g;
 
 export function redact(text: string, vantage: string[] = [], other: string[] = []): string {
   let out = text;
@@ -41,9 +52,7 @@ export function redact(text: string, vantage: string[] = [], other: string[] = [
     .replace(/\bdb\.[a-z]{20}\.supabase\.co\b/g, "db.<ref>.supabase.co")
     .replace(/\b[a-z]{20}\.supabase\.co\b/g, "<ref>.supabase.co")
     .replace(/\baws-\d-[a-z0-9-]+\.pooler\.supabase\.com\b/g, "<pooler-host>")
-    // Bounded on letters and digits, not `\b`: `_` is a word character, so
-    // `\b` let `postgres_<ref>` and `<ref>_ok` through (work-supabase-lab#10).
-    .replace(/(?<![A-Za-z0-9])[a-z]{20}(?![A-Za-z0-9])/g, "<ref>")
+    .replace(REF_SHAPE, "<ref>")
     .replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, "<email>")
     // The platform appends its own provenance comment to statements it runs on
     // your behalf, and it names the acting credential: `-- user: pat:<digits>`
@@ -53,7 +62,9 @@ export function redact(text: string, vantage: string[] = [], other: string[] = [
     // this rule existed. It is an identifier for the token rather than the
     // token, and it still does not belong in a public repo.
     .replace(/\bpat:\d+/g, "pat:<id>")
-    .replace(/\boauth:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g, "oauth:<id>");
+    .replace(/\boauth:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g, "oauth:<id>")
+    // A stack trace or captured stderr names the operator's home directory.
+    .replace(/\/(?:Users|home)\/[^/\s"'\\]+/g, "~");
 }
 
 // The CLI body runs only when invoked directly: `redact` has unit cases in
@@ -105,7 +116,7 @@ async function main(src: string, expDir: string, only: string[] | undefined): Pr
   const jsonName = basename(src);
   await writeFile(join(outDir, jsonName), JSON.stringify(run, null, 2));
   await writeFile(join(outDir, jsonName.replace(/\.json$/, ".facts.md")), renderFacts(run, { only }));
-  const leftover = redacted.match(/\b[a-z]{20}\b/g)?.length ?? 0;
+  const leftover = redacted.match(REF_SHAPE)?.length ?? 0;
   const creds = redacted.match(/\bpat:\d+|\boauth:[0-9a-f]{8}-/g)?.length ?? 0;
   console.log(`published ${jsonName} -> ${outDir} (${run.results.length} results; ${leftover} unredacted ref-shaped tokens remain; ${creds} unredacted credential ids remain)`);
   if (leftover) process.exit(1);
