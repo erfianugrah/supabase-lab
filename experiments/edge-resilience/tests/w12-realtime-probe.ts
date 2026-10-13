@@ -113,7 +113,7 @@ const mod: TestModule = {
 
     try {
       // 1. Ensure table exists and is in publication.
-      await runSql(`CREATE TABLE IF NOT EXISTS public.probe_canary (id serial primary key, payload text)`);
+      await runSql(`CREATE TABLE IF NOT EXISTS public.probe_canary (id serial primary key, payload text); GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.probe_canary TO anon, authenticated, service_role; GRANT USAGE, SELECT ON SEQUENCE public.probe_canary_id_seq TO anon, authenticated, service_role`);
       await runSql(`DROP PUBLICATION IF EXISTS supabase_realtime`);
       await runSql(`CREATE PUBLICATION supabase_realtime FOR TABLE public.probe_canary`);
       measurements["publication_setup"] = "true";
