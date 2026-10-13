@@ -46,3 +46,34 @@ Each token's remaining count drops when the OTHER token calls - one shared
 counter per user per scope (matching the documented identity priority:
 OAuth App ID, then User ID for a PAT, then IP). PAT sharding does not
 multiply the budget.
+
+## 2026-10-13 - L02: breach shape per endpoint and burst (work-supabase-lab#42)
+
+Harness: `make probe ONLY=L02`, lab commit 1a7158f with the W3 plan's Task
+O4 L02 change uncommitted at run time, one throwaway Pro project (Micro,
+ap-southeast-1) for the project-scoped rows; 05:09 to 05:27 UTC; published
+`out/2026-10-13/run-2026-10-13T05-09-36-511Z.facts.md`.
+
+Each cell: first non-2xx by issue order (`n`), status, body class,
+`retry-after`; then the 2xx count in the cell. In the parallel and spike
+cells `n` is issue order, not arrival order, so a low `n` there does not
+mean the budget ran out early.
+
+| endpoint | serial | parallel-20 | spike-150 |
+|---|---|---|---|
+| projects_list | n=121, 429, json-throttler, 60; 120 x 2xx | n=120, 429, json-throttler, 60; 119 x 2xx | n=15, 429, json-throttler, 60; 119 x 2xx |
+| orgs_list | n=121, 429, json-throttler, 60; 120 x 2xx | n=4, 429, json-throttler, 59; 119 x 2xx | n=3, 429, json-throttler, 60; 119 x 2xx |
+| project_get | n=121, 429, json-throttler, 60; 120 x 2xx | n=14, 429, json-throttler, 60; 119 x 2xx | n=6, 429, json-throttler, 60; 119 x 2xx |
+| functions_list | n=121, 429, json-throttler, 60; 120 x 2xx | n=10, 429, json-throttler, 59; 119 x 2xx | n=55, 429, json-throttler, 59; 119 x 2xx |
+| health | n=121, 429, json-throttler, 60; 120 x 2xx | n=113, 429, json-throttler, 60; 119 x 2xx | n=36, 429, json-throttler, 59; 119 x 2xx |
+
+Read: no cell got `html`; all 15 breaches were the API's JSON throttler
+(`application/json; charset=utf-8`, `{"message":"ThrottlerException: Too
+Many Requests"}`), with `retry-after` 59 or 60. Every 429 in the run was
+that class (the spike cells: 31 x 429 each). Each cell's endpoint answered
+2xx again at the first read after the 65 s cooldown (`recovered_s` 65 on all
+15). A serial burst got 120 x 2xx before the 429; every parallel and spike
+cell got 119. Not settled: one token, one vantage, one day; write endpoints
+were not burst; the HTML page other experiments met on aggressive polling
+was not reproduced by any of these shapes, so what produces it is still
+open.
