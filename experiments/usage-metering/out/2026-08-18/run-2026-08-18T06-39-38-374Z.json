@@ -1,0 +1,51 @@
+{
+  "startedAt": "2026-08-18T06:39:38.374Z",
+  "finishedAt": "2026-08-18T06:41:55.377Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "usage-metering",
+  "labCommit": "5bce8da",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "OpenSSL 3.6.3 9 Jun 2026 (Library: OpenSSL 3.6.3 9 Jun 2026)"
+  },
+  "results": [
+    {
+      "id": "M06-control",
+      "title": "M06-control: provision + schema + seed",
+      "status": "pass",
+      "measurements": {
+        "provision_s": 134
+      },
+      "durationMs": 137009
+    },
+    {
+      "id": "M06a",
+      "title": "M06a: replayed flush is idempotent",
+      "status": "pass",
+      "measurements": {
+        "rollup_windows": 4,
+        "identical_after_reflush": 1,
+        "totals": "t-0@00h=250 t-0@01h=250 t-1@00h=250 t-1@01h=250"
+      },
+      "durationMs": 137009
+    },
+    {
+      "id": "M06b",
+      "title": "M06b: late event recompute + duplicate rejection",
+      "status": "info",
+      "detail": "duplicate idempotency_key rejected",
+      "measurements": {
+        "late_insert_status": 201,
+        "duplicate_rejected": 1,
+        "closed_window_delta": 5,
+        "closed_window_delta_expected": 5,
+        "other_windows_unchanged": 1
+      },
+      "durationMs": 137009
+    }
+  ]
+}
