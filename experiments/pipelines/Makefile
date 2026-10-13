@@ -35,3 +35,11 @@ teardown: gen
 clean:
 	docker compose --env-file .run/env --profile replicator down -v --remove-orphans
 	rm -rf .run
+
+.PHONY: publish-evidence
+
+# Redacted copy of a run artifact plus its facts.md into out/<date>/ (committed).
+# PUBLISH_ONLY, not ONLY, narrows it: ONLY has a default above.
+publish-evidence:
+	@test -n "$(RUN)" || (echo "RUN=evidence/<ts>/run-<stamp>.json required"; exit 1)
+	@cd $(ROOT)/harness && bun scripts/publish-evidence.ts $(abspath $(RUN)) $(abspath .) $(if $(PUBLISH_ONLY),--only $(PUBLISH_ONLY),)

@@ -1,0 +1,823 @@
+{
+  "startedAt": "2026-10-10T07:27:52.201Z",
+  "finishedAt": "2026-10-10T08:33:48.742Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "pipelines",
+  "labCommit": "70e4244",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "PL01a",
+      "title": "PL01a: public Management API description names no Pipelines route",
+      "status": "info",
+      "detail": "115 paths; 0 match pipeline|replication|etl|destination|ducklake|warehouse (read-replica routes excluded)",
+      "measurements": {
+        "spec_http": 200,
+        "spec_path_count": 115,
+        "pipeline_like_paths": 0,
+        "matched": "none"
+      },
+      "durationMs": 358
+    },
+    {
+      "id": "PL01b",
+      "title": "PL01b: PAT on the Dashboard's replication routes",
+      "status": "info",
+      "detail": "no /platform/replication route accepted the PAT while the same PAT answered /v1",
+      "measurements": {
+        "unused_ref_sources_http": 401,
+        "unused_ref_sources_body": "{\"message\":\"Unsupported access token\"}",
+        "unused_ref_destinations_http": 401,
+        "unused_ref_destinations_body": "{\"message\":\"Unsupported access token\"}",
+        "unused_ref_pipelines_http": 401,
+        "unused_ref_pipelines_body": "{\"message\":\"Unsupported access token\"}",
+        "control_v1_projects_http": 200
+      },
+      "durationMs": 358
+    },
+    {
+      "id": "PL02a",
+      "title": "PL02a: source database facts",
+      "status": "info",
+      "detail": "project created this run",
+      "measurements": {
+        "postgres": "PostgreSQL 17.11 on x86_64-pc-linux-gnu, compiled by gcc (GC",
+        "wal_level": "logical",
+        "max_replication_slots": "10",
+        "max_wal_senders": "10",
+        "max_slot_wal_keep_size": "512MB",
+        "wal_keep_size": "0",
+        "checkpoint_timeout": "5min",
+        "slots_before_pipeline": "0",
+        "postgres_role_bypassrls": "true",
+        "etl_schema_before": "0",
+        "create_status": 201,
+        "ipv4_addon_dns_s": 10,
+        "replicator_commit": "3fc88dd52a55",
+        "laptop_to_source_select1_p50_ms": 171,
+        "laptop_to_source_select1_max_ms": 176
+      },
+      "durationMs": 95179
+    },
+    {
+      "id": "PL02b",
+      "title": "PL02b: initial copy of 1000000 rows",
+      "status": "pass",
+      "detail": "table state {\"public.pl02_copy\":\"sync_done\"}; destination matches source (count/sum(id)/sum(qty)/sum(length(note)))",
+      "measurements": {
+        "rows": 1000000,
+        "heap_mb": 101.1,
+        "total_relation_mb": 123.7,
+        "seed_s": 5.4,
+        "up_to_sync_done_s": 53,
+        "copy_phase_s": 13.3,
+        "catchup_phase_s": 1.2,
+        "copy_mb_per_s": 7.61,
+        "sync_done_to_ready_s": 13.5,
+        "state_timeline": "init>data_sync>finished_copy>sync_done",
+        "max_slots_during_copy": 2,
+        "slot_names_seen": "supabase_etl_apply_<id> supabase_etl_table_sync_<id>",
+        "dest_rows": "1000000",
+        "src_rows": "1000000",
+        "dest_matches_source": "yes"
+      },
+      "durationMs": 95179
+    },
+    {
+      "id": "PL03a",
+      "title": "PL03a: lag with the engine default batch wait (10000 ms)",
+      "status": "info",
+      "detail": "65 of 65 probe rows seen at the destination within the window",
+      "measurements": {
+        "batch_max_fill_ms": 10000,
+        "window_s": 90,
+        "rows_probed": 65,
+        "rows_seen": 65,
+        "lag_min_ms": 235,
+        "lag_p50_ms": 5577,
+        "lag_p95_ms": 10177,
+        "lag_max_ms": 10940,
+        "duck_poll_p50_ms": 10,
+        "duck_poll_p95_ms": 14
+      },
+      "durationMs": 319477
+    },
+    {
+      "id": "PL03b",
+      "title": "PL03b: lag with batch wait 1000 ms",
+      "status": "info",
+      "detail": "63 of 63 probe rows seen at the destination within the window",
+      "measurements": {
+        "batch_max_fill_ms": 1000,
+        "window_s": 90,
+        "rows_probed": 63,
+        "rows_seen": 63,
+        "lag_min_ms": 90,
+        "lag_p50_ms": 1131,
+        "lag_p95_ms": 1880,
+        "lag_max_ms": 1928,
+        "duck_poll_p50_ms": 11,
+        "duck_poll_p95_ms": 14
+      },
+      "durationMs": 319477
+    },
+    {
+      "id": "PL04a",
+      "title": "PL04a: control - the policy is in force for `authenticated` on the source",
+      "status": "pass",
+      "detail": "as authenticated the source table reads 0 of 1000 rows",
+      "measurements": {
+        "rows_visible_to_authenticated": "0"
+      },
+      "durationMs": 219005
+    },
+    {
+      "id": "PL04b",
+      "title": "PL04b: destination holds RLS-hidden rows (copy path and change path)",
+      "status": "pass",
+      "detail": "initial copy 1000 of 1000 rows; after 200 inserts and 20 deletes 1180 of 1180; 50 updates seen 50 of 50",
+      "measurements": {
+        "engine_role": "postgres",
+        "engine_role_bypassrls": "true",
+        "copy_rows_at_dest": "1000",
+        "after_changes_rows_at_dest": "1180",
+        "after_changes_expected": "1180",
+        "updates_seen": "50"
+      },
+      "durationMs": 219005
+    },
+    {
+      "id": "PL04c",
+      "title": "PL04c: publication column list and row filter filter the destination",
+      "status": "pass",
+      "detail": "rows 500 of 500, columns [id owner], owner values [keep]",
+      "measurements": {
+        "dest_rows": "500",
+        "dest_columns": "id owner",
+        "dest_owner_values": "keep"
+      },
+      "durationMs": 219006
+    },
+    {
+      "id": "PL04d",
+      "title": "PL04d: initial copy as a role without BYPASSRLS, policy exposes 100 of 1000 rows",
+      "status": "info",
+      "detail": "destination holds 100 of 1000 rows",
+      "measurements": {
+        "engine_role": "pl_norls (REPLICATION, NOBYPASSRLS, SELECT only)",
+        "policy_visible_rows": 100,
+        "source_rows": 1000,
+        "dest_rows": "100",
+        "table_state": "{\"public.pl04_rls\":\"sync_done\"}",
+        "log_errors": "  2026-10-10T07:38:19.632362Z  INFO etl::runtime::table_sync::worker: waiting for table state, table_id: 18431, current_table_state_type: catchup, target_table_"
+      },
+      "durationMs": 219006
+    },
+    {
+      "id": "PL05-base",
+      "title": "PL05 baseline: destination column definitions after the initial copy",
+      "status": "info",
+      "measurements": {
+        "dest_columns": "id:BIGINT:NO a:VARCHAR:NO b:INTEGER:NO c:VARCHAR:YES d:INTEGER:YES",
+        "source_not_null_columns": "id a b"
+      },
+      "durationMs": 310745
+    },
+    {
+      "id": "PL05a",
+      "title": "PL05a: add nullable column",
+      "status": "info",
+      "detail": "row after the statement visible at destination in 5 s",
+      "measurements": {
+        "source_ddl_ms": 186,
+        "next_row_visible_s": 5,
+        "dest_column_after": "e: VARCHAR null=YES default=NULL",
+        "table_state_after": "ready",
+        "replicator_running_after": "true",
+        "warn_or_error_log_lines": 0,
+        "first_log_line": "none"
+      },
+      "durationMs": 310745
+    },
+    {
+      "id": "PL05b",
+      "title": "PL05b: add column with constant default",
+      "status": "info",
+      "detail": "row after the statement visible at destination in 5 s",
+      "measurements": {
+        "source_ddl_ms": 174,
+        "next_row_visible_s": 5,
+        "dest_column_after": "f: INTEGER null=YES default=\"'42'\"",
+        "probe": "f_on_old_row_1=42",
+        "table_state_after": "ready",
+        "replicator_running_after": "true",
+        "warn_or_error_log_lines": 0,
+        "first_log_line": "none"
+      },
+      "durationMs": 310745
+    },
+    {
+      "id": "PL05c",
+      "title": "PL05c: add column with volatile default (gen_random_uuid())",
+      "status": "info",
+      "detail": "row after the statement visible at destination in 5 s",
+      "measurements": {
+        "source_ddl_ms": 185,
+        "next_row_visible_s": 5,
+        "dest_column_after": "g: UUID null=YES default=NULL",
+        "table_state_after": "ready",
+        "replicator_running_after": "true",
+        "warn_or_error_log_lines": 1,
+        "first_log_line": " 2026-10-10T07:39:39.822013Z WARN etl_destinations::ducklake::schema: skipping unsupported source column default for ducklake, column_name: g"
+      },
+      "durationMs": 310745
+    },
+    {
+      "id": "PL05d",
+      "title": "PL05d: add NOT NULL column with default",
+      "status": "info",
+      "detail": "row after the statement visible at destination in 5.7 s",
+      "measurements": {
+        "source_ddl_ms": 174,
+        "next_row_visible_s": 5.7,
+        "dest_column_after": "h: INTEGER null=YES default=\"'7'\"",
+        "table_state_after": "ready",
+        "replicator_running_after": "true",
+        "warn_or_error_log_lines": 1,
+        "first_log_line": " 2026-10-10T07:39:45.646746Z WARN etl_destinations::ducklake::core: adding a source not null column as nullable in ducklake; the destination schema will be more permissive, table_name: public.pl05_ddl"
+      },
+      "durationMs": 310745
+    },
+    {
+      "id": "PL05e",
+      "title": "PL05e: rename column",
+      "status": "info",
+      "detail": "row after the statement visible at destination in 5 s",
+      "measurements": {
+        "source_ddl_ms": 178,
+        "next_row_visible_s": 5,
+        "dest_column_after": "c2: VARCHAR null=YES default=NULL",
+        "table_state_after": "ready",
+        "replicator_running_after": "true",
+        "warn_or_error_log_lines": 0,
+        "first_log_line": "none"
+      },
+      "durationMs": 310745
+    },
+    {
+      "id": "PL05f",
+      "title": "PL05f: drop column",
+      "status": "info",
+      "detail": "row after the statement visible at destination in 5 s",
+      "measurements": {
+        "source_ddl_ms": 178,
+        "next_row_visible_s": 5,
+        "dest_column_after": "d: absent",
+        "table_state_after": "ready",
+        "replicator_running_after": "true",
+        "warn_or_error_log_lines": 0,
+        "first_log_line": "none"
+      },
+      "durationMs": 310745
+    },
+    {
+      "id": "PL05g",
+      "title": "PL05g: drop NOT NULL",
+      "status": "info",
+      "detail": "row after the statement visible at destination in 5 s",
+      "measurements": {
+        "source_ddl_ms": 172,
+        "next_row_visible_s": 5,
+        "dest_column_after": "a: VARCHAR null=YES default=NULL",
+        "table_state_after": "ready",
+        "replicator_running_after": "true",
+        "warn_or_error_log_lines": 0,
+        "first_log_line": "none"
+      },
+      "durationMs": 310745
+    },
+    {
+      "id": "PL05h",
+      "title": "PL05h: set NOT NULL (tighten)",
+      "status": "info",
+      "detail": "row after the statement visible at destination in 11.4 s",
+      "measurements": {
+        "source_ddl_ms": 352,
+        "next_row_visible_s": 11.4,
+        "dest_column_after": "e: VARCHAR null=YES default=NULL",
+        "table_state_after": "ready",
+        "replicator_running_after": "true",
+        "warn_or_error_log_lines": 1,
+        "first_log_line": " 2026-10-10T07:40:14.918007Z WARN etl_destinations::ducklake::core: ducklake does not tighten an existing nullable column to not null; keeping the destination column nullable, table_name: public.pl05_"
+      },
+      "durationMs": 310745
+    },
+    {
+      "id": "PL05i",
+      "title": "PL05i: set default",
+      "status": "info",
+      "detail": "row after the statement visible at destination in 5 s",
+      "measurements": {
+        "source_ddl_ms": 172,
+        "next_row_visible_s": 5,
+        "dest_column_after": "b: INTEGER null=NO default=\"'9'\"",
+        "probe": "b_of_new_row_default=9",
+        "table_state_after": "ready",
+        "replicator_running_after": "true",
+        "warn_or_error_log_lines": 0,
+        "first_log_line": "none"
+      },
+      "durationMs": 310746
+    },
+    {
+      "id": "PL05j",
+      "title": "PL05j: drop default",
+      "status": "info",
+      "detail": "row after the statement visible at destination in 5 s",
+      "measurements": {
+        "source_ddl_ms": 178,
+        "next_row_visible_s": 5,
+        "dest_column_after": "b: INTEGER null=NO default=NULL",
+        "table_state_after": "ready",
+        "replicator_running_after": "true",
+        "warn_or_error_log_lines": 0,
+        "first_log_line": "none"
+      },
+      "durationMs": 310746
+    },
+    {
+      "id": "PL05k",
+      "title": "PL05k: type change int to bigint, then a row whose value fits INTEGER",
+      "status": "info",
+      "detail": "row after the statement visible at destination in 5.7 s",
+      "measurements": {
+        "source_ddl_ms": 178,
+        "next_row_visible_s": 5.7,
+        "dest_column_after": "b: INTEGER null=NO default=NULL",
+        "table_state_after": "ready",
+        "replicator_running_after": "true",
+        "warn_or_error_log_lines": 1,
+        "first_log_line": " 2026-10-10T07:40:32.429192Z WARN etl_destinations::recovery: ducklake column type changes are currently unsupported; subsequent schema changes and row writes may fail or behave unpredictably until ty"
+      },
+      "durationMs": 310746
+    },
+    {
+      "id": "PL05l",
+      "title": "PL05l: row with a value outside the INTEGER range, after the type change",
+      "status": "info",
+      "detail": "row after the statement NOT visible within 60 s",
+      "measurements": {
+        "source_ddl_ms": 167,
+        "next_row_visible_s": -1,
+        "dest_column_after": "b: INTEGER null=NO default=NULL",
+        "table_state_after": "ready",
+        "replicator_running_after": "true",
+        "warn_or_error_log_lines": 62,
+        "first_log_line": " 2026-10-10T07:40:35.666657Z ERROR etl_destinations::ducklake::batches: error append row, error: Call to EndRow before all columns have been appended to!"
+      },
+      "durationMs": 310746
+    },
+    {
+      "id": "PL05m",
+      "title": "PL05m: a small-value row inserted after the out-of-range row",
+      "status": "info",
+      "detail": "later row NOT visible within 120 s",
+      "measurements": {
+        "later_row_visible_s": -1,
+        "overflow_row_at_dest": "0",
+        "table_state": "ready",
+        "replicator_running": "false",
+        "warn_error_lines_last_2min": 138,
+        "last_line": " 2026-10-10T07:42:52.210458Z ERROR etl_replicator: replicator failed, error: [DestinationAtomicBatchRetryable] DuckLake atomic table batch sequence failed after retries: table=public.pl05_ddl, batch_count=1"
+      },
+      "durationMs": 310746
+    },
+    {
+      "id": "PL05-final",
+      "title": "PL05 final: source and destination column lists",
+      "status": "info",
+      "measurements": {
+        "source_columns": "id:bigint:NO a:text:YES b:bigint:NO c2:text:YES e:text:NO f:integer:YES g:uuid:YES h:integer:NO",
+        "dest_columns": "id:BIGINT:NO a:VARCHAR:YES b:INTEGER:NO c2:VARCHAR:YES e:VARCHAR:YES f:INTEGER:YES g:UUID:YES h:INTEGER:YES"
+      },
+      "durationMs": 310746
+    },
+    {
+      "id": "PL06-default-1",
+      "title": "PL06 default trial 1: SIGKILL at 29 s",
+      "status": "info",
+      "detail": "destination caught up; duplicate rows this trial: pk table 0, no-pk table 0",
+      "measurements": {
+        "batch_max_fill_ms": 10000,
+        "signal": "SIGKILL",
+        "stop_call_ms": 152,
+        "restart_to_converged_s": 53,
+        "src_rows_pk": 3026,
+        "src_rows_nopk": 3026,
+        "dest_rows_pk": 3026,
+        "dest_distinct_ids_pk": 3026,
+        "dest_rows_nopk": 3026,
+        "dest_distinct_ids_nopk": 3026,
+        "duplicates_pk_this_trial": 0,
+        "duplicates_nopk_this_trial": 0,
+        "dest_rows_before_stop_pk": 2086,
+        "src_rows_before_stop_pk": 2146,
+        "converged": "yes"
+      },
+      "durationMs": 958139
+    },
+    {
+      "id": "PL06-default-2",
+      "title": "PL06 default trial 2: SIGKILL at 32 s",
+      "status": "info",
+      "detail": "destination caught up; duplicate rows this trial: pk table 0, no-pk table 0",
+      "measurements": {
+        "batch_max_fill_ms": 10000,
+        "signal": "SIGKILL",
+        "stop_call_ms": 175,
+        "restart_to_converged_s": 56,
+        "src_rows_pk": 5226,
+        "src_rows_nopk": 5226,
+        "dest_rows_pk": 5226,
+        "dest_distinct_ids_pk": 5226,
+        "dest_rows_nopk": 5226,
+        "dest_distinct_ids_nopk": 5226,
+        "duplicates_pk_this_trial": 0,
+        "duplicates_nopk_this_trial": 0,
+        "dest_rows_before_stop_pk": 4286,
+        "src_rows_before_stop_pk": 4366,
+        "converged": "yes"
+      },
+      "durationMs": 958140
+    },
+    {
+      "id": "PL06-default-3",
+      "title": "PL06 default trial 3: SIGKILL at 25 s",
+      "status": "info",
+      "detail": "destination caught up; duplicate rows this trial: pk table 0, no-pk table 0",
+      "measurements": {
+        "batch_max_fill_ms": 10000,
+        "signal": "SIGKILL",
+        "stop_call_ms": 364,
+        "restart_to_converged_s": 50,
+        "src_rows_pk": 7126,
+        "src_rows_nopk": 7126,
+        "dest_rows_pk": 7126,
+        "dest_distinct_ids_pk": 7126,
+        "dest_rows_nopk": 7126,
+        "dest_distinct_ids_nopk": 7126,
+        "duplicates_pk_this_trial": 0,
+        "duplicates_nopk_this_trial": 0,
+        "dest_rows_before_stop_pk": 6026,
+        "src_rows_before_stop_pk": 6226,
+        "converged": "yes"
+      },
+      "durationMs": 958140
+    },
+    {
+      "id": "PL06-default-4",
+      "title": "PL06 default trial 4: SIGKILL at 25 s",
+      "status": "info",
+      "detail": "destination caught up; duplicate rows this trial: pk table 0, no-pk table 0",
+      "measurements": {
+        "batch_max_fill_ms": 10000,
+        "signal": "SIGKILL",
+        "stop_call_ms": 121,
+        "restart_to_converged_s": 50,
+        "src_rows_pk": 9046,
+        "src_rows_nopk": 9046,
+        "dest_rows_pk": 9046,
+        "dest_distinct_ids_pk": 9046,
+        "dest_rows_nopk": 9046,
+        "dest_distinct_ids_nopk": 9046,
+        "duplicates_pk_this_trial": 0,
+        "duplicates_nopk_this_trial": 0,
+        "dest_rows_before_stop_pk": 7966,
+        "src_rows_before_stop_pk": 8166,
+        "converged": "yes"
+      },
+      "durationMs": 958140
+    },
+    {
+      "id": "PL06-default-5",
+      "title": "PL06 default trial 5: SIGTERM (graceful stop) at 30 s",
+      "status": "info",
+      "detail": "destination caught up; duplicate rows this trial: pk table 0, no-pk table 0",
+      "measurements": {
+        "batch_max_fill_ms": 10000,
+        "signal": "SIGTERM",
+        "stop_call_ms": 1425,
+        "restart_to_converged_s": 50,
+        "src_rows_pk": 11226,
+        "src_rows_nopk": 11226,
+        "dest_rows_pk": 11226,
+        "dest_distinct_ids_pk": 11226,
+        "dest_rows_nopk": 11226,
+        "dest_distinct_ids_nopk": 11226,
+        "duplicates_pk_this_trial": 0,
+        "duplicates_nopk_this_trial": 0,
+        "dest_rows_before_stop_pk": 9886,
+        "src_rows_before_stop_pk": 10306,
+        "converged": "yes"
+      },
+      "durationMs": 958140
+    },
+    {
+      "id": "PL06-1s-1",
+      "title": "PL06 1s trial 1: SIGKILL at 10 s",
+      "status": "info",
+      "detail": "destination caught up; duplicate rows this trial: pk table 0, no-pk table 0",
+      "measurements": {
+        "batch_max_fill_ms": 1000,
+        "signal": "SIGKILL",
+        "stop_call_ms": 161,
+        "restart_to_converged_s": 44,
+        "src_rows_pk": 2302,
+        "src_rows_nopk": 2302,
+        "dest_rows_pk": 2302,
+        "dest_distinct_ids_pk": 2302,
+        "dest_rows_nopk": 2302,
+        "dest_distinct_ids_nopk": 2302,
+        "duplicates_pk_this_trial": 0,
+        "duplicates_nopk_this_trial": 0,
+        "dest_rows_before_stop_pk": 1382,
+        "src_rows_before_stop_pk": 1422,
+        "converged": "yes"
+      },
+      "durationMs": 958140
+    },
+    {
+      "id": "PL06-1s-2",
+      "title": "PL06 1s trial 2: SIGKILL at 16 s",
+      "status": "info",
+      "detail": "destination caught up; duplicate rows this trial: pk table 0, no-pk table 0",
+      "measurements": {
+        "batch_max_fill_ms": 1000,
+        "signal": "SIGKILL",
+        "stop_call_ms": 123,
+        "restart_to_converged_s": 43,
+        "src_rows_pk": 3842,
+        "src_rows_nopk": 3842,
+        "dest_rows_pk": 3842,
+        "dest_distinct_ids_pk": 3842,
+        "dest_rows_nopk": 3842,
+        "dest_distinct_ids_nopk": 3842,
+        "duplicates_pk_this_trial": 0,
+        "duplicates_nopk_this_trial": 0,
+        "dest_rows_before_stop_pk": 2902,
+        "src_rows_before_stop_pk": 2982,
+        "converged": "yes"
+      },
+      "durationMs": 958140
+    },
+    {
+      "id": "PL06-1s-3",
+      "title": "PL06 1s trial 3: SIGKILL at 8 s",
+      "status": "info",
+      "detail": "destination caught up; duplicate rows this trial: pk table 0, no-pk table 0",
+      "measurements": {
+        "batch_max_fill_ms": 1000,
+        "signal": "SIGKILL",
+        "stop_call_ms": 131,
+        "restart_to_converged_s": 44,
+        "src_rows_pk": 5062,
+        "src_rows_nopk": 5062,
+        "dest_rows_pk": 5062,
+        "dest_distinct_ids_pk": 5062,
+        "dest_rows_nopk": 5062,
+        "dest_distinct_ids_nopk": 5062,
+        "duplicates_pk_this_trial": 0,
+        "duplicates_nopk_this_trial": 0,
+        "dest_rows_before_stop_pk": 4162,
+        "src_rows_before_stop_pk": 4182,
+        "converged": "yes"
+      },
+      "durationMs": 958140
+    },
+    {
+      "id": "PL06-1s-4",
+      "title": "PL06 1s trial 4: SIGKILL at 13 s",
+      "status": "info",
+      "detail": "destination caught up; duplicate rows this trial: pk table 0, no-pk table 0",
+      "measurements": {
+        "batch_max_fill_ms": 1000,
+        "signal": "SIGKILL",
+        "stop_call_ms": 123,
+        "restart_to_converged_s": 44,
+        "src_rows_pk": 6502,
+        "src_rows_nopk": 6502,
+        "dest_rows_pk": 6502,
+        "dest_distinct_ids_pk": 6502,
+        "dest_rows_nopk": 6502,
+        "dest_distinct_ids_nopk": 6502,
+        "duplicates_pk_this_trial": 0,
+        "duplicates_nopk_this_trial": 0,
+        "dest_rows_before_stop_pk": 5582,
+        "src_rows_before_stop_pk": 5602,
+        "converged": "yes"
+      },
+      "durationMs": 958140
+    },
+    {
+      "id": "PL06-1s-5",
+      "title": "PL06 1s trial 5: SIGKILL at 15 s",
+      "status": "info",
+      "detail": "destination caught up; duplicate rows this trial: pk table 0, no-pk table 0",
+      "measurements": {
+        "batch_max_fill_ms": 1000,
+        "signal": "SIGKILL",
+        "stop_call_ms": 106,
+        "restart_to_converged_s": 44,
+        "src_rows_pk": 8022,
+        "src_rows_nopk": 8022,
+        "dest_rows_pk": 8022,
+        "dest_distinct_ids_pk": 8022,
+        "dest_rows_nopk": 8022,
+        "dest_distinct_ids_nopk": 8022,
+        "duplicates_pk_this_trial": 0,
+        "duplicates_nopk_this_trial": 0,
+        "dest_rows_before_stop_pk": 7062,
+        "src_rows_before_stop_pk": 7142,
+        "converged": "yes"
+      },
+      "durationMs": 958140
+    },
+    {
+      "id": "PL06-1s-6",
+      "title": "PL06 1s trial 6: SIGKILL at 15 s",
+      "status": "info",
+      "detail": "destination caught up; duplicate rows this trial: pk table 0, no-pk table 0",
+      "measurements": {
+        "batch_max_fill_ms": 1000,
+        "signal": "SIGKILL",
+        "stop_call_ms": 135,
+        "restart_to_converged_s": 47,
+        "src_rows_pk": 9522,
+        "src_rows_nopk": 9522,
+        "dest_rows_pk": 9522,
+        "dest_distinct_ids_pk": 9522,
+        "dest_rows_nopk": 9522,
+        "dest_distinct_ids_nopk": 9522,
+        "duplicates_pk_this_trial": 0,
+        "duplicates_nopk_this_trial": 0,
+        "dest_rows_before_stop_pk": 8622,
+        "src_rows_before_stop_pk": 8662,
+        "converged": "yes"
+      },
+      "durationMs": 958140
+    },
+    {
+      "id": "PL06-total",
+      "title": "PL06 total: duplicate rows across all trials",
+      "status": "info",
+      "measurements": {
+        "trials_run": 11,
+        "duplicates_pk_total": 0,
+        "duplicates_nopk_total": 0
+      },
+      "durationMs": 958140
+    },
+    {
+      "id": "PL07a",
+      "title": "PL07a: main slot while the replicator runs",
+      "status": "info",
+      "measurements": {
+        "slot_active": "true",
+        "wal_status": "reserved",
+        "retained_mb": 1,
+        "unconfirmed_mb": 0,
+        "safe_wal_size_mb": 552.5,
+        "max_slot_wal_keep_size_mb": 536.9,
+        "table_heap_mb": 117,
+        "wal_dir": "18 files, 285.2 MB"
+      },
+      "durationMs": 1081896
+    },
+    {
+      "id": "PL07b",
+      "title": "PL07b: slot retention while the replicator is stopped and 75000 rows are written",
+      "status": "info",
+      "detail": "slot active after stop: false; retained 1 MB (idle, 30 s after stop) to 47.2 MB after 75000 rows",
+      "measurements": {
+        "stop_call_s": 0.6,
+        "slot_active_after_stop": "false",
+        "retained_just_after_stop_mb": 1,
+        "retained_after_30s_idle_mb": 1,
+        "idle_growth_kb_per_30s": 0,
+        "rows_written_while_stopped": 75000,
+        "retained_after_writes_mb": 47.2,
+        "retained_growth_from_writes_mb": 46.2,
+        "retained_bytes_per_row_written": 616,
+        "unconfirmed_after_writes_mb": 46.2,
+        "wal_status_after_writes": "reserved",
+        "safe_wal_size_after_writes_mb": 506.3,
+        "samples": 15,
+        "retained_mb_series": "3 5 7 18.6 20.6 23.3 25.3 33.3 35.3 37.3 39.3 41.2 43.2 45.3 47.2",
+        "wal_dir_after": "18 files, 285.2 MB"
+      },
+      "durationMs": 1081896
+    },
+    {
+      "id": "PL07c",
+      "title": "PL07c: restart drains the backlog",
+      "status": "fail",
+      "detail": "did not drain in 180 s (dest 100000 of 175000)",
+      "measurements": {
+        "restart_to_drained_s": -1,
+        "src_rows": "175000",
+        "dest_rows": "100000",
+        "retained_after_drain_mb": 117.3,
+        "unconfirmed_after_drain_mb": 116.3
+      },
+      "durationMs": 1081896
+    },
+    {
+      "id": "PL07d",
+      "title": "PL07d: retention beyond max_slot_wal_keep_size",
+      "status": "info",
+      "detail": "slot wal_status unreserved before CHECKPOINT, lost 368 s after",
+      "measurements": {
+        "max_slot_wal_keep_size_mb": 536.9,
+        "update_passes": 3,
+        "wal_generation_s": 35,
+        "retained_before_checkpoint_mb": 773.6,
+        "wal_status_before_checkpoint": "unreserved",
+        "safe_wal_size_before_checkpoint_mb": -220.1,
+        "checkpoint_statement": "refused: permission denied to execute CHECKPOINT command",
+        "wal_status_trail": "unreserved>lost",
+        "invalidation_reason": "wal_removed",
+        "retained_final_mb": -1,
+        "wal_dir_at_peak": "50 files, 822.1 MB",
+        "rows": "175000",
+        "retained_mb_series": "341.2 556.3 773.5",
+        "start_retained_mb": 117.3
+      },
+      "durationMs": 1081896
+    },
+    {
+      "id": "PL07e",
+      "title": "PL07e: restart with invalidated_slot_behavior error (default)",
+      "status": "info",
+      "detail": "container running after 60 s: false; table state ready",
+      "measurements": {
+        "container_running_after_60s": "false",
+        "table_state": "ready",
+        "log_lines_matching": 5,
+        "first_matching_line": " 2026-10-10T08:32:17.678428Z ERROR etl::runtime::apply::worker: apply worker failed, error: [ReplicationSlotInvalidated] Replication slot has been invalidated: The replication slot 'supabase_etl_apply_1' for pipeline 1 has been invalidated."
+      },
+      "durationMs": 1081897
+    },
+    {
+      "id": "PL07f",
+      "title": "PL07f: invalidated_slot_behavior recreate rebuilds the table",
+      "status": "info",
+      "detail": "destination matched source 47.5 s after restart (50 rows deleted at the source while the slot was lost)",
+      "measurements": {
+        "restart_to_rebuilt_s": 47.5,
+        "table_states_after_restart": "init>data_sync>finished_copy>sync_done",
+        "src_rows": "174950",
+        "dest_rows": "174950",
+        "new_slot_status": "reserved",
+        "new_slot_active": "true"
+      },
+      "durationMs": 1081897
+    },
+    {
+      "id": "PL08a",
+      "title": "PL08a: billing add-on listing carries an etl_pipeline variant",
+      "status": "info",
+      "detail": "variant etl_pipeline_default, $39/month",
+      "measurements": {
+        "list_http": 200,
+        "etl_variant": "etl_pipeline_default",
+        "price_description": "$39/month",
+        "price_amount": 0.053,
+        "price_interval": "hourly",
+        "price_type": "usage",
+        "docs_rate_usd_per_hour": 0.053,
+        "implied_monthly_usd_at_730h": 38.69,
+        "selected_before": "compute_instance ipv4"
+      },
+      "durationMs": 3770
+    },
+    {
+      "id": "PL08b",
+      "title": "PL08b: a token attaches and detaches the etl_pipeline add-on",
+      "status": "info",
+      "detail": "PATCH 400: {\"message\":\"addon_variant: Invalid input\"}",
+      "measurements": {
+        "patch_http": 400,
+        "patch_body": "{\"message\":\"addon_variant: Invalid input\"}",
+        "selected_while_attached": "compute_instance:ci_micro ipv4:ipv4_default"
+      },
+      "durationMs": 3770
+    }
+  ]
+}
