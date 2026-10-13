@@ -95,3 +95,34 @@ Projects:Read, consent approved via the localhost listener):
 The full Path B loop is now measured end to end: register (dashboard-only)
 -> authorize (422 client validation first) -> consent -> code -> token ->
 refresh rotates -> org-scoped access -> revoke kills instantly.
+
+## 2026-10-13 - O03 re-run for the explicit Data API grants (#128): fails before the grant runs
+
+Task 20 of `docs/plans/2026-10-13-lab-backlog-waves.md` added `grant select,
+insert, update, delete on table public.o03_docs to anon, authenticated,
+service_role` to O03c's setup SQL. Two runs, local vantage, Pro org,
+ap-southeast-1, run from source at lab commit b270a45, each project
+provisioned and deleted by the module. Artifacts are private (no
+`publish-evidence` target here): `evidence/20261013-114454/run-2026-10-13T03-44-55-057Z.json`
+and `evidence/20261013-114559/run-2026-10-13T03-45-59-555Z.json`.
+
+| Probe | 2026-10-13 (both runs) | 2026-08-18 |
+|---|---|---|
+| O03-control | pass, `provision_s` 12, auth config PATCH 200 | pass, 175 s, PATCH 200 |
+| O03a | admin user create 200 | info (client registered) |
+| O03b | FAIL: `flow failed: consent=404 token=0`; no `client_id` claim | pass: `client_id` present, aud=authenticated, scope=email |
+| O03c | skip: "no OAuth token" | visible_with_matching_client=1, hidden_with_other_client=1 |
+
+The grant statement never executed: O03c skips before its setup SQL, so this
+re-run says nothing about the #128 grants, and O03 no longer reproduces its
+2026-08-18 result. The 404 is from either the authorize call or the consent
+call: `runFlow` returns the authorize response's status in `consentStatus`
+when no `authorization_id` is found, and the artifact does not separate them.
+The routes still exist upstream (`GET /oauth/authorize`, `GET
+/oauth/authorizations/{authorization_id}`, `POST .../consent` in
+supabase/auth `internal/api/api.go` on the default branch, read 2026-10-13),
+and the authorization id is still lowercase base32, which the module's
+`[a-z0-9]+` match covers. One untested candidate: the flow starts within
+seconds of the auth config PATCH, and the module does not wait for the
+config to apply; with provisioning now reading healthy at the first 10 s
+poll, the whole run took 13-14 s. Cause not established.

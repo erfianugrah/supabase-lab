@@ -4,8 +4,8 @@
 
 > **W1 + Task 20 SHIPPED 2026-10-13 (commits: see git log).** Tasks 1-17
 > and 20 (Steps 1-3) done; Task 18 took its no-release fallback; Task 19
-> Steps 2-4 and Task 20 Step 4 are open. Deviations are noted under each
-> task.
+> Steps 2-4 done; Task 20 Step 4 ran 2026-10-13 with O03 and W12 still
+> unverified (note under the step). Deviations are noted under each task.
 >
 > **STATUS 2026-10-13: PLANNED.** Covers every open card on the
 > `work-supabase-lab` board (90 To-Do plus #127 In Review = 91; two non-lab
@@ -2671,7 +2671,21 @@ git add experiments/edge-resilience experiments/compute-disk/tests/d09-compute-r
 git commit -m "fix: explicit Data API grants on SQL-created tables before the 2026-10-30 default (#128)"
 ```
 
-- [ ] **Step 4 (live, W2 plan): re-run one module per changed experiment**
+- [x] **Step 4 (live, W2 plan): re-run one module per changed experiment**
+
+> **Done 2026-10-13 (partial; see the RUNLOG entries of the same date):**
+> no 401/403/42501 on the Data API in any run. M05, M01 (Pro org) and D09
+> (Pro org) match their last entries; the grants executed (M05 schema 201,
+> anon REST reads of `m01_payload` and `dpython_probe` answered). Z01 ran on a
+> production free-plan org (Pro cannot pause): seed with grant 201, zero
+> wakers over 52 reads; Z01e fails because the seeded `/advisors/security`
+> is now a silent degrader missing from `SILENT_DEGRADERS`. Not verified:
+> O03 fails at O03b (`consent=404`, 2 of 2 runs) before O03c's grant runs;
+> W12 not run, because edge-resilience's tofu state is empty and `make up`
+> provisions two projects and a Worker; T22 waits for #130. D09 surfaced an
+> outage-accounting gap in the module (compute-disk RUNLOG). Artifacts stay
+> in `evidence/` (none of the four experiments has a `publish-evidence`
+> target).
 
 Before 2026-10-30, on a PAT and the lab Pro org: edge-resilience W12 (one
 project), compute-disk D09, s2z-wake Z01 (about 35 min), usage-metering M01

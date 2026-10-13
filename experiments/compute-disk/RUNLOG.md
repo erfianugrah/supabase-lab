@@ -53,6 +53,40 @@ Reference: COMPUTE-DISK.md at repo root. Probes: `.pi/probe-compute-disk.sh D01[
   the quota; the second round caught the cooldown on the second attempt.
   Recorded as nondeterministic, not a clean pass/fail.
 
+## 2026-10-13 - D09 re-run after the explicit Data API grant (#128)
+
+Task 20 of `docs/plans/2026-10-13-lab-backlog-waves.md` appended `grant
+select, insert, update, delete on table public.dpython_probe to anon,
+authenticated, service_role` to the SQL that creates the table D09's REST
+sampler reads with the anon key. One run, local vantage, Pro org,
+ap-southeast-1, run from source at lab commit b270a45, project provisioned and
+deleted by the module. Artifact (private, no `publish-evidence` target):
+`evidence/20261013-114620/run-2026-10-13T03-46-20-408Z.json`.
+
+| Op | PATCH | `_s` | REST max outage | REST samples OK | Findings line above |
+|---|---|---|---|---|---|
+| micro -> small | accepted | 39 | 0 | 17 of 46 (37%) | 105 s, 1.0 s |
+| small -> large | 429 "try again in 3 minute(s)" | 61 | 15.063 s | 175 of 195 (89.7%) | 61 s, 17.0 s |
+| large -> small | 429 "... 2 minute(s)" | 61 | 0 | 244 of 244 | 61 s, 0 s |
+| small -> micro | 429 "... 1 minute(s)" | 63 | 0 | 250 of 250 | 73 s, 0 s |
+
+Auth `/auth/v1/health`: no outage in any op, as before. No 42501: the anon key
+read `dpython_probe` on the first 17 samples and on every sample of the last
+two ops, and a missing grant would fail every sample.
+
+Only the first PATCH was applied; the other three were refused by the addon
+rate limit the findings line already records. For a refused op the module
+still records a duration: it waits up to 60 s to see the project leave
+`ACTIVE_HEALTHY`, so 61-63 s is that wait, not a resize. The REST outage
+accounting has a gap: `PhaseStatsAccumulator` closes an outage only on the
+next success, so a run of failures still open when a phase ends is dropped.
+17 OK of 46 with a max outage of 0 means the 29 failures came after the last
+success of the micro -> small phase, and the 15.063 s in the next (refused)
+phase reads as the tail of the same outage. The findings-line figures
+(committed 2026-08-19 in c6e19da, also in AGENTS.md) carry the
+same pattern (61 s for two ops, 17.0 s outage on an op after the first) and
+may have the same cause; their artifact was not re-read here.
+
 ## 2026-10-05 - the spend cap does not gate a manual grow past 8 GB (D12)
 
 The database-size guide (Free Plan section) says to disable the spend cap for
