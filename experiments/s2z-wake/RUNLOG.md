@@ -457,3 +457,36 @@ the dashboard, which shows the figure directly.
 Two routes a caller may expect do not exist at all: `/v1/projects/{ref}/quota`
 and `/v1/projects/quota/active` are absent from the document, as is any `/v2`
 namespace. Checked 2026-09-23.
+
+## 2026-10-13 - Z01 re-run on a production free-plan org after the explicit grant (#128)
+
+Task 20 of `docs/plans/2026-10-13-lab-backlog-waves.md` appended `grant
+select, insert, update, delete on table public.z01_rls_off to anon,
+authenticated, service_role` to the advisor seed. One run, local vantage, run
+from source (harness unchanged since b270a45; the artifact stamps 315c0a6, a
+docs-only commit that landed mid-run), production control plane, free-plan
+org, ap-southeast-1. Free-plan because a Pro org cannot pause (`400 Project is
+not free-tier`, restore-paths key facts in AGENTS.md), so Z01c-Z01e need a
+pausable plan. The last Z01 run (2026-09-09) was a platform-plan org on the
+staging control plane. Project provisioned and deleted by the module.
+Artifact (private, no `publish-evidence` target):
+`evidence/20261013-115101/run-2026-10-13T03-51-01-878Z.json`.
+
+| Probe | 2026-10-13 | 2026-09-09 |
+|---|---|---|
+| Z01a | pass, healthy at the first status read, `nano` | pass, `nano` |
+| Z01b | 52 endpoints, 43 answered 200, 9 non-2xx; advisor seed (create table + grant) 201 | 52 endpoints |
+| Z01c | pause 200, `INACTIVE` in 62 s via PAUSING; data plane 540 | pause 53 s |
+| Z01d | no waker: all 52 reads left the project `INACTIVE`; 16 changed status code vs awake | `wakers=0` |
+| Z01e | FAIL: 4 silent degraders, 1 unexpected: `/advisors/security` | 3, the expected set |
+| Z01f | restore 200, healthy in 181 s via COMING_UP, RESTORING | restore 222 s |
+
+The seed did what the 2026-09-09 fix intended: `/advisors/security` answered
+200 with 618 bytes awake and 200 with 12 bytes (`{"lints":[]}` size) parked, so
+the security advisor now has a finding to lose. `SILENT_DEGRADERS` in
+`lib/surface.ts` still lists the three endpoints from before the seed existed,
+so Z01e reports the fourth as new. This is the first recorded module run since
+the seed was added. The other three degraders read as before: `/api-keys` 1524
+-> 2 bytes, `/config/database/pooler` 568 -> 2, `/advisors/performance` 590 ->
+12. No Data API request touches `z01_rls_off`; the grant's evidence is the
+seed's 201 and the advisor finding it produced.
