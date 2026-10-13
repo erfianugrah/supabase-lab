@@ -208,8 +208,9 @@ Reading the stall:
 - Earlier artifacts (`full1` (`out/2026-10-10/run-2026-10-10T01-06-52-479Z.json`), `final`, `final2`, `final3`, `final4`)
   were produced before the connect-error counters and the final MG08 lag
   existed; they are cited above only for the detection-time spread, the MG04
-  stall range and demotion, and the 5 s lag variant. None is published, so figures not in this file are not
-  citable.
+  stall range and demotion, and the 5 s lag variant. All five are published
+  redacted beside run5 (see Run files), so their figures are citable from
+  those artifacts.
 
 ## Run files
 
