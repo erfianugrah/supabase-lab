@@ -2,6 +2,16 @@ ROOT := $(abspath ../..)
 VARS := -var-file=$(ROOT)/secrets.tfvars -var-file=experiment.tfvars
 TS := $(shell date +%Y%m%d-%H%M%S)
 
+# The harness build is linux-x64 only; elsewhere run the same entry from source
+# (the governed-starter-kit Makefile's switch).
+ifeq ($(shell uname -s),Linux)
+RUNNER := $(ROOT)/harness/dist/pvlab
+BUILD  := cd $(ROOT)/harness && bun run build >/dev/null
+else
+RUNNER := bun $(ROOT)/harness/src/run.ts
+BUILD  := cd $(ROOT)/harness && bun scripts/gen-registry.ts >/dev/null
+endif
+
 # A project ref is 20 lowercase letters. Filtering on that SHAPE is what makes
 # the `test -n` guard below actually fire: with no state, `tofu output -raw`
 # prints its "No outputs found" warning to STDOUT, which is not empty, so a
@@ -31,7 +41,7 @@ PW := $(shell grep -E '^db_password' $(ROOT)/secrets.tfvars 2>/dev/null | cut -d
 ONLY ?= D01,D02
 RUNNER_FLAGS ?=
 
-.PHONY: init fmt validate apply probe probe-destructive destroy
+.PHONY: init fmt validate apply probe probe-destructive publish-evidence destroy
 
 init:
 	tofu init
@@ -53,14 +63,14 @@ probe:
 	@test -n "$(TOK)" || (echo "no PAT - export SUPABASE_ACCESS_TOKEN or run 'make secrets-decrypt' at the root"; exit 1)
 	@case "$(TOK)" in *REPLACE_ME*) echo "PAT is the committed placeholder - export SUPABASE_ACCESS_TOKEN"; exit 1;; esac
 	@test -n "$(ONLY)" || (echo "refusing to run with an empty ONLY - see the comment above"; exit 1)
-	@cd $(ROOT)/harness && bun run build >/dev/null
+	@$(BUILD)
 	@mkdir -p evidence/$(TS)
 	@anon=$$(curl -s -H "Authorization: Bearer $(TOK)" \
 		"https://api.supabase.com/v1/projects/$(REF)/api-keys" \
 		| jq -r '.[] | select(.name=="anon") | .api_key' | head -1); \
 	test -n "$$anon" || (echo "could not fetch the anon key"; exit 1); \
 	PVLAB_REF="$(REF)" SUPABASE_ACCESS_TOKEN="$(TOK)" SUPABASE_ANON_KEY="$$anon" DB_PASSWORD="$(PW)" \
-		$(ROOT)/harness/dist/pvlab --where local --experiment platform-downtime \
+		$(RUNNER) --where local --experiment platform-downtime \
 		--only $(ONLY) $(RUNNER_FLAGS) --out evidence/$(TS)
 	@echo "== evidence/$(TS)/ =="
 
@@ -68,6 +78,11 @@ probe:
 # bare `make probe` can never take it down by accident.
 probe-destructive:
 	@$(MAKE) probe RUNNER_FLAGS=--destructive
+
+# Redacted copy + facts table into out/<date>/ - what RUNLOG and docs cite.
+publish-evidence:
+	@test -n "$(RUN)" || (echo "RUN=evidence/<ts>/run-<stamp>.json required"; exit 1)
+	@cd $(ROOT)/harness && bun scripts/publish-evidence.ts $(abspath $(RUN)) $(abspath .) $(if $(PUBLISH_ONLY),--only $(PUBLISH_ONLY),)
 
 destroy:
 	@tofu plan -destroy $(VARS) -var="supabase_access_token=$(TOK)" -out=tfplan-destroy
