@@ -33,3 +33,10 @@ down:
 	@mkdir -p evidence/$(TS)
 	@PVLAB_ENDPOINT_CUSTOM_DOMAIN="$(DOMAIN)" \
 		$(RUNNER) --where local --experiment hostname-path --destructive --only HP09 --out evidence/$(TS)
+
+.PHONY: publish-evidence
+
+# Redacted copy of a run artifact plus its facts.md into out/<date>/ (committed).
+publish-evidence:
+	@test -n "$(RUN)" || (echo "RUN=evidence/<ts>/run-<stamp>.json required"; exit 1)
+	@cd $(ROOT)/harness && bun scripts/publish-evidence.ts $(abspath $(RUN)) $(abspath .) $(if $(PUBLISH_ONLY),--only $(PUBLISH_ONLY),)
