@@ -1,0 +1,668 @@
+{
+  "startedAt": "2026-10-10T00:36:30.860Z",
+  "finishedAt": "2026-10-10T00:45:05.162Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "observability-surface",
+  "labCommit": "70e4244",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "OB01a 2.111.0/unbundled",
+      "title": "OB01a: 2.111.0/unbundled",
+      "status": "info",
+      "detail": "rest=traceparent fn=traceparent own-third-party-url=traceparent wrapped-third-party=none",
+      "measurements": {
+        "rest_headers": "traceparent",
+        "fn_headers": "traceparent",
+        "client_on_third_party_url": "traceparent",
+        "wrapped_fetch_third_party": "none",
+        "wrapped_fetch_xsupabase_co": "none",
+        "wrapped_fetch_supabase_co_suffix_host": "none",
+        "wrapped_fetch_other_supabase_co_project": "traceparent",
+        "no_span_headers": "none",
+        "fn_received_client_trace_id": "yes",
+        "rest_status": 200,
+        "fn_error": "none",
+        "warnings": "none"
+      },
+      "durationMs": 514300
+    },
+    {
+      "id": "OB01a 2.111.0/bun-tree",
+      "title": "OB01a: 2.111.0/bun-tree",
+      "status": "info",
+      "detail": "rest=traceparent fn=traceparent own-third-party-url=traceparent wrapped-third-party=none",
+      "measurements": {
+        "rest_headers": "traceparent",
+        "fn_headers": "traceparent",
+        "client_on_third_party_url": "traceparent",
+        "wrapped_fetch_third_party": "none",
+        "wrapped_fetch_xsupabase_co": "none",
+        "wrapped_fetch_supabase_co_suffix_host": "none",
+        "wrapped_fetch_other_supabase_co_project": "traceparent",
+        "no_span_headers": "none",
+        "fn_received_client_trace_id": "yes",
+        "rest_status": 200,
+        "fn_error": "none",
+        "warnings": "none"
+      },
+      "durationMs": 514300
+    },
+    {
+      "id": "OB01a 2.111.0/bun-detached",
+      "title": "OB01a: 2.111.0/bun-detached",
+      "status": "info",
+      "detail": "rest=none fn=none own-third-party-url=none wrapped-third-party=none",
+      "measurements": {
+        "rest_headers": "none",
+        "fn_headers": "none",
+        "client_on_third_party_url": "none",
+        "wrapped_fetch_third_party": "none",
+        "wrapped_fetch_xsupabase_co": "none",
+        "wrapped_fetch_supabase_co_suffix_host": "none",
+        "wrapped_fetch_other_supabase_co_project": "none",
+        "no_span_headers": "none",
+        "fn_received_client_trace_id": "no",
+        "rest_status": 200,
+        "fn_error": "none",
+        "warnings": "none"
+      },
+      "durationMs": 514300
+    },
+    {
+      "id": "OB01a 2.111.0/esbuild-tree",
+      "title": "OB01a: 2.111.0/esbuild-tree",
+      "status": "info",
+      "detail": "rest=traceparent fn=traceparent own-third-party-url=traceparent wrapped-third-party=none",
+      "measurements": {
+        "rest_headers": "traceparent",
+        "fn_headers": "traceparent",
+        "client_on_third_party_url": "traceparent",
+        "wrapped_fetch_third_party": "none",
+        "wrapped_fetch_xsupabase_co": "none",
+        "wrapped_fetch_supabase_co_suffix_host": "none",
+        "wrapped_fetch_other_supabase_co_project": "traceparent",
+        "no_span_headers": "none",
+        "fn_received_client_trace_id": "yes",
+        "rest_status": 200,
+        "fn_error": "none",
+        "warnings": "none"
+      },
+      "durationMs": 514300
+    },
+    {
+      "id": "OB01a 2.111.0/esbuild-detached",
+      "title": "OB01a: 2.111.0/esbuild-detached",
+      "status": "info",
+      "detail": "rest=none fn=none own-third-party-url=none wrapped-third-party=none",
+      "measurements": {
+        "rest_headers": "none",
+        "fn_headers": "none",
+        "client_on_third_party_url": "none",
+        "wrapped_fetch_third_party": "none",
+        "wrapped_fetch_xsupabase_co": "none",
+        "wrapped_fetch_supabase_co_suffix_host": "none",
+        "wrapped_fetch_other_supabase_co_project": "none",
+        "no_span_headers": "none",
+        "fn_received_client_trace_id": "no",
+        "rest_status": 200,
+        "fn_error": "none",
+        "warnings": "none"
+      },
+      "durationMs": 514300
+    },
+    {
+      "id": "OB01a 2.112.0/unbundled",
+      "title": "OB01a: 2.112.0/unbundled",
+      "status": "info",
+      "detail": "rest=traceparent fn=traceparent own-third-party-url=traceparent wrapped-third-party=none",
+      "measurements": {
+        "rest_headers": "traceparent",
+        "fn_headers": "traceparent",
+        "client_on_third_party_url": "traceparent",
+        "wrapped_fetch_third_party": "none",
+        "wrapped_fetch_xsupabase_co": "none",
+        "wrapped_fetch_supabase_co_suffix_host": "none",
+        "wrapped_fetch_other_supabase_co_project": "traceparent",
+        "no_span_headers": "none",
+        "fn_received_client_trace_id": "yes",
+        "rest_status": 200,
+        "fn_error": "none",
+        "warnings": "none"
+      },
+      "durationMs": 514300
+    },
+    {
+      "id": "OB01a 2.112.0/bun-tree",
+      "title": "OB01a: 2.112.0/bun-tree",
+      "status": "info",
+      "detail": "rest=traceparent fn=traceparent own-third-party-url=traceparent wrapped-third-party=none",
+      "measurements": {
+        "rest_headers": "traceparent",
+        "fn_headers": "traceparent",
+        "client_on_third_party_url": "traceparent",
+        "wrapped_fetch_third_party": "none",
+        "wrapped_fetch_xsupabase_co": "none",
+        "wrapped_fetch_supabase_co_suffix_host": "none",
+        "wrapped_fetch_other_supabase_co_project": "traceparent",
+        "no_span_headers": "none",
+        "fn_received_client_trace_id": "yes",
+        "rest_status": 200,
+        "fn_error": "none",
+        "warnings": "none"
+      },
+      "durationMs": 514300
+    },
+    {
+      "id": "OB01a 2.112.0/bun-detached",
+      "title": "OB01a: 2.112.0/bun-detached",
+      "status": "info",
+      "detail": "rest=traceparent fn=traceparent own-third-party-url=traceparent wrapped-third-party=none",
+      "measurements": {
+        "rest_headers": "traceparent",
+        "fn_headers": "traceparent",
+        "client_on_third_party_url": "traceparent",
+        "wrapped_fetch_third_party": "none",
+        "wrapped_fetch_xsupabase_co": "none",
+        "wrapped_fetch_supabase_co_suffix_host": "none",
+        "wrapped_fetch_other_supabase_co_project": "traceparent",
+        "no_span_headers": "none",
+        "fn_received_client_trace_id": "yes",
+        "rest_status": 200,
+        "fn_error": "none",
+        "warnings": "none"
+      },
+      "durationMs": 514300
+    },
+    {
+      "id": "OB01a 2.112.0/esbuild-tree",
+      "title": "OB01a: 2.112.0/esbuild-tree",
+      "status": "info",
+      "detail": "rest=traceparent fn=traceparent own-third-party-url=traceparent wrapped-third-party=none",
+      "measurements": {
+        "rest_headers": "traceparent",
+        "fn_headers": "traceparent",
+        "client_on_third_party_url": "traceparent",
+        "wrapped_fetch_third_party": "none",
+        "wrapped_fetch_xsupabase_co": "none",
+        "wrapped_fetch_supabase_co_suffix_host": "none",
+        "wrapped_fetch_other_supabase_co_project": "traceparent",
+        "no_span_headers": "none",
+        "fn_received_client_trace_id": "yes",
+        "rest_status": 200,
+        "fn_error": "none",
+        "warnings": "none"
+      },
+      "durationMs": 514300
+    },
+    {
+      "id": "OB01a 2.112.0/esbuild-detached",
+      "title": "OB01a: 2.112.0/esbuild-detached",
+      "status": "info",
+      "detail": "rest=traceparent fn=traceparent own-third-party-url=traceparent wrapped-third-party=none",
+      "measurements": {
+        "rest_headers": "traceparent",
+        "fn_headers": "traceparent",
+        "client_on_third_party_url": "traceparent",
+        "wrapped_fetch_third_party": "none",
+        "wrapped_fetch_xsupabase_co": "none",
+        "wrapped_fetch_supabase_co_suffix_host": "none",
+        "wrapped_fetch_other_supabase_co_project": "traceparent",
+        "no_span_headers": "none",
+        "fn_received_client_trace_id": "yes",
+        "rest_status": 200,
+        "fn_error": "none",
+        "warnings": "none"
+      },
+      "durationMs": 514300
+    },
+    {
+      "id": "OB01a 2.117.3/unbundled",
+      "title": "OB01a: 2.117.3/unbundled",
+      "status": "info",
+      "detail": "rest=traceparent fn=traceparent own-third-party-url=traceparent wrapped-third-party=none",
+      "measurements": {
+        "rest_headers": "traceparent",
+        "fn_headers": "traceparent",
+        "client_on_third_party_url": "traceparent",
+        "wrapped_fetch_third_party": "none",
+        "wrapped_fetch_xsupabase_co": "none",
+        "wrapped_fetch_supabase_co_suffix_host": "none",
+        "wrapped_fetch_other_supabase_co_project": "traceparent",
+        "no_span_headers": "none",
+        "fn_received_client_trace_id": "yes",
+        "rest_status": 200,
+        "fn_error": "none",
+        "warnings": "none"
+      },
+      "durationMs": 514300
+    },
+    {
+      "id": "OB01a 2.117.3/bun-tree",
+      "title": "OB01a: 2.117.3/bun-tree",
+      "status": "info",
+      "detail": "rest=traceparent fn=traceparent own-third-party-url=traceparent wrapped-third-party=none",
+      "measurements": {
+        "rest_headers": "traceparent",
+        "fn_headers": "traceparent",
+        "client_on_third_party_url": "traceparent",
+        "wrapped_fetch_third_party": "none",
+        "wrapped_fetch_xsupabase_co": "none",
+        "wrapped_fetch_supabase_co_suffix_host": "none",
+        "wrapped_fetch_other_supabase_co_project": "traceparent",
+        "no_span_headers": "none",
+        "fn_received_client_trace_id": "yes",
+        "rest_status": 200,
+        "fn_error": "none",
+        "warnings": "none"
+      },
+      "durationMs": 514300
+    },
+    {
+      "id": "OB01a 2.117.3/bun-detached",
+      "title": "OB01a: 2.117.3/bun-detached",
+      "status": "info",
+      "detail": "rest=traceparent fn=traceparent own-third-party-url=traceparent wrapped-third-party=none",
+      "measurements": {
+        "rest_headers": "traceparent",
+        "fn_headers": "traceparent",
+        "client_on_third_party_url": "traceparent",
+        "wrapped_fetch_third_party": "none",
+        "wrapped_fetch_xsupabase_co": "none",
+        "wrapped_fetch_supabase_co_suffix_host": "none",
+        "wrapped_fetch_other_supabase_co_project": "traceparent",
+        "no_span_headers": "none",
+        "fn_received_client_trace_id": "yes",
+        "rest_status": 200,
+        "fn_error": "none",
+        "warnings": "none"
+      },
+      "durationMs": 514300
+    },
+    {
+      "id": "OB01a 2.117.3/esbuild-tree",
+      "title": "OB01a: 2.117.3/esbuild-tree",
+      "status": "info",
+      "detail": "rest=traceparent fn=traceparent own-third-party-url=traceparent wrapped-third-party=none",
+      "measurements": {
+        "rest_headers": "traceparent",
+        "fn_headers": "traceparent",
+        "client_on_third_party_url": "traceparent",
+        "wrapped_fetch_third_party": "none",
+        "wrapped_fetch_xsupabase_co": "none",
+        "wrapped_fetch_supabase_co_suffix_host": "none",
+        "wrapped_fetch_other_supabase_co_project": "traceparent",
+        "no_span_headers": "none",
+        "fn_received_client_trace_id": "yes",
+        "rest_status": 200,
+        "fn_error": "none",
+        "warnings": "none"
+      },
+      "durationMs": 514300
+    },
+    {
+      "id": "OB01a 2.117.3/esbuild-detached",
+      "title": "OB01a: 2.117.3/esbuild-detached",
+      "status": "info",
+      "detail": "rest=traceparent fn=traceparent own-third-party-url=traceparent wrapped-third-party=none",
+      "measurements": {
+        "rest_headers": "traceparent",
+        "fn_headers": "traceparent",
+        "client_on_third_party_url": "traceparent",
+        "wrapped_fetch_third_party": "none",
+        "wrapped_fetch_xsupabase_co": "none",
+        "wrapped_fetch_supabase_co_suffix_host": "none",
+        "wrapped_fetch_other_supabase_co_project": "traceparent",
+        "no_span_headers": "none",
+        "fn_received_client_trace_id": "yes",
+        "rest_status": 200,
+        "fn_error": "none",
+        "warnings": "none"
+      },
+      "durationMs": 514300
+    },
+    {
+      "id": "OB01a 2.112.0/no-tracing-import",
+      "title": "OB01a: 2.112.0/no-tracing-import",
+      "status": "info",
+      "detail": "rest=none fn=none own-third-party-url=none wrapped-third-party=none",
+      "measurements": {
+        "rest_headers": "none",
+        "fn_headers": "none",
+        "client_on_third_party_url": "none",
+        "wrapped_fetch_third_party": "none",
+        "wrapped_fetch_xsupabase_co": "none",
+        "wrapped_fetch_supabase_co_suffix_host": "none",
+        "wrapped_fetch_other_supabase_co_project": "none",
+        "no_span_headers": "none",
+        "fn_received_client_trace_id": "no",
+        "rest_status": 200,
+        "fn_error": "none",
+        "warnings": "@supabase/supabase-js: tracePropagation is enabled but the tracing runtime is not loaded, so trace headers will not be attached. Add `import '@supabase/supabase"
+      },
+      "durationMs": 514300
+    },
+    {
+      "id": "OB01a 2.112.0/unsampled",
+      "title": "OB01a: 2.112.0/unsampled",
+      "status": "info",
+      "detail": "rest=none fn=none own-third-party-url=none wrapped-third-party=none",
+      "measurements": {
+        "rest_headers": "none",
+        "fn_headers": "none",
+        "client_on_third_party_url": "none",
+        "wrapped_fetch_third_party": "none",
+        "wrapped_fetch_xsupabase_co": "none",
+        "wrapped_fetch_supabase_co_suffix_host": "none",
+        "wrapped_fetch_other_supabase_co_project": "none",
+        "no_span_headers": "none",
+        "fn_received_client_trace_id": "no",
+        "rest_status": 200,
+        "fn_error": "none",
+        "warnings": "none"
+      },
+      "durationMs": 514300
+    },
+    {
+      "id": "OB01a 2.117.3/unsampled",
+      "title": "OB01a: 2.117.3/unsampled",
+      "status": "info",
+      "detail": "rest=traceparent fn=traceparent own-third-party-url=traceparent wrapped-third-party=none",
+      "measurements": {
+        "rest_headers": "traceparent",
+        "fn_headers": "traceparent",
+        "client_on_third_party_url": "traceparent",
+        "wrapped_fetch_third_party": "none",
+        "wrapped_fetch_xsupabase_co": "none",
+        "wrapped_fetch_supabase_co_suffix_host": "none",
+        "wrapped_fetch_other_supabase_co_project": "traceparent",
+        "no_span_headers": "none",
+        "fn_received_client_trace_id": "yes",
+        "rest_status": 200,
+        "fn_error": "none",
+        "warnings": "none"
+      },
+      "durationMs": 514300
+    },
+    {
+      "id": "OB01a 2.117.3/tracePropagation-off",
+      "title": "OB01a: 2.117.3/tracePropagation-off",
+      "status": "info",
+      "detail": "rest=none fn=none own-third-party-url=none wrapped-third-party=none",
+      "measurements": {
+        "rest_headers": "none",
+        "fn_headers": "none",
+        "client_on_third_party_url": "none",
+        "wrapped_fetch_third_party": "none",
+        "wrapped_fetch_xsupabase_co": "none",
+        "wrapped_fetch_supabase_co_suffix_host": "none",
+        "wrapped_fetch_other_supabase_co_project": "none",
+        "no_span_headers": "none",
+        "fn_received_client_trace_id": "no",
+        "rest_status": 200,
+        "fn_error": "none",
+        "warnings": "none"
+      },
+      "durationMs": 514300
+    },
+    {
+      "id": "OB01b 2.111.0/unbundled",
+      "title": "OB01b: 2.111.0/unbundled trace ids in logs",
+      "status": "info",
+      "measurements": {
+        "rest_sources": "none",
+        "fn_sources": "none",
+        "third_sources": "none"
+      },
+      "detail": "last logs error: {\"message\":\"Failed to get project's logs\"}",
+      "durationMs": 514300
+    },
+    {
+      "id": "OB01b 2.111.0/bun-tree",
+      "title": "OB01b: 2.111.0/bun-tree trace ids in logs",
+      "status": "info",
+      "measurements": {
+        "rest_sources": "none",
+        "fn_sources": "none",
+        "third_sources": "none"
+      },
+      "detail": "last logs error: {\"message\":\"Failed to get project's logs\"}",
+      "durationMs": 514300
+    },
+    {
+      "id": "OB01b 2.111.0/bun-detached",
+      "title": "OB01b: 2.111.0/bun-detached trace ids in logs",
+      "status": "info",
+      "measurements": {
+        "rest_sources": "none",
+        "fn_sources": "none",
+        "third_sources": "none"
+      },
+      "detail": "last logs error: {\"message\":\"Failed to get project's logs\"}",
+      "durationMs": 514300
+    },
+    {
+      "id": "OB01b 2.111.0/esbuild-tree",
+      "title": "OB01b: 2.111.0/esbuild-tree trace ids in logs",
+      "status": "info",
+      "measurements": {
+        "rest_sources": "none",
+        "fn_sources": "none",
+        "third_sources": "none"
+      },
+      "detail": "last logs error: {\"message\":\"Failed to get project's logs\"}",
+      "durationMs": 514300
+    },
+    {
+      "id": "OB01b 2.111.0/esbuild-detached",
+      "title": "OB01b: 2.111.0/esbuild-detached trace ids in logs",
+      "status": "info",
+      "measurements": {
+        "rest_sources": "none",
+        "fn_sources": "none",
+        "third_sources": "none"
+      },
+      "detail": "last logs error: {\"message\":\"Failed to get project's logs\"}",
+      "durationMs": 514300
+    },
+    {
+      "id": "OB01b 2.112.0/unbundled",
+      "title": "OB01b: 2.112.0/unbundled trace ids in logs",
+      "status": "info",
+      "measurements": {
+        "rest_sources": "none",
+        "fn_sources": "none",
+        "third_sources": "none"
+      },
+      "detail": "last logs error: {\"message\":\"Failed to get project's logs\"}",
+      "durationMs": 514300
+    },
+    {
+      "id": "OB01b 2.112.0/bun-tree",
+      "title": "OB01b: 2.112.0/bun-tree trace ids in logs",
+      "status": "info",
+      "measurements": {
+        "rest_sources": "none",
+        "fn_sources": "none",
+        "third_sources": "none"
+      },
+      "detail": "last logs error: {\"message\":\"Failed to get project's logs\"}",
+      "durationMs": 514300
+    },
+    {
+      "id": "OB01b 2.112.0/bun-detached",
+      "title": "OB01b: 2.112.0/bun-detached trace ids in logs",
+      "status": "info",
+      "measurements": {
+        "rest_sources": "none",
+        "fn_sources": "none",
+        "third_sources": "none"
+      },
+      "detail": "last logs error: {\"message\":\"Failed to get project's logs\"}",
+      "durationMs": 514300
+    },
+    {
+      "id": "OB01b 2.112.0/esbuild-tree",
+      "title": "OB01b: 2.112.0/esbuild-tree trace ids in logs",
+      "status": "info",
+      "measurements": {
+        "rest_sources": "none",
+        "fn_sources": "none",
+        "third_sources": "none"
+      },
+      "detail": "last logs error: {\"message\":\"Failed to get project's logs\"}",
+      "durationMs": 514300
+    },
+    {
+      "id": "OB01b 2.112.0/esbuild-detached",
+      "title": "OB01b: 2.112.0/esbuild-detached trace ids in logs",
+      "status": "info",
+      "measurements": {
+        "rest_sources": "none",
+        "fn_sources": "none",
+        "third_sources": "none"
+      },
+      "detail": "last logs error: {\"message\":\"Failed to get project's logs\"}",
+      "durationMs": 514300
+    },
+    {
+      "id": "OB01b 2.117.3/unbundled",
+      "title": "OB01b: 2.117.3/unbundled trace ids in logs",
+      "status": "info",
+      "measurements": {
+        "rest_sources": "none",
+        "fn_sources": "none",
+        "third_sources": "none"
+      },
+      "detail": "last logs error: {\"message\":\"Failed to get project's logs\"}",
+      "durationMs": 514300
+    },
+    {
+      "id": "OB01b 2.117.3/bun-tree",
+      "title": "OB01b: 2.117.3/bun-tree trace ids in logs",
+      "status": "info",
+      "measurements": {
+        "rest_sources": "none",
+        "fn_sources": "none",
+        "third_sources": "none"
+      },
+      "detail": "last logs error: {\"message\":\"Failed to get project's logs\"}",
+      "durationMs": 514300
+    },
+    {
+      "id": "OB01b 2.117.3/bun-detached",
+      "title": "OB01b: 2.117.3/bun-detached trace ids in logs",
+      "status": "info",
+      "measurements": {
+        "rest_sources": "none",
+        "fn_sources": "none",
+        "third_sources": "none"
+      },
+      "detail": "last logs error: {\"message\":\"Failed to get project's logs\"}",
+      "durationMs": 514300
+    },
+    {
+      "id": "OB01b 2.117.3/esbuild-tree",
+      "title": "OB01b: 2.117.3/esbuild-tree trace ids in logs",
+      "status": "info",
+      "measurements": {
+        "rest_sources": "none",
+        "fn_sources": "none",
+        "third_sources": "none"
+      },
+      "detail": "last logs error: {\"message\":\"Failed to get project's logs\"}",
+      "durationMs": 514300
+    },
+    {
+      "id": "OB01b 2.117.3/esbuild-detached",
+      "title": "OB01b: 2.117.3/esbuild-detached trace ids in logs",
+      "status": "info",
+      "measurements": {
+        "rest_sources": "none",
+        "fn_sources": "none",
+        "third_sources": "none"
+      },
+      "detail": "last logs error: {\"message\":\"Failed to get project's logs\"}",
+      "durationMs": 514300
+    },
+    {
+      "id": "OB01b 2.112.0/no-tracing-import",
+      "title": "OB01b: 2.112.0/no-tracing-import trace ids in logs",
+      "status": "info",
+      "measurements": {
+        "rest_sources": "none",
+        "fn_sources": "none",
+        "third_sources": "none"
+      },
+      "detail": "last logs error: {\"message\":\"Failed to get project's logs\"}",
+      "durationMs": 514300
+    },
+    {
+      "id": "OB01b 2.112.0/unsampled",
+      "title": "OB01b: 2.112.0/unsampled trace ids in logs",
+      "status": "info",
+      "measurements": {
+        "rest_sources": "none",
+        "fn_sources": "none",
+        "third_sources": "none"
+      },
+      "detail": "last logs error: {\"message\":\"Failed to get project's logs\"}",
+      "durationMs": 514300
+    },
+    {
+      "id": "OB01b 2.117.3/unsampled",
+      "title": "OB01b: 2.117.3/unsampled trace ids in logs",
+      "status": "info",
+      "measurements": {
+        "rest_sources": "none",
+        "fn_sources": "none",
+        "third_sources": "none"
+      },
+      "detail": "last logs error: {\"message\":\"Failed to get project's logs\"}",
+      "durationMs": 514300
+    },
+    {
+      "id": "OB01b 2.117.3/tracePropagation-off",
+      "title": "OB01b: 2.117.3/tracePropagation-off trace ids in logs",
+      "status": "info",
+      "measurements": {
+        "rest_sources": "none",
+        "fn_sources": "none",
+        "third_sources": "none"
+      },
+      "detail": "last logs error: {\"message\":\"Failed to get project's logs\"}",
+      "durationMs": 514300
+    },
+    {
+      "id": "OB01d",
+      "title": "OB01d: log sources that carry a trace_id attribute",
+      "status": "info",
+      "measurements": {
+        "realtime_logs": "0 of 3",
+        "postgrest_logs": "0 of 107",
+        "function_edge_logs": "0 of 20",
+        "storage_logs": "0 of 3",
+        "pgbouncer_logs": "0 of 76",
+        "postgres_logs": "0 of 15",
+        "auth_logs": "0 of 43",
+        "function_logs": "0 of 60",
+        "edge_logs": "38 of 38"
+      },
+      "durationMs": 514300
+    },
+    {
+      "id": "OB01",
+      "title": "OB01 complete",
+      "status": "info",
+      "detail": "19 variants, 57 trace ids, first log hit -1 ms after first client run",
+      "durationMs": 514300
+    }
+  ]
+}

@@ -1,0 +1,94 @@
+{
+  "startedAt": "2026-10-10T00:59:15.215Z",
+  "finishedAt": "2026-10-10T00:59:33.181Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "observability-surface",
+  "labCommit": "70e4244",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "OB05a",
+      "title": "OB05a: create a notebook with markdown, database and log cells through the API",
+      "status": "pass",
+      "measurements": {
+        "create_status": 201,
+        "cells": 3,
+        "ids_assigned": "true",
+        "cli_version": "2.120.0"
+      },
+      "durationMs": 17966
+    },
+    {
+      "id": "OB05b",
+      "title": "OB05b: pull writes the project notebook to supabase/notebooks/",
+      "status": "pass",
+      "detail": "Pulled 1 notebook(s) into <tmp>/supabase/notebooks",
+      "measurements": {
+        "exit": 0,
+        "files": "ob05-alpha.json",
+        "top_level_keys": "description,favorite,content",
+        "cells_equal_api": "true"
+      },
+      "durationMs": 17966
+    },
+    {
+      "id": "OB05c",
+      "title": "OB05c: push an edited file (one sql changed, one cell appended without id)",
+      "status": "pass",
+      "detail": "Pushed 1 notebook(s) to <ref> (0 created, 1 updated)",
+      "measurements": {
+        "exit": 0,
+        "cells_after": 4,
+        "edited_sql_after": "select 2 as two",
+        "original_ids_kept": "true",
+        "new_cell_has_id": "true",
+        "updated_by": "present",
+        "notebooks_on_project": 1
+      },
+      "durationMs": 17966
+    },
+    {
+      "id": "OB05d",
+      "title": "OB05d: pull on an unchanged tree, then pull <id> over a locally edited file",
+      "status": "info",
+      "detail": "No notebooks to pull. Kept 1 existing local notebook(s) unchanged. || Pulled 1 notebook(s) into <tmp>/supabase/notebooks",
+      "measurements": {
+        "second_pull_exit": 0,
+        "second_pull_same_files": "true",
+        "id_pull_exit": 0,
+        "id_pull_replaced_local_edit": "true"
+      },
+      "durationMs": 17966
+    },
+    {
+      "id": "OB05e",
+      "title": "OB05e: a new local notebook file is created on the project by push",
+      "status": "pass",
+      "detail": "│ ◇ Listing notebooks... │ ◇ Updating notebook ob05-alpha... Pushed 2 notebook(s) to <ref> (1 created, 1 updated)",
+      "measurements": {
+        "exit": 0,
+        "names_on_project": "ob05-alpha,ob05-beta"
+      },
+      "durationMs": 17966
+    },
+    {
+      "id": "OB05f",
+      "title": "OB05f: push --yes with a project notebook the directory does not have",
+      "status": "info",
+      "detail": "Pushed 1 notebook(s) to <ref> (0 created, 1 updated) 1 project notebook(s) are not in <tmp>/supabase/notebooks: • ob05-alpha Left alone — rerun interactively to resolve.",
+      "measurements": {
+        "exit": 0,
+        "alpha_still_on_project": "true",
+        "names_on_project": "ob05-alpha,ob05-beta"
+      },
+      "durationMs": 17966
+    }
+  ]
+}
