@@ -27,6 +27,31 @@ Makefile), `5a6cb4c` (sharp override) and two `db_password` rotations.
   `npm install` meets an npm lockfile), `live-app-prep` 28 s; 63 paths
   staged, no commit. Kit left up.
 
+### Live segment, third rehearsal (same day)
+
+- Agent run 6 min 31 s (the session's own timer). Design: `equipment` /
+  `loans`, an exclusion constraint on approved loans with overlapping
+  `daterange(start_date, end_date)`, column grants for insert and update,
+  invoker triggers that stamp `decided_by`, `decided_at` and `returned_at`,
+  `decide_loan(loan_id, decision, note)` and `return_loan(loan_id)` as
+  SECURITY INVOKER, a `security_invoker` view `equipment_availability`.
+  Four migrations; 38 checks in a rolled-back transaction, per its report.
+- The agent could not resolve `kit-live.erfi.dev` through the system
+  resolver after its deploy and reached it by pinning the Cloudflare IP
+  (`/auth/login` 200, `/protected` 307). From the operator shell a few
+  minutes later the system resolver answered and `/auth/login` was 200.
+  Same negative-cache pattern as the 2026-10-09 run.
+- Outside checks: 16 of 16 API checks (`loan-attacks` adapted to this
+  schema). Dave (Marketing manager) calling `decide_loan` on a Sales loan got
+  HTTP 500 with `P0002` "Loan request not found": refused, but as a 500,
+  because the function raises `no_data_found`. Headless sign-in on the public
+  URL: alice and bob see Sales equipment, bob gets Add and Retire and his own
+  pending request is absent from his decision queue, carol sees no Sales
+  rows, `/auth/sign-up` 404.
+- Reset: Worker deleted (hostname 530 afterwards), `live-reset APPLY=1`
+  dropped 9 objects (users=4 kept), the rehearsal workspace moved off `~`,
+  a fresh workspace scaffolded and prepped, 63 paths staged.
+
 ## 2026-10-10 - app MCP server block (K06) and MCP confirmations (K07)
 
 Vantage: operator laptop (macOS), Bun 1.3.14, supabase CLI 2.120.0, Claude
