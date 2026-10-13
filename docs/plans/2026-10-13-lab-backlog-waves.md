@@ -2442,7 +2442,14 @@ vkctl mv work-supabase-lab#172 work-supabase-lab#131 work-supabase-lab#132 work-
 Add #151, #86, #87 to that list only if their tasks completed (not their
 fallbacks).
 
-- [ ] **Step 4: Lexicanum re-cite (separate repo, separate commit; not part of this plan's execution)**
+- [x] **Step 4: Lexicanum re-cite (separate repo, separate commit; not part of this plan's execution)**
+
+> Done 2026-10-13 in lexicanum 7a99147: 97 rows on 20 pages link the
+> facts.md published at b237121 (76 files, all verified to exist). Unpublished
+> modules unchanged (SP04, M03, M07, I01-I03, K06, K07). audit-trail-integrity
+> and multi-tenant-placement had no rows for these experiments. Older
+> experiments with out/ but no row links (client-retries, mgmt-api-faults,
+> edge-runtime-auth, platform-downtime, ...): lexicanum#28.
 
 In `~/lexicanum`, replace "not published" / evidence-label cells with links of
 the form `https://github.com/erfianugrah/supabase-lab/blob/<pushed short sha>/experiments/<name>/out/<date>/run-<stamp>.facts.md`
