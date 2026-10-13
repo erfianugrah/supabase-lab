@@ -330,7 +330,7 @@ left-behind K06 project. Check after the last run: a read-only `GET
 - `make bff-deploy`, `make fn-secret`, then `make probe`: 52 pass, 0 fail,
   0 skip in 132 s. K05's first call after the deploy: the function's own
   502 in 3015 ms, all upstreams at the 800 ms timeout (fifth of five fresh
-  deploys). Artifact `evidence/20261009-111031/`.
+  deploys). Artifact `out/2026-10-09/run-2026-10-09T03-10-31-406Z.json`.
 - App UI walk (headless, local dev server): 7 of 7; the assistant answered
   the policy question in 7.9 s. Test row deleted.
 - Live segment, second rehearsal: `live-reset` nothing to drop, scaffold
@@ -428,7 +428,7 @@ BFF and the cold-start 502:
   the morning deploy. K05 first call http 200 in 1007 ms, then 8 of 8.
   Medians (wall / server ms): all upstreams 677 / 445; cache hit 520 / 283,
   cache read 72; `slow=stats` 1125 / 871, stats cut at 801; `fail=feed`
-  597 / 339. Artifact `evidence/20261009-093738/`.
+  597 / 339. Artifact `out/2026-10-09/run-2026-10-09T01-37-38-655Z.json`.
 - `make bff-deploy` (SQL, both functions, secrets check passed), then K05
   at once. First call http 502 in 3183 ms. K05 now logs the body of a
   non-200 first call: the function's own all-failed response,
@@ -438,7 +438,7 @@ BFF and the cold-start 502:
   ~2.4 s of wall time is spent before `fanOut` starts its clock (worker
   boot, JWT checks, network), not broken out. Then 8 of 8: 674 / 433;
   552 / 321, cache read 109; 1094 / 863, stats cut at 801; 540 / 322.
-  Artifact `evidence/20261009-093812/`.
+  Artifact `out/2026-10-09/run-2026-10-09T01-38-12-919Z.json`.
 - Four fresh deploys, four first-call 502s (3314, 4203, 3086, 3183 ms);
   hours idle without a redeploy, 200. Why the mock's first calls after a
   deploy take over 800 ms is inferred (the new version booting); the
@@ -458,7 +458,8 @@ Agent chat, first run against a model (K03):
   pending); bob's confirmed approval set `approved` and `decided_by`; the
   injected KB chunk and the user-message injection produced no decide and
   no audit rows; listing showed 1 own row and 0 Sales probe rows. The
-  wording checks needed no adjustment. Artifact `evidence/20261009-093936/`.
+  wording checks needed no adjustment. Artifact
+  `out/2026-10-09/run-2026-10-09T01-39-36-446Z.json`.
 
 App UI (`app/`, local dev server against the ready project):
 
@@ -553,8 +554,9 @@ Re-run with the renamed code, 2026-10-09 (Supabase CLI 2.120.0):
   - L06-L08 equivalents passed: all-failed 502, second user never served the
     first user's rows, `fanout_cache_put` as a user 403 `42501`, `private`
     schema 406 `PGRST106`.
-  Artifacts `evidence/20261009-061934/` and `evidence/20261009-061954/`
-  (warm-up `evidence/20261009-061907/`; gitignored).
+  Artifacts `out/2026-10-08/run-2026-10-08T22-19-34-934Z.json` and
+  `out/2026-10-08/run-2026-10-08T22-19-54-915Z.json` (warm-up
+  `out/2026-10-08/run-2026-10-08T22-19-07-768Z.json`).
 
 ## 2026-10-08 (later) - BFF fanout-api: first hosted run
 
@@ -591,8 +593,9 @@ local`), so wall times include the client round trip to the region.
   639 ms. For a live demo, make one warm-up call after deploying.
 - Not measured: hosted latency from any vantage other than the operator's
   machine; behaviour under concurrent load; upstreams that are not Edge
-  Functions. Artifacts `evidence/20261008-2025*/` and
-  `evidence/20261008-202628/` (gitignored).
+  Functions. Artifacts `out/2026-10-08/run-2026-10-08T12-25-21-378Z.json`,
+  `out/2026-10-08/run-2026-10-08T12-25-46-029Z.json` and
+  `out/2026-10-08/run-2026-10-08T12-26-28-545Z.json`.
 
 ## 2026-10-08 - agent chat loop local runner - built, model run pending
 

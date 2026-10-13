@@ -1,0 +1,100 @@
+{
+  "startedAt": "2026-10-08T22:19:34.934Z",
+  "finishedAt": "2026-10-08T22:19:51.533Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "governed-starter-kit",
+  "labCommit": "e3408a6",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "K05.01",
+      "title": "no JWT or a tampered JWT is refused",
+      "status": "pass",
+      "detail": "no token http 401; tampered signature http 401",
+      "durationMs": 16599
+    },
+    {
+      "id": "K05.02",
+      "title": "all upstreams ok, cache read skipped (refresh=1), x5",
+      "status": "pass",
+      "detail": "last: profile=upstream/ok/345ms feed=upstream/ok/246ms inbox=upstream/ok/274ms stats=upstream/ok/167ms; total 408 ms",
+      "measurements": {
+        "wall_ms_median": 644,
+        "wall_ms_min": 618,
+        "wall_ms_max": 654,
+        "server_total_ms_median": 416
+      },
+      "durationMs": 16599
+    },
+    {
+      "id": "K05.03",
+      "title": "cache hit on the next call: profile + feed from cache, inbox + stats live, x5",
+      "status": "pass",
+      "detail": "last: profile=cache/ok/0ms feed=cache/ok/0ms inbox=upstream/ok/206ms stats=upstream/ok/90ms; cache read 42 ms",
+      "measurements": {
+        "wall_ms_median": 459,
+        "wall_ms_min": 449,
+        "wall_ms_max": 567,
+        "server_total_ms_median": 254,
+        "cache_read_ms_median": 53
+      },
+      "durationMs": 16599
+    },
+    {
+      "id": "K05.04",
+      "title": "stats slow (3 s) past the 800 ms per-call timeout: partial, the rest returned, x5",
+      "status": "pass",
+      "detail": "last: profile=cache/ok/0ms feed=cache/ok/0ms inbox=upstream/ok/215ms stats=upstream/timeout/801ms; total 852 ms",
+      "measurements": {
+        "wall_ms_median": 1073,
+        "wall_ms_min": 1050,
+        "wall_ms_max": 1078,
+        "server_total_ms_median": 852,
+        "timeout_ms": 800,
+        "stats_ms_median": 802
+      },
+      "durationMs": 16599
+    },
+    {
+      "id": "K05.05",
+      "title": "feed failing (503): partial, the rest returned, x5",
+      "status": "pass",
+      "detail": "last: profile=cache/ok/0ms feed=upstream/error/285ms inbox=upstream/ok/206ms stats=upstream/ok/170ms; total 332 ms",
+      "measurements": {
+        "wall_ms_median": 542,
+        "wall_ms_min": 520,
+        "wall_ms_max": 608,
+        "server_total_ms_median": 332
+      },
+      "durationMs": 16599
+    },
+    {
+      "id": "K05.06",
+      "title": "every upstream failing: http 502 with the per-upstream report",
+      "status": "pass",
+      "detail": "http 502; profile=upstream/error/362ms feed=upstream/error/277ms inbox=upstream/error/217ms stats=upstream/error/162ms",
+      "durationMs": 16599
+    },
+    {
+      "id": "K05.07",
+      "title": "a second user gets their own data, never the first user's cached rows",
+      "status": "pass",
+      "detail": "user_id is b=true; profile.user_id is b=true (source cache); cache hit",
+      "durationMs": 16599
+    },
+    {
+      "id": "K05.08",
+      "title": "the cache is service_role-write only, not exposed as a table, and the read RPC returns only the caller's rows",
+      "status": "pass",
+      "detail": "put as user http 403 (\"code\":\"42501\"); private table http 406 (\"code\":\"PGRST106\"); own rows via get: feed,profile",
+      "durationMs": 16599
+    }
+  ]
+}
