@@ -175,7 +175,8 @@ async function pushOverEndpoint(ctx: Ctx) {
   if (init.exitCode !== 0) return { ok: false, out: "supabase init failed" };
   await Bun.write(
     `${dir}/supabase/migrations/20260802000000_pvlab.sql`,
-    `create table if not exists ${PROBE_TABLE} (id int primary key, at timestamptz default now());\n`,
+    `create table if not exists ${PROBE_TABLE} (id int primary key, at timestamptz default now());\n` +
+      `grant select, insert, update, delete on table ${PROBE_TABLE} to anon, authenticated, service_role;\n`,
   );
   const url = `postgresql://postgres:${encodeURIComponent(ctx.dbPassword)}@${ctx.phzHost}:5432/postgres?sslmode=require`;
   const p = await $`bash -lc ${`printf 'y\\n' | supabase db push --db-url '${url}' --include-all`}`

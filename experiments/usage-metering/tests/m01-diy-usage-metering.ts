@@ -140,7 +140,7 @@ const mod: TestModule = {
           // ---- M01a: DB ground truth ----
           try {
             const before = await sql(ctx, ref, "select pg_database_size(current_database()) as bytes");
-            await sql(ctx, ref, "create table if not exists public.m01_payload (id bigint generated always as identity primary key, body text)");
+            await sql(ctx, ref, "create table if not exists public.m01_payload (id bigint generated always as identity primary key, body text); grant select, insert, update, delete on table public.m01_payload to anon, authenticated, service_role");
             const ins = await sql(
               ctx,
               ref,

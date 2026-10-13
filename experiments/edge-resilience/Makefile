@@ -81,7 +81,7 @@ seed:
 	@test -n "$(REF)" || (echo "no project_ref output - run 'make apply' first"; exit 1)
 	@curl -sf -X POST -H "Authorization: Bearer $(TOK)" -H "Content-Type: application/json" \
 		"https://api.supabase.com/v1/projects/$(REF)/database/query" \
-		-d '{"query":"create table if not exists public.w_probe(id int primary key); insert into public.w_probe values (1) on conflict do nothing;"}'
+		-d '{"query":"create table if not exists public.w_probe(id int primary key); insert into public.w_probe values (1) on conflict do nothing; grant select, insert, update, delete on table public.w_probe to anon, authenticated, service_role;"}'
 	@echo " - w_probe seeded"
 
 probe:
