@@ -3,6 +3,7 @@
  * "is this available" checks.
  */
 import { $ } from "bun";
+import { mgmt } from "./mgmt";
 import type { Capability, Ctx, Where } from "./types";
 
 async function has(cmd: string): Promise<boolean> {
@@ -217,6 +218,19 @@ export async function buildCtx(input: CtxInput): Promise<Ctx> {
       if (!input.quiet) console.log(`  ${m}`);
     },
   };
+}
+
+/**
+ * The target project's region, for the run artifact. Undefined when the run
+ * has no ref or no PAT, or the read fails: the artifact then says the region
+ * shown is the harness setting instead of guessing (work-supabase-lab#172).
+ */
+export async function readProjectRegion(ctx: Ctx, call: typeof mgmt = mgmt): Promise<string | undefined> {
+  if (!ctx.ref || !ctx.pat) return undefined;
+  const res = await call(ctx, "GET", `/projects/${ctx.ref}`, undefined, 10_000).catch(() => undefined);
+  if (res?.status !== 200) return undefined;
+  const region = (res.json as { region?: unknown } | undefined)?.region;
+  return typeof region === "string" && region ? region : undefined;
 }
 
 export async function toolVersions(): Promise<Record<string, string>> {

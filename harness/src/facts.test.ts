@@ -47,6 +47,18 @@ describe("renderFacts", () => {
   });
 });
 
+describe("region in the facts header", () => {
+  test("without projectRegion the header says the region is the harness setting", () => {
+    expect(renderFacts(run)).toContain("harness region ap-southeast-1 (not read from the project)");
+  });
+
+  test("with projectRegion the header names the project's region", () => {
+    const md = renderFacts({ ...run, projectRegion: "eu-central-1" });
+    expect(md).toContain("region eu-central-1 (read from the project)");
+    expect(md).not.toContain("harness region");
+  });
+});
+
 describe("numbersIn", () => {
   test("collects every number in measurements, detail and evidence with separators stripped", () => {
     const n = numbersIn(run);

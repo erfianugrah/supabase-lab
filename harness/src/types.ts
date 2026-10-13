@@ -121,7 +121,14 @@ export interface RunArtifact {
   startedAt: string;
   finishedAt: string;
   where: Where;
+  /**
+   * The harness region setting (REGION / AWS_REGION / ap-southeast-1): where
+   * self-provisioning modules create projects. It says nothing about a
+   * PVLAB_REF project, which can live anywhere (work-supabase-lab#172).
+   */
   region: string;
+  /** The target project's region from GET /v1/projects/{ref}, when the run had a ref and a PAT. */
+  projectRegion?: string;
   ref: string;
   /**
    * Which experiment produced this. One registry now carries every

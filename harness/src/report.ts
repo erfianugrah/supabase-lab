@@ -2,6 +2,7 @@
  * Generic renderer: walks results and their `measurements`, so a new test
  * appears in the report without any renderer change.
  */
+import { regionLabel } from "./facts";
 import type { RunArtifact, TestResult } from "./types";
 
 const STATUS_ORDER = ["fail", "pass", "info", "skip"] as const;
@@ -29,7 +30,7 @@ export function renderMarkdown(a: RunArtifact): string {
   out.push(`# ${a.experiment ? `${a.experiment} run` : "supabase-lab run"} - ${a.startedAt}`);
   out.push("");
   out.push(
-    `Project \`${a.ref}\` | region ${a.region} | vantage ${a.where}` +
+    `Project \`${a.ref}\` | ${regionLabel(a)} | vantage ${a.where}` +
       (a.labCommit ? ` | lab \`${a.labCommit}\`` : ""),
   );
   out.push("");
