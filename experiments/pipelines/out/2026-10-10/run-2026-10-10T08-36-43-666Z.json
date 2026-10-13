@@ -1,0 +1,122 @@
+{
+  "startedAt": "2026-10-10T08:36:43.666Z",
+  "finishedAt": "2026-10-10T08:48:33.131Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "pipelines",
+  "labCommit": "70e4244",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "PL07a",
+      "title": "PL07a: main slot while the replicator runs",
+      "status": "info",
+      "measurements": {
+        "slot_active": "true",
+        "wal_status": "reserved",
+        "retained_mb": 0,
+        "unconfirmed_mb": 0,
+        "safe_wal_size_mb": 547.7,
+        "max_slot_wal_keep_size_mb": 536.9,
+        "table_heap_mb": 117,
+        "wal_dir": "50 files, 822.1 MB"
+      },
+      "durationMs": 709464
+    },
+    {
+      "id": "PL07b",
+      "title": "PL07b: slot retention while the replicator is stopped and 75000 rows are written",
+      "status": "info",
+      "detail": "slot active after stop: false; retained 0 MB (idle, 30 s after stop) to 30.7 MB after 75000 rows",
+      "measurements": {
+        "stop_call_s": 0.8,
+        "slot_active_after_stop": "false",
+        "retained_just_after_stop_mb": 0,
+        "retained_after_30s_idle_mb": 0,
+        "idle_growth_kb_per_30s": 0,
+        "rows_written_while_stopped": 75000,
+        "retained_after_writes_mb": 30.7,
+        "retained_growth_from_writes_mb": 30.7,
+        "retained_bytes_per_row_written": 409,
+        "unconfirmed_after_writes_mb": 30.7,
+        "wal_status_after_writes": "reserved",
+        "safe_wal_size_after_writes_mb": 517,
+        "samples": 15,
+        "retained_mb_series": "2 4 6 8 10 12 14.7 16.9 18.8 20.8 22.8 24.8 26.7 28.7 30.7",
+        "wal_dir_after": "50 files, 822.1 MB"
+      },
+      "durationMs": 709464
+    },
+    {
+      "id": "PL07c",
+      "title": "PL07c: restart drains the backlog",
+      "status": "info",
+      "detail": "destination matched source 43.6 s after the restart call",
+      "measurements": {
+        "restart_to_drained_s": 43.6,
+        "src_rows": "175000",
+        "dest_rows": "175000",
+        "retained_after_drain_mb": 30.8,
+        "unconfirmed_after_drain_mb": 0
+      },
+      "durationMs": 709464
+    },
+    {
+      "id": "PL07d",
+      "title": "PL07d: retention beyond max_slot_wal_keep_size",
+      "status": "info",
+      "detail": "slot wal_status unreserved before CHECKPOINT, lost 215 s after",
+      "measurements": {
+        "max_slot_wal_keep_size_mb": 536.9,
+        "update_passes": 3,
+        "wal_generation_s": 25,
+        "retained_before_checkpoint_mb": 688.5,
+        "wal_status_before_checkpoint": "unreserved",
+        "safe_wal_size_before_checkpoint_mb": -140.8,
+        "checkpoint_statement": "refused: permission denied to execute CHECKPOINT command",
+        "wal_status_trail": "unreserved>lost",
+        "invalidation_reason": "wal_removed",
+        "retained_final_mb": -1,
+        "wal_dir_at_peak": "50 files, 822.1 MB",
+        "rows": "175000",
+        "retained_mb_series": "246.9 460.8 688.5",
+        "start_retained_mb": 30.8
+      },
+      "durationMs": 709464
+    },
+    {
+      "id": "PL07e",
+      "title": "PL07e: restart with invalidated_slot_behavior error (default)",
+      "status": "info",
+      "detail": "container running after 60 s: false; table state ready",
+      "measurements": {
+        "container_running_after_60s": "false",
+        "table_state": "ready",
+        "log_lines_matching": 5,
+        "first_matching_line": " 2026-10-10T08:47:04.799759Z ERROR etl::runtime::apply::worker: apply worker failed, error: [ReplicationSlotInvalidated] Replication slot has been invalidated: The replication slot 'supabase_etl_apply_1' for pipeline 1 has been invalidated."
+      },
+      "durationMs": 709464
+    },
+    {
+      "id": "PL07f",
+      "title": "PL07f: invalidated_slot_behavior recreate rebuilds the table",
+      "status": "info",
+      "detail": "destination matched source 43.3 s after restart (50 rows deleted at the source while the slot was lost)",
+      "measurements": {
+        "restart_to_rebuilt_s": 43.3,
+        "table_states_after_restart": "init>data_sync>finished_copy>sync_done",
+        "src_rows": "174950",
+        "dest_rows": "174950",
+        "new_slot_status": "reserved",
+        "new_slot_active": "true"
+      },
+      "durationMs": 709464
+    }
+  ]
+}
