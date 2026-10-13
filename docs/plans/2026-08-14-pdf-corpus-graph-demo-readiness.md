@@ -1,5 +1,10 @@
 # pdf-corpus-graph: demo-readiness gaps and the next iteration
 
+> **STATUS (stocktake 2026-10-13): CLOSED.** The 2026-08-14 banner below is
+> the last progress record. Its seven unticked items (E3, G12, G15, H1-H4) are
+> not carried to the board: the project is destroyed and Track H was
+> conversation preparation, not repo work.
+
 > **STATUS 2026-08-14: SUBSTANTIALLY LANDED.** Tracks E (headline), F
 > (corpus, time, resolution) and most of G (fusion run, region, OCR, per-PDF
 > arithmetic) shipped the same day; details in the RUNLOG. G12's write-up is
