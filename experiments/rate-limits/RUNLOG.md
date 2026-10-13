@@ -8,10 +8,11 @@ PAT is supplied via PVLAB_PAT2.
 
 No OpenTofu state: read-only Management API calls plus a deliberate burst on
 a cheap single-project read (the budget returns after the window; L01c waits
-and confirms recovery). Run it with:
+and confirms recovery). Run it with (since 2026-10-13; the
+`.pi/probe-rate-limits.sh` named here before was gitignored local tooling):
 
 ```
-.pi/probe-rate-limits.sh L01
+sx SUPABASE_ACCESS_TOKEN -- make probe ONLY=L01 PVLAB_REF=<any project ref>
 ```
 
 ## 2026-08-17 - L01 green: headers on every response, JSON 429 at the boundary
