@@ -1,11 +1,13 @@
 /**
- * F03 - is a Personal Access Token still unscoped?
+ * F03 - does /v1 expose a scoping surface for a classic (Legacy) Personal
+ * Access Token?
  *
- * The consolidation guide's security section rests on this: a PAT reads and
- * writes every organization and every project the account can reach, and
- * there is no scoping surface to reach for. The evidence was a probe of every
- * plausible scope/permission endpoint - all 404, while ordinary endpoints
- * returned 200 on the same token.
+ * The consolidation guide's security section rested on this in August: a
+ * classic PAT reads and writes every organization and every project the
+ * account can reach, and /v1 has no scoping surface to reach for. The
+ * evidence was a probe of every plausible scope/permission endpoint - all
+ * 404, while ordinary endpoints returned 200 on the same token. Scoped
+ * tokens (the 2026-10-07 note below) are created in the dashboard, not here.
  *
  * That is a claim with a short half-life, in the direction that matters: if
  * Supabase ships token scoping, the guide's "mitigations are operational
