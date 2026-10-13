@@ -1761,7 +1761,11 @@ skip-only dry runs). `/private/tmp` is tmpfs and is wiped on reboot, so
 Step 1 is time-critical; if it finds nothing, the artifacts are gone and the
 fallback at the end of this task applies.
 
-- [ ] **Step 1: Recover the raw artifacts into the gitignored evidence/ dirs (do this first)**
+- [x] **Step 1: Recover the raw artifacts into the gitignored evidence/ dirs (do this first)**
+
+> Done 2026-10-13 (run by hand right after this plan was written): all 18
+> files below recovered, the set matching this list exactly; `git status`
+> clean. The two `dd01s-dry*` runs are skip-only (no ref) - do not publish them.
 
 ```bash
 fd -H -I -t f -e json '^run-2026-10-' /private/tmp 2>/dev/null | while read -r f; do
