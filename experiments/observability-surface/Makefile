@@ -44,3 +44,10 @@ cleanup:
 	      curl -s -o /dev/null -w "%{http_code}\n" -X DELETE https://api.supabase.com/v1/projects/$$r -H "Authorization: Bearer $$SUPABASE_ACCESS_TOKEN"; done
 	@curl -s https://api.supabase.com/v1/projects -H "Authorization: Bearer $$SUPABASE_ACCESS_TOKEN" \
 	  | jq -r '[.[] | select(.name | startswith("ob-surface-"))] | length | "ob-surface- projects left: \(.)"'
+
+.PHONY: publish-evidence
+
+# Redacted copy of a run artifact plus its facts.md into out/<date>/ (committed).
+publish-evidence:
+	@test -n "$(RUN)" || (echo "RUN=evidence/<ts>/run-<stamp>.json required"; exit 1)
+	@cd $(ROOT)/harness && bun scripts/publish-evidence.ts $(abspath $(RUN)) $(abspath .) $(if $(PUBLISH_ONLY),--only $(PUBLISH_ONLY),)
