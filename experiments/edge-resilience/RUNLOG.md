@@ -657,3 +657,38 @@ unified endpoint is untested; whether the 13 s ingestion lag holds under load (s
 The queries the module sent are in the artifact's `evidence` fields and in
 `experiments/edge-resilience/tests/w27-pgrst303-edge-logs.ts` (`richSql`,
 `incidentSql`).
+
+## W12 re-run with the explicit Data API grants (2026-10-13, green, module)
+
+Why: commit 8785380 added explicit `GRANT`s ahead of the 2026-10-30 Data API
+default (the seed target's `w_probe` grant, and W12's grant on `probe_canary`
+and its sequence). This run checks that the statements execute and W12 still
+passes. One fresh Pro-org project (ap-southeast-1, no compute add-on selected,
+created through `POST /v1/projects` and deleted in the same script, nothing else
+on it), the seed target's SQL applied verbatim through the Management API query
+endpoint (no tofu, no worker, no standby), then `--only W12 --destructive` from
+source on a developer Mac. One run. Artifact:
+`out/2026-10-13/run-2026-10-13T06-13-48-557Z.json` (published, redacted) and
+`.facts.md`.
+
+- Seed SQL incl. `grant select, insert, update, delete on table public.w_probe
+  to anon, authenticated, service_role`: HTTP 201, body `[]` (script log, not in
+  the artifact). `GET /rest/v1/w_probe?select=id` with the publishable key
+  then answered 200 `[{"id":1}]`.
+- W12: pass. `publication_setup` true, so the CREATE + GRANT statement on
+  `probe_canary` returned below 300 (the module throws on anything else). The
+  REST insert as the publishable key succeeded on both connections: no 401,
+  403 or 42501 anywhere in the run.
+- Insert-to-event latency: 76 ms on connection 1, 360 ms on connection 2
+  (the reconnect). 2026-08-15: about 0.5 s for the event and 431 ms for the
+  reconnect. Same order of magnitude; one run each, so no trend claim.
+- Connection 1 needed the retry: attempt 1 ended "Connection closed before
+  event received", attempt 2 passed. On 2026-08-15 that failure was only seen
+  in battery context; here W12 ran alone on a project seconds old, so it also
+  happens standalone on a fresh project.
+- Not proven: that the grants are load-bearing. The project still had the
+  legacy default ACL (`pg_default_acl` for postgres in `public`: tables
+  `arwdDxtm`, sequences `rwU` for anon, authenticated and service_role; `w_probe`
+  relacl showed `arwdDxtm` for all three), so W12 would have passed without the
+  explicit grants. Separating that needs `alter default privileges ... revoke`
+  before the seed (as DD01c did) on a later run.
