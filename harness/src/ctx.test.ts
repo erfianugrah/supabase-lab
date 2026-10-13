@@ -1,5 +1,48 @@
 import { describe, expect, test } from "bun:test";
-import { deriveCapabilities, readEndpoints, readOrgs, readPeers } from "./ctx";
+import { deriveCapabilities, readEndpoints, readOrgs, readPeers, readProjectRegion } from "./ctx";
+import type { MgmtResponse } from "./mgmt";
+import type { Ctx } from "./types";
+
+describe("readProjectRegion", () => {
+  const ctx = { ref: "abcdefghijklmnopqrst", pat: "sbp_test", region: "ap-southeast-1" } as Ctx;
+  const answer = (status: number, json?: unknown) => async (): Promise<MgmtResponse> => ({
+    status,
+    text: "",
+    json: json as MgmtResponse["json"],
+    throttled: false,
+  });
+
+  test("reads region from GET /v1/projects/{ref}", async () => {
+    const seen: string[] = [];
+    const call = async (_c: Ctx, method: string, path: string): Promise<MgmtResponse> => {
+      seen.push(`${method} ${path}`);
+      return { status: 200, text: "", json: { region: "eu-central-1" }, throttled: false };
+    };
+    expect(await readProjectRegion(ctx, call)).toBe("eu-central-1");
+    expect(seen).toEqual(["GET /projects/abcdefghijklmnopqrst"]);
+  });
+
+  test("no ref or no PAT: no call is made", async () => {
+    let calls = 0;
+    const call = async (): Promise<MgmtResponse> => {
+      calls++;
+      return { status: 200, text: "", json: { region: "eu-central-1" }, throttled: false };
+    };
+    expect(await readProjectRegion({ ...ctx, ref: "" }, call)).toBeUndefined();
+    expect(await readProjectRegion({ ...ctx, pat: undefined }, call)).toBeUndefined();
+    expect(calls).toBe(0);
+  });
+
+  test("a non-200, a body without region, or a failed call is undefined, never the harness default", async () => {
+    expect(await readProjectRegion(ctx, answer(404, { message: "not found" }))).toBeUndefined();
+    expect(await readProjectRegion(ctx, answer(200, { name: "x" }))).toBeUndefined();
+    expect(
+      await readProjectRegion(ctx, async () => {
+        throw new Error("offline");
+      }),
+    ).toBeUndefined();
+  });
+});
 
 describe("readOrgs", () => {
   test("PVLAB_ORG_<ROLE> becomes a lowercase role key", () => {

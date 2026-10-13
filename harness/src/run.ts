@@ -11,7 +11,7 @@
 import { $ } from "bun";
 import { readdir } from "node:fs/promises";
 import { resolve } from "node:path";
-import { buildCtx, toolVersions } from "./ctx";
+import { buildCtx, readProjectRegion, toolVersions } from "./ctx";
 import { planRun } from "./plan";
 import { diffArtifacts, renderDiffMarkdown } from "./diff";
 import { renderFacts } from "./facts";
@@ -69,6 +69,7 @@ async function mergeMode(files: string[], outDir: string): Promise<void> {
     finishedAt: parts.map((p) => p.finishedAt).sort().at(-1)!,
     where: first.where,
     region: first.region,
+    projectRegion: parts.find((p) => p.projectRegion)?.projectRegion,
     ref: parts.find((p) => p.ref)?.ref ?? "",
     experiment: first.experiment,
     labCommit: first.labCommit,
@@ -160,6 +161,8 @@ const main = async () => {
       `(vantage=${where}, capabilities=${[...ctx.capabilities].sort().join(",") || "none"})`,
   );
 
+  // Read before any module runs: a module may delete the project it targets.
+  const projectRegion = await readProjectRegion(ctx);
   const startedAt = new Date().toISOString();
   const results: TestResult[] = [...skipped];
 
@@ -192,6 +195,7 @@ const main = async () => {
     finishedAt: new Date().toISOString(),
     where,
     region: ctx.region,
+    projectRegion,
     ref: ctx.ref,
     experiment,
     labCommit: await labCommit(),
