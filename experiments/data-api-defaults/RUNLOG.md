@@ -188,3 +188,25 @@ Not measured: the 2026-03-11 / 2026-04-08 rollout split (one project, created
 after both dates); a token without the read-only database permission the
 notice mentions; the Management API path against a project created before the
 anon change.
+
+## 2026-10-13 - DD01S standing-project baseline, before 2026-10-30
+
+Harness: `make run-standing`, module DD01S only, `--destructive` (one probe
+table created and dropped; no GRANT, REVOKE or ALTER sent), lab commit 91fe131
+plus the staged tree that adds DD01S. n = 1 existing project, created
+2026-04-07 (before the 2026-05-30 new-project default), Postgres 17.6, not a
+lab-provisioned project. Published: `out/2026-10-13/`. The artifact header's
+region is the harness default, not the project's region.
+
+| step | measured |
+|---|---|
+| DD01Sa `pg_default_acl`, schema `public`, roles `postgres` and `supabase_admin` | tables: `anon`, `authenticated`, `service_role` each `arwdDxtm`; sequences `rwU`; functions `X` - the same legacy grants DD01a read on the 2026-10-10 API-created project |
+| DD01Sb table made in SQL, anon GET | 200 `[{"id":1}]` after 1 s; publishable key 200 |
+| DD01Sb drop | dropped, `to_regclass` null |
+
+This is the pre-enforcement half of #89. Re-run the same target on the same
+project on or after 2026-10-30 and diff the two artifacts (README,
+"Standing-project baseline"); a 42501 with the "Grant the required
+privileges" hint on DD01Sb would show the enforcement reached an existing
+project, and an unchanged `pg_default_acl` would show it was done some way
+other than rewriting the default ACL.
