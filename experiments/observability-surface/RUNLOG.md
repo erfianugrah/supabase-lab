@@ -3,12 +3,29 @@
 All runs 2026-10-10. Vantage: one macOS machine in Singapore (Bun 1.3.14; Node v26.11.1
 for the esbuild bundles; `supabase` CLI 2.120.0), projects in
 ap-southeast-1 on a Pro-plan organization, Management API from the same
-machine. Run artifacts are `evidence/run1/` to `evidence/run3/` (gitignored:
-they carry project refs); they were not published to `out/`, so the figures
-below are quoted from those artifacts and are not yet citable by artifact.
+machine. Raw run artifacts are `evidence/run1/` to `evidence/run3/`
+(gitignored: they carry project refs); the figures below are quoted from them
+and the redacted copies are listed under "Published artifacts" below. The side
+files `ob01-clients.json`, `ob02-polls.json` and `ob03-canary.json` are not
+run artifacts and stay in `evidence/`.
 Every project this experiment created was deleted by the module that made it
 (checked with `GET /v1/projects` after the last run: none named `ob-surface-`
 remained).
+
+Published artifacts (redacted, a `.facts.md` beside each, `out/2026-10-10/`):
+
+| run | module | artifact |
+|---|---|---|
+| run1 | OB01 | `run-2026-10-10T00-36-30-860Z.json` |
+| run1 | OB02 | `run-2026-10-10T00-35-30-688Z.json` |
+| run1 | OB03 | `run-2026-10-10T00-48-25-371Z.json` |
+| run1 | OB04 | `run-2026-10-10T00-39-42-004Z.json` |
+| run1 | OB05 | `run-2026-10-10T00-40-48-205Z.json` |
+| run2 | OB01 | `run-2026-10-10T00-45-35-196Z.json` |
+| run2 | OB02 | `run-2026-10-10T00-59-06-273Z.json` |
+| run2 | OB05 | `run-2026-10-10T00-59-15-215Z.json` |
+| run3 | OB01 | `run-2026-10-10T01-10-20-267Z.json` |
+| run3 | OB02 | `run-2026-10-10T01-23-47-158Z.json` |
 
 Reading guide. "Docs say" lines come from public pages read on 2026-10-10 and
 are not measurements. "Measured" lines name the module row, `n`, and the run.
@@ -314,8 +331,8 @@ Measured (run1, n = 1 Pro-plan project, one pass):
   notebooks path answered 200 on both projects, which would put the PAT and v2
   prefix outside the cause, and the Dashboard's internal route
   (`/platform/projects/{ref}/analytics/log-drains`) answered 401 `Unsupported
-  access token` to the PAT. Only the Pro-org 403s were kept, in a run artifact
-  that is not in the repo (gitignored `evidence/`). No drain was created, so OB04d (batch size, flush
+  access token` to the PAT. Only the Pro-org 403s were kept, in the run1 OB04
+  artifact (`out/2026-10-10/run-2026-10-10T00-39-42-004Z.json`). No drain was created, so OB04d (batch size, flush
   spacing, content-encoding as sent by the platform, HTTP version, event fields,
   arrival lag, sources that arrive) was not run: its code has never executed
   against a live drain.
