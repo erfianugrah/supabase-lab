@@ -109,3 +109,36 @@ artifact.
 | M07-control | invoice PDF parsed: 91 per-ref lines | the compute-line count and hour total are in the local facts render, not copied here: they describe the account's billing, not the method |
 | M07a | 32 invoiced refs; 3 live projects, 3 matched; 29 deleted since the invoice | - |
 | M07b | 4 reconciled rows; largest share of the billing window 98.7% | - |
+
+## 2026-10-13 - M01 and M05 re-run after the explicit Data API grants (#128)
+
+Task 20 of `docs/plans/2026-10-13-lab-backlog-waves.md` appended `grant
+select, insert, update, delete ... to anon, authenticated, service_role` to
+the SQL that creates `public.m01_payload` (M01) and `public.metering_hourly`
+(M05). Until the 2026-10-30 default change these grants repeat what the
+default already gives; the re-run checks that they execute and change no
+result. One run each, local vantage, Pro org, ap-southeast-1, run from source
+(`bun harness/src/run.ts`) at lab commit b270a45, each project provisioned and
+deleted by its module. Artifacts are private (this experiment has no
+`publish-evidence` target): M05 `evidence/20261013-114237/run-2026-10-13T03-42-38-273Z.json`,
+M01 `evidence/20261013-114309/run-2026-10-13T03-43-10-147Z.json`.
+
+| Probe | 2026-10-13 | Last entry |
+|---|---|---|
+| M05-control | pass, provisioned in 13 s, schema 201 (the grant is one of the schema statements; the loop stops on the first non-2xx) | pass, 135 s, 201 (2026-08-18, both runs) |
+| M05a | 4 org projects, 4 rows inserted through the store's PostgREST with its secret key, own row present, 4 read back | same as the 2026-08-18 06:25 run |
+| M05b | t-a 100 rows, 100400 payload bytes; t-b 25 rows, 25100 | same (2026-08-18, both runs) |
+| M01-control | pass, 12 s | pass, 135 s (2026-08-17) |
+| M01a | pg_database_size 10843827 -> 11032243 bytes, delta 188416 | delta 188416 (9,940,115 -> 10,128,531, 2026-08-17) |
+| M01b | anon REST read answered 200 on the first warm-up request (1 warm-up), then 12 counted requests, last status 206 (`Prefer: count=exact` with `limit=1`); usage.api-counts showed 9 at the first poll, 61 s after the last request | 13 of 13 at 61 s (2026-08-18); 10 of 12 at about 67 s (2026-08-17) |
+| M01c | 200, text/plain, 336 metric families | 200, text/plain, 326 (2026-08-18) |
+| M01d | 262144 bytes uploaded, 262144 listed | same |
+
+No 401, 403 or 42501 on the Data API in either run: anon reads of
+`m01_payload` and the secret key's inserts into `metering_hourly` (201 for 4 of
+4) succeeded. M01b's 9 of 13 is below the 2026-08-18 exact count; the module
+stops polling at the first non-zero reading, so it cannot tell a bucket still
+filling from an undercount (one run). `provision_s` was 12-13 s on 2026-10-13
+against 135 s in August. It spans create to the first `ACTIVE_HEALTHY` read
+(polled every 10 s) plus the key fetch, and in M05 the schema install, so the
+first poll already read healthy.
