@@ -1,10 +1,10 @@
 # jit-db-access RUNLOG
 
 Chronological record of what was run. Org slugs, project refs, the caller's
-user id and email are not recorded here (the org class is). Artifacts are in
-`evidence/` (gitignored); no `out/` copy was published for these runs, so the
-rows below are quoted from the `evidence/<ts>/run-*.json` files named in the
-table.
+user id and email are not recorded here (the org class is). Raw artifacts are
+in `evidence/` (gitignored); the rows below are quoted from them. Each
+artifact stamp in the run table is published redacted as
+`out/2026-10-10/run-2026-10-10T<stamp>.json`, with a `.facts.md` beside it.
 
 Public sources for the docs claims (not measurements):
 https://supabase.com/changelog/46346-feature-preview-temporary-token-based-database-access
