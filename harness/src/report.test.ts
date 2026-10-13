@@ -25,6 +25,13 @@ describe("renderMarkdown", () => {
     expect(unlabelled).not.toContain("PrivateLink");
   });
 
+  test("the header says whether the region was read from the project", () => {
+    const plain = renderMarkdown(artifact([{ id: "X01", title: "shapes", status: "pass" }]));
+    expect(plain).toContain("| harness region ap-southeast-1 (not read from the project) |");
+    const read = renderMarkdown({ ...artifact([{ id: "X01", title: "shapes", status: "pass" }]), projectRegion: "eu-central-1" });
+    expect(read).toContain("| region eu-central-1 (read from the project) |");
+  });
+
   test("a new test's measurements become columns with no renderer change", () => {
     const md = renderMarkdown(
       artifact([
