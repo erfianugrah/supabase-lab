@@ -592,7 +592,10 @@ each user's auth rows". Findings and artifacts in RUNLOG.md; out/2026-09-25/.
   ESTIMATE, not a measured outage - platform-downtime showed operation duration
   and client-visible window differ per path, sometimes 2x - and all three
   returning exactly 1 reads as a coarse figure. `eligible` can also come back
-  `null` with no version fields; do not treat it as always-boolean.
+  `null` with no version fields; do not treat it as always-boolean. F07
+  (2026-10-13, work-supabase-lab#41): across 4 projects in the lab orgs no
+  row was null (3 true, 1 false, all `ACTIVE_HEALTHY`), so what null goes
+  with is still unobserved.
 - F05 reads the whole spec on purpose. A previous investigation concluded an API
   "cannot do X" after probing only paths containing X's noun and was wrong,
   because the lever sat on a differently-named path. A negative is only worth
@@ -862,7 +865,12 @@ L01: `x-ratelimit-limit/remaining/reset` on every response; limit 120,
 `429 ThrottlerException` with `retry-after: 60` and recovers after the
 window. L01b: the budget is CUMULATIVE across a user's PATs (each token's
 remaining drops on the other's calls) - PAT sharding does not multiply
-it. L01b needs `PVLAB_PAT2` in the env.
+it. L01b needs `PVLAB_PAT2` in the env. L02 (2026-10-13, work-supabase-lab#42):
+no endpoint x burst shape answered the edge HTML page; all 15 cells (five
+read-only GETs x serial, 20 in parallel, 150 at once) broke on the JSON 429
+with `retry-after` 59-60, and each endpoint answered 2xx again at the first
+read after a 65 s cooldown. `make probe ONLY=L02` (~20 min) exhausts the token's
+budget about 15 times; run nothing else with that token meanwhile.
 
 ## experiments/usage-metering - key facts (validated 2026-08-17/18)
 

@@ -205,3 +205,22 @@ on each; `function.max_count` 100 / 1000 / 2000 functions;
 `function.size_limit_mb` 20 MB on all three; `security.member_roles` gains
 Read-only on Team; `auth.platform.sso` yes on Team only;
 `security.audit_logs_days` 0 / 0 / 62.
+
+## 2026-10-13 - F07: eligibility across the lab orgs (work-supabase-lab#41)
+
+Harness: `make fleet ORGS=<pro>,<team>,<free>,<free2>` (slugs from the
+environment; the account has two Free orgs, both listed), lab commit 1a7158f
+with the W3 plan's Task O3 F07 change uncommitted at run time; published
+`out/2026-10-13/run-2026-10-13T05-09-07-979Z.facts.md`.
+4 projects, all in the Pro org (the Team and both Free orgs listed none):
+eligible true 3, false 1, null 0, absent 0, unread 0. Null rows: none
+(`null_statuses` none, `null_payload_keys` none, 0 with version fields).
+The three `true` rows are the standing projects (ages 188, 111 and 98 days,
+`supabase-postgres-17.6.1.141`, latest `supabase-postgres-17.11.0.003`, one
+target each); the `false` row is the platform-downtime D01 project created
+that day (age 0 days), already on `supabase-postgres-17.11.0.003` with no target and no validation
+error. Every payload carried the same 12 keys.
+Read (W3 plan, B02-1): null is 0 on this run, so the state that produced
+`eligible: null` on 2026-08-04 is not present on any lab project now; what
+it goes with stays unexplained. Not settled: one sweep of 4 projects, none
+paused, none coming up.
