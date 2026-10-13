@@ -1,0 +1,97 @@
+{
+  "startedAt": "2026-10-10T00:26:40.222Z",
+  "finishedAt": "2026-10-10T00:27:04.307Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "auth-providers",
+  "labCommit": "70e4244",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "AU04a",
+      "title": "AU04a: enable SAML, create SSO provider from metadata XML",
+      "status": "pass",
+      "detail": "saml_enabled patch HTTP 200 settled=true; provider create HTTP 201; SP metadata HTTP 200",
+      "measurements": {
+        "saml_enabled_patch_status": 200,
+        "saml_enabled_settled": "true",
+        "provider_create_status": 201,
+        "provider_response_keys": "created_at,disabled,domains,id,saml,updated_at",
+        "sp_metadata_status": 200,
+        "sp_entity_id_matches_project_url": "true",
+        "acs_matches_project_url": "true"
+      },
+      "durationMs": 24085
+    },
+    {
+      "id": "AU04b",
+      "title": "AU04b: SP-initiated sign-in with a valid signed assertion; replay",
+      "status": "pass",
+      "detail": "first: session (sso:50d5ea40-8697-495c-92d5-3e368ff5a4c6); replay of the same Response: 303 saml_relay_state_not_found SAML RelayState does not exist, try logging in again?",
+      "measurements": {
+        "sso_redirect_status": 200,
+        "acs_post_ms_first": 90,
+        "acs_post_ms_max_of_4": 90,
+        "signins_attempted": 4,
+        "same_user_every_time": "true",
+        "app_metadata_provider": "sso:50d5ea40-8697-495c-92d5-3e368ff5a4c6",
+        "user_email": "<email>",
+        "identity_provider": "sso:50d5ea40-8697-495c-92d5-3e368ff5a4c6",
+        "replay_signed_in": "false",
+        "replay_error": "SAML RelayState does not exist, try logging in again?"
+      },
+      "durationMs": 24085
+    },
+    {
+      "id": "AU04c",
+      "title": "AU04c: SAML negative controls (signature, audience, expiry, recipient, IdP-initiated)",
+      "status": "info",
+      "detail": "badsig: 303 validation_failed SAML Assertion is not valid <samlp:Response xmlns: ... m</saml:AttributeValue></saml:Attribute></saml:AttributeStatement></saml:Assertion></samlp:Response> | unsigned: 303 validation_failed SAML Assertion is not valid <samlp:Response xmlns: ... m</saml:AttributeValue></saml:Attribute></saml:AttributeStatement></saml:Assertion></samlp:Response> | wrongaud: 303 validation_failed SAML Assertion is not valid <samlp:Response xmlns: ... m</saml:AttributeValue></saml:Attribute></saml:AttributeStatement></saml:Assertion></samlp:Response> | expired: 303 validation_failed SAML Assertion is not valid <samlp:Response xmlns: ... m</saml:AttributeValue></saml:Attribute></saml:AttributeStatement></saml:Assertion></samlp:Response> | wrongrecipient: 303 validation_failed SAML Assertion is not valid <samlp:Response xmlns: ... m</saml:AttributeValue></saml:Attribute></saml:AttributeStatement></saml:Assertion></samlp:Response> | other-domain email: session (sso:50d5ea40-8697-495c-92d5-3e368ff5a4c6) | IdP-initiated: session (sso:50d5ea40-8697-495c-92d5-3e368ff5a4c6)",
+      "measurements": {
+        "badsig_signed_in": "false",
+        "badsig_outcome": "303 validation_failed SAML Assertion is not valid <samlp:Respo",
+        "badsig_description_chars": 4409,
+        "badsig_description_tail": "ype=\"xs:string\"><email></saml:AttributeValue></saml:Attribute></saml:AttributeStatement></saml:Assertion></samlp:Response>",
+        "badsig_description_echoes_response_xml": "true",
+        "unsigned_signed_in": "false",
+        "unsigned_outcome": "303 validation_failed SAML Assertion is not valid <samlp:Respo",
+        "unsigned_description_chars": 2431,
+        "unsigned_description_tail": "ype=\"xs:string\"><email></saml:AttributeValue></saml:Attribute></saml:AttributeStatement></saml:Assertion></samlp:Response>",
+        "unsigned_description_echoes_response_xml": "true",
+        "wrongaud_signed_in": "false",
+        "wrongaud_outcome": "303 validation_failed SAML Assertion is not valid <samlp:Respo",
+        "wrongaud_description_chars": 4383,
+        "wrongaud_description_tail": "ype=\"xs:string\"><email></saml:AttributeValue></saml:Attribute></saml:AttributeStatement></saml:Assertion></samlp:Response>",
+        "wrongaud_description_echoes_response_xml": "true",
+        "expired_signed_in": "false",
+        "expired_outcome": "303 validation_failed SAML Assertion is not valid <samlp:Respo",
+        "expired_description_chars": 4409,
+        "expired_description_tail": "ype=\"xs:string\"><email></saml:AttributeValue></saml:Attribute></saml:AttributeStatement></saml:Assertion></samlp:Response>",
+        "expired_description_echoes_response_xml": "true",
+        "wrongrecipient_signed_in": "false",
+        "wrongrecipient_outcome": "303 validation_failed SAML Assertion is not valid <samlp:Respo",
+        "wrongrecipient_description_chars": 4383,
+        "wrongrecipient_description_tail": "ype=\"xs:string\"><email></saml:AttributeValue></saml:Attribute></saml:AttributeStatement></saml:Assertion></samlp:Response>",
+        "wrongrecipient_description_echoes_response_xml": "true",
+        "other_domain_email_signed_in": "true",
+        "other_domain_email_outcome": "session (sso:50d5ea40-8697-495c-92d5-3e368ff5a4c6)",
+        "idp_initiated_signed_in": "true",
+        "idp_initiated_outcome": "session (sso:50d5ea40-8697-495c-92d5-3e368ff5a4c6)"
+      },
+      "durationMs": 24085
+    },
+    {
+      "id": "AU04z",
+      "title": "AU04z: cleanup",
+      "status": "info",
+      "detail": "project delete HTTP 200; scratch dir removed",
+      "durationMs": 24085
+    }
+  ]
+}

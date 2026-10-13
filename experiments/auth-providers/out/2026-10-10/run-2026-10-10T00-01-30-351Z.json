@@ -1,0 +1,148 @@
+{
+  "startedAt": "2026-10-10T00:01:30.351Z",
+  "finishedAt": "2026-10-10T00:02:08.990Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "auth-providers",
+  "labCommit": "70e4244",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "AU02-setup",
+      "title": "AU02-setup: project, user, browser container",
+      "status": "info",
+      "measurements": {
+        "provision_s": 12
+      },
+      "durationMs": 38638
+    },
+    {
+      "id": "AU02a",
+      "title": "AU02a: registerPasskey with passkeys disabled (default)",
+      "status": "pass",
+      "detail": "passkey_disabled \"Passkeys are disabled\"",
+      "measurements": {
+        "chromium": "156.0.8078.4",
+        "login_ok": "true",
+        "register_error_code": "passkey_disabled",
+        "register_http": 404
+      },
+      "durationMs": 38639
+    },
+    {
+      "id": "AU02b",
+      "title": "AU02b: enable, registerPasskey, signInWithPasskey, list",
+      "status": "pass",
+      "detail": "patch HTTP 200; register ok; signin ok",
+      "measurements": {
+        "patch_status": 200,
+        "rp_visible_s": 3,
+        "register_ok": "true",
+        "register_friendly_name_requested": "lab key",
+        "register_friendly_name_returned": "Passkey",
+        "register_data_keys": "created_at,friendly_name,id",
+        "signin_ok": "true",
+        "signin_same_user": "true",
+        "signin_amr": "[{\"method\":\"passkey\",\"timestamp\":1791590511}]",
+        "user_list_count": 1,
+        "admin_list_status": 200,
+        "admin_list_count": 1,
+        "admin_row_keys": "created_at,friendly_name,id,last_used_at",
+        "admin_last_used_set": "true",
+        "credentials_exported": 1,
+        "credential_rp_ids": "localhost"
+      },
+      "durationMs": 38639
+    },
+    {
+      "id": "AU02c",
+      "title": "AU02c: page origin outside webauthn_rp_origins",
+      "status": "pass",
+      "detail": "signin: webauthn_verification_failed \"Credential verification failed\"; register: webauthn_verification_failed \"Credential verification failed\"",
+      "measurements": {
+        "options_rp_id": "localhost",
+        "signin_error_code": "webauthn_verification_failed",
+        "signin_http": 400,
+        "signin_error_is_browser_dom_error": "false",
+        "register_error_code": "webauthn_verification_failed",
+        "register_http": 400
+      },
+      "durationMs": 38639
+    },
+    {
+      "id": "AU02d",
+      "title": "AU02d: webauthn_rp_id not a suffix of the page host",
+      "status": "pass",
+      "detail": "patch HTTP 200; register: ERROR_INVALID_RP_ID \"The RP ID \"example.com\" is invalid for this domain\"; signin: ERROR_INVALID_RP_ID \"The RP ID \"example.com\" is invalid for this domain\"",
+      "measurements": {
+        "patch_status": 200,
+        "rp_visible_s": 6,
+        "register_error_name": "SecurityError",
+        "register_http": "-",
+        "signin_error_name": "SecurityError",
+        "signin_http": "-"
+      },
+      "durationMs": 38639
+    },
+    {
+      "id": "AU02e",
+      "title": "AU02e: RP ID changed after enrolment",
+      "status": "fail",
+      "detail": "patch HTTP 400; old credential signin: ERROR_INVALID_RP_ID \"The RP ID \"example.com\" is invalid for this domain\"; new RP register: ERROR_INVALID_RP_ID; new RP signin: ERROR_INVALID_RP_ID",
+      "measurements": {
+        "patch_status": 400,
+        "rp_visible_s": -1,
+        "old_credential_signin_ok": "false",
+        "old_credential_error_name": "SecurityError",
+        "old_credential_http": "-",
+        "new_rp_register_ok": "false",
+        "new_rp_signin_ok": "false"
+      },
+      "durationMs": 38639
+    },
+    {
+      "id": "AU02f",
+      "title": "AU02f: admin passkey API (list, delete) and sign-in afterwards",
+      "status": "pass",
+      "detail": "publishable-key list HTTP 401; delete HTTP 204; signin after delete: webauthn_verification_failed \"Credential verification failed\"",
+      "measurements": {
+        "list_with_publishable_key_status": 401,
+        "list_with_secret_key_status": 200,
+        "passkeys_before_delete": 1,
+        "delete_status": 204,
+        "passkeys_after_delete": 0,
+        "signin_after_delete_ok": "false",
+        "signin_after_delete_code": "webauthn_verification_failed",
+        "signin_after_delete_http": 400
+      },
+      "durationMs": 38639
+    },
+    {
+      "id": "AU02g",
+      "title": "AU02g: passkeys per user until refusal",
+      "status": "info",
+      "detail": "registered 10 before: too_many_passkeys \"Maximum number of passkeys reached\"",
+      "measurements": {
+        "max_attempted": 12,
+        "registered_before_refusal": 10,
+        "refusal_code": "too_many_passkeys",
+        "refusal_http": 422
+      },
+      "evidence": "[\"ok\",\"ok\",\"ok\",\"ok\",\"ok\",\"ok\",\"ok\",\"ok\",\"ok\",\"ok\",\"too_many_passkeys\"]",
+      "durationMs": 38639
+    },
+    {
+      "id": "AU02z",
+      "title": "AU02z: cleanup",
+      "status": "info",
+      "detail": "browser dir removed; project delete HTTP 200",
+      "durationMs": 38639
+    }
+  ]
+}
