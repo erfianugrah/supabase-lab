@@ -1,0 +1,243 @@
+{
+  "startedAt": "2026-10-10T07:22:08.083Z",
+  "finishedAt": "2026-10-10T07:22:50.900Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "free-email-templates",
+  "labCommit": "70e4244",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "FE01a",
+      "title": "FE01a: create project on a free org",
+      "status": "pass",
+      "measurements": {
+        "create_status": 201,
+        "healthy_s": 0,
+        "auth_config_ready_s": 1
+      },
+      "durationMs": 30819
+    },
+    {
+      "id": "FE01b",
+      "title": "FE01b: baseline mailer_* / smtp_* keys",
+      "status": "info",
+      "detail": "smtp_host=null; 6/6 content keys, 6/6 subject keys present",
+      "measurements": {
+        "get_status": 200,
+        "content_keys_present": 6,
+        "subject_keys_present": 6,
+        "smtp_host_null": 1
+      },
+      "evidence": "{\"mailer_allow_unverified_email_sign_ins\":false,\"mailer_autoconfirm\":false,\"mailer_otp_exp\":3600,\"mailer_otp_length\":8,\"mailer_secure_email_change_enabled\":true,\"mailer_subjects_confirmation\":\"Confirm your email address\",\"mailer_subjects_email_change\":\"Confirm your new email address\",\"mailer_subjects_invite\":\"You've been invited\",\"mailer_subjects_magic_link\":\"Your sign-in link\",\"mailer_subjects_reauthentication\":\"{{ .Token }} is your verification code\",\"mailer_subjects_recovery\":\"Reset your password\",\"mailer_subjects_password_changed_notification\":\"Your password was changed\",\"mailer_subjects_email_changed_notification\":\"Your email address was changed\",\"mailer_subjects_phone_changed_notification\":\"Your phone number was changed\",\"mailer_subjects_mfa_factor_enrolled_notification\":\"A new verification method was added to your account\",\"mailer_subjects_mfa_factor_unenrolled_notification\":\"A verification method was removed from your account\",\"mailer_subjects_identity_linked_notification\":\"A new sign-in method was linked to your account\",\"mailer_subjects_identity_unlinked_notification\":\"A sign-in method was removed from your account\",\"mailer_templates_confirmation_content\":\"<h2>Confirm your email address</h2>\\n\\n<p>Follow the link belo...(184 chars)\",\"mailer_templates_email_change_content\":\"<h2>Confirm your new email address</h2>\\n\\n<p>Follow the link ...(270 chars)\",\"mailer_templates_invite_content\":\"<h2>You've been invited</h2>\\n\\n<p>You've been invited to crea...(173 chars)\",\"mailer_templates_magic_link_content\":\"<h2>Your sign-in link</h2>\\n\\n<p>Follow the link below to sign...(173 chars)\",\"mailer_templates_reauthentication_content\":\"<h2>Your verification code</h2>\\n\\n<p>Use the code below to ve...(124 chars)\",\"mailer_templates_recovery_content\":\"<h2>Reset your password</h2>\\n\\n<p>We received a request to re...(254 chars)\",\"mailer_templates_password_changed_notification_content\":\"<h2>Your password was changed</h2>\\n\\n<p>The password for your...(187 chars)\",\"mailer_templates_email_changed_notification_content\":\"<h2>Your email address was changed</h2>\\n\\n<p>The email addres...(201 chars)\",\"mailer_templates_phone_changed_notification_content\":\"<h2>Your phone number was changed</h2>\\n\\n<p>The phone number ...(199 chars)\",\"mailer_templates_mfa_factor_enrolled_notification_content\":\"<h2>A new verification method was added</h2>\\n\\n<p>Sign-in ver...(194 chars)\",\"mailer_templates_mfa_factor_unenrolled_notification_content\":\"<h2>A verification method was removed</h2>\\n\\n<p>Sign-in verif...(196 chars)\",\"mailer_templates_identity_linked_notification_content\":\"<h2>A new sign-in method was linked</h2>\\n\\n<p>Your {{ .Provid...(199 chars)\",\"mailer_templates_identity_unlinked_notification_content\":\"<h2>A sign-in method was removed</h2>\\n\\n<p>Your {{ .Provider ...(193 chars)\",\"mailer_notifications_password_changed_enabled\":false,\"mailer_notifications_email_changed_enabled\":false,\"mailer_notifications_phone_changed_enabled\":false,\"mailer_notifications_mfa_factor_enrolled_enabled\":false,\"mailer_notifications_mfa_factor_unenrolled_enabled\":false,\"mailer_notifications_identity_linked_enabled\":false,\"mailer_notifications_identity_unlinked_enabled\":false,\"smtp_admin_email\":null,\"smtp_host\":null,\"smtp_max_frequency\":60,\"smtp_pass\":null,\"smtp_port\":null,\"smtp_sender_name\":null,\"smtp_user\":null,\"mailer_subjects_custom_contents\":{\"MAILER_SUBJECTS_CONFIRMATION\":false,\"MAILER_SUBJECTS_EMAIL_CHANGE\":false,\"MAILER_SUBJECTS_INVITE\":false,\"MAILER_SUBJECTS_MAGIC_LINK\":false,\"MAILER_SUBJECTS_REAUTHENTICATION\":false,\"MAILER_SUBJECTS_RECOVERY\":false,\"MAILER_SUBJECTS_PASSWORD_CHANGED_NOTIFICATION\":false,\"MAILER_SUBJECTS_EMAIL_CHANGED_NOTIFICATION\":false,\"MAILER_SUBJECTS_PHONE_CHANGED_NOTIFICATION\":false,\"MAILER_SUBJECTS_MFA_FACTOR_ENROLLED_NOTIFICATION\":false,\"MAILER_SUBJECTS_MFA_FACTOR_UNENROLLED_NOTIFICATION\":false,\"MAILER_SUBJECTS_IDENTITY_LINKED_NOTIFICATION\":false,\"MAILER_SUBJECTS_IDENTITY_UNLINKED_NOTIFICATION\":false},\"mailer_templates_custom_contents\":{\"MAILER_TEMPLATES_CONFIRMATION_CONTENT\":false,\"MAILER_TEMPLATES_EMAIL_CHANGE_CONTENT\":false,\"MAILER_TEMPLATES_INVITE_CONTENT\":false,\"MAILER_TEMPLATES_MAGIC_LINK_CONTENT\":false,\"MAILER_TEMPLATES_REAUTHENTICATION_CONTENT\":false,\"MAILER_TEMPLATES_RECOVERY_CONTENT\":false,\"MAILER_TEMPLATES_PASSWORD_CHANGED_NOTIFICATION_CONTENT\":false,\"MAILER_TEMPLATES_EMAIL_CHANGED_NOTIFICATION_CONTENT\":false,\"MAILER_TEMPLATES_PHONE_CHANGED_NOTIFICATION_CONTENT\":false,\"MAILER_TEMPLATES_MFA_FACTOR_ENROLLED_NOTIFICATION_CONTENT\":false,\"MAILER_TEMPLATES_MFA_FACTOR_UNENROLLED_NOTIFICATION_CONTENT\":false,\"MAILER_TEMPLATES_IDENTITY_LINKED_NOTIFICATION_CONTENT\":false,\"MAILER_TEMPLATES_IDENTITY_UNLINKED_NOTIFICATION_CONTENT\":false}}",
+      "durationMs": 30819
+    },
+    {
+      "id": "FE01c",
+      "title": "FE01c: control PATCH of a non-template field",
+      "status": "pass",
+      "detail": "HTTP 200",
+      "measurements": {
+        "patch_status": 200,
+        "persisted": 1
+      },
+      "durationMs": 30819
+    },
+    {
+      "id": "FE01d",
+      "title": "FE01d: template PATCH on a free org, default SMTP",
+      "status": "info",
+      "detail": "content: 0/6 accepted, 0/6 persisted; subjects (one PATCH): HTTP 400: {\"message\":\"Email template modification is not available for free tier projects using the default email provider. Please upgrade your plan or configure a custom SMTP provider.\"}, 0/6 persisted; notification templates (one PATCH): HTTP 400: {\"message\":\"Email template modification is not available for free tier projects using the default email provider. Please upgrade your plan or configure a custom SMTP provider.\"}; notification enable flag: HTTP 200",
+      "measurements": {
+        "content_confirmation_status": 400,
+        "content_confirmation_persisted": 0,
+        "content_invite_status": 400,
+        "content_invite_persisted": 0,
+        "content_magic_link_status": 400,
+        "content_magic_link_persisted": 0,
+        "content_recovery_status": 400,
+        "content_recovery_persisted": 0,
+        "content_email_change_status": 400,
+        "content_email_change_persisted": 0,
+        "content_reauthentication_status": 400,
+        "content_reauthentication_persisted": 0,
+        "content_accepted": 0,
+        "content_persisted_n": 0,
+        "subjects_status": 400,
+        "subjects_persisted_n": 0,
+        "notif_content_status": 400,
+        "notif_enable_status": 200,
+        "templates_custom_flags_true": 0,
+        "subjects_custom_flags_true": 0
+      },
+      "evidence": "{\"content_errors\":{\"confirmation\":\"HTTP 400: {\\\"message\\\":\\\"Email template modification is not available for free tier projects using the default email provider. Please upgrade your plan or configure a custom SMTP provider.\\\"}\",\"invite\":\"HTTP 400: {\\\"message\\\":\\\"Email template modification is not available for free tier projects using the default email provider. Please upgrade your plan or configure a custom SMTP provider.\\\"}\",\"magic_link\":\"HTTP 400: {\\\"message\\\":\\\"Email template modification is not available for free tier projects using the default email provider. Please upgrade your plan or configure a custom SMTP provider.\\\"}\",\"recovery\":\"HTTP 400: {\\\"message\\\":\\\"Email template modification is not available for free tier projects using the default email provider. Please upgrade your plan or configure a custom SMTP provider.\\\"}\",\"email_change\":\"HTTP 400: {\\\"message\\\":\\\"Email template modification is not available for free tier projects using the default email provider. Please upgrade your plan or configure a custom SMTP provider.\\\"}\",\"reauthentication\":\"HTTP 400: {\\\"message\\\":\\\"Email template modification is not available for free tier projects using the default email provider. Please upgrade your plan or configure a custom SMTP provider.\\\"}\"},\"subjects\":\"HTTP 400: {\\\"message\\\":\\\"Email template modification is not available for free tier projects using the default email provider. Please upgrade your plan or configure a custom SMTP provider.\\\"}\",\"notif_content\":\"HTTP 400: {\\\"message\\\":\\\"Email template modification is not available for free tier projects using the default email provider. Please upgrade your plan or configure a custom SMTP provider.\\\"}\",\"notif_enable\":\"HTTP 200\"}",
+      "durationMs": 30819
+    },
+    {
+      "id": "FE01e",
+      "title": "FE01e: custom SMTP fields (dummy host) written",
+      "status": "pass",
+      "detail": "HTTP 200",
+      "measurements": {
+        "patch_status": 200,
+        "smtp_host_persisted": 1
+      },
+      "evidence": "{\"smtp_admin_email\":\"<email>\",\"smtp_host\":\"smtp.example.com\",\"smtp_max_frequency\":60,\"smtp_pass\":\"<set>\",\"smtp_port\":\"587\",\"smtp_sender_name\":\"lab\",\"smtp_user\":\"lab-user\"}",
+      "durationMs": 30819
+    },
+    {
+      "id": "FE01f",
+      "title": "FE01f: template PATCH with custom SMTP set",
+      "status": "info",
+      "detail": "content: 6/6 accepted, 6/6 persisted; subjects (one PATCH): HTTP 200; notification templates (one PATCH): HTTP 200; notification enable flag: HTTP 200",
+      "measurements": {
+        "content_confirmation_status": 200,
+        "content_confirmation_persisted": 1,
+        "content_invite_status": 200,
+        "content_invite_persisted": 1,
+        "content_magic_link_status": 200,
+        "content_magic_link_persisted": 1,
+        "content_recovery_status": 200,
+        "content_recovery_persisted": 1,
+        "content_email_change_status": 200,
+        "content_email_change_persisted": 1,
+        "content_reauthentication_status": 200,
+        "content_reauthentication_persisted": 1,
+        "content_accepted": 6,
+        "content_persisted_n": 6,
+        "subjects_status": 200,
+        "notif_content_status": 200,
+        "notif_enable_status": 200,
+        "templates_custom_flags_true": 13,
+        "subjects_custom_flags_true": 6
+      },
+      "evidence": "{\"content_errors\":{},\"notif_content\":\"HTTP 200\"}",
+      "durationMs": 30819
+    },
+    {
+      "id": "FE01g",
+      "title": "FE01g: custom SMTP cleared",
+      "status": "info",
+      "detail": "clear: HTTP 200; smtp_host after=null; 0/6 custom-SMTP-era templates still stored; retry: 0/6 accepted",
+      "measurements": {
+        "clear_status": 200,
+        "smtp_host_null_after": 1,
+        "templates_survived_n": 0,
+        "templates_equal_baseline_n": 6,
+        "subjects_equal_baseline_n": 6,
+        "templates_custom_flags_true_after_clear": 0,
+        "retry_confirmation_status": 400,
+        "retry_confirmation_persisted": 0,
+        "retry_invite_status": 400,
+        "retry_invite_persisted": 0,
+        "retry_magic_link_status": 400,
+        "retry_magic_link_persisted": 0,
+        "retry_recovery_status": 400,
+        "retry_recovery_persisted": 0,
+        "retry_email_change_status": 400,
+        "retry_email_change_persisted": 0,
+        "retry_reauthentication_status": 400,
+        "retry_reauthentication_persisted": 0,
+        "retry_accepted": 0,
+        "retry_persisted_n": 0
+      },
+      "evidence": "{\"retry_errors\":{\"confirmation\":\"HTTP 400: {\\\"message\\\":\\\"Email template modification is not available for free tier projects using the default email provider. Please upgrade your plan or configure a custom SMTP provider.\\\"}\",\"invite\":\"HTTP 400: {\\\"message\\\":\\\"Email template modification is not available for free tier projects using the default email provider. Please upgrade your plan or configure a custom SMTP provider.\\\"}\",\"magic_link\":\"HTTP 400: {\\\"message\\\":\\\"Email template modification is not available for free tier projects using the default email provider. Please upgrade your plan or configure a custom SMTP provider.\\\"}\",\"recovery\":\"HTTP 400: {\\\"message\\\":\\\"Email template modification is not available for free tier projects using the default email provider. Please upgrade your plan or configure a custom SMTP provider.\\\"}\",\"email_change\":\"HTTP 400: {\\\"message\\\":\\\"Email template modification is not available for free tier projects using the default email provider. Please upgrade your plan or configure a custom SMTP provider.\\\"}\",\"reauthentication\":\"HTTP 400: {\\\"message\\\":\\\"Email template modification is not available for free tier projects using the default email provider. Please upgrade your plan or configure a custom SMTP provider.\\\"}\"}}",
+      "durationMs": 30819
+    },
+    {
+      "id": "FE01h",
+      "title": "FE01h: smtp_host alone set, then a template PATCH",
+      "status": "info",
+      "detail": "smtp_host only: HTTP 200; template after: HTTP 400: {\"message\":\"Email template modification is not available for free tier projects using the default email provider. Please upgrade your plan or configure a custom SMTP provider.\"}",
+      "measurements": {
+        "host_only_status": 200,
+        "template_status": 400
+      },
+      "durationMs": 30819
+    },
+    {
+      "id": "FE01i",
+      "title": "FE01i: SMTP and template fields in one PATCH from default state",
+      "status": "info",
+      "detail": "HTTP 200",
+      "measurements": {
+        "patch_status": 200,
+        "smtp_host_persisted": 1,
+        "template_persisted": 1
+      },
+      "durationMs": 30819
+    },
+    {
+      "id": "FE02a",
+      "title": "FE02a: create project on a Pro org",
+      "status": "pass",
+      "measurements": {
+        "create_status": 201,
+        "healthy_s": 0,
+        "auth_config_ready_s": 1
+      },
+      "durationMs": 11998
+    },
+    {
+      "id": "FE02b",
+      "title": "FE02b: baseline mailer_* / smtp_* keys",
+      "status": "info",
+      "detail": "smtp_host=null; 6/6 content keys, 6/6 subject keys present",
+      "measurements": {
+        "get_status": 200,
+        "content_keys_present": 6,
+        "subject_keys_present": 6,
+        "smtp_host_null": 1
+      },
+      "evidence": "{\"mailer_allow_unverified_email_sign_ins\":false,\"mailer_autoconfirm\":false,\"mailer_otp_exp\":3600,\"mailer_otp_length\":8,\"mailer_secure_email_change_enabled\":true,\"mailer_subjects_confirmation\":\"Confirm your email address\",\"mailer_subjects_email_change\":\"Confirm your new email address\",\"mailer_subjects_invite\":\"You've been invited\",\"mailer_subjects_magic_link\":\"Your sign-in link\",\"mailer_subjects_reauthentication\":\"{{ .Token }} is your verification code\",\"mailer_subjects_recovery\":\"Reset your password\",\"mailer_subjects_password_changed_notification\":\"Your password was changed\",\"mailer_subjects_email_changed_notification\":\"Your email address was changed\",\"mailer_subjects_phone_changed_notification\":\"Your phone number was changed\",\"mailer_subjects_mfa_factor_enrolled_notification\":\"A new verification method was added to your account\",\"mailer_subjects_mfa_factor_unenrolled_notification\":\"A verification method was removed from your account\",\"mailer_subjects_identity_linked_notification\":\"A new sign-in method was linked to your account\",\"mailer_subjects_identity_unlinked_notification\":\"A sign-in method was removed from your account\",\"mailer_templates_confirmation_content\":\"<h2>Confirm your email address</h2>\\n\\n<p>Follow the link belo...(184 chars)\",\"mailer_templates_email_change_content\":\"<h2>Confirm your new email address</h2>\\n\\n<p>Follow the link ...(270 chars)\",\"mailer_templates_invite_content\":\"<h2>You've been invited</h2>\\n\\n<p>You've been invited to crea...(173 chars)\",\"mailer_templates_magic_link_content\":\"<h2>Your sign-in link</h2>\\n\\n<p>Follow the link below to sign...(173 chars)\",\"mailer_templates_reauthentication_content\":\"<h2>Your verification code</h2>\\n\\n<p>Use the code below to ve...(124 chars)\",\"mailer_templates_recovery_content\":\"<h2>Reset your password</h2>\\n\\n<p>We received a request to re...(254 chars)\",\"mailer_templates_password_changed_notification_content\":\"<h2>Your password was changed</h2>\\n\\n<p>The password for your...(187 chars)\",\"mailer_templates_email_changed_notification_content\":\"<h2>Your email address was changed</h2>\\n\\n<p>The email addres...(201 chars)\",\"mailer_templates_phone_changed_notification_content\":\"<h2>Your phone number was changed</h2>\\n\\n<p>The phone number ...(199 chars)\",\"mailer_templates_mfa_factor_enrolled_notification_content\":\"<h2>A new verification method was added</h2>\\n\\n<p>Sign-in ver...(194 chars)\",\"mailer_templates_mfa_factor_unenrolled_notification_content\":\"<h2>A verification method was removed</h2>\\n\\n<p>Sign-in verif...(196 chars)\",\"mailer_templates_identity_linked_notification_content\":\"<h2>A new sign-in method was linked</h2>\\n\\n<p>Your {{ .Provid...(199 chars)\",\"mailer_templates_identity_unlinked_notification_content\":\"<h2>A sign-in method was removed</h2>\\n\\n<p>Your {{ .Provider ...(193 chars)\",\"mailer_notifications_password_changed_enabled\":false,\"mailer_notifications_email_changed_enabled\":false,\"mailer_notifications_phone_changed_enabled\":false,\"mailer_notifications_mfa_factor_enrolled_enabled\":false,\"mailer_notifications_mfa_factor_unenrolled_enabled\":false,\"mailer_notifications_identity_linked_enabled\":false,\"mailer_notifications_identity_unlinked_enabled\":false,\"smtp_admin_email\":null,\"smtp_host\":null,\"smtp_max_frequency\":60,\"smtp_pass\":null,\"smtp_port\":null,\"smtp_sender_name\":null,\"smtp_user\":null,\"mailer_subjects_custom_contents\":{\"MAILER_SUBJECTS_CONFIRMATION\":false,\"MAILER_SUBJECTS_EMAIL_CHANGE\":false,\"MAILER_SUBJECTS_INVITE\":false,\"MAILER_SUBJECTS_MAGIC_LINK\":false,\"MAILER_SUBJECTS_REAUTHENTICATION\":false,\"MAILER_SUBJECTS_RECOVERY\":false,\"MAILER_SUBJECTS_PASSWORD_CHANGED_NOTIFICATION\":false,\"MAILER_SUBJECTS_EMAIL_CHANGED_NOTIFICATION\":false,\"MAILER_SUBJECTS_PHONE_CHANGED_NOTIFICATION\":false,\"MAILER_SUBJECTS_MFA_FACTOR_ENROLLED_NOTIFICATION\":false,\"MAILER_SUBJECTS_MFA_FACTOR_UNENROLLED_NOTIFICATION\":false,\"MAILER_SUBJECTS_IDENTITY_LINKED_NOTIFICATION\":false,\"MAILER_SUBJECTS_IDENTITY_UNLINKED_NOTIFICATION\":false},\"mailer_templates_custom_contents\":{\"MAILER_TEMPLATES_CONFIRMATION_CONTENT\":false,\"MAILER_TEMPLATES_EMAIL_CHANGE_CONTENT\":false,\"MAILER_TEMPLATES_INVITE_CONTENT\":false,\"MAILER_TEMPLATES_MAGIC_LINK_CONTENT\":false,\"MAILER_TEMPLATES_REAUTHENTICATION_CONTENT\":false,\"MAILER_TEMPLATES_RECOVERY_CONTENT\":false,\"MAILER_TEMPLATES_PASSWORD_CHANGED_NOTIFICATION_CONTENT\":false,\"MAILER_TEMPLATES_EMAIL_CHANGED_NOTIFICATION_CONTENT\":false,\"MAILER_TEMPLATES_PHONE_CHANGED_NOTIFICATION_CONTENT\":false,\"MAILER_TEMPLATES_MFA_FACTOR_ENROLLED_NOTIFICATION_CONTENT\":false,\"MAILER_TEMPLATES_MFA_FACTOR_UNENROLLED_NOTIFICATION_CONTENT\":false,\"MAILER_TEMPLATES_IDENTITY_LINKED_NOTIFICATION_CONTENT\":false,\"MAILER_TEMPLATES_IDENTITY_UNLINKED_NOTIFICATION_CONTENT\":false}}",
+      "durationMs": 11998
+    },
+    {
+      "id": "FE02c",
+      "title": "FE02c: control PATCH of a non-template field",
+      "status": "pass",
+      "detail": "HTTP 200",
+      "measurements": {
+        "patch_status": 200,
+        "persisted": 1
+      },
+      "durationMs": 11999
+    },
+    {
+      "id": "FE02d",
+      "title": "FE02d: template PATCH on a Pro org, default SMTP",
+      "status": "info",
+      "detail": "content: 6/6 accepted, 6/6 persisted; subjects (one PATCH): HTTP 200, 6/6 persisted; notification templates (one PATCH): HTTP 200; notification enable flag: HTTP 200",
+      "measurements": {
+        "content_confirmation_status": 200,
+        "content_confirmation_persisted": 1,
+        "content_invite_status": 200,
+        "content_invite_persisted": 1,
+        "content_magic_link_status": 200,
+        "content_magic_link_persisted": 1,
+        "content_recovery_status": 200,
+        "content_recovery_persisted": 1,
+        "content_email_change_status": 200,
+        "content_email_change_persisted": 1,
+        "content_reauthentication_status": 200,
+        "content_reauthentication_persisted": 1,
+        "content_accepted": 6,
+        "content_persisted_n": 6,
+        "subjects_status": 200,
+        "subjects_persisted_n": 6,
+        "notif_content_status": 200,
+        "notif_enable_status": 200,
+        "templates_custom_flags_true": 13,
+        "subjects_custom_flags_true": 6
+      },
+      "evidence": "{\"content_errors\":{},\"subjects\":\"HTTP 200\",\"notif_content\":\"HTTP 200\",\"notif_enable\":\"HTTP 200\"}",
+      "durationMs": 11999
+    }
+  ]
+}
