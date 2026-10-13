@@ -7,7 +7,7 @@ experiments:
 
 # Decrypt the committed secrets.enc.tfvars to secrets.tfvars (gitignored).
 secrets-decrypt:
-	$(SOPS) -d secrets.enc.tfvars > secrets.tfvars
+	umask 077; $(SOPS) -d secrets.enc.tfvars > secrets.tfvars
 	@echo "secrets.tfvars written (gitignored)"
 
 # Re-encrypt after editing secrets.tfvars. The plaintext stays local.
