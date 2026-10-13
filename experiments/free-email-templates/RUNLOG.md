@@ -1,10 +1,12 @@
 # free-email-templates RUNLOG
 
 Chronological record of what was actually run. Org slugs and project refs are
-not recorded here. Evidence stays in gitignored
-`evidence/`; it has not been published to `out/` yet, so the figures below are
-transcribed from the run artifacts' measurement tables and each cites its
-module id and run.
+not recorded here. Raw evidence stays in the gitignored `evidence/`; the
+figures below are transcribed from the run artifacts' measurement tables and
+each cites its module id and run. Redacted copies, each with a `.facts.md`
+beside it: run 1 `out/2026-10-10/run-2026-10-10T07-20-50-952Z.json`, run 2
+`out/2026-10-10/run-2026-10-10T07-22-08-083Z.json`, run 3
+`out/2026-10-10/run-2026-10-10T07-23-12-964Z.json`.
 
 ## What the docs claim (not measured by this run)
 
