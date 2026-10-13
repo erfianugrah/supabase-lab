@@ -2,6 +2,16 @@ ROOT := $(abspath ../..)
 VARS := -var-file=$(ROOT)/secrets.tfvars -var-file=experiment.tfvars
 TS := $(shell date +%Y%m%d-%H%M%S)
 
+# The harness build is linux-x64 only; elsewhere run the same entry from source
+# (the governed-starter-kit Makefile's switch).
+ifeq ($(shell uname -s),Linux)
+RUNNER := $(ROOT)/harness/dist/pvlab
+BUILD  := cd $(ROOT)/harness && bun run build >/dev/null
+else
+RUNNER := bun $(ROOT)/harness/src/run.ts
+BUILD  := cd $(ROOT)/harness && bun scripts/gen-registry.ts >/dev/null
+endif
+
 # A project ref is 20 lowercase letters. Filtering on that SHAPE is what makes
 # the `test -n` guard below actually fire: with no state, `tofu output -raw`
 # prints its "No outputs found" warning to STDOUT, which is not empty, so a
@@ -46,14 +56,14 @@ probe:
 	@test -n "$(TOK)" || (echo "no PAT - export SUPABASE_ACCESS_TOKEN or run 'make secrets-decrypt' at the root"; exit 1)
 	@case "$(TOK)" in *REPLACE_ME*) echo "PAT is the committed placeholder - export SUPABASE_ACCESS_TOKEN"; exit 1;; esac
 	@test -n "$(ONLY)" || (echo "refusing to run with an empty ONLY - see the comment above"; exit 1)
-	@cd $(ROOT)/harness && bun run build >/dev/null
+	@$(BUILD)
 	@mkdir -p evidence/$(TS)
 	@anon=$$(curl -s -H "Authorization: Bearer $(TOK)" \
 		"https://api.supabase.com/v1/projects/$(REF)/api-keys" \
 		| jq -r '.[] | select(.name=="anon") | .api_key' | head -1); \
 	test -n "$$anon" || (echo "could not fetch the anon key"; exit 1); \
 	PVLAB_REF="$(REF)" SUPABASE_ACCESS_TOKEN="$(TOK)" SUPABASE_ANON_KEY="$$anon" DB_PASSWORD="$(PW)" \
-		$(ROOT)/harness/dist/pvlab --where local --experiment data-api-reenable \
+		$(RUNNER) --where local --experiment data-api-reenable \
 		--only $(ONLY) $(RUNNER_FLAGS) --out evidence/$(TS)
 	@echo "== evidence/$(TS)/ =="
 
