@@ -1,0 +1,136 @@
+{
+  "startedAt": "2026-10-10T07:20:24.545Z",
+  "finishedAt": "2026-10-10T07:22:21.438Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "scoped-pats",
+  "labCommit": "70e4244",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "SP02-lab",
+      "title": "SP02-lab: lab token baseline across 59 probes",
+      "status": "pass",
+      "detail": "no probe refused with missing_permissions; the probe list is usable and this token is not narrower than the probes; fixture self-provisioned",
+      "measurements": {
+        "probes": 59,
+        "ok": 53,
+        "denied_missing_permissions": 0,
+        "forbidden_other": 0,
+        "unauthorized_401": 0,
+        "other_status": 6,
+        "predicted_denied": 0,
+        "agree": 59,
+        "disagree": 0
+      },
+      "evidence": "{\"statuses\":{\"api-keys-reveal\":\"200\",\"sql-select-readonly-endpoint\":\"201\",\"sql-select-write-endpoint\":\"201\",\"v1-generate-typescript-types\":\"200\",\"v1-get-all-projects-for-organization\":\"200\",\"v1-get-an-organization\":\"200\",\"v1-get-auth-service-config\":\"200\",\"v1-get-backup-schedule\":\"402\",\"v1-get-database-disk\":\"200\",\"v1-get-database-metadata\":\"200\",\"v1-get-database-openapi\":\"200\",\"v1-get-disk-utilization\":\"200\",\"v1-get-hostname-config\":\"400\",\"v1-get-jit-access\":\"406\",\"v1-get-jit-access-config\":\"200\",\"v1-get-legacy-signing-key\":\"200\",\"v1-get-network-restrictions\":\"200\",\"v1-get-organization-entitlements\":\"200\",\"v1-get-performance-advisors\":\"200\",\"v1-get-pgsodium-config\":\"200\",\"v1-get-pooler-config\":\"200\",\"v1-get-postgres-config\":\"200\",\"v1-get-postgres-upgrade-eligibility\":\"200\",\"v1-get-postgres-upgrade-status\":\"200\",\"v1-get-postgrest-service-config\":\"200\",\"v1-get-project\":\"200\",\"v1-get-project-api-keys\":\"200\",\"v1-get-project-disk-autoscale-config\":\"200\",\"v1-get-project-legacy-api-keys\":\"200\",\"v1-get-project-logs\":\"200\",\"v1-get-project-logs-all\":\"410\",\"v1-get-project-pgbouncer-config\":\"200\",\"v1-get-project-signing-keys\":\"200\",\"v1-get-project-usage-api-count\":\"200\",\"v1-get-project-usage-request-count\":\"200\",\"v1-get-readonly-mode-status\":\"200\",\"v1-get-realtime-config\":\"200\",\"v1-get-restore-point\":\"400\",\"v1-get-security-advisors\":\"200\",\"v1-get-ssl-enforcement-config\":\"200\",\"v1-get-storage-config\":\"200\",\"v1-get-vanity-subdomain-config\":\"200\",\"v1-list-action-runs\":\"200\",\"v1-list-all-backups\":\"200\",\"v1-list-all-branches\":\"200\",\"v1-list-all-buckets\":\"200\",\"v1-list-all-functions\":\"200\",\"v1-list-all-organizations\":\"200\",\"v1-list-all-projects\":\"200\",\"v1-list-all-secrets\":\"200\",\"v1-list-all-snippets\":\"200\",\"v1-list-all-sso-provider\":\"200\",\"v1-list-available-restore-versions\":\"400\",\"v1-list-jit-access\":\"200\",\"v1-list-migration-history\":\"200\",\"v1-list-organization-members\":\"200\",\"v1-list-project-addons\":\"200\",\"v1-list-project-tpa-integrations\":\"200\",\"v1-scrape-project-metrics\":\"200\"},\"mismatches\":[]}",
+      "durationMs": 98080
+    },
+    {
+      "id": "SP02-legacy",
+      "title": "SP02-legacy",
+      "status": "skip",
+      "detail": "PVLAB_LEGACY_PAT not set (A pre-GA classic token (dashboard shows a Legacy badge), if one still exists on the account or the dashboard still offers one. Optional contrast for SP02/SP06: the lab's own SUPABASE_ACCESS_TOKEN already has the scoped sbp_fc format.)",
+      "durationMs": 98080
+    },
+    {
+      "id": "SP03-legacy",
+      "title": "SP03-legacy",
+      "status": "skip",
+      "detail": "PVLAB_LEGACY_PAT not set (A pre-GA classic token (dashboard shows a Legacy badge), if one still exists on the account or the dashboard still offers one. Optional contrast for SP02/SP06: the lab's own SUPABASE_ACCESS_TOKEN already has the scoped sbp_fc format.)",
+      "durationMs": 98080
+    },
+    {
+      "id": "SP02-org",
+      "title": "SP02-org",
+      "status": "skip",
+      "detail": "PVLAB_SCOPED_PAT_ORG not set (Resources: the Pro org only, all projects. Permissions: Organization Projects = Read-write, nothing else.)",
+      "durationMs": 98080
+    },
+    {
+      "id": "SP03-org",
+      "title": "SP03-org",
+      "status": "skip",
+      "detail": "PVLAB_SCOPED_PAT_ORG not set (Resources: the Pro org only, all projects. Permissions: Organization Projects = Read-write, nothing else.)",
+      "durationMs": 98080
+    },
+    {
+      "id": "SP02-ro",
+      "title": "SP02-ro",
+      "status": "skip",
+      "detail": "PVLAB_SCOPED_PAT_RO not set (Resources: the fixture project only. Permissions: Read on every project-level permission EXCEPT API Key Secrets (leave that, and every Write, off).)",
+      "durationMs": 98080
+    },
+    {
+      "id": "SP03-ro",
+      "title": "SP03-ro",
+      "status": "skip",
+      "detail": "PVLAB_SCOPED_PAT_RO not set (Resources: the fixture project only. Permissions: Read on every project-level permission EXCEPT API Key Secrets (leave that, and every Write, off).)",
+      "durationMs": 98080
+    },
+    {
+      "id": "SP02-dbrw",
+      "title": "SP02-dbrw",
+      "status": "skip",
+      "detail": "PVLAB_SCOPED_PAT_DBRW not set (Resources: the fixture project only. Permissions: Database = Read-write, Project Settings = Read, API Keys = Read, API Key Secrets = Read.)",
+      "durationMs": 98080
+    },
+    {
+      "id": "SP03-dbrw",
+      "title": "SP03-dbrw",
+      "status": "skip",
+      "detail": "PVLAB_SCOPED_PAT_DBRW not set (Resources: the fixture project only. Permissions: Database = Read-write, Project Settings = Read, API Keys = Read, API Key Secrets = Read.)",
+      "durationMs": 98080
+    },
+    {
+      "id": "SP02-narrow",
+      "title": "SP02-narrow",
+      "status": "skip",
+      "detail": "PVLAB_SCOPED_PAT_NARROW not set (Resources: the fixture project only. Permissions: Project Settings = Read, nothing else.)",
+      "durationMs": 98080
+    },
+    {
+      "id": "SP03-narrow",
+      "title": "SP03-narrow",
+      "status": "skip",
+      "detail": "PVLAB_SCOPED_PAT_NARROW not set (Resources: the fixture project only. Permissions: Project Settings = Read, nothing else.)",
+      "durationMs": 98080
+    },
+    {
+      "id": "SP05-lab",
+      "title": "SP05-lab: select and create table through both SQL endpoints",
+      "status": "pass",
+      "detail": "baseline: write endpoint creates the table, read-only endpoint does not",
+      "measurements": {
+        "select_query_status": 201,
+        "select_readonly_status": 201,
+        "create_via_readonly_endpoint_status": 400,
+        "table_present_after_readonly_endpoint": 0,
+        "create_via_query_status": 201,
+        "table_present_after_query_endpoint": 1
+      },
+      "evidence": "readonly-endpoint create: {\"message\":\"Failed to run sql query: ERROR:  25006: cannot execute CREATE TABLE in a read-only transaction\\n\"}\nquery-endpoint create: []",
+      "durationMs": 18813
+    },
+    {
+      "id": "SP05-ro",
+      "title": "SP05-ro",
+      "status": "skip",
+      "detail": "PVLAB_SCOPED_PAT_RO not set (Resources: the fixture project only. Permissions: Read on every project-level permission EXCEPT API Key Secrets (leave that, and every Write, off).)",
+      "durationMs": 18813
+    },
+    {
+      "id": "SP05-dbrw",
+      "title": "SP05-dbrw",
+      "status": "skip",
+      "detail": "PVLAB_SCOPED_PAT_DBRW not set (Resources: the fixture project only. Permissions: Database = Read-write, Project Settings = Read, API Keys = Read, API Key Secrets = Read.)",
+      "durationMs": 18813
+    }
+  ]
+}

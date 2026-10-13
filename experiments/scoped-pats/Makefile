@@ -1,6 +1,6 @@
 ROOT := $(abspath ../..)
 TS := $(shell date +%Y%m%d-%H%M%S)
-RUN = bun $(ROOT)/harness/src/run.ts --where local --tests $(CURDIR)/tests --experiment scoped-pats --out $(CURDIR)/evidence/$(TS)
+PVLAB = bun $(ROOT)/harness/src/run.ts --where local --tests $(CURDIR)/tests --experiment scoped-pats --out $(CURDIR)/evidence/$(TS)
 
 # Self-provisioning: there is no OpenTofu state. The destructive modules create
 # and delete their own projects (named $(PVLAB_SP_NAME_PREFIX)<tag>-<ms>).
@@ -21,29 +21,36 @@ registry:
 
 # Read-only, no project: creation surface, profile/CLI, header semantics.
 probe: registry
-	$(RUN) --only SP01,SP06,SP10
+	$(PVLAB) --only SP01,SP06,SP10
 
 # Permission matrix + SQL read-only boundary. Provisions one project per module.
 matrix: registry
-	$(RUN) --only SP02,SP05 --destructive
+	$(PVLAB) --only SP02,SP05 --destructive
 
 # Q14: org-scoped token creates projects, sees later ones, request budget.
 org: registry
-	$(RUN) --only SP04 --destructive
+	$(PVLAB) --only SP04 --destructive
 
 # Project-scoped token boundary (needs PVLAB_PEER_FIXTURE and PVLAB_PEER_OTHER).
 boundary: registry
-	$(RUN) --only SP09 --destructive
+	$(PVLAB) --only SP09 --destructive
 
 # Operator-in-the-loop: demote the creator / delete the token while this polls.
 watch-demote: registry
-	PVLAB_SP_WATCH_S=$${PVLAB_SP_WATCH_S:-900} $(RUN) --only SP07 --destructive
+	PVLAB_SP_WATCH_S=$${PVLAB_SP_WATCH_S:-900} $(PVLAB) --only SP07 --destructive
 
 watch-revoke: registry
-	PVLAB_SP_WATCH_S=$${PVLAB_SP_WATCH_S:-900} $(RUN) --only SP08 --destructive
+	PVLAB_SP_WATCH_S=$${PVLAB_SP_WATCH_S:-900} $(PVLAB) --only SP08 --destructive
 
 all-scoped: probe matrix org boundary
 
 facts:
 	@test -n "$(RUNFILE)" || (echo "usage: make facts RUNFILE=evidence/<ts>/run-<stamp>.json"; exit 1)
 	bun $(ROOT)/harness/src/run.ts --facts $(RUNFILE)
+
+.PHONY: publish-evidence
+
+# Redacted copy of a run artifact plus its facts.md into out/<date>/ (committed).
+publish-evidence:
+	@test -n "$(RUN)" || (echo "RUN=evidence/<ts>/run-<stamp>.json required"; exit 1)
+	@cd $(ROOT)/harness && bun scripts/publish-evidence.ts $(abspath $(RUN)) $(abspath .) $(if $(PUBLISH_ONLY),--only $(PUBLISH_ONLY),)

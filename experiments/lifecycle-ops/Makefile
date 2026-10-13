@@ -34,3 +34,11 @@ run-destructive:
 	@cd $(ROOT) && bun harness/scripts/gen-registry.ts >/dev/null
 	@cd $(ROOT) && bun harness/src/run.ts --where local --experiment lifecycle-ops \
 		--only $(ONLY) --destructive --out experiments/lifecycle-ops/evidence/$(TS)
+
+.PHONY: publish-evidence
+
+# Redacted copy of a run artifact plus its facts.md into out/<date>/ (committed).
+# PUBLISH_ONLY, not ONLY, narrows it: ONLY has a default above.
+publish-evidence:
+	@test -n "$(RUN)" || (echo "RUN=evidence/<ts>/run-<stamp>.json required"; exit 1)
+	@cd $(ROOT)/harness && bun scripts/publish-evidence.ts $(abspath $(RUN)) $(abspath .) $(if $(PUBLISH_ONLY),--only $(PUBLISH_ONLY),)

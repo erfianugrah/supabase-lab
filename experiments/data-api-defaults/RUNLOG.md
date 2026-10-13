@@ -10,7 +10,10 @@ public notice cited in the module header; "measured" means the artifact.
 
 Harness: `make run`, modules DD01-DD04 and DD99, `--destructive`, lab commit
 70e4244 plus the uncommitted tree that adds this experiment. n = 1 project per
-run, one trial per probe. Postgres 17.11 on both projects.
+run, one trial per probe. Postgres 17.11 on both projects. Published
+(redacted, recovered from a session scratchpad on 2026-10-13): run 1
+`out/2026-10-09/run-2026-10-09T23-58-24-538Z.json` (UTC start date), run 2
+`out/2026-10-10/run-2026-10-10T00-00-27-688Z.json`, each with a `.facts.md`.
 
 - Run 1: 9 pass, 2 fail. The two fails were probe bugs, not platform
   behaviour: DD02c and DD02d matched `Unknown field "__schema"` against the

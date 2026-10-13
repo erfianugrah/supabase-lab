@@ -1,7 +1,16 @@
 # scoped-pats RUNLOG
 
 Chronological record of what was run. Org slugs and project refs are not
-recorded here. Raw artifacts carry refs and stay off-repo.
+recorded here. Raw artifacts carry refs and stay off-repo (recovered from a
+session scratchpad on 2026-10-13 into the gitignored `evidence/recovered/`).
+Redacted copies, a `.facts.md` beside each, `out/2026-10-10/`:
+`run-2026-10-10T07-18-10-870Z.json` (SP01, first run),
+`run-2026-10-10T07-19-28-030Z.json` (SP01, SP06),
+`run-2026-10-10T07-19-47-655Z.json` (SP10),
+`run-2026-10-10T07-20-24-545Z.json` (SP02, SP03, SP05). Not published: the
+SP04 artifact (`evidence/recovered/20261010-org-standin/run-2026-10-10T07-22-34-771Z.json`),
+because its SP04a evidence lists the account's organization names and a saved
+SQL snippet's title and id, which redaction does not touch.
 
 Terms used below. "Lab token" is the `SUPABASE_ACCESS_TOKEN` the runs were
 made with: a personal access token whose format class is `sbp_fc` (SP01d).
