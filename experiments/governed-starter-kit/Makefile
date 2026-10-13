@@ -526,3 +526,10 @@ bff-deploy: guard-tok
 		| jq -e '[.[].name] | contains(["UPSTREAM_API_KEY", "UPSTREAM_BASE_URL"])' >/dev/null \
 		&& echo "UPSTREAM_API_KEY and UPSTREAM_BASE_URL set on the ready project" \
 		|| (echo "upstream secrets not listed after set"; exit 1)
+
+.PHONY: publish-evidence
+
+# Redacted copy of a run artifact plus its facts.md into out/<date>/ (committed).
+publish-evidence:
+	@test -n "$(RUN)" || (echo "RUN=evidence/<ts>/run-<stamp>.json required"; exit 1)
+	@cd $(ROOT)/harness && bun scripts/publish-evidence.ts $(abspath $(RUN)) $(abspath .) $(if $(PUBLISH_ONLY),--only $(PUBLISH_ONLY),)
