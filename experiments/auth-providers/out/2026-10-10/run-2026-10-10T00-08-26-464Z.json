@@ -1,0 +1,41 @@
+{
+  "startedAt": "2026-10-10T00:08:26.464Z",
+  "finishedAt": "2026-10-10T00:08:59.566Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "auth-providers",
+  "labCommit": "70e4244",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "AU03-setup",
+      "title": "AU03-setup: project, user, custom provider",
+      "status": "fail",
+      "detail": "custom provider create HTTP 400",
+      "measurements": {
+        "provision_s": 12
+      },
+      "durationMs": 33102
+    },
+    {
+      "id": "AU03-error",
+      "title": "AU03-error",
+      "status": "fail",
+      "detail": "Error: custom provider create failed\n    at run (~/work/supabase-lab/.claude/worktrees/wf_f4bb500c-430-4/experiments/auth-providers/tests/au03-canary.ts:89:40)\n    at async <anonymous> (~/work/supabase-lab/.claude/worktrees/wf_f4bb500c-430-4/harness/src/run.ts:170:25)",
+      "durationMs": 33102
+    },
+    {
+      "id": "AU03z",
+      "title": "AU03z: cleanup",
+      "status": "info",
+      "detail": "project delete HTTP 200; worker delete ok",
+      "durationMs": 33102
+    }
+  ]
+}
