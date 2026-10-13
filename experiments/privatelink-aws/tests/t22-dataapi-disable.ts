@@ -33,6 +33,7 @@
 import { $ } from "bun";
 import { Client } from "pg";
 import type { Ctx, TestModule, TestResult } from "../../../harness/src/types";
+import { GRAPHQL_TYPENAME_QUERY, graphqlState, pgGraphqlInstalled } from "../../../harness/src/graphql";
 
 const MGMT = "https://api.supabase.com";
 const POLL_MS = 5000;
@@ -106,13 +107,33 @@ async function get(ctx: Ctx, path: string): Promise<Probe> {
   }
 }
 
+/**
+ * POST `{ __typename }`, not a bare GET (work-supabase-lab#129): on a project
+ * without pg_graphql the endpoint answers 200 with an errors envelope, so the
+ * status alone said nothing. `graphqlState` reads the body.
+ */
+async function postGraphql(ctx: Ctx): Promise<Probe> {
+  const key = ctx.anonKey ?? "";
+  try {
+    const res = await fetch(`https://${ctx.apiHost}/graphql/v1`, {
+      method: "POST",
+      headers: { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ query: GRAPHQL_TYPENAME_QUERY }),
+      signal: AbortSignal.timeout(15000),
+    });
+    return { status: res.status, body: (await res.text()).slice(0, 300) };
+  } catch (e) {
+    return { status: 0, body: e instanceof Error ? e.message : String(e) };
+  }
+}
+
 async function snapshot(ctx: Ctx): Promise<Snapshot> {
   return {
     table: await get(ctx, `/rest/v1/${PROBE_TABLE}?select=id&limit=1`),
     root: await get(ctx, "/rest/v1/"),
     // pg_graphql rides the same PostgREST process - collateral damage belongs
     // in the evidence, not in a footnote.
-    graphql: await get(ctx, "/graphql/v1"),
+    graphql: await postGraphql(ctx),
   };
 }
 
@@ -222,6 +243,7 @@ const mod: TestModule = {
     ctx.log(`baseline db_schema = "${baseline.db_schema}"`);
 
     const live = await snapshot(ctx);
+    const gqlInstalled = await pgGraphqlInstalled(ctx);
 
     // BASELINE GATE: the private-path claim below ("DB still works with the
     // Data API off") is meaningless if the DB path was already broken before
@@ -248,6 +270,8 @@ const mod: TestModule = {
         table_status: live.table.status,
         root_status: live.root.status,
         db_schema: baseline.db_schema,
+        graphql_state: graphqlState(live.graphql.status, live.graphql.body),
+        pg_graphql_installed: gqlInstalled === null ? "unread" : gqlInstalled ? "yes" : "no",
       },
       evidence: `table: ${live.table.body}\nroot: ${live.root.body}`,
     });
@@ -283,6 +307,7 @@ const mod: TestModule = {
           disabled_table_status: dead.last.table.status,
           disabled_root_status: dead.last.root.status,
           disabled_graphql_status: dead.last.graphql.status,
+          disabled_graphql_state: graphqlState(dead.last.graphql.status, dead.last.graphql.body),
           poll_interval_s: POLL_MS / 1000,
         },
         evidence: `table: ${dead.last.table.body}\nroot: ${dead.last.root.body}\ngraphql: ${dead.last.graphql.body}`,
@@ -295,12 +320,13 @@ const mod: TestModule = {
         id: "T22h",
         title: `disabled state ${HOLD_MS / 1000}s later`,
         status: "info",
-        detail: `${classify(held)}; root still HTTP ${held.root.status}, graphql HTTP ${held.graphql.status}`,
+        detail: `${classify(held)}; root still HTTP ${held.root.status}, graphql ${graphqlState(held.graphql.status, held.graphql.body)}`,
         measurements: {
           held_s: HOLD_MS / 1000,
           table_status: held.table.status,
           root_status: held.root.status,
           graphql_status: held.graphql.status,
+          graphql_state: graphqlState(held.graphql.status, held.graphql.body),
           classification: classify(held),
         },
         evidence: `table: ${held.table.body}\ngraphql: ${held.graphql.body}`,

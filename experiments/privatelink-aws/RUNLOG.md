@@ -536,3 +536,8 @@ Closes the T27 half of the "Run T27/T28/T29" follow-up below.
       enable_transit_gateway=true enable_read_replica=true enable_soak=true`,
       apply, let the soak accumulate for a while, then `--destructive`
       (T28 needs it; T29 does not).
+- [ ] Re-run T22 after work-supabase-lab#130: since 2026-10-13 its GraphQL
+      probe POSTs `{ __typename }` and records `graphql_state`
+      (`harness/src/graphql.ts`) and `pg_graphql_installed`, because a bare
+      GET status reads "up" on a project without pg_graphql (#129). Changed,
+      typechecked, not run.
