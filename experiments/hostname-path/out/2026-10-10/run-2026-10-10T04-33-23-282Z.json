@@ -1,0 +1,57 @@
+{
+  "startedAt": "2026-10-10T04:33:23.282Z",
+  "finishedAt": "2026-10-10T04:33:24.235Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "hostname-path",
+  "labCommit": "70e4244",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "HP04a",
+      "title": "OAuth round trip entering at custom (custom domain active)",
+      "status": "pass",
+      "detail": "authorize built client-side at custom; redirect_uri to the issuer custom/auth/v1/callback; issuer sent the browser to custom; landed localhost:3000; token iss origin/auth/v1; redirect_uri in the token request custom/auth/v1/callback; /auth/v1/user with the token {\"origin\":\"200\",\"custom\":\"200\"}",
+      "measurements": {
+        "entry": "custom",
+        "hops": "302>302>302",
+        "redirect_uri_host": "custom",
+        "redirect_uri_path": "/auth/v1/callback",
+        "callback_host": "custom",
+        "landing_host": "localhost:3000",
+        "iss_host": "origin",
+        "iss_path": "/auth/v1",
+        "token_request_redirect_host": "custom",
+        "user_on": "{\"origin\":\"200\",\"custom\":\"200\"}",
+        "sub_present": "yes"
+      },
+      "durationMs": 953
+    },
+    {
+      "id": "HP04b",
+      "title": "OAuth round trip entering at origin (custom domain active)",
+      "status": "pass",
+      "detail": "authorize built client-side at origin; redirect_uri to the issuer custom/auth/v1/callback; issuer sent the browser to custom; landed localhost:3000; token iss origin/auth/v1; redirect_uri in the token request custom/auth/v1/callback; /auth/v1/user with the token {\"origin\":\"200\",\"custom\":\"200\"}",
+      "measurements": {
+        "entry": "origin",
+        "hops": "302>302>302",
+        "redirect_uri_host": "custom",
+        "redirect_uri_path": "/auth/v1/callback",
+        "callback_host": "custom",
+        "landing_host": "localhost:3000",
+        "iss_host": "origin",
+        "iss_path": "/auth/v1",
+        "token_request_redirect_host": "custom",
+        "user_on": "{\"origin\":\"200\",\"custom\":\"200\"}",
+        "sub_present": "yes"
+      },
+      "durationMs": 953
+    }
+  ]
+}
