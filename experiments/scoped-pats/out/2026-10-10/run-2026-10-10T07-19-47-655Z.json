@@ -1,0 +1,38 @@
+{
+  "startedAt": "2026-10-10T07:19:47.655Z",
+  "finishedAt": "2026-10-10T07:19:58.272Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "scoped-pats",
+  "labCommit": "70e4244",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "SP10a",
+      "title": "SP10a: one route four times, remaining and reset",
+      "status": "info",
+      "measurements": {
+        "limit": "120",
+        "remaining_seq": "117,116,115,114",
+        "reset_seq": "41,39,38,37"
+      },
+      "durationMs": 10617
+    },
+    {
+      "id": "SP10b",
+      "title": "SP10b: /organizations and /projects alternated, remaining and reset",
+      "status": "info",
+      "measurements": {
+        "remaining_seq": "113,118,112,117",
+        "reset_seq": "35,42,32,39"
+      },
+      "durationMs": 10617
+    }
+  ]
+}
