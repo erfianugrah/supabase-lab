@@ -139,10 +139,11 @@ Teardown: `tofu destroy`, 1 resource, project gone, 0 in the lab org.
 
 ## What this does NOT answer
 
-- Whether the private data path survives the lockdown (T22d/e/f) - needs the
-  `db` capability, i.e. a run from inside the VPC in the PrivateLink
-  experiment. Every mechanism observed here is HTTP-tier only, so the
-  expectation is "unaffected", but it is untested.
+- [answered in privatelink-aws run 9, 2026-08-07] Whether the private data
+  path survives the lockdown (T22d/e/f): it does. With the Data API wedged
+  through `PATCH .../postgrest` (`db_schema=""`), queries over the private
+  host on 5432 and 6543 succeeded and `db push --db-url` still applied
+  migrations (`experiments/privatelink-aws/RUNLOG.md`, run 9).
 - [answered in run 2] The Dashboard toggle produces the SAME state as the
   wedge, because it is the same lever - and its round-trip drops every schema
   but `public`.
