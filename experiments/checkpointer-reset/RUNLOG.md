@@ -155,3 +155,18 @@ Read:
 
 Which shape the managed platform's stop path produces, and its grace period,
 is unknown. The scripts were session scratch; re-create them from this table.
+
+## 2026-10-13 - the managed stop path, read from postgres_logs (work-supabase-lab#67)
+
+platform-downtime D01 (three `POST /restart` runs, 2026-10-13, its RUNLOG)
+now records the stop and boot lines Postgres writes to `postgres_logs` beside
+`stats_reset`. On the managed project (Micro, ap-southeast-1): stop `fast` on
+1 of 3 runs by D01's patterns (`received fast shutdown request`); on all 3,
+`terminating connection due to administrator command` and `the database
+system is shutting down` were logged; next boot not logged on any run;
+`stats_reset` kept on 3 of 3. Against this experiment's table that is the
+clean-stop shape (stats kept), read from the counters only: neither the
+shutdown checkpoint, nor "database system is shut down", nor a `was shut down
+at` or `not properly shut down` startup line reached `postgres_logs`, so the
+grace period is not readable there. First stop line to the new postmaster
+start: 75.9 s, 44.7 s, 43.3 s.

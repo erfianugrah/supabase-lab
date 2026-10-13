@@ -524,8 +524,14 @@ each user's auth rows". Findings and artifacts in RUNLOG.md; out/2026-09-25/.
   and REST, Auth, Storage and Realtime stayed up (the pooler is not probed:
   its probe uses the password being changed). Integration-provisioned
   projects were not tested (a Vercel-Marketplace install needs a human
-  `vercel integration accept-terms` first). For "does a managed restart
-  reset the checkpointer", read the same pair around D01's `POST /restart`.
+  `vercel integration accept-terms` first).
+- **D01 2026-10-13 (work-supabase-lab#20, #67): a managed `POST /restart`
+  keeps `pg_stat_checkpointer.stats_reset`** (3 of 3 runs), and
+  `postgres_logs` records the stop as a fast shutdown (the request line on 1
+  of 3; `terminating connection due to administrator command` on 3 of 3)
+  with no next-boot line on any run. On 17.x the kept stats point to a clean
+  stop, but `postgres_logs` never shows the shutdown checkpoint or the boot,
+  so the grace period cannot be read from the logs.
 
 ## experiments/checkpointer-reset - key facts (validated 2026-10-01, local only)
 
