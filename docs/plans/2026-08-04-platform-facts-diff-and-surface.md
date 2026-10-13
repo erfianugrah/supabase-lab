@@ -1,5 +1,10 @@
 # platform-facts: a real diff, plus two new surfaces - implementation plan
 
+> **STATUS (stocktake 2026-10-13): SHIPPED** 2026-08-04: `diffArtifacts` and
+> `pvlab --diff` in 4771889, F04 and the experiment Makefile in c3ecae0, F05
+> in 475be15. The checkboxes below were never ticked;
+> `experiments/platform-facts/RUNLOG.md` is the record of what ran.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development
 > (recommended) or superpowers:executing-plans to implement this plan task-by-task.
 > Steps use checkbox (`- [ ]`) syntax for tracking.

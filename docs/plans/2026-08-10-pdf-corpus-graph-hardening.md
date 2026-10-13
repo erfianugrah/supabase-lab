@@ -1,5 +1,9 @@
 # pdf-corpus-graph: hardening, editorial reshape, and the open scale questions
 
+> **STATUS (stocktake 2026-10-13):** the checkboxes below were never ticked;
+> the 2026-08-11 banner that follows is the record (all tracks done, project
+> destroyed).
+
 > **STATUS 2026-08-11: DESTROYED.** All tracks done and committed
 > (`327301c`, `883de45`), then the throwaway project was torn down
 > (`make destroy`, `supabase_project.probe` ref `<ref>`, medium,
