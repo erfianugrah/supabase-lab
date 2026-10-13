@@ -11,7 +11,7 @@ TS := $(shell date +%Y%m%d-%H%M%S)
 # leftovers by prefix.
 ONLY ?= DD01,DD02,DD03,DD04,DD99
 
-.PHONY: run clean list publish-evidence
+.PHONY: run run-standing clean list publish-evidence
 
 run:
 	@test -n "$(SUPABASE_ACCESS_TOKEN)" || (echo "export SUPABASE_ACCESS_TOKEN"; exit 1)
@@ -20,6 +20,19 @@ run:
 	@mkdir -p evidence/$(TS)
 	cd $(ROOT) && bun harness/src/run.ts --where local --experiment data-api-defaults \
 		--only $(ONLY) --destructive --out experiments/data-api-defaults/evidence/$(TS)
+	@echo "== evidence/$(TS)/ =="
+
+# DD01S only, against an EXISTING project (PVLAB_REF, created before
+# 2026-05-30). Creates and drops one probe table in public; no GRANT/REVOKE,
+# no ALTER DEFAULT PRIVILEGES, nothing else touched. Run once before
+# 2026-10-30 and once after; `--diff` the two artifacts.
+run-standing:
+	@test -n "$(SUPABASE_ACCESS_TOKEN)" || (echo "export SUPABASE_ACCESS_TOKEN"; exit 1)
+	@test -n "$(PVLAB_REF)" || (echo "export PVLAB_REF=<ref of a project created before 2026-05-30>"; exit 1)
+	@cd $(ROOT)/harness && bun run gen >/dev/null
+	@mkdir -p evidence/$(TS)
+	cd $(ROOT) && bun harness/src/run.ts --where local --experiment data-api-defaults \
+		--only DD01S --destructive --out experiments/data-api-defaults/evidence/$(TS)
 	@echo "== evidence/$(TS)/ =="
 
 # List (no --delete) or delete (DELETE=1) projects left behind by a run that died.
