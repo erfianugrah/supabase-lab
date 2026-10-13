@@ -1,0 +1,76 @@
+{
+  "startedAt": "2026-10-10T07:18:10.870Z",
+  "finishedAt": "2026-10-10T07:18:15.553Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "scoped-pats",
+  "labCommit": "70e4244",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "SP01a",
+      "title": "SP01a: no access-token creation operation in the public OpenAPI document",
+      "status": "pass",
+      "detail": "no creation operation; claim-token and oauth routes matched the pattern and are a different mechanism",
+      "measurements": {
+        "spec_paths": 115,
+        "spec_operations": 170,
+        "spec_sha256_16": "fd277fd48c289e19",
+        "creation_matches": 0,
+        "claim_or_oauth_matches": 0
+      },
+      "durationMs": 4683
+    },
+    {
+      "id": "SP01b",
+      "title": "SP01b: the dashboard's token route with a classic PAT (GET only, nothing created)",
+      "status": "skip",
+      "detail": "control GET /v1/profile HTTP 403; token unusable, probe uninterpretable",
+      "measurements": {
+        "control_profile_status": 403,
+        "platform_access_tokens_status": 401,
+        "v1_profile_access_tokens_status": 404,
+        "v1_access_tokens_status": 404
+      },
+      "evidence": "platform body: {\"message\":\"Unsupported access token\"}",
+      "durationMs": 4683
+    },
+    {
+      "id": "SP01c",
+      "title": "SP01c: x-fga-permissions declared per operation (doc-derived)",
+      "status": "info",
+      "detail": "no declared permissions: GET /v1/projects/available-regions; GET /v1/oauth/authorize; POST /v1/oauth/token; POST /v1/oauth/revoke; GET /v1/profile; POST /v1/projects/{ref}/database/jit/invite/accept",
+      "measurements": {
+        "operations": 170,
+        "with_fga": 164,
+        "without_fga": 6,
+        "distinct_permission_names": 73,
+        "distinct_oauth_scopes": 19,
+        "generated_probes": 59
+      },
+      "evidence": "action_runs_read,action_runs_write,advisors_read,analytics_logs_read,analytics_usage_read,api_gateway_keys_read,api_gateway_keys_secret_read,api_gateway_keys_write,auth_config_read,auth_config_write,auth_signing_keys_read,auth_signing_keys_write,backups_read,backups_write,branching_development_create,branching_development_delete,branching_development_read,branching_development_write,branching_production_create,branching_production_delete,branching_production_read,branching_production_write,custom_domain_read,custom_domain_write,data_api_config_read,data_api_config_secret_read,data_api_config_write,database_config_read,database_config_write,database_jit_read,database_jit_write,database_migrations_read,database_migrations_write,database_network_bans_read,database_network_bans_write,database_network_restrictions_read,database_network_restrictions_write,database_pooling_config_read,database_pooling_config_write,database_read,database_readonly_config_read,database_readonly_config_write,database_ssl_config_read,database_ssl_config_write,database_webhooks_config_write,database_write,edge_functions_read,edge_functions_secrets_read,edge_functions_secrets_write,edge_functions_write,infra_add_ons_read,infra_add_ons_write,infra_disk_config_read,infra_disk_config_write,infra_read_replicas_write,members_read,organization_admin_read,organization_admin_write,organization_projects_create,organization_projects_read,organizations_create,organizations_read,project_admin_read,project_admin_write,projects_read,realtime_config_read,realtime_config_write,snippets_read,storage_config_read,storage_config_write,storage_read,vanity_subdomain_read,vanity_subdomain_write",
+      "durationMs": 4683
+    },
+    {
+      "id": "SP01d",
+      "title": "SP01d: token format classes (docs: scoped tokens start with sbp_fc)",
+      "status": "info",
+      "measurements": {
+        "classic_pat": "sbp_fc",
+        "org": "not supplied",
+        "ro": "not supplied",
+        "dbrw": "not supplied",
+        "narrow": "not supplied",
+        "member": "not supplied",
+        "revoke": "not supplied"
+      },
+      "durationMs": 4683
+    }
+  ]
+}

@@ -1,0 +1,117 @@
+{
+  "startedAt": "2026-10-10T00:36:15.870Z",
+  "finishedAt": "2026-10-10T00:38:54.703Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "lifecycle-ops",
+  "labCommit": "70e4244",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "LO03a",
+      "title": "LO03a: failed creates: status, body, orphan check",
+      "status": "pass",
+      "measurements": {
+        "unknown_region_http": 400,
+        "unknown_region_ms": 194,
+        "unknown_org_http": 404,
+        "unknown_org_ms": 80,
+        "missing_name_http": 400,
+        "missing_name_ms": 93,
+        "unknown_size_http": 400,
+        "unknown_size_ms": 55,
+        "projects_listed_after_failed_creates": 0
+      },
+      "evidence": "unknown_region: HTTP 400 {\"message\":\"region_selection.code: Need to use one of available regions.\"}\nunknown_org: HTTP 404 {\"message\":\"Not Found\"}\nmissing_name: HTTP 400 {\"message\":\"name: Invalid input: expected string, received undefined\"}\nunknown_size: HTTP 400 {\"message\":\"desired_instance_size: Need to use one of available instance sizes.\"}",
+      "durationMs": 158832
+    },
+    {
+      "id": "LO03b1",
+      "title": "LO03b1: create 1 of 3 through the fallback wrapper",
+      "status": "pass",
+      "measurements": {
+        "create_n": 1,
+        "attempts": 2,
+        "landed_region": "ap-southeast-1",
+        "region_list": "zz-nowhere-1>ap-southeast-1",
+        "attempt1_http": 400,
+        "attempt1_ms": 74,
+        "attempt2_http": 201,
+        "attempt2_ms": 2358,
+        "active_healthy_s": 145,
+        "reached_healthy": 1,
+        "delete_http": 200,
+        "gone_from_org_listing_s": 0
+      },
+      "evidence": "gate: proceed=true blockers=0 warnings=0\nattempt 1 zz-nowhere-1: HTTP 400 74 ms {\"message\":\"region_selection.code: Need to use one of available regions.\"}\nattempt 2 ap-southeast-1: HTTP 201 2358 ms {\"id\":\"<ref>\",\"ref\":\"<ref>\",\"organization_id\":\"<ref>\",\"organization_slug\":\"<ref>\",\"name\":\"gap-lifecy\ntransitions (10 s poll from before the POST): COMING_UP@3s > ACTIVE_HEALTHY@145s",
+      "durationMs": 158832
+    },
+    {
+      "id": "LO03b2",
+      "title": "LO03b2: create 2 of 3 through the fallback wrapper",
+      "status": "pass",
+      "measurements": {
+        "create_n": 2,
+        "attempts": 1,
+        "landed_region": "ap-southeast-1",
+        "region_list": "ap-southeast-1",
+        "attempt1_http": 201,
+        "attempt1_ms": 1499,
+        "active_healthy_s": 2,
+        "reached_healthy": 1,
+        "delete_http": 200,
+        "gone_from_org_listing_s": 0
+      },
+      "evidence": "gate: proceed=true blockers=0 warnings=0\nattempt 1 ap-southeast-1: HTTP 201 1499 ms {\"id\":\"<ref>\",\"ref\":\"<ref>\",\"organization_id\":\"<ref>\",\"organization_slug\":\"<ref>\",\"name\":\"gap-lifecy\ntransitions (10 s poll from before the POST): ACTIVE_HEALTHY@2s",
+      "durationMs": 158832
+    },
+    {
+      "id": "LO03b3",
+      "title": "LO03b3: create 3 of 3 through the fallback wrapper",
+      "status": "pass",
+      "measurements": {
+        "create_n": 3,
+        "attempts": 1,
+        "landed_region": "ap-southeast-1",
+        "region_list": "ap-southeast-1",
+        "attempt1_http": 201,
+        "attempt1_ms": 1656,
+        "active_healthy_s": 2,
+        "reached_healthy": 1,
+        "delete_http": 200,
+        "gone_from_org_listing_s": 0
+      },
+      "evidence": "gate: proceed=true blockers=0 warnings=0\nattempt 1 ap-southeast-1: HTTP 201 1656 ms {\"id\":\"<ref>\",\"ref\":\"<ref>\",\"organization_id\":\"<ref>\",\"organization_slug\":\"<ref>\",\"name\":\"gap-lifecy\ntransitions (10 s poll from before the POST): ACTIVE_HEALTHY@2s",
+      "durationMs": 158832
+    },
+    {
+      "id": "LO03b",
+      "title": "LO03b: time to ACTIVE_HEALTHY across the creates",
+      "status": "pass",
+      "measurements": {
+        "creates_healthy": "3 of 3",
+        "active_healthy_p50_s": 2,
+        "active_healthy_min_s": 2,
+        "active_healthy_max_s": 145,
+        "create_call_ms_p50": 1656,
+        "poll_interval_s": 10
+      },
+      "durationMs": 158832
+    },
+    {
+      "id": "LO03c",
+      "title": "LO03c: leftovers carrying this run's name tag",
+      "status": "pass",
+      "measurements": {
+        "remaining": 0
+      },
+      "durationMs": 158832
+    }
+  ]
+}

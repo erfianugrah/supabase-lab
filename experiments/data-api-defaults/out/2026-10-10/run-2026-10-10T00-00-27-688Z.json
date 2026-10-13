@@ -1,0 +1,347 @@
+{
+  "startedAt": "2026-10-10T00:00:27.688Z",
+  "finishedAt": "2026-10-10T00:01:01.697Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "data-api-defaults",
+  "labCommit": "70e4244",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "DD01a",
+      "title": "DD01a: pg_default_acl (schema public) on a fresh project from POST /v1/projects",
+      "status": "info",
+      "detail": "postgres/tables acl={postgres=arwdDxtm/postgres,anon=arwdDxtm/postgres,authenticated=arwdDxtm/postgres,service_role=arwdDxtm/postgres}",
+      "measurements": {
+        "postgres_tables_acl": "{postgres=arwdDxtm/postgres,anon=arwdDxtm/postgres,authenticated=arwdDxtm/postgres,service_role=arwdDxtm/postgres}",
+        "postgres_sequences_acl": "{postgres=rwU/postgres,anon=rwU/postgres,authenticated=rwU/postgres,service_role=rwU/postgres}",
+        "postgres_functions_acl": "{postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+        "anon_in_tables_acl": 1,
+        "anon_privs_in_tables_acl": "arwdDxtm",
+        "authenticated_in_tables_acl": 1,
+        "service_role_in_tables_acl": 1,
+        "supabase_admin_tables_acl": "{postgres=arwdDxtm/supabase_admin,anon=arwdDxtm/supabase_admin,authenticated=arwdDxtm/supabase_admin,service_role=arwdDxtm/supabase_admin}",
+        "postgres_version": "PostgreSQL 17.11"
+      },
+      "durationMs": 15406
+    },
+    {
+      "id": "DD01b",
+      "title": "DD01b: SQL-created table under the default privileges, anon read",
+      "status": "info",
+      "detail": "create HTTP 201; anon GET -> 200 [{\"id\":1}]",
+      "measurements": {
+        "create_status": 201,
+        "relacl": "{postgres=arwdDxtm/postgres,anon=arwdDxtm/postgres,authenticated=arwdDxtm/postgres,service_role=arwdDxtm/postgres}",
+        "anon_status": 200,
+        "anon_code": "-",
+        "anon_seconds_to_serve": 2,
+        "publishable_status": 200
+      },
+      "durationMs": 15406
+    },
+    {
+      "id": "DD01c",
+      "title": "DD01c: after the opt-in ALTER DEFAULT PRIVILEGES REVOKE, a new SQL table is not readable",
+      "status": "pass",
+      "detail": "revoke HTTP 201; anon GET -> 401 {\"code\":\"42501\",\"details\":null,\"hint\":\"Grant the required privileges to the current role with: GRANT SELECT ON public.dd01_revoked TO anon;\",\"message\":\"permission denied for table dd01_revoked\"}",
+      "measurements": {
+        "revoke_status": 201,
+        "postgres_tables_acl_after": "{postgres=arwdDxtm/postgres,anon=Dxtm/postgres,authenticated=Dxtm/postgres,service_role=Dxtm/postgres}",
+        "anon_privs_in_tables_acl_after": "Dxtm",
+        "service_role_privs_in_tables_acl_after": "Dxtm",
+        "new_table_relacl": "{postgres=arwdDxtm/postgres,anon=Dxtm/postgres,authenticated=Dxtm/postgres,service_role=Dxtm/postgres}",
+        "create_status": 201,
+        "anon_status": 401,
+        "anon_code": "42501",
+        "anon_message": "permission denied for table dd01_revoked",
+        "anon_hint": "Grant the required privileges to the current role with: GRANT SELECT ON public.dd01_revoked TO anon;",
+        "anon_hint_has_grant_text": 1,
+        "publishable_status": 401,
+        "publishable_code": "42501",
+        "publishable_hint": "Grant the required privileges to the current role with: GRANT SELECT ON public.dd01_revoked TO anon;",
+        "service_role_status": 403,
+        "service_role_code": "42501",
+        "service_role_hint": "Grant the required privileges to the current role with: GRANT SELECT ON public.dd01_revoked TO service_role;",
+        "sb_secret_status": 403,
+        "sb_secret_code": "42501",
+        "sb_secret_hint": "Grant the required privileges to the current role with: GRANT SELECT ON public.dd01_revoked TO service_role;"
+      },
+      "evidence": "anon body: {\"code\":\"42501\",\"details\":null,\"hint\":\"Grant the required privileges to the current role with: GRANT SELECT ON public.dd01_revoked TO anon;\",\"message\":\"permission denied for table dd01_revoked\"}",
+      "durationMs": 15406
+    },
+    {
+      "id": "DD01d",
+      "title": "DD01d: GRANT SELECT to anon re-opens the table for anon only",
+      "status": "pass",
+      "detail": "grant HTTP 201; anon GET -> 200 [{\"id\":1}]",
+      "measurements": {
+        "grant_status": 201,
+        "relacl_after_grant": "{postgres=arwdDxtm/postgres,anon=rDxtm/postgres,authenticated=Dxtm/postgres,service_role=Dxtm/postgres}",
+        "anon_status": 200,
+        "anon_seconds_to_serve": 0,
+        "publishable_status": 200,
+        "service_role_status_still": 403
+      },
+      "durationMs": 15406
+    },
+    {
+      "id": "DD02a",
+      "title": "DD02a: pg_graphql absent on a fresh API-created project",
+      "status": "pass",
+      "detail": "typename -> 200 errors:pg_graphql extension is not enabled.",
+      "measurements": {
+        "installed_rows": 0,
+        "default_version_offered": "1.6.2",
+        "graphql_public_graphql_fn": 1,
+        "typename_answer": "200 errors:pg_graphql extension is not enabled.",
+        "old_probe_answer": "200 errors:pg_graphql extension is not enabled.",
+        "fixed_probe_row": "200 pg_graphql extension is not enabled.",
+        "old_probe_row": "200 pg_graphql extension is not enabled."
+      },
+      "durationMs": 3339
+    },
+    {
+      "id": "DD02b",
+      "title": "DD02b: CREATE EXTENSION pg_graphql, time until the endpoint serves",
+      "status": "pass",
+      "detail": "serving after 0s",
+      "measurements": {
+        "create_status": 201,
+        "extversion": "1.6.2",
+        "seconds_to_serve_typename": 0,
+        "total_ms": 625
+      },
+      "durationMs": 3339
+    },
+    {
+      "id": "DD02c",
+      "title": "DD02c: introspection refused by default once pg_graphql is on",
+      "status": "pass",
+      "detail": "__schema -> 200 errors:Unknown field \"__schema\" on type Query; __type -> 200 errors:Unknown field \"__type\" on type Query",
+      "measurements": {
+        "schema_answer": "200 errors:Unknown field \"__schema\" on type Query",
+        "type_answer": "200 errors:Unknown field \"__type\" on type Query",
+        "typename_answer": "200 data:{\"__typename\":\"Query\"}",
+        "collection_answer": "200 data:{\"dd02_gCollection\":{\"edges\":[{\"node\":{\"id\":1,\"note\":\"row\"}}]}}",
+        "public_schema_comment": "standard public schema",
+        "fixed_probe_row": "200 ok:Query",
+        "old_probe_row": "200 Unknown field \"__schema\" on type Query"
+      },
+      "durationMs": 3339
+    },
+    {
+      "id": "DD02d",
+      "title": "DD02d: comment-on-schema introspection opt-in, and explicit false",
+      "status": "pass",
+      "detail": "opt-in: __schema -> 200 data:{\"__schema\":{\"queryType\":{\"name\":\"Query\"}}}; false: 200 errors:Unknown field \"__schema\" on type Query",
+      "measurements": {
+        "optin_schema_answer": "200 data:{\"__schema\":{\"queryType\":{\"name\":\"Query\"}}}",
+        "optin_type_answer": "200 data:{\"__type\":{\"name\":\"Query\"}}",
+        "optin_seconds_to_serve": 0,
+        "explicit_false_schema_answer": "200 errors:Unknown field \"__schema\" on type Query",
+        "explicit_false_seconds_to_refuse": 0,
+        "fixed_probe_row_optin": "200 ok:Query",
+        "old_probe_row_optin": "200 "
+      },
+      "durationMs": 3339
+    },
+    {
+      "id": "DD02e",
+      "title": "DD02e: fixed vs old iap-lockdown GraphQL probe across the states",
+      "status": "pass",
+      "detail": "absent: fixed=[200 pg_graphql extension is not enabled.] old=[200 pg_graphql extension is not enabled.]; on, no opt-in: fixed=[200 ok:Query] old=[200 Unknown field \"__schema\" on type Query]; opt-in: fixed=[200 ok:Query] old=[200 ]",
+      "measurements": {
+        "absent_fixed": "200 pg_graphql extension is not enabled.",
+        "absent_old": "200 pg_graphql extension is not enabled.",
+        "enabled_fixed": "200 ok:Query",
+        "enabled_old": "200 Unknown field \"__schema\" on type Query",
+        "optin_fixed": "200 ok:Query",
+        "optin_old": "200 "
+      },
+      "evidence": "200 pg_graphql extension is not enabled. | 200 ok:Query | 200 ok:Query",
+      "durationMs": 3339
+    },
+    {
+      "id": "DD03a",
+      "title": "DD03a: role and superuser flag per vantage",
+      "status": "info",
+      "measurements": {
+        "mgmt_current_user": "postgres",
+        "mgmt_is_superuser": "off",
+        "pg_current_user": "postgres",
+        "pg_is_superuser": "off"
+      },
+      "durationMs": 7462
+    },
+    {
+      "id": "DD03b",
+      "title": "DD03b: CREATE EXTENSION ... VERSION is accepted, ignored, and warned about",
+      "status": "pass",
+      "detail": "pg warning on v1.5: WARNING: only superusers can specify extension versions, ignoring version \"1.5\" and installing the default version",
+      "measurements": {
+        "default_version": "1.6",
+        "pg_create_v1.5_error": "none",
+        "pg_create_v1.5_notices": "WARNING: only superusers can specify extension versions, ignoring version \"1.5\" and installing the default version",
+        "pg_create_v1.5_extversion": "1.6",
+        "pg_create_v9.9_error": "none",
+        "pg_create_v9.9_notices": "WARNING: only superusers can specify extension versions, ignoring version \"9.9\" and installing the default version",
+        "pg_create_v9.9_extversion": "1.6",
+        "mgmt_create_v1_5_status": 201,
+        "mgmt_create_v1_5_response": "[]",
+        "mgmt_create_v1_5_extversion": "1.6"
+      },
+      "durationMs": 7462
+    },
+    {
+      "id": "DD03c",
+      "title": "DD03c: ALTER EXTENSION ... UPDATE [TO version] outcome and extversion after",
+      "status": "info",
+      "detail": "extversion 1.6 -> 1.6; update_to_1_4 (pg): XX000 pgaudit stack is not empty",
+      "measurements": {
+        "extversion_before": "1.6",
+        "default_version": "1.6",
+        "mgmt_update_bare": "HTTP 400 ERROR: XX000: pgaudit stack is not empty",
+        "pg_update_bare_error": "XX000 pgaudit stack is not empty",
+        "pg_update_bare_notices": "NOTICE: version \"1.6\" of extension \"citext\" is already installed",
+        "mgmt_update_to_1_4": "HTTP 400 ERROR: XX000: pgaudit stack is not empty",
+        "pg_update_to_1_4_error": "XX000 pgaudit stack is not empty",
+        "pg_update_to_1_4_notices": "WARNING: only superusers can specify extension versions, ignoring version \"1.4\" and updating to the default version | NOTICE: version \"1.6\" of extension \"citext\" is already installed",
+        "mgmt_update_to_default": "HTTP 400 ERROR: XX000: pgaudit stack is not empty",
+        "pg_update_to_default_error": "XX000 pgaudit stack is not empty",
+        "pg_update_to_default_notices": "WARNING: only superusers can specify extension versions, ignoring version \"1.6\" and updating to the default version | NOTICE: version \"1.6\" of extension \"citext\" is already installed",
+        "mgmt_update_to_9_9": "HTTP 400 ERROR: XX000: pgaudit stack is not empty",
+        "pg_update_to_9_9_error": "XX000 pgaudit stack is not empty",
+        "pg_update_to_9_9_notices": "WARNING: only superusers can specify extension versions, ignoring version \"9.9\" and updating to the default version | NOTICE: version \"1.6\" of extension \"citext\" is already installed",
+        "extversion_after": "1.6",
+        "control_set_schema_public": "ok 201"
+      },
+      "durationMs": 7462
+    },
+    {
+      "id": "DD03d",
+      "title": "DD03d: control - a policy on realtime.messages can be created and dropped",
+      "status": "pass",
+      "detail": "create 201, listed 1, drop 201",
+      "measurements": {
+        "create_policy_status": 201,
+        "listed": 1,
+        "drop_policy_status": 201
+      },
+      "durationMs": 7462
+    },
+    {
+      "id": "DD03e",
+      "title": "DD03e: realtime schema operations named in the changelog, as postgres",
+      "status": "info",
+      "detail": "6 of 10 refused, 4 allowed (each inside begin/rollback)",
+      "measurements": {
+        "schema_usage": "true",
+        "schema_create": "false",
+        "schema_owner": "supabase_admin",
+        "messages_owner": "supabase_realtime_admin",
+        "schema_migrations_owner": "supabase_admin",
+        "schema_migrations_postgres_acl": "{supabase_admin=arwdDxtm/supabase_admin,postgres=arwdDxtm/supabase_admin,dashboard_user=arwdDxtm/supabase_admin}",
+        "schema_migrations_rows_before": 89,
+        "tr_check_filters_exists_before": "true",
+        "latest_migration_version": "20261002120000",
+        "mgmt_create_table": "ERROR: 42501: permission denied for schema realtime LINE 1: begin; create table realtime.dd_probe (id int); rollback; ^",
+        "mgmt_create_function": "ERROR: 42501: permission denied for schema realtime",
+        "mgmt_alter_messages_drop_column": "ERROR: 42501: must be owner of table messages",
+        "mgmt_drop_messages": "ERROR: 42501: must be owner of table messages",
+        "mgmt_drop_function_topic": "ERROR: 42501: must be owner of function realtime.topic",
+        "mgmt_drop_trigger_tr_check_filters": "ALLOWED (201)",
+        "mgmt_insert_schema_migrations": "ALLOWED (201)",
+        "mgmt_update_schema_migrations": "ALLOWED (201)",
+        "mgmt_delete_schema_migrations": "ALLOWED (201)",
+        "mgmt_alter_schema_migrations": "ERROR: 42501: must be owner of table schema_migrations",
+        "pg_create_table": "42501 permission denied for schema realtime",
+        "pg_insert_schema_migrations": "ALLOWED",
+        "pg_update_schema_migrations": "ALLOWED",
+        "pg_delete_schema_migrations": "ALLOWED",
+        "pg_alter_schema_migrations": "42501 must be owner of table schema_migrations",
+        "schema_migrations_rows_after": 89,
+        "probe_rows_persisted": 0,
+        "dd_probe_table_persisted": "false",
+        "messages_topic_column_present": "true",
+        "topic_function_present": "true",
+        "operations_refused": 6,
+        "operations_allowed": 4
+      },
+      "durationMs": 7462
+    },
+    {
+      "id": "DD04a",
+      "title": "DD04a: GET /rest/v1/ per key type",
+      "status": "info",
+      "detail": "anon 401; publishable 401; service_role 200; sb_secret 200",
+      "measurements": {
+        "nokey_status": 401,
+        "nokey_body": "{\"message\":\"No API key found in request\",\"hint\":\"No `apikey` request header or url param was found.\"}",
+        "anon_apikey_bearer_status": 401,
+        "anon_apikey_bearer_body": "{\"message\":\"Invalid API key\",\"hint\":\"Only the `service_role` API key can be used for this endpoint.\"}",
+        "anon_apikey_only_status": 401,
+        "anon_apikey_only_body": "{\"message\":\"Invalid API key\",\"hint\":\"Only the `service_role` API key can be used for this endpoint.\"}",
+        "publishable_apikey_bearer_status": 401,
+        "publishable_apikey_bearer_body": "{\"message\":\"Secret API key required\",\"hint\":\"Only secret API keys can be used for this endpoint.\"}",
+        "publishable_apikey_only_status": 401,
+        "publishable_apikey_only_body": "{\"message\":\"Secret API key required\",\"hint\":\"Only secret API keys can be used for this endpoint.\"}",
+        "service_role_apikey_bearer_status": 200,
+        "service_role_apikey_bearer_body": "spec 2.0 title=\"standard public schema\" paths=5",
+        "service_role_apikey_only_status": 200,
+        "service_role_apikey_only_body": "spec 2.0 title=\"standard public schema\" paths=5",
+        "sb_secret_apikey_bearer_status": 200,
+        "sb_secret_apikey_bearer_body": "spec 2.0 title=\"standard public schema\" paths=5",
+        "sb_secret_apikey_only_status": 200,
+        "sb_secret_apikey_only_body": "spec 2.0 title=\"standard public schema\" paths=5"
+      },
+      "durationMs": 6050
+    },
+    {
+      "id": "DD04b",
+      "title": "DD04b: control - GET /rest/v1/<granted table> per key type",
+      "status": "info",
+      "measurements": {
+        "nokey_status": 401,
+        "anon_status": 200,
+        "publishable_status": 200,
+        "service_role_status": 200,
+        "sb_secret_status": 200
+      },
+      "durationMs": 6050
+    },
+    {
+      "id": "DD04c",
+      "title": "DD04c: GET /v1/projects/{ref}/database/openapi",
+      "status": "pass",
+      "detail": "PAT -> 200 spec 2.0 title=\"standard public schema\" paths=5",
+      "measurements": {
+        "pat_status": 200,
+        "pat_spec": "spec 2.0 title=\"standard public schema\" paths=5",
+        "pat_paths_equal_root_spec_from_sb_secret": 1,
+        "graphql_public_status": 200,
+        "graphql_public_spec": "spec 2.0 title=\"PostgREST API\" paths=2",
+        "no_token_status": 401,
+        "no_token_body": "{\"message\":\"No access token provided\"}"
+      },
+      "durationMs": 6050
+    },
+    {
+      "id": "DD99",
+      "title": "DD99: project deleted and gone from the listing",
+      "status": "pass",
+      "detail": "DELETE 200; absent from GET /projects after 0s",
+      "measurements": {
+        "delete_status": 200,
+        "gone_from_listing_s": 0
+      },
+      "durationMs": 1751
+    }
+  ]
+}

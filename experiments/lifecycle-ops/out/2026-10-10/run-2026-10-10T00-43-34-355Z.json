@@ -1,0 +1,87 @@
+{
+  "startedAt": "2026-10-10T00:43:34.355Z",
+  "finishedAt": "2026-10-10T00:43:35.480Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "lifecycle-ops",
+  "labCommit": "70e4244",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "LO01a",
+      "title": "LO01a: components.json shape",
+      "status": "info",
+      "measurements": {
+        "components": 189,
+        "regions_present": 18,
+        "region_name_occurrences_min": 10,
+        "region_name_occurrences_max": 11,
+        "has_group_or_service_field": 0,
+        "distinct_statuses": "operational",
+        "non_region_components": "Auth | Billing & Payments | Dashboard | Logging & Observability | Realtime",
+        "components_http": 200,
+        "fetch_ms": 410
+      },
+      "evidence": "component keys: created_at,description,id,name,page_id,position,status,updated_at",
+      "durationMs": 1125
+    },
+    {
+      "id": "LO01b",
+      "title": "LO01b: incidents.json shape",
+      "status": "info",
+      "measurements": {
+        "incidents": 25,
+        "oldest_created": "2026-08-24",
+        "open_now": 0,
+        "has_component_or_region_field": 0,
+        "unresolved_json_http": 404,
+        "summary_scheduled_maintenances": 1,
+        "incidents_http": 200
+      },
+      "evidence": "incident keys: created_at,id,impact,incident_updates,name,page_id,resolved_at,status,updated_at",
+      "durationMs": 1125
+    },
+    {
+      "id": "LO01c",
+      "title": "LO01c: gate decision per region, now",
+      "status": "info",
+      "detail": "ap-southeast-1 restart: proceed (region status operational, 11 components, 0 blockers, 0 warnings)",
+      "measurements": {
+        "create_regions_proceed_of_18": 18,
+        "restart_regions_proceed_of_18": 18,
+        "resize_regions_proceed_of_18": 18,
+        "upgrade_regions_proceed_of_18": 18,
+        "observed_at": "2026-10-10T00:43:35.436Z"
+      },
+      "durationMs": 1125
+    },
+    {
+      "id": "LO01d",
+      "title": "LO01d: replay of the incident feed through the gate (restart)",
+      "status": "info",
+      "detail": "window 1113 h; ap-southeast-1 restart refused 38.5 h; region hours max 205.1",
+      "measurements": {
+        "window_h": 1113,
+        "incidents_scope_title_region": 6,
+        "incidents_scope_body_region_only": 2,
+        "incidents_scope_all_regions": 3,
+        "incidents_scope_unscoped": 14,
+        "incidents_blocking_some_region": 10,
+        "of_those_impact_none": 2,
+        "incidents_resolved_before_created": 2,
+        "ap_southeast_1_refused_h": 38.5,
+        "eu_west_1_refused_h": 41.8,
+        "us_east_1_refused_h": 205.1,
+        "min_region_refused_h": 38.5
+      },
+      "evidence": "ap-east-1\t38.5\nap-northeast-1\t38.5\nap-northeast-2\t41.3\nap-south-1\t38.5\nap-southeast-1\t38.5\nap-southeast-2\t38.5\nca-central-1\t38.5\neu-central-1\t38.5\neu-central-2\t38.5\neu-north-1\t38.5\neu-west-1\t41.8\neu-west-2\t38.5\neu-west-3\t38.5\nsa-east-1\t38.5\nus-east-1\t205.1\nus-east-2\t38.5\nus-west-1\t38.5\nus-west-2\t38.5",
+      "durationMs": 1125
+    }
+  ]
+}
