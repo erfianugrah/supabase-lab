@@ -1,0 +1,254 @@
+{
+  "startedAt": "2026-10-10T02:10:36.037Z",
+  "finishedAt": "2026-10-10T02:20:13.616Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "jit-db-access",
+  "labCommit": "70e4244",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "JA01a",
+      "title": "JA01a: Pro project on Postgres 17",
+      "status": "pass",
+      "detail": "status ACTIVE_HEALTHY; Postgres 17.11.0.003 (docs floor 17.6.1.081: met)",
+      "measurements": {
+        "provision_s": 2,
+        "postgres_version": "17.11.0.003",
+        "postgres_engine": "17",
+        "reused": 0
+      },
+      "durationMs": 577574
+    },
+    {
+      "id": "JA01b",
+      "title": "JA01b: gates before enabling (SSL enforcement)",
+      "status": "info",
+      "detail": "fresh project: ssl database=false; GET jit-access 200 {\"state\":\"unavailable\",\"unavailableReason\":\"ssl_enforcement_required\"}; PUT enabled before enforcement -> 200 {\"state\":\"unavailable\",\"unavailableReason\":\"ssl_enforcement_required\"}; GET database/jit/list -> 200; PUT ssl-enforcement -> 200 (2s); GET jit-access after -> {\"state\":\"disabled\",\"appliedSuccessfully\":true}",
+      "measurements": {
+        "ssl_enforced_at_create": "false",
+        "get_before_status": 200,
+        "get_before_state": "unavailable",
+        "get_before_reason": "ssl_enforcement_required",
+        "put_enabled_early_status": 200,
+        "list_early_status": 200,
+        "ssl_put_status": 200,
+        "get_after_ssl_state": "disabled"
+      },
+      "durationMs": 577574
+    },
+    {
+      "id": "JA01c",
+      "title": "JA01c: enable temporary access",
+      "status": "pass",
+      "detail": "PUT jit-access enabled -> 200 {\"state\":\"enabled\",\"appliedSuccessfully\":true}; read-back state=enabled",
+      "measurements": {
+        "put_status": 200,
+        "readback_state": "enabled"
+      },
+      "durationMs": 577574
+    },
+    {
+      "id": "JA01d",
+      "title": "JA01d: grant API shape (roles vs user_roles, replace vs merge, read routes)",
+      "status": "pass",
+      "detail": "PUT database/jit with body key roles -> 200 (response keys user_id,user_roles); with docs key user_roles -> 400 {\"message\":\"roles: Invalid input: expected array, received undefined\"}; after that PUT the list shows [postgres]; then PUT [ja_reader] alone -> 200, list shows [ja_reader] (PUT replaces the user's role set). GET database/jit -> 200; POST database/jit {role,rhost} -> 403 {\"message\":\"Unauthorized to assume role\"}",
+      "measurements": {
+        "put_roles_key_status": 200,
+        "put_user_roles_key_status": 400,
+        "put_response_keys": "user_id,user_roles",
+        "list_status": 200,
+        "list_item_keys": "expires_at,invite_id,primary_email,user_id,user_roles",
+        "roles_after_second_put": "ja_reader",
+        "get_database_jit_status": 200,
+        "post_database_jit_status": 403,
+        "post_response_keys": "message"
+      },
+      "durationMs": 577574
+    },
+    {
+      "id": "JA01e",
+      "title": "JA01e: connection matrix with the PAT as the Postgres password",
+      "status": "pass",
+      "detail": "PUT grant -> 200; first pooler login 0.5 s after the PUT returned. pooler_6543_jit: ok postgres/postgres; pooler_5432_jit: ok postgres/postgres; pooler_docs_host_5432_jit: refused psql: error: connection to server at \"<pooler-host>\" (<ipv4>), port 5432 failed: FATAL: (ENOTFOUND) tenant/user postgres.<ref> not found; direct_5432: ok postgres/postgres; pooler_5432_no_option: refused psql: error: connection to server at \"<pooler-host>\" (<ipv4>), port 5432 failed: FATAL: password authentication failed for user \"postgres\"; dedicated_pooler_6543: refused psql: error: connection to server at \"<direct-ipv6>\", port 6543 failed: FATAL: SASL authentication failed; pooler_5432_jit_unmapped_role: refused psql: error: connection to server at \"<pooler-host>\" (<ipv4>), port 5432 failed: FATAL: password authentication failed for user \"supabase_admin\"",
+      "measurements": {
+        "grant_status": 200,
+        "grant_to_first_login_s": 0.5,
+        "pooler_6543_jit": "ok",
+        "pooler_5432_jit": "ok",
+        "pooler_docs_host_5432_jit": "ENOTFOUND",
+        "direct_5432": "ok",
+        "pooler_5432_no_option": "password",
+        "dedicated_pooler_6543": "SASL",
+        "pooler_5432_jit_unmapped_role": "password",
+        "direct_dns_aaaa": 1,
+        "direct_dns_a": 0,
+        "pooler_host_family": "aws-0",
+        "docs_host_family": "aws-1"
+      },
+      "evidence": "pooler_6543_jit: ok postgres/postgres\npooler_5432_jit: ok postgres/postgres\npooler_docs_host_5432_jit: refused psql: error: connection to server at \"<pooler-host>\" (<ipv4>), port 5432 failed: FATAL: (ENOTFOUND) tenant/user postgres.<ref> not found\ndirect_5432: ok postgres/postgres\npooler_5432_no_option: refused psql: error: connection to server at \"<pooler-host>\" (<ipv4>), port 5432 failed: FATAL: password authentication failed for user \"postgres\"\ndedicated_pooler_6543: refused psql: error: connection to server at \"<direct-ipv6>\", port 6543 failed: FATAL: SASL authentication failed\npooler_5432_jit_unmapped_role: refused psql: error: connection to server at \"<pooler-host>\" (<ipv4>), port 5432 failed: FATAL: password authentication failed for user \"supabase_admin\"",
+      "durationMs": 577574
+    },
+    {
+      "id": "JA01f",
+      "title": "JA01f: identity inside a PAT-authenticated session",
+      "status": "pass",
+      "detail": "pooler as postgres: postgres|postgres|postgres|Supavisor|f; direct as postgres: postgres|postgres|postgres|jatxabq5-who|f; pooler as ja_reader: ja_reader|ja_reader|ja_reader|Supavisor|f; ja_reader CREATE TABLE: ERROR: permission denied for schema public LINE 1: create table public.ja_denied",
+      "measurements": {
+        "pooler_postgres": "postgres|postgres|postgres|Supavisor|f",
+        "direct_postgres": "postgres|postgres|postgres|jatxabq5-who|f",
+        "pooler_custom_role": "ja_reader|ja_reader|ja_reader|Supavisor|f",
+        "custom_role_create_table": "denied"
+      },
+      "durationMs": 577574
+    },
+    {
+      "id": "JA01g",
+      "title": "JA01g: expiry of a granted role (seconds vs milliseconds unit; open sessions)",
+      "status": "pass",
+      "detail": "grants: postgres expires_at=now+75s in epoch SECONDS, ja_reader the same instant in epoch MILLISECONDS; stored back as 1791598325 / 1791598325000. Logins before expiry (the pooler login took 0.2 s; 74 s were left of 75): pooler ok, direct ok, ja_reader pooler ok. First refusal vs expires_at: pg_pooler_seconds refused +0s [password]; pg_direct_seconds refused +0s [PAM]; rd_direct_millis not refused within expiry+70s [-]. Held sessions (open before expiry: pooler true, direct true, ja_reader direct true) pinged every 5 s after the probe window: pooler postgres alive at expiry+300s; direct postgres alive at expiry+300s; direct ja_reader (ms grant) alive at expiry+300s. Largest gap between watch-loop iterations 6 s. Bans after phase: 0",
+      "measurements": {
+        "put_status": 200,
+        "expires_in_s": 75,
+        "pre_expiry_login_pooler": "ok",
+        "pre_expiry_login_direct": "ok",
+        "pre_expiry_login_ja_reader": "ok",
+        "pg_pooler_refused_after_expiry_s": 0,
+        "pg_direct_refused_after_expiry_s": 0,
+        "ja_reader_ms_direct_refused_after_expiry_s": "never",
+        "refusal_kind_pooler": "password",
+        "refusal_first_kind_pooler": "password",
+        "refusal_kind_direct": "PAM",
+        "refusal_kind_ja_reader_direct": "",
+        "breaker_wait_s": 0,
+        "refusal_text_pooler": "psql: error: connection to server at \"<pooler-host>\" (<ipv4>), port 5432 failed: FATAL: password authentication failed for user \"postgres\"",
+        "refusal_text_direct": "psql: error: connection to server at \"<direct-ipv6>\", port 5432 failed: FATAL: PAM authentication failed for user \"postgres\"",
+        "refusal_text_ja_reader_direct": "",
+        "held_pooler_alive_before": "true",
+        "held_direct_alive_before": "true",
+        "held_ja_reader_alive_before": "true",
+        "held_pooler_after_70s": "true",
+        "held_direct_after_70s": "true",
+        "held_pooler_closed_after_expiry_s": "alive",
+        "held_direct_closed_after_expiry_s": "alive",
+        "held_ja_reader_closed_after_expiry_s": "alive",
+        "watch_window_s": 300,
+        "stall_max_gap_s": 6,
+        "bans_after": 0
+      },
+      "durationMs": 577574
+    },
+    {
+      "id": "JA01h",
+      "title": "JA01h: extending an expired grant",
+      "status": "pass",
+      "detail": "PUT later expires_at -> 200; fresh direct login works 0.4 s later, pooler 0.3 s later (-1 = never within the wait; refusal kinds seen on the pooler before it worked: []); total 1 s",
+      "measurements": {
+        "put_status": 200,
+        "extension_to_pooler_login_s": 0.3,
+        "extension_to_direct_login_s": 0.4,
+        "pooler_kinds_before_success": ""
+      },
+      "durationMs": 577574
+    },
+    {
+      "id": "JA01i",
+      "title": "JA01i: revocation by deleting the mapping and by disabling temporary access",
+      "status": "pass",
+      "detail": "DELETE database/jit/{user_id} -> 200 (0.1 s); first refusal pooler 0.3 s, direct 0.5 s; held sessions alive before/after true/true -> true/true (pooler, direct); re-grant then fresh login 0.5 s. PUT jit-access disabled -> 200 (0.5 s); first refusal pooler 0.7 s, direct 0.9 s; held sessions true/true -> false/true; PUT enabled then fresh login 3 s. Mappings left in the list after DELETE: 1 role(s) (before the re-grant that followed was applied); after disable+enable: postgres. Bans: 0/0. Refusal kinds (pooler/direct): delete EJITREQUESTFAILED/PAM, disable password/password. Refusal text: psql: error: connection to server at \"<pooler-host>\" (<ipv4>), port 5432 failed: FATAL: (EJITREQUESTFAILED) failed to reach JIT provider for user \"postgres\" | psql: error: connection to server at \"<direct-ipv6>\", port 5432 failed: FATAL: PAM authentication failed for user \"postgres\"",
+      "measurements": {
+        "delete_status": 200,
+        "delete_pooler_refused_s": 0.3,
+        "delete_direct_refused_s": 0.5,
+        "delete_pre_login_s": 0.3,
+        "delete_pooler_refusal_kind": "EJITREQUESTFAILED",
+        "delete_pooler_first_kind": "EJITREQUESTFAILED",
+        "delete_direct_refusal_kind": "PAM",
+        "delete_breaker_wait_s": 0,
+        "delete_held_pooler_before": "true",
+        "delete_held_direct_before": "true",
+        "delete_held_pooler_after": "true",
+        "delete_held_direct_after": "true",
+        "delete_regrant_login_s": 0.5,
+        "disable_status": 200,
+        "disable_pooler_refused_s": 0.7,
+        "disable_direct_refused_s": 0.9,
+        "disable_pre_login_s": 0.4,
+        "disable_pooler_refusal_kind": "password",
+        "disable_pooler_first_kind": "password",
+        "disable_direct_refusal_kind": "password",
+        "disable_breaker_wait_s": 0,
+        "disable_held_pooler_before": "true",
+        "disable_held_direct_before": "true",
+        "disable_held_pooler_after": "false",
+        "disable_held_direct_after": "true",
+        "disable_reenable_login_s": 3,
+        "roles_listed_after_delete": 1,
+        "roles_listed_after_disable_and_enable": 1,
+        "bans_after": 0
+      },
+      "evidence": "delete refusal: psql: error: connection to server at \"<pooler-host>\" (<ipv4>), port 5432 failed: FATAL: (EJITREQUESTFAILED) failed to reach JIT provider for user \"postgres\" | psql: error: connection to server at \"<direct-ipv6>\", port 5432 failed: FATAL: PAM authentication failed for user \"postgres\"\ndisable refusal: psql: error: connection to server at \"<pooler-host>\" (<ipv4>), port 5432 failed: FATAL: password authentication failed for user \"postgres\" | psql: error: connection to server at \"<direct-ipv6>\", port 5432 failed: FATAL: password authentication failed for user \"postgres\"",
+      "durationMs": 577574
+    },
+    {
+      "id": "JA01j",
+      "title": "JA01j: allowed_networks on a granted role",
+      "status": "pass",
+      "detail": "documentation-range /24 only: PUT 200, pooler refused, direct refused. Vantage IPv4 /32 only: PUT 200, pooler refused, direct refused (direct arrives from an IPv6 address). Vantage IPv4 /32 plus allowed_cidrs_v6 of the address the database saw for the direct session: PUT 200, pooler not probed, direct ok. Vantage IPv4 /32 plus allowed_cidrs_v6 ::/0: PUT 200, pooler ok, direct ok; the address the database sees on a pooler session is ipv6 (the pooler's, not the vantage's). Bans after phase: 0. Refusal text pooler: psql: error: connection to server at \"<pooler-host>\" (<ipv4>), port 5432 failed: FATAL: password authentication failed for user \"postgres\"; direct: psql: error: connection to server at \"<direct-ipv6>\", port 5432 failed: FATAL: PAM authentication failed for user \"postgres\"",
+      "measurements": {
+        "doc_range_pooler": "refused",
+        "doc_range_direct": "refused",
+        "doc_range_pooler_kind": "password",
+        "v4_only_pooler_kind": "password",
+        "v6_any_pooler_kind": "ok",
+        "v6_any_pooler_login_s": 0.2,
+        "v4_only_pooler": "refused",
+        "v4_only_direct": "refused",
+        "v4_plus_v6_pooler": "not probed",
+        "v4_plus_v6_direct": "ok",
+        "v6_any_pooler": "ok",
+        "v6_any_direct": "ok",
+        "pooler_session_client_addr_family": "ipv6",
+        "bans_after": 0
+      },
+      "durationMs": 577575
+    },
+    {
+      "id": "JA01k",
+      "title": "JA01k: what the logs record for a PAT login (postgres_logs, supavisor_logs)",
+      "status": "info",
+      "detail": "log_connections PUT -> 200. Four marked logins (pooler jit, direct, dedicated pooler, pooler without option); marker rows found after 38 s: postgres_logs 1, supavisor_logs 2. Postgres connection lines carry method(s) [pam] and identity [postgres]; application_name values on 'connection authorized' lines: [<marker>-ldirect]. supavisor_logs 'user' attribute values [postgres], peer_ip present: true. Rows (any source) containing the caller's user id or email: 1 (sources [postgres_logs]); rows containing 'sbp_': 0. 'received fast shutdown request' rows in the last hour: 1, seconds relative to the PUT ssl-enforcement call: [1]. ",
+      "measurements": {
+        "log_connections_put_status": 200,
+        "marker_lag_s": 38,
+        "postgres_logs_marker_rows": 1,
+        "supavisor_logs_marker_rows": 2,
+        "postgres_auth_methods": "pam",
+        "postgres_identity_values": "postgres",
+        "supavisor_user_values": "postgres",
+        "supavisor_peer_ip_present": "true",
+        "user_id_or_email_rows": 1,
+        "user_id_or_email_sources": "postgres_logs",
+        "token_prefix_rows": 0,
+        "terminate_or_expire_rows": 8,
+        "shutdown_rows_last_hour": 1,
+        "shutdown_vs_ssl_put_s": "1"
+      },
+      "evidence": "terminate/expire row: 2026-10-10T02:01:35.036000 terminating connection due to administrator command\nterminate/expire row: 2026-10-10T02:01:35.039000 terminating connection due to administrator command\nterminate/expire row: 2026-10-10T02:01:35.042000 terminating connection due to administrator command\nterminate/expire row: 2026-10-10T02:01:35.043000 terminating connection due to administrator command\nterminate/expire row: 2026-10-10T02:01:35.046000 terminating connection due to administrator command\nterminate/expire row: 2026-10-10T02:10:43.182000 terminating connection due to administrator command\nterminate/expire row: 2026-10-10T02:10:43.183000 terminating connection due to administrator command\nterminate/expire row: 2026-10-10T02:10:43.186000 terminating connection due to administrator command\nid/email hit -> postgres_logs: statement: create role ja_reader login; grant usage on schema public to ja_reader; grant select on all tables in schema public to ja_reader; -- source: POST /v1/projects/:ref/database/query -- user: scoped_pat:<user-id> \npostgres_logs: connection authorized: user=postgres database=postgres application_name=<marker>-ldirect SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)\npostgres_logs: connection authorized: user=postgres database=postgres application_name=<marker>-ldirect SSL enabled (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256)\npostgres_logs: connection authenticated: identity=\"postgres\" method=pam (/etc/postgresql/pg_hba_pam_public_ssl.conf:4)",
+      "durationMs": 577575
+    },
+    {
+      "id": "JA01l",
+      "title": "JA01l: membership removal and PAT revocation (not run)",
+      "status": "skip",
+      "detail": "Removing the project member needs a second human user whose PAT is the Postgres password and an owner to remove them; revoking the PAT itself would revoke the only token this run holds (token creation is not on the /v1 API). The changelog claim that revoking project access immediately revokes database login is therefore doc-cited-not-tested here.",
+      "durationMs": 577575
+    }
+  ]
+}
