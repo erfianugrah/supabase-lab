@@ -1,5 +1,32 @@
 # governed-starter-kit - RUNLOG
 
+## 2026-10-13 - fourth full rebuild; kit left up
+
+First run through the kit after `40521f6` (credentials off command lines,
+Makefile), `5a6cb4c` (sharp override) and two `db_password` rotations.
+`secrets.tfvars` compared equal to a fresh decrypt before the run.
+
+- Model key: one-token call to the in-app agent's model answered 200 before
+  `fn-secret`.
+- `make up` from an empty state: 89 s, its probe 35 pass, 0 fail, 4 skip
+  (K03 without a key, K05 not deployed, K06 and K07 not `--destructive`).
+- `bff-deploy`, `fn-secret`, `make probe`: 52 pass, 0 fail, 2 skip (K06,
+  K07) in 152 s. K05's first call after the deploy was the function's own
+  502 in 3376 ms, all upstreams at the 800 ms timeout (seventh of seven
+  fresh deploys).
+- `make app-deploy` (stage token): custom domain `starter-kit.erfi.dev`
+  attached; the first request to `/login` answered 500, the next one 10 s
+  later 200. App walk against the public URL 7 of 7 (assistant policy answer
+  7377 ms, confirmed write 4867 ms); the test row was deleted afterwards.
+- Troubleshooting segment: `fault-inject`, `fault-check` (advisors 3 findings
+  on fault objects, feed query mean=3147.0ms over calls=10, slow GET
+  p50=3596ms, RPC 400s and `22012`), `fault-clear` back to the 72-object
+  snapshot, clean check with nothing left.
+- Live segment set up and not run: `live-reset` had nothing to drop,
+  `live-workspace`, scaffold 25 s (`--use-npm`, so `live-app-prep`'s
+  `npm install` meets an npm lockfile), `live-app-prep` 28 s; 63 paths
+  staged, no commit. Kit left up.
+
 ## 2026-10-10 - app MCP server block (K06) and MCP confirmations (K07)
 
 Vantage: operator laptop (macOS), Bun 1.3.14, supabase CLI 2.120.0, Claude
