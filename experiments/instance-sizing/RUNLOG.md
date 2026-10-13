@@ -68,6 +68,31 @@ cannot be re-paused and joins the always-on compute floor. For a platform
 carrying dormant tenants, "wake on demand" for a legacy/free-era project
 permanently changes its cost basis.
 
+## 2026-08-18 - I04: a free org's compute surface and pause lifecycle (written up from the artifacts, work-supabase-lab#47)
+
+Module `tests/i04-free-org.ts`, landed in d62dafd. Written from the local
+artifacts with `pvlab --facts`; the lab commit stamped in them (f0c4460)
+predates the history rewrites and does not resolve. One free-org project per
+run in ap-southeast-1, created and deleted by the module; n = 3 runs.
+
+Published (redacted, a `.facts.md` beside each), `out/2026-08-18/`:
+`run-2026-08-18T04-43-40-236Z.json`, `run-2026-08-18T04-49-43-066Z.json`,
+`run-2026-08-18T05-07-03-585Z.json`, each with `--only I04-control,I04a,I04b`.
+The filter drops a row `I04 - Source limits` (fail) from the first two: the
+image-transformations module with the same id, which `--only I04` also
+selected from the shared registry then. A 05:01 artifact has no results and
+is not published.
+
+| Probe | 04:43 | 04:49 | 05:07 |
+|---|---|---|---|
+| I04-control: create without `desired_instance_size` | provision_s 13; compute_selected `none`; ci_nano_available 0; compute_variants_available empty | provision_s 12; same readback | provision_s 12; same readback |
+| I04a: create with `desired_instance_size: nano` | 201, accepted | 201 | 201 |
+| I04b: pause, wait for INACTIVE, restore | pause 200; reached INACTIVE; wake_s 182; final ACTIVE_HEALTHY | pause 200; INACTIVE; wake_s 162; ACTIVE_HEALTHY | pause 200; INACTIVE; wake_s 204; ACTIVE_HEALTHY |
+
+While paused, the data API answered `HTTP 540: Project paused. Please unpause
+the project before proceeding.` (I04b detail in the 04:43 and 04:49 runs; the
+05:07 run records no detail).
+
 ## 2026-08-24/25 addendum - I01's "Nano absent" reading scoped by sfp-platforms
 
 I01 stands for Pro orgs, but its "Nano absent" generalization measured the
