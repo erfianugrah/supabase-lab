@@ -67,7 +67,7 @@ const mod: TestModule = {
       await runSql(primary, `DROP TABLE IF EXISTS public.w16_t; CREATE TABLE public.w16_t(id serial primary key, val text)`);
       await runSql(primary, `DROP PUBLICATION IF EXISTS w16_pub`);
       await runSql(primary, `CREATE PUBLICATION w16_pub FOR TABLE public.w16_t`);
-      await runSql(standby, `DROP TABLE IF EXISTS public.w16_t; CREATE TABLE public.w16_t(id serial primary key, val text)`);
+      await runSql(standby, `DROP TABLE IF EXISTS public.w16_t; CREATE TABLE public.w16_t(id serial primary key, val text); GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.w16_t TO anon, authenticated, service_role`);
       
       const directConn = `host=db.${primary}.supabase.co port=5432 dbname=postgres user=postgres password=${dbPw} sslmode=require connect_timeout=15`;
       await runSql(standby, `CREATE SUBSCRIPTION w16_sub CONNECTION '${directConn}' PUBLICATION w16_pub WITH (copy_data = false, streaming = on)`);

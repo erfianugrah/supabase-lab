@@ -136,7 +136,7 @@ const mod: TestModule = {
       // cannot tell "no findings" from "could not look" - which is the whole
       // question. A public table with RLS disabled trips a known lint.
       const seed = await mgmt(ctx, "POST", `/projects/${ref}/database/query`, {
-        query: "create table if not exists public.z01_rls_off(i int);",
+        query: "create table if not exists public.z01_rls_off(i int); grant select, insert, update, delete on table public.z01_rls_off to anon, authenticated, service_role;",
       }).catch(() => null);
 
       // --- Z01b: awake baseline ---

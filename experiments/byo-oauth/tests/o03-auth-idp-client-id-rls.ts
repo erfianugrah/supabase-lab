@@ -310,6 +310,7 @@ const mod: TestModule = {
       const setup = await mgmt(ctx, "POST", `/projects/${ref}/database/query`, {
         query:
           `create table public.${table} (id bigint generated always as identity primary key, note text); ` +
+          `grant select, insert, update, delete on table public.${table} to anon, authenticated, service_role; ` +
           `alter table public.${table} enable row level security; ` +
           `create policy client_can_read on public.${table} for select using (auth.jwt() ->> 'client_id' = '${claim?.client_id ?? ""}'); ` +
           `insert into public.${table} (note) values ('client-visible'); ` +
