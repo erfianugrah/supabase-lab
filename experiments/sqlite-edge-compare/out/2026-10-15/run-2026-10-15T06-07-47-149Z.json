@@ -1,0 +1,83 @@
+{
+  "startedAt": "2026-10-15T06:07:47.149Z",
+  "finishedAt": "2026-10-15T06:10:51.709Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "projectRegion": "ap-southeast-2",
+  "ref": "<ref>",
+  "experiment": "sqlite-edge-compare",
+  "labCommit": "e1fa570",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "TD03b",
+      "title": "worker -> turso: insert + 3 conditional updates, read after each",
+      "status": "pass",
+      "detail": "100 jobs (10 warm-up dropped), all reads saw their write; p50 insert 206 ms, update 206, read 191, whole job 1608; colos SIN:11",
+      "measurements": {
+        "backend": "turso",
+        "vantage": "worker",
+        "colo": "SIN:11",
+        "data_region": "aws-ap-southeast-2",
+        "driver": "@libsql/client/web 0.18.0",
+        "n": 100,
+        "jobs_attempted": 110,
+        "jobs_dropped": 10,
+        "jobs_clean": 110,
+        "errors": 0,
+        "ryw_misses": 0,
+        "write_misses": 0,
+        "insert_ms_n": 100,
+        "insert_ms_p25": 204,
+        "insert_ms_p50": 206,
+        "insert_ms_p75": 208,
+        "insert_ms_p95": 273.1,
+        "insert_ms_p99": 285.24,
+        "update_ms_n": 300,
+        "update_ms_p25": 204,
+        "update_ms_p50": 206,
+        "update_ms_p75": 209,
+        "update_ms_p95": 276.1,
+        "update_ms_p99": 335.05,
+        "read_ms_n": 400,
+        "read_ms_p25": 190,
+        "read_ms_p50": 191,
+        "read_ms_p75": 193,
+        "read_ms_p95": 206,
+        "read_ms_p99": 237.01,
+        "job_ms_n": 100,
+        "job_ms_p25": 1588,
+        "job_ms_p50": 1608,
+        "job_ms_p75": 1659.25,
+        "job_ms_p95": 1737.45,
+        "job_ms_p99": 1772.69,
+        "invocations": 11,
+        "transport_retries": 0,
+        "connect_ms_p50": 0
+      },
+      "durationMs": 184561
+    },
+    {
+      "id": "TD03l",
+      "title": "ordering by whole-job p50 ('<' = p25-p75 spreads separate, '~' = they overlap)",
+      "status": "info",
+      "detail": "worker: turso; local: no samples",
+      "measurements": {
+        "turso_job_p50": 1608
+      },
+      "durationMs": 184561
+    },
+    {
+      "id": "TD03z",
+      "title": "cleanup",
+      "status": "pass",
+      "detail": "dropped td03_jobs on d1, turso, supabase",
+      "durationMs": 184561
+    }
+  ]
+}
