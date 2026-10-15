@@ -1,0 +1,124 @@
+{
+  "startedAt": "2026-10-15T05:10:14.718Z",
+  "finishedAt": "2026-10-15T05:17:54.152Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "projectRegion": "ap-southeast-2",
+  "ref": "<ref>",
+  "experiment": "sqlite-edge-compare",
+  "labCommit": "e1fa570",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "TD02s",
+      "title": "seed check: identical rows in D1, Turso and Postgres",
+      "status": "pass",
+      "detail": "expected count/sum(n)/max(id) 10000/5004937218/10000; d1 10000/5004937218/10000, turso 10000/5004937218/10000, supabase 10000/5004937218/10000",
+      "measurements": {
+        "rows": 10000,
+        "seed": 20261015,
+        "seed_ms": 19889,
+        "postgrest_visible_ms": 0,
+        "d1": "10000/5004937218/10000",
+        "turso": "10000/5004937218/10000",
+        "supabase": "10000/5004937218/10000"
+      },
+      "durationMs": 459433
+    },
+    {
+      "id": "TD02a",
+      "title": "worker -> d1: point read by PK",
+      "status": "pass",
+      "detail": "n=300 (20 warm-up dropped) p50 230 ms, p25-p75 225-236, p95 244, p99 246; first-in-invocation p50 232.5 vs rest 229; colos SIN:32",
+      "measurements": {
+        "backend": "d1",
+        "vantage": "worker",
+        "colo": "SIN:32",
+        "data_region": "served_by_region=OC served_by_colo=MEL hint=oc",
+        "driver": "d1-binding 2026-09-01",
+        "n": 300,
+        "attempted": 320,
+        "errors": 0,
+        "mismatches": 0,
+        "ms_n": 300,
+        "ms_dropped": 20,
+        "ms_min": 217,
+        "ms_p25": 225,
+        "ms_p50": 230,
+        "ms_p75": 236,
+        "ms_p95": 244,
+        "ms_p99": 246,
+        "ms_max": 252,
+        "ms_mean": 230.23,
+        "first_ms_n": 30,
+        "first_ms_p25": 228.25,
+        "first_ms_p50": 232.5,
+        "first_ms_p75": 235,
+        "first_ms_p95": 238.55,
+        "first_ms_p99": 241.84,
+        "rest_ms_n": 270,
+        "rest_ms_p25": 224,
+        "rest_ms_p50": 229,
+        "rest_ms_p75": 236,
+        "rest_ms_p95": 244,
+        "rest_ms_p99": 246,
+        "invocations": 32,
+        "transport_retries": 0,
+        "connect_ms_p50": 0,
+        "http_rtt_ms_p50": 2319.76
+      },
+      "durationMs": 459433
+    },
+    {
+      "id": "TD02l",
+      "title": "ordering by p50 ('<' = p25-p75 spreads separate, '~' = they overlap)",
+      "status": "info",
+      "detail": "worker: d1; local: no samples",
+      "measurements": {
+        "d1_p50": 230
+      },
+      "durationMs": 459433
+    },
+    {
+      "id": "TD02n",
+      "title": "turso from the Worker: queries per invocation until one fails",
+      "status": "info",
+      "detail": "1001 queries ok in one invocation; at 10001: 10000 ok, 1 failed, 0 missing; first error: Too many subrequests by single Worker invocation. To configure this limit, refer to https://developers.cloudflare.com/workers/wrangler/configuration/#limits",
+      "measurements": {
+        "backend": "turso",
+        "vantage": "worker",
+        "colo": "SIN",
+        "concurrency": 16,
+        "ladder": "1001,10001",
+        "highest_ok_queries": 1001,
+        "ceiling_found": 1,
+        "transport_retries": 0,
+        "failing_step_queries": 10001,
+        "failing_step_ok": 10000,
+        "failing_step_failed": 1,
+        "failing_step_missing": 0,
+        "first_fail_i": 10000,
+        "step0_queries": 1001,
+        "step0_ok": 1001,
+        "step0_wall_ms": 31903,
+        "step1_queries": 10001,
+        "step1_ok": 10000,
+        "step1_wall_ms": 330912
+      },
+      "evidence": "Too many subrequests by single Worker invocation. To configure this limit, refer to https://developers.cloudflare.com/workers/wrangler/configuration/#limits",
+      "durationMs": 459433
+    },
+    {
+      "id": "TD02z",
+      "title": "cleanup",
+      "status": "pass",
+      "detail": "dropped td02_kv on d1, turso, supabase",
+      "durationMs": 459433
+    }
+  ]
+}
