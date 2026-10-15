@@ -2,9 +2,9 @@
 
 > **For agentic workers:** Execute this plan inline, task by task, in the current session. Steps use checkbox (`- [ ]`) syntax for tracking. Per-task subagents (subagent-driven-development) only if the user asks for them.
 
-> **STATUS 2026-10-15: battery RUN and torn down; write-up drafted, not
-> committed.** Tasks 0-4 and 7 executed, reviewer findings applied;
-> Task 5 (stocktake) open. Results:
+> **STATUS 2026-10-16: DONE.** Battery run 2026-10-15 and torn down;
+> Tasks 0-5 and 7 executed, reviewer findings applied, results committed.
+> Results:
 > `experiments/sqlite-edge-compare/README.md` (by use case) and `RUNLOG.md`
 > (by module); artifacts `experiments/sqlite-edge-compare/out/2026-10-15/`.
 > Spend: one Micro project on the Pro org from before the first smoke run
@@ -198,7 +198,7 @@ published pricing, offline).
 
 ## Task 5 - stocktake
 
-- [ ] This plan's status line, README experiment list, board card.
+- [x] This plan's status line, README experiment list, board card.
 
 ## Task 6 - Workflow shape (how Tasks 1-4 run)
 
