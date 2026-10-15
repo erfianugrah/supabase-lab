@@ -15,7 +15,9 @@
  * Redaction is by shape, not by a list: any 20-lowercase-letter token (the
  * project ref shape), `<ref>.supabase.co` and `db.<ref>.supabase.co`, the
  * `aws-N-<region>.pooler.supabase.com` hosts, anything that looks like an
- * email, and a home-directory prefix (macOS or Linux); plus, by literal, the publishing vantage's own public address. The gitignore carves experiments/<name>/out/ out of the global out/
+ * email, a home-directory prefix (macOS or Linux), Turso database hosts and
+ * workers.dev hosts; plus, by literal, the publishing vantage's own public
+ * address and any PVLAB_REDACT_LITERALS (comma-separated) the experiment names. The gitignore carves experiments/<name>/out/ out of the global out/
  * rule (the literal patterns are in .gitignore; a star-slash here would close
  * this comment).
  */
@@ -35,8 +37,13 @@ import type { RunArtifact } from "../src/types";
  */
 export const REF_SHAPE = /(?:(?<=\\[nrtbf])|(?<![A-Za-z0-9]))[a-z]{20}(?![A-Za-z0-9])/g;
 
-export function redact(text: string, vantage: string[] = [], other: string[] = []): string {
+export function redact(text: string, vantage: string[] = [], other: string[] = [], literals: string[] = []): string {
   let out = text;
+  // Account identifiers that have no fixed shape (org slugs, a D1 database
+  // id, a Hyperdrive config id), named by the experiment via
+  // PVLAB_REDACT_LITERALS. Longest first so a hostname goes before the slug
+  // inside it.
+  for (const l of [...literals].filter((x) => x.length >= 6).sort((a, b) => b.length - a.length)) out = out.split(l).join("<id>");
   // Literal addresses, matched whole so 192.0.2.4 does not eat the front of
   // 192.0.2.44: the vantage's own egress IP, and any other address the
   // operator names (a project's add-on IPv4, a pooler's address as Postgres
@@ -52,6 +59,10 @@ export function redact(text: string, vantage: string[] = [], other: string[] = [
     .replace(/\bdb\.[a-z]{20}\.supabase\.co\b/g, "db.<ref>.supabase.co")
     .replace(/\b[a-z]{20}\.supabase\.co\b/g, "<ref>.supabase.co")
     .replace(/\baws-\d-[a-z0-9-]+\.pooler\.supabase\.com\b/g, "<pooler-host>")
+    // Turso database hostnames embed the org slug (<db>-<org>.<region>.turso.io);
+    // workers.dev hostnames embed the account's subdomain.
+    .replace(/\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.turso\.io\b/g, "<turso-host>")
+    .replace(/\b[a-z0-9-]+\.[a-z0-9-]+\.workers\.dev\b/g, "<worker-host>")
     .replace(REF_SHAPE, "<ref>")
     .replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, "<email>")
     // The platform appends its own provenance comment to statements it runs on
@@ -103,7 +114,8 @@ async function main(src: string, expDir: string, only: string[] | undefined): Pr
   const addrs = await vantageAddresses();
   if (!addrs.length) console.error("warning: could not learn this vantage's public address; set PVLAB_REDACT_ADDRS");
   const other = (process.env.PVLAB_REDACT_ADDRS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
-  const redacted = redact(raw, addrs, other);
+  const literals = (process.env.PVLAB_REDACT_LITERALS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  const redacted = redact(raw, addrs, other, literals);
   const run = JSON.parse(redacted) as RunArtifact;
   if (only?.length) {
     const lower = only.map((o) => o.toLowerCase());

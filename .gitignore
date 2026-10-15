@@ -68,3 +68,8 @@ experiments/*/local/.env
 
 # agent worktrees (Claude Code harness)
 .claude/worktrees/
+
+# sqlite-edge-compare: the live fixture (refs, hostnames, DB password, secret
+# key, Turso token, probe key) and the wrangler.jsonc rendered from it
+experiments/sqlite-edge-compare/.fixture.json
+experiments/sqlite-edge-compare/wrangler.jsonc

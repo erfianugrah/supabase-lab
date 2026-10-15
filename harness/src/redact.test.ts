@@ -138,3 +138,22 @@ describe("redact removes the addresses it is told to, and only those", () => {
     expect(redact(s, ["192.0.2.44"])).toBe(s);
   });
 });
+
+// sqlite-edge-compare (2026-10-15): Turso database hostnames carry the org
+// slug and workers.dev hostnames the account's subdomain, so both go by shape;
+// shapeless account ids (a D1 database id, an org slug inside an error body)
+// go by literal through PVLAB_REDACT_LITERALS.
+describe("redact: edge vendors", () => {
+  test("Turso database host", () => {
+    expect(redact("url https://sec-td-x-someorg.aws-ap-southeast-2.turso.io/v2/pipeline")).toBe("url https://<turso-host>/v2/pipeline");
+  });
+  test("workers.dev host", () => {
+    expect(redact("POST https://sec-probe-x.somesub.workers.dev/run")).toBe("POST https://<worker-host>/run");
+  });
+  test("api.turso.tech is a public endpoint and stays", () => {
+    expect(redact("https://api.turso.tech/v1/locations")).toBe("https://api.turso.tech/v1/locations");
+  });
+  test("literals, longest first; short ones ignored", () => {
+    expect(redact("org someorg db 0f0f0f0f-1111-2222-3333-444444444444 abc", [], [], ["someorg", "0f0f0f0f-1111-2222-3333-444444444444", "abc"])).toBe("org <id> db <id> abc");
+  });
+});
