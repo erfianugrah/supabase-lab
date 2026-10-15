@@ -2482,6 +2482,46 @@ Modules OB01-OB05; docs claims and measurements are kept apart in RUNLOG.md.
   determined. Missing prerequisite: an org the v2 route accepts, or a drain
   created in the Dashboard pointed at the sink.
 
+## experiments/logs-volume - key facts (validated 2026-10-15, Pro org, ap-southeast-1, one self-provisioned project per module run)
+
+Size is a proxy: `event_message` plus `log_attributes` keys and values as the
+logs endpoint returns them (metered bytes are not readable by PAT, OB03c).
+
+- **Per action (LV01, n = 100, run2)**: about 0.9 `edge_logs` rows per REST
+  GET or single-row insert; a REST GET row is 1807 bytes (insert about 1.6 KB
+  per request); a 100-row bulk insert is one row. `getUser` ~2 rows, 2.6 KB
+  per call; `getClaims` with an ES256 token 1 `auth_logs` and 1 `edge_logs` row
+  per 100 calls. 100 public Storage GETs (99 cache HIT) produced 99 (run1) and
+  90 (run2) `edge_logs` rows: cache hits are logged. Realtime broadcast
+  messages and an idle subscription wrote no rows. Idle project: 520
+  `pgbouncer_logs` rows/h, about 4.2 MiB/day extrapolated from one 180 s
+  window (includes 3 `function_logs` rows, probably warm-up Shutdowns).
+- **Edge Functions**: a silent invocation writes `function_edge_logs` plus a
+  Boot and a Shutdown row in `function_logs` (~3 KB total); each console line
+  adds ~520-540 bytes. Shutdown rows land up to ~3.5 min after the request
+  (exploratory probe, not archived), so count `function_logs` by
+  `log_attributes['function_id']`, not by time window; a windowed count
+  undercounts and pollutes later phases (run1).
+- **edge_logs completeness**: 84 (run1) and 92 (run2) `edge_logs` rows for 100
+  marked REST GETs, unchanged after the 300 s tail; not explained.
+- **Postgres knobs (LV02, n = 50; REST three runs, direct path run3, pooler
+  session settings run2 and run3)**: defaults log nothing per statement. Of
+  `postgres`, `authenticator` and `anon`, only settings on `authenticator`
+  logged Data API traffic (`log_statement=all` 4.02 rows / ~4.4 KB per request,
+  `log_min_duration_statement=0` 8.1 rows / ~9.0 KB); `log_statement=all` on
+  `anon` logged nothing. `postgres`-role settings reached new DIRECT sessions in
+  run3 (1.02 rows, 621-681 bytes per statement). Through the shared pooler
+  (5432 session mode) the pooled session kept the pre-change value; its
+  backend age grew by about 75 s per condition (75-453 s), which fits one
+  reused server connection. When the pooler opens a new server connection was
+  not measured. `RAISE NOTICE` logs nothing at defaults, `RAISE LOG` one row
+  per call. `alter role authenticator reset all` returned OK and left
+  `log_statement=all` in place (three runs); `reset log_statement` removed it.
+- **Harness notes**: Bun's `dns.lookup` returned ENOTFOUND for the AAAA-only
+  `db.<ref>.supabase.co` on macOS while `dig` resolved it; `lib/lv.ts`
+  `directSession` uses `dns.resolve6` plus TLS `servername`. The logs endpoint
+  throttles bursts of queries (`ThrottlerException`); `logsPatient` retries.
+
 ## experiments/edge-runtime-auth - key facts (validated 2026-10-10, Pro org, ap-southeast-1, self-provisioned projects, one per module run)
 
 Self-provisioning: each module creates and deletes its own project (name

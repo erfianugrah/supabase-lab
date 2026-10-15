@@ -287,6 +287,14 @@ facts):
   notebooks` pull and push, and a log-drain sink that is ready but blocked on
   an organization-level API gate. Self-provisioning, no OpenTofu state.
   Measured 2026-10-10; see its RUNLOG.
+- `logs-volume` - log rows and size per client action by source (REST read
+  and write, bulk vs single insert, Edge Functions with 0 / 1 / 10 console
+  lines, `getUser` vs `getClaims`, cached public Storage reads, Realtime
+  broadcast, an idle project), and what `log_statement`,
+  `log_min_duration_statement` and `pgaudit.log` add per statement depending
+  on the role they are set on and the connection path, and what
+  `RAISE NOTICE` / `RAISE LOG` add at defaults. Self-provisioning, Pro org,
+  LV01-LV02. Measured 2026-10-15; see its RUNLOG.
 - `edge-runtime-auth` - `@supabase/server` auth modes (`none`, `user`,
   `secret`, `publishable`, `['user','secret']`) against 14 credential
   presentations on an Edge Function and on the Workers runtime (workerd in a
