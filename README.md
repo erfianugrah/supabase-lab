@@ -412,6 +412,14 @@ facts):
   answer 200 but are not listed; updates land with exit 1; a width-24 destroy
   leaves the listed functions in place and empties state. `-parallelism=1`
   is clean. Measured 2026-10-10; see its RUNLOG.
+- `sqlite-edge-compare` - Turso (libSQL), Cloudflare D1 and Supabase Postgres
+  (Hyperdrive with and without caching, and PostgREST) on eight workloads from
+  one probe Worker, all in Sydney: database-per-tenant create to first query,
+  point reads, job-state writes and the per-invocation query ceiling, write
+  contention up to 64 writers, an event log, full-text and vector search,
+  transaction semantics (D1 has `batch()`, no `BEGIN`) and a Turso embedded
+  replica (TD01-TD08). Self-provisioning, Pro org plus Turso and Cloudflare
+  accounts. Measured 2026-10-15; see its README (by use case) and RUNLOG.
 
 ## Ad-hoc platform probes (no experiment dir)
 
