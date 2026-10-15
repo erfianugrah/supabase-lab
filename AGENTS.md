@@ -2522,6 +2522,69 @@ logs endpoint returns them (metered bytes are not readable by PAT, OB03c).
   `directSession` uses `dns.resolve6` plus TLS `servername`. The logs endpoint
   throttles bursts of queries (`ThrottlerException`); `logsPatient` retries.
 
+## experiments/sqlite-edge-compare - key facts (validated 2026-10-15, Turso libSQL vs Supabase Postgres vs Cloudflare D1, all in Sydney, probe Worker mostly SIN, local client in Singapore)
+
+Self-provisioning, no OpenTofu state: `make up` creates a Micro project on the
+Pro org (`ap-southeast-2`), Turso group `sec-syd` (`aws-ap-southeast-2`) with
+one libSQL database, a D1 database (hint `oc`), two Hyperdrive configs (caching
+off and on) and the probe Worker; `make down` and `make cleanup` touch only
+`sec-*` names (the Cloudflare account and both orgs hold other work). Results
+per use case in its README, per module in its RUNLOG; artifacts
+`out/2026-10-15/`.
+
+- **Colo first, backend second**: Worker orderings hold for one colo. TD06's
+  first run landed in NRT and reversed SIN's order (Postgres full-text p50
+  104-115 ms from NRT, 282-292.5 from SIN). Parallel invocations from one
+  client spread over SIN, NRT, HKG and KIX (TD04 C16/C64); every row records
+  `colo`.
+- **Point reads (TD02, n = 300, SIN)**: Worker p50 Turso 190, D1 227,
+  Hyperdrive uncached 257, PostgREST 307 ms (`turso < d1 < pg ~ pg_cached <
+  postgrest`); local, the pooler separated from direct and D1 REST.
+  Postgres op timings exclude connect (local p50 1640.4 ms pooler); the
+  other paths pay setup in their first op. Turso's first read per invocation p50 740
+  ms (a cold client), so its p95 is 738.2. Hyperdrive caching on a hot set:
+  p50 5 ms; after a write, a cached read returned the old value 29 of 30
+  times (TD07c).
+- **Per-invocation ceilings (TD02m, TD02n)**: 10000 queries for D1 (`Too many
+  API requests by single Worker invocation`) and 10000 fetches for Turso
+  (`Too many subrequests by single Worker invocation`) on this account; the
+  D1 limits page says 1000 on Paid. Which plan figure applies to this account
+  is not settled.
+- **Contention (TD04, 256 ops per cell)**: no errors and no lost updates on any
+  backend up to 64 writers; Turso (libSQL) per-op p50 rose to 1690.5-2186 ms
+  at C64 with fewer ops/s than at C16 (one sample per cell), D1 and Postgres held 250-256.5 ms. D1's
+  `overloaded` point was not reached. The Turso engine (`BEGIN CONCURRENT`)
+  needs `tursodb_enabled` on the org; the Platform API refuses `use_tursodb:
+  true` with HTTP 400 until an owner enables it (TD04m0).
+- **Transactions (TD07)**: D1 refuses `BEGIN TRANSACTION` through the binding
+  (points at `state.storage.transaction()`); `batch()` is its transaction.
+  Turso and Postgres interactive transactions work from a Worker. A
+  concurrent autocommit writer's slowest write during a Turso write
+  transaction was 1885 ms, consistent with waiting (inferred, n = 1); Postgres READ COMMITTED showed a non-repeatable read and REPEATABLE
+  READ failed with `40001`.
+- **Search (TD06)**: FTS5 on D1 and Turso returned identical top 10s; D1 has
+  no `vector32` (`no such function`). libSQL vector index with
+  `compress_neighbors=float8, max_neighbors=16` gave recall@10 0.265 at
+  10,000 x 384 (1 at 500 vectors); with libSQL's default arguments the index
+  loaded far slower (500 rows: last op 18586 ms). `CREATE INDEX` after a
+  load failed once with `unable to initialize diskann` and worked on retry;
+  `DROP INDEX` leaves the `_shadow` table behind. pgvector HNSW recall 1 in the SIN run (mean 0.95, min 0 in the
+  superseded NRT run; not explained).
+- **Embedded replica (TD08)**: replica PK read p50 0.25 ms vs 244.53 over
+  HTTP; primary write visible after one `sync()` (p50 913.28 ms); a fresh
+  replica took 36 s to open; TD08 as a whole moved 154484736 bytes by the
+  usage counter.
+- **Database per tenant (TD01, burst of 20)**: no refusals; create to first
+  query p50 Turso 4732.6, D1 2244.42, Postgres schema 1017.55 ms.
+- **Harness notes**: Bun's socket idle timeout (5 min) closes a long silent
+  `fetch` before an `AbortSignal` deadline; `lib/client.ts` passes `timeout:
+  false` (the Turso 10001-query invocation takes 330912 ms). The direct host
+  is AAAA-only and Bun's `dns.lookup` returns ENOTFOUND for it on macOS, so
+  `pgConfig(f, "direct")` connects to the resolved address. Publishing needs
+  `PVLAB_REDACT_LITERALS` (filled by `make publish-evidence` from the live and
+  archived fixtures) because D1 and Hyperdrive ids and org slugs have no fixed
+  shape; Turso and workers.dev hosts are redacted by shape.
+
 ## experiments/edge-runtime-auth - key facts (validated 2026-10-10, Pro org, ap-southeast-1, self-provisioned projects, one per module run)
 
 Self-provisioning: each module creates and deletes its own project (name
