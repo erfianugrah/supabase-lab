@@ -50,13 +50,13 @@ async function devProject(ctx: Ctx): Promise<ObProject | null> {
   return { ctx: child, ref: st.ref, name: st.name, createdAt: Date.now(), healthyMs: 0, dbPass: st.dbPass };
 }
 
-export async function makeProject(ctx: Ctx, tag: string): Promise<ObProject> {
+export async function makeProject(ctx: Ctx, tag: string, prefix = NAME_PREFIX): Promise<ObProject> {
   const dev = await devProject(ctx);
   if (dev) return dev;
   const org = ctx.orgs.pro;
   if (!org) throw new Error("PVLAB_ORG_PRO not set");
   const t0 = Date.now();
-  const name = `${NAME_PREFIX}${tag}-${t0.toString(36)}`;
+  const name = `${prefix}${tag}-${t0.toString(36)}`;
   const dbPass = `${crypto.randomUUID()}Aa1!`;
   const create = await mgmtPatient(ctx, "POST", "/projects", {
     organization_slug: org,
