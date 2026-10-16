@@ -85,6 +85,8 @@ describe("fixture file shape", () => {
     expect(w.compatibility_flags).toEqual(["nodejs_compat"]);
     expect((w.hyperdrive as { binding: string }[]).map((h) => h.binding)).toEqual(["HD", "HD_CACHED"]);
     expect((w.d1_databases as { binding: string }[])[0]!.binding).toBe("DB");
+    expect(w.durable_objects).toEqual({ bindings: [{ name: "PDO", class_name: "ProbeDO" }] });
+    expect(w.migrations).toEqual([{ tag: "v1", new_sqlite_classes: ["ProbeDO"] }]);
     const s = JSON.stringify(w);
     expect(s).not.toContain("sb_secret_x");
     expect(s).not.toContain('"tok"');

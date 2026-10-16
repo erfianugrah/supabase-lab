@@ -55,6 +55,7 @@ import {
   deleteWorker,
   goneOk,
   listD1,
+  listDoNamespaces,
   listHyperdrive,
   listSecProjects,
   listTurso,
@@ -179,6 +180,8 @@ export function renderWrangler(f: Fixture, drivers: { pg: string; libsql: string
       { binding: "HD", id: f.hyperdrive.nocache.id },
       { binding: "HD_CACHED", id: f.hyperdrive.cached.id },
     ],
+    durable_objects: { bindings: [{ name: "PDO", class_name: "ProbeDO" }] },
+    migrations: [{ tag: "v1", new_sqlite_classes: ["ProbeDO"] }],
     vars: {
       SUPABASE_URL: f.supabase.url,
       TURSO_URL: f.turso.url,
@@ -774,12 +777,13 @@ export async function status(): Promise<void> {
 
 /** Every sec- resource on all three vendors, by name. */
 export async function leftovers(v: Env) {
-  const [projects, d1, hd, workers, t] = await Promise.all([listSecProjects(v.ctx, v.org), listD1(v.c), listHyperdrive(v.c), listWorkers(v.c), listTurso(v.t)]);
+  const [projects, d1, hd, workers, t, dons] = await Promise.all([listSecProjects(v.ctx, v.org), listD1(v.c), listHyperdrive(v.c), listWorkers(v.c), listTurso(v.t), listDoNamespaces(v.c).catch((e) => [{ name: `${PREFIX}unlistable (${String(e).slice(0, 80)})`, id: "", className: "" }])]);
   return {
     projects,
     d1: secOnly(d1, (x) => x.name),
     hyperdrive: secOnly(hd, (x) => x.name),
     workers: secOnly(workers, (x) => x.name),
+    doNamespaces: secOnly(dons, (x) => x.name),
     tursoDbs: secOnly(t.databases, (x) => x.name),
     tursoGroups: secOnly(t.groups, (x) => x),
   };
@@ -809,6 +813,7 @@ export async function cleanup(dry: boolean): Promise<number> {
     cf_workers: after.workers.length,
     cf_d1: after.d1.length,
     cf_hyperdrive: after.hyperdrive.length,
+    cf_do_namespaces: after.doNamespaces.length,
     turso_dbs: after.tursoDbs.length,
     turso_groups: after.tursoGroups.length,
   };

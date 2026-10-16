@@ -31,7 +31,10 @@
  *                    recorded); backends round-robin per iteration. `correct`
  *                    = the rows equal the JavaScript truth. D1 rows: rows_read
  *                    and sql_duration_ms from the binding's meta.
- *   TD05c            Turso Platform API usage (rows read / written, storage)
+ *   TD05c[-tursodb]  Turso Platform API usage (rows read / written, storage)
+ *                    for each Turso database, before and after, each read
+ *                    repeated until rows_written settles; rows_written per
+ *                    ingested event isolates the engines on one workload
  *                    before and after, when readable; the counter may lag.
  *   TD05z            cleanup.
  *
@@ -85,6 +88,7 @@ const ID = "TD05";
 const BASE_BACKENDS: { b: WorkerBackend; d: Dialect }[] = [
   { b: "d1", d: "sqlite" },
   { b: "turso", d: "sqlite" },
+  { b: "do", d: "sqlite" },
   { b: "pg", d: "pg" },
 ];
 const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e)).slice(0, 300);
@@ -95,16 +99,32 @@ async function run(fx: Fixture, req: RunRequest<WorkerBackend>): Promise<RunResu
 }
 
 /** Turso usage counters for the fixture DB, or the reason they are not readable. */
-async function tursoUsage(fx: Fixture): Promise<Record<string, number> | string> {
+async function tursoUsage(db: string): Promise<Record<string, number> | string> {
   const t = tursoCreds();
   if (!t) return "TURSO_API_TOKEN / PVLAB_ORG_TURSO not in env";
   try {
-    const r = await turso<{ database?: { usage?: Record<string, number> } }>(t, "GET", `databases/${encodeURIComponent(fx.turso!.db)}/usage`);
+    const r = await turso<{ database?: { usage?: Record<string, number> } }>(t, "GET", `databases/${encodeURIComponent(db)}/usage`);
     if (r.status !== 200 || !r.json.database?.usage) return `HTTP ${r.status}`;
     return r.json.database.usage;
   } catch (e) {
     return errMsg(e);
   }
+}
+
+/**
+ * Usage after a wait (TD05_USAGE_WAIT_MS, default 300 s: the counter lagged by more than 20 s on 2026-10-16), then
+ * re-read until rows_written stops moving (two equal reads 20 s apart, at most 6 reads).
+ */
+async function settledUsage(db: string): Promise<{ u: Record<string, number> | string; reads: number }> {
+  await new Promise((r) => setTimeout(r, Number(process.env.TD05_USAGE_WAIT_MS ?? 300_000)));
+  let prev = await tursoUsage(db);
+  for (let i = 1; i < 6; i++) {
+    await new Promise((r) => setTimeout(r, 20_000));
+    const cur = await tursoUsage(db);
+    if (typeof prev !== "string" && typeof cur !== "string" && cur.rows_written === prev.rows_written) return { u: cur, reads: i + 1 };
+    prev = cur;
+  }
+  return { u: prev, reads: 6 };
 }
 
 const mod: TestModule = {
@@ -152,7 +172,10 @@ const mod: TestModule = {
         const bad = !r.ok || (r.ops ?? []).some((o) => !o.ok) || (r.ops ?? []).length === 0;
         if (bad) broken.set(b, `schema: ${firstErr(r) || "no ops"}`);
       }
-      const usage0 = await tursoUsage(fx);
+      // Usage per Turso database (libSQL and, when present, the Turso engine): the same ingest on both isolates rows_written per engine.
+      const usageDbs: [string, string][] = [["turso", fx.turso!.db], ...(fx.tursodb?.url ? ([["tursodb", fx.tursodb.db]] as [string, string][]) : [])];
+      const usage0 = new Map<string, Record<string, number> | string>();
+      for (const [k, db] of usageDbs) usage0.set(k, (await settledUsage(db)).u);
 
       // ---- ingest: backends take turns per batch, order rotating ----
       const batches = chunk(events, sz.batchRows);
@@ -242,13 +265,20 @@ const mod: TestModule = {
         });
       }
 
+      // Queries skipped per backend (TD05_SKIP, "backend/query" list; empty string runs everything). Default: the
+      // Turso engine's p95_by_colo, which counts about 4 rows written per input row per execution
+      // (scripts/rows-written-probe.ts, 2026-10-16): a full run would pass the Free plan's monthly write allowance.
+      const skipQ = new Set((process.env.TD05_SKIP ?? "tursodb/p95_by_colo").split(",").map((x) => x.trim()).filter(Boolean));
+      const qsFor = (b: WorkerBackend) => TD05_QUERIES.filter((q) => !skipQ.has(`${b}/${q}`));
+
       // ---- correctness: one pass returning rows ----
       const correct = new Map<string, number>();
       const wrong: string[] = [];
       for (const { b, d } of live()) {
         const aggs = td05Aggregates(d);
-        const r = await run(fx, { backend: b, statements: TD05_QUERIES.map((q) => aggs[q]), returnRows: true, rowsLimit: 1000, returnMeta: false });
-        for (const [k, q] of TD05_QUERIES.entries()) {
+        const qs = qsFor(b);
+        const r = await run(fx, { backend: b, statements: qs.map((q) => aggs[q]), returnRows: true, rowsLimit: 1000, returnMeta: false });
+        for (const [k, q] of qs.entries()) {
           const op = r.ops.find((o) => o.stmt === k);
           const ok = !!op?.ok && fingerprint(op.out?.[0]?.rows ?? []) === fingerprint(truth[q]);
           correct.set(`${b}/${q}`, ok ? 1 : 0);
@@ -265,7 +295,7 @@ const mod: TestModule = {
         const { b, d } = slot.item;
         const aggs = td05Aggregates(d);
         // Order rotates per iteration so the first-statement cost (client setup on the invocation) is spread over every query.
-        const order = rotate(TD05_QUERIES, slot.iter);
+        const order = rotate(qsFor(b), slot.iter);
         const r = await run(fx, { backend: b, statements: order.map((q) => aggs[q]), returnMeta: b === "d1", label: `${ID} agg ${slot.iter}` }).catch(
           (e) => ({ ok: false, error: errMsg(e), ops: [], colos: [] }) as unknown as RunResult,
         );
@@ -281,6 +311,16 @@ const mod: TestModule = {
       for (const { b } of live()) {
         for (const q of TD05_QUERIES as readonly Td05Query[]) {
           const key = `${b}/${q}`;
+          if (skipQ.has(key)) {
+            out.push({
+              id: `${ID}b-${b}-${q}`,
+              title: `${q} on ${b}: skipped`,
+              status: "skip",
+              detail: `skipped (TD05_SKIP): on the Turso engine this window-function query counted about 4 rows written per input row per execution (scripts/rows-written-probe.ts, 2026-10-16); ${sz.events} rows x ${sz.n + sz.warmup + 1} passes would exhaust the Free plan's monthly write allowance`,
+              measurements: { backend: b, query: q, skipped: 1 },
+            });
+            continue;
+          }
           const list = samples.get(key) ?? [];
           const kept = list.filter((x) => !x.warm && x.ok).map((x) => x.ms);
           const s = { ...summarize(kept), dropped: list.filter((x) => x.warm).length };
@@ -325,21 +365,26 @@ const mod: TestModule = {
       }
 
       // ---- Turso usage counters ----
-      const usage1 = await tursoUsage(fx);
-      if (typeof usage0 === "string" || typeof usage1 === "string") {
-        out.push({ id: `${ID}c`, title: "Turso usage counters (Platform API)", status: "info", detail: `not readable: ${typeof usage0 === "string" ? usage0 : usage1}` });
-      } else {
-        const m: Record<string, number | string> = { backend: "turso", source: "GET /v1/organizations/{org}/databases/{db}/usage" };
-        for (const k of ["rows_read", "rows_written", "storage_bytes"]) {
-          m[`${k}_before`] = usage0[k] ?? Number.NaN;
-          m[`${k}_after`] = usage1[k] ?? Number.NaN;
-          m[`${k}_delta`] = (usage1[k] ?? Number.NaN) - (usage0[k] ?? Number.NaN);
+      for (const [b, db] of usageDbs) {
+        const u0 = usage0.get(b)!;
+        const { u: u1, reads } = await settledUsage(db);
+        const id = b === "turso" ? `${ID}c` : `${ID}c-${b}`;
+        if (typeof u0 === "string" || typeof u1 === "string") {
+          out.push({ id, title: `Turso usage counters (${b}, Platform API)`, status: "info", detail: `not readable: ${typeof u0 === "string" ? u0 : u1}` });
+          continue;
         }
+        const m: Record<string, number | string> = { backend: b, source: "GET /v1/organizations/{org}/databases/{db}/usage", usage_reads_after: reads, events: sz.events };
+        for (const k of ["rows_read", "rows_written", "storage_bytes"]) {
+          m[`${k}_before`] = u0[k] ?? Number.NaN;
+          m[`${k}_after`] = u1[k] ?? Number.NaN;
+          m[`${k}_delta`] = (u1[k] ?? Number.NaN) - (u0[k] ?? Number.NaN);
+        }
+        m.rows_written_per_event = Math.round(((m.rows_written_delta as number) / sz.events) * 1000) / 1000;
         out.push({
-          id: `${ID}c`,
-          title: "Turso usage counters across TD05 (Platform API; may lag)",
+          id,
+          title: `Turso usage counters across TD05 (${b}; Platform API, re-read until rows_written settled)`,
           status: "info",
-          detail: `rows_read +${m.rows_read_delta}, rows_written +${m.rows_written_delta}, storage ${m.storage_bytes_after} bytes after (whole database, read right after the run)`,
+          detail: `rows_read +${m.rows_read_delta}, rows_written +${m.rows_written_delta} (${m.rows_written_per_event} per ingested event), storage ${m.storage_bytes_after} bytes after; read after a ${Number(process.env.TD05_USAGE_WAIT_MS ?? 300_000) / 1000} s wait, settled after ${reads} reads (the counter lags; earlier writes to the same database can still land in the before-read)`,
           measurements: m,
         });
       }
@@ -347,7 +392,7 @@ const mod: TestModule = {
       out.push({ id: ID, title: this.title, status: "fail", detail: `threw: ${errMsg(e)}` });
     } finally {
       const bad = await drop();
-      out.push({ id: `${ID}z`, title: "cleanup", status: bad ? "fail" : "pass", detail: bad ? `drop failed: ${bad}` : "dropped td05_events on D1, Turso and Postgres" });
+      out.push({ id: `${ID}z`, title: "cleanup", status: bad ? "fail" : "pass", detail: bad ? `drop failed: ${bad}` : "dropped td05_events on every backend in the run" });
     }
     return out;
   },

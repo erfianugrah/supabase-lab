@@ -7,7 +7,7 @@
  */
 import { postgrestCall } from "./adapters";
 import { type Fixture, type RunResult, runLocal, runOnWorker } from "./client";
-import type { LocalBackend, RunRequest, WorkerBackend } from "./contract";
+import { DO_LOCATION_HINT, type LocalBackend, type RunRequest, type WorkerBackend } from "./contract";
 import { summarize } from "./stats";
 import type { Store, Target } from "./td02-03-plan";
 import { metaValues } from "./td02-03-plan";
@@ -73,7 +73,7 @@ export function targetUnavailable(t: Target): string | null {
   return null;
 }
 
-const setupBackend: Record<Store, WorkerBackend> = { d1: "d1", turso: "turso", tursodb: "tursodb", supabase: "pg" };
+const setupBackend: Record<Store, WorkerBackend> = { d1: "d1", turso: "turso", tursodb: "tursodb", do: "do", supabase: "pg" };
 
 /**
  * Setup / teardown SQL through the probe Worker, one store at a time, as a
@@ -123,7 +123,9 @@ export function vantageFacts(fx: Fixture, t: Target, results: readonly RunResult
   const region =
     t.store === "d1"
       ? `served_by_region=${metaValues(ops, "served_by_region") || "?"} served_by_colo=${metaValues(ops, "served_by_colo") || "?"} hint=${fx.d1?.locationHint ?? "?"}`
-      : t.store === "turso" || t.store === "tursodb"
+      : t.store === "do"
+        ? `Durable Object locationHint=${DO_LOCATION_HINT}`
+        : t.store === "turso" || t.store === "tursodb"
         ? (fx.turso?.location ?? "?")
         : (fx.supabase?.region ?? "?");
   return {

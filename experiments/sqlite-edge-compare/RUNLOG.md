@@ -73,9 +73,8 @@ those with n stated.
   state.storage.transactionSync() APIs instead of the SQL BEGIN TRANSACTION ...`.
 - D1 queries per invocation (smoke): 1100 sequential `select 1` in one
   invocation (`noSplit`) all succeeded, past the 1000 the D1 limits page gives
-  for Paid. The account is not on the self-serve Workers Paid plan, so the
-  documented ceiling may not be the one that applies here; TD02 records the
-  ceiling row.
+  for Paid; which documented ceiling applies to this account was not
+  determined. TD02 records the ceiling row.
 - Hyperdrive: the first create attempt failed client-side (`The socket
   connection was closed unexpectedly`) with no config saved; on resume both
   configs (caching disabled, caching enabled) saved in about 3 s each and both
@@ -151,8 +150,7 @@ from SIN (32 invocations per row, 12 on the hot-set rows). D1 rows report
   Turso (re-run only) 1001 ok; at 10001, 10000 ok and 1 failed with `Too many
   subrequests by single Worker invocation` (same link). The D1 limits page
   gives 1000 queries per invocation on Paid (facts doc); this account allowed
-  10000. The account is not on the self-serve Workers Paid plan, so which
-  documented figure applies to it is not settled.
+  10000; which documented figure applies to this account is not settled.
 - Not settled: other colos and regions, behaviour under concurrent load
   (TD04), D1 read replication (left at its default, disabled), the cause of
   Turso's first-read cost.
