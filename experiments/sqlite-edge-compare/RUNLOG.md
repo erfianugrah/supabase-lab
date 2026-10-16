@@ -1,6 +1,7 @@
 # RUNLOG - sqlite-edge-compare
 
-All runs 2026-10-15 (UTC). Vantage: one macOS machine in Singapore (Bun
+Runs 2026-10-15 (UTC) in the sections below, and a re-run on 2026-10-16 with
+the Turso engine added in the last section. Vantage: one macOS machine in Singapore (Bun
 1.3.14), reaching the probe Worker at a nearby Cloudflare colo (SIN for most
 rows; each row records its colo, and some landed in HKG, NRT or KIX, see
 below). Data planes in Sydney (Supabase `ap-southeast-2`, Micro, Postgres
@@ -400,3 +401,274 @@ succeeded on attempt 1.
   databases on Free and 50,000 D1 databases per account on Paid are docs
   figures; neither was reached), per-tenant cost, many schemas under load,
   project-per-tenant beyond one create.
+
+## Re-run 2026-10-16: the Turso engine added
+
+The org setting the 2026-10-15 TD04m0 row asked for was switched on by the
+account owner on 2026-10-16 (dashboard: the concurrency setting; the
+organization object then reads `tursodb_enabled true`). The fixture gained a
+second Turso database in the same group, created with `use_tursodb: true`
+(`sec-tdb-<stamp>`, 990 ms), and the probe Worker a `tursodb` backend: the
+same `@libsql/client/web` client against that database. TD01 to TD07 run it
+next to the libSQL one where the fixture has it (`withTursodb`,
+`lib/td04-07-plan.ts`). Same vantage (this machine in Singapore), same
+regions, Worker at SIN unless a row says otherwise. Code: the working tree on
+top of lab commit 4edcdd1.
+
+Code changes before or during this run, each recorded here because a row
+depends on it:
+
+- TD05 rotates the order of its five queries per iteration
+  (`rotate`, `lib/stats.ts`) and records each query's p50 when it ran first in
+  the invocation and when it did not.
+- TD04's Turso-engine rows open a Hrana stream per statement outside a
+  transaction (see TD04m1 below); the first attempt (run 23:56) failed on that.
+- `pgConfig` (local Postgres paths) gained `query_timeout: 120000` and
+  `keepAlive: true` after the first TD03 attempt hung for 34 minutes on one
+  query over a dead connection to port 5432; that attempt was stopped and
+  wrote no artifact.
+- TD05 re-sends a failed ingest batch once, only when a row count shows the
+  batch did not land (generated ids); TD06 re-sends a failed vector batch once
+  (explicit ids; a duplicate-key answer counts the batch as landed).
+- Row ids: TD02 printed the Turso-engine row as `TD02undefined` (fixed later
+  to TD02o; the TD03 artifact already has TD03o); TD01 printed the
+  Turso-engine rows as TD01g / TD01h, and TD01g collides with the Supabase
+  project row in the same artifact (fixed later to TD01i / TD01j). The
+  artifacts keep the ids they were written with, and the sections below quote
+  those ids.
+
+Published artifacts (`out/2026-10-16/` unless noted, redacted as before):
+
+| module | artifact | UTC | note |
+|---|---|---|---|
+| TD04 | `out/2026-10-15/run-2026-10-15T23-56-11-249Z.json` | 23:56-00:05 | libSQL, D1, Postgres cells (a second sample of each); TD04m0/m1 Turso engine; TD04m2 failed on the stream issue |
+| TD04 | `run-2026-10-16T00-07-27-227Z.json` | 00:07-00:43 | with the Turso engine in the Worker cells; TD04m2 complete |
+| TD07 | `run-2026-10-16T00-43-57-653Z.json` | 00:43-00:47 | |
+| TD02 | `run-2026-10-16T00-47-12-215Z.json` | 00:47-01:14 | Turso-engine row printed as `TD02undefined` |
+| TD05 | `run-2026-10-16T02-10-27-593Z.json` | 02:10-02:16 | superseded: one ingest batch per Turso database lost to HTTP 520, Turso aggregates skipped; Worker at HKG |
+| TD06 | `run-2026-10-16T02-16-57-235Z.json` | 02:16-02:27 | Turso-engine vector load 9900/10000 (one batch lost, error text not recorded) |
+| TD01 | `run-2026-10-16T02-27-14-443Z.json` | 02:27 | Turso-engine rows printed as TD01g/TD01h |
+| TD03 | `run-2026-10-16T02-28-06-480Z.json` | 02:28-03:20 | |
+| TD05 | `run-2026-10-16T03-20-26-319Z.json` | 03:20-03:27 | canonical |
+| TD06 | `run-2026-10-16T03-27-49-254Z.json` | 03:27-03:38 | superseded: vector loads and cleanup lost to a local DNS outage |
+| TD06 | `run-2026-10-16T03-44-01-976Z.json` | 03:44-03:59 | canonical |
+| TD08 | `run-2026-10-16T03-59-43-029Z.json` | 03:59-04:02 | write and Turso Sync rows failed on the Turso write block |
+
+### TD04 - write contention, two more samples
+
+ops/s at C1 / C4 / C16 / C64, per-op p50 at C64 in brackets. Run 1 is
+2026-10-15 06:10 (above), run 2 is 2026-10-15 23:56, run 3 is 2026-10-16
+00:07. Every C16 and C64
+cell in runs 2 and 3 ran from SIN.
+
+| backend | workload | run 1 | run 2 | run 3 |
+|---|---|---|---|---|
+| D1 | insert | 4.22 / 16.42 / 59.95 / 172.04 (253) | fail / 16.44 / 57.41 / 148.75 (347.5) | 4.2 / 15.82 / 55.36 / 162.33 (329) |
+| D1 | increment | 4.18 / 16.43 / 63.76 / 135.38 (250) | 4.17 / 16 / 63.26 / 149.88 (265) | 4.07 / 15.64 / 61.88 / 166.13 (296) |
+| Turso libSQL | insert | 4.71 / 17.45 / 43.88 / 25.82 (2186) | 4.74 / 18.48 / 44.78 / 26.83 (2284) | 4.77 / 18.48 / 50.77 / 24.4 (2592.5) |
+| Turso libSQL | increment | 4.65 / 6.07 / 42.39 / 30.63 (1690.5) | 5.16 / 18.3 / 52.44 / 30.96 (1760) | 4.74 / 18.25 / 49.42 / 24.1 (2502) |
+| Turso engine | insert | - | - | 3.19 / 12.93 / 14.28 / 13.03 (4575.5) |
+| Turso engine | increment | - | - | 3.15 / 14.55 / 13.95 / 10.98 (5500) |
+| Postgres | insert | 3.98 / 14.38 / 53.2 / 150.77 (251.5) | 3.55 / 14.48 / 59.62 / 170.55 (281) | fail / 14.75 / 56.78 / 152.47 (253) |
+| Postgres | increment | 3.55 / 15.03 / 56.25 / 147.98 (256.5) | 3.53 / 15.3 / 56.35 / 169.65 (251) | 3.51 / 14.48 / 53.55 / 155.25 (280) |
+
+- The libSQL drop at C64 repeated in all three runs (24.1 to 30.96 ops/s,
+  per-op p50 1690.5 to 2592.5 ms). Run 1's C64 cells spread over four colos;
+  runs 2 and 3 were SIN only, so the drop is not the colo mix.
+- The Turso engine's per-op p50 was already 1002 ms (insert) and 1015.5 ms
+  (increment) at C16; its ops/s stayed between 12.93 and 14.55 from C4 to
+  C16 and fell at C64 (13.03 / 10.98).
+- Failed cells: run 2 TD04a-d1-c1 (the request came back as a Cloudflare HTTP
+  502 page after 29617 ms; 122 rows had committed), run 3 TD04a-pg-c1 (the
+  local client timed out; 256 rows had committed), run 3 TD04a-tursodb-c64
+  (all 256 ops ok; the row-count read answered HTTP 520).
+- TD04m0 (run 3): create with `use_tursodb: true` HTTP 200 in 1317 ms; DbId
+  classifies as tursodb.
+- TD04m1: the Turso-engine database reports `journal_mode` `mvcc` and accepts
+  `BEGIN CONCURRENT`; `PRAGMA journal_mode = wal` is refused (`SQL not allowed
+  statement`). The libSQL database reports `wal` and rejects `BEGIN
+  CONCURRENT` as a parse error. On both, a second autocommit statement on one
+  Hrana stream fails: the server returns no baton after an autocommit
+  statement, so the stream ends (`STREAM_CLOSED` is this lab's client's text,
+  `lib/td04-07-hrana.ts`); `@libsql/client` opens a new stream instead.
+- TD04m2 (local vantage, Hrana over HTTP, one statement per round trip, n = 64
+  transactions per cell, up to 25 attempts):
+
+| engine | begin | workload | C1 tx/s | C4 tx/s | C16 tx/s | conflicts retried (C4 / C16) | committed at C16 |
+|---|---|---|---|---|---|---|---|
+| Turso engine | BEGIN CONCURRENT | insert | 1.08 | 4.4 | 1.73 | 0 / 0 | 64 |
+| libSQL | BEGIN IMMEDIATE | insert | 1.31 | 1.83 | 1.82 | 0 / 0 | 64 |
+| Turso engine | BEGIN CONCURRENT | read-modify-write | 0.9 | 1.13 | 1.24 | 189 / 713 | 53 (11 gave up after 25 attempts) |
+| libSQL | BEGIN IMMEDIATE | read-modify-write | 0.99 | 1.26 | 1.24 | 0 / 0 | 64 |
+
+  Every cell's final count equalled its committed transactions (no lost
+  update). Conflicts arrive as `[SQLITE_ABORT] Tursodb error: Write-write
+  conflict`. One sample per cell.
+
+### TD07 - transaction semantics, with the Turso engine
+
+TD07a to TD07d on the Turso engine matched the libSQL rows: interactive
+transaction committed in 634 ms (libSQL 576); a duplicate key rolls back the
+batch and the interactive transaction and leaves the earlier row in `each`
+mode; 30/30 reads saw their own and the preceding write; in TD07d a writer B
+waited behind A's open write transaction (slowest B write 2107 ms, libSQL
+1934 ms) and A's two reads were equal. The D1 and Postgres rows repeat
+2026-10-15: D1 refuses `BEGIN TRANSACTION`, the Hyperdrive cache returned the
+pre-write value on 29 of 30 reads, Postgres read committed showed a
+non-repeatable read and repeatable read failed A with 40001.
+
+### TD02 - point reads, with the Turso engine
+
+Worker at SIN:32 for every Worker row; n = 300 after 20 warm-up.
+
+| target | p25 | p50 | p75 | first in invocation p50 | connect p50 |
+|---|---|---|---|---|---|
+| D1 (TD02a) | 219 | 221 | 223.25 | 221 | 0 |
+| Turso libSQL (TD02b) | 180 | 184 | 189 | 729.5 | 0 |
+| Turso engine (`TD02undefined`) | 183 | 186 | 188 | 732.5 | 0 |
+| Hyperdrive, caching off (TD02c) | 249 | 250 | 282 | 252.5 | 2 |
+| Hyperdrive, caching on (TD02d) | 252.75 | 283 | 286 | 285.5 | 2 |
+| PostgREST (TD02e) | 290 | 324 | 327 | 337.5 | 0 |
+
+TD02l ordering: `turso ~ tursodb < d1 < pg ~ pg_cached < postgrest`. TD02b
+is `fail` on 1 of 320 reads answering HTTP 520. TD02m/n repeated the
+2026-10-15 ceiling: 10000 queries ok and the 10001st refused, on D1 and Turso.
+Connect time: `connect_ms_p50` is the Hyperdrive connection open inside the
+Worker (2 ms here, 7 ms on 2026-10-15); the local pooler and direct paths
+connect in 2015.81 and 2123.34 ms, outside op timings in both runs.
+
+### TD01 - database per tenant, with the Turso engine
+
+| backend | single: create / create to first query / delete (ms) | burst of 20: create p50 / first query p50 / max / wall (ms) |
+|---|---|---|
+| Turso libSQL | 1380.91 / 3727.39 / 790.22 | 1591.49 / 4080.64 / 4322.38 / 4322.8 |
+| Turso engine (written TD01g, TD01h) | 1166.34 / 3792.89 / 1110.09 | 2006.4 / 4651.5 / 4934.59 / 4934.85 |
+| D1 | 707.41 / 2087.22 / 1010.91 | 767.94 / 2177.16 / 2841.78 / 2842.32 |
+| Postgres schema | 248.41 / 987.94 / 244.98 | 253.91 / 1012.95 / 1062.97 / 3179.01 |
+
+All 20 of each burst were created, answered and deleted; TD01z found nothing
+left under the run prefix on any backend.
+
+### TD03 - job-state writes, with the Turso engine
+
+Artifact `run-2026-10-16T02-28-06-480Z.json` (02:28-03:20; the earlier
+attempt that hung is not published). Worker rows SIN:11 (PostgREST SIN:10);
+100 jobs after 10 warm-up. p50 per op and per whole job (insert, three
+updates, a read after each), ms:
+
+| target | insert | update | read | job p25 | job p50 | job p75 |
+|---|---|---|---|---|---|---|
+| D1 (TD03a) | 241 | 239 | 224 | 1844.75 | 1855 | 1869.25 |
+| Turso libSQL (TD03b) | 201 | 201 | 186 | 1540.5 | 1565 | 1629.25 |
+| Turso engine (TD03o) | 318.5 | 319 | 186 | 1981 | 2002.5 | 2041.25 |
+| Hyperdrive, caching off (TD03c) | 283 | 283 | 282 | 2002 | 2262 | 2272 |
+| PostgREST (TD03d) | 327 | 322 | 320 | 2469 | 2541.5 | 2639.5 |
+| local Turso HTTP (TD03e) | 277.67 | 273.88 | 260.39 | 2152.66 | 2241.76 | 2351.45 |
+| local pooler 6543 (TD03f) | 257.3 | 257.25 | 253.8 | 2048.27 | 2137.96 | 2205.94 |
+| local direct (TD03g) | 293.72 | 293.25 | 292.75 | 2295.89 | 2390.89 | 2445.52 |
+| local D1 REST (TD03h) | 308.7 | 301.05 | 287.38 | 2297.81 | 2396.68 | 2737.43 |
+
+TD03l: `turso < d1 < tursodb ~ pg < postgrest` on the Worker. The Turso
+engine's writes took 318.5 / 319 ms against libSQL's 201 / 201 ms on the same
+group and client; its reads matched (186 ms). TD03d failed on 80 operations
+timing out client-side (one block lost and re-sent with fresh ids; 100 of
+110 jobs clean); TD03h failed on one timeout and one ECONNRESET (4
+read-your-write misses and 3 writes not changing one row, all on those
+errored jobs).
+
+### TD05 - analytics event log, query order rotated
+
+Artifact `run-2026-10-16T03-20-26-319Z.json` (03:20-03:27, Worker SIN).
+Ingest of 100000 events in 1000-row ops: D1 36215 ms summed op time, Turso
+libSQL 33205, Turso engine 43090, Postgres 64509; every backend counted 100000
+rows, no ingest retry was needed. The five queries rotate per iteration, so
+each led 4 of the 20 kept iterations (Turso engine last_24h: 3 of 19, one
+read failed); p50 overall / when first in the
+invocation / when not first, ms:
+
+| backend | by_hour | top_paths | status_by_country | p95_by_colo | last_24h |
+|---|---|---|---|---|---|
+| D1 | 301 / 294.5 / 302.5 | 365 / 365.5 / 365 | 395 / 389.5 / 396 | 630.5 / 636 / 626 | 228 / 224.5 / 228 |
+| Turso libSQL | 211.5 / 756.5 / 208.5 | 236.5 / 802 / 220.5 | 271.5 / 771.5 / 265.5 | 896.5 / 1315.5 / 872 | 187 / 772.5 / 186.5 |
+| Turso engine | 402.5 / 788 / 402 | 493.5 / 494.5 / 493.5 | 477 / 471 / 477 | 2413.5 / 2418.5 / 2413.5 | 195 / 198 / 194 (fail) |
+| Postgres | 301 / 286.5 / 301 | 304 / 310 / 275.5 | 306 / 294.5 / 306 | 480 / 482.5 / 466 | 282 / 253.5 / 284 |
+
+- Turso libSQL: whichever query ran first in the invocation took 443.5 to 586
+  ms longer than its not-first p50, on all five shapes; that is the client's
+  first-request cost (TD02 shows the same: first-in-invocation 729.5 vs 183 not first).
+  The 2026-10-15 run always ran by_hour first.
+- Turso engine: only by_hour shows a first-in-invocation gap (788 vs 402);
+  the other four do not. n = 4 first-in-invocation samples per cell (3 for
+  last_24h); not explained.
+- Turso engine aggregates ran slower than libSQL on the same data, most on
+  the window-function query (p95_by_colo 2413.5 vs 896.5 ms).
+- TD05b-tursodb-last_24h is `fail` on one read answering HTTP 520.
+- Superseded attempt `run-2026-10-16T02-10-27-593Z.json` (Worker HKG): one
+  ingest batch per Turso database answered HTTP 520 and the Turso aggregates
+  were skipped; that run's D1 and Postgres rows are a second sample.
+
+### TD06 - search, with the Turso engine
+
+Canonical artifact `run-2026-10-16T03-44-01-976Z.json` (03:44-03:59, Worker
+SIN), the third attempt: `run-2026-10-16T02-16-57-235Z.json` lost one
+Turso-engine vector batch (load 9900/10000, error text not recorded) and
+`run-2026-10-16T03-27-49-254Z.json` lost every vector load (6600, 6600 and
+6500 of 10000; the Turso engine's first error an HTTP 520) and its cleanup to
+a local DNS outage (both published, superseded).
+
+- FTS: the Turso engine refuses the FTS5 table, `Parse error: Virtual tables
+  are not supported in MVCC mode` (TD06a-tursodb). D1, Turso libSQL and
+  Postgres repeat 2026-10-15: same match counts (9672 / 1414 / 62 / 364),
+  libSQL's top-10 equal to D1's on every query, Postgres `ts_rank` overlap
+  0.1 to 0.5 with D1's bm25 (0.3 / 0.5 / 0.5 / 0.1 in both runs). TD06b-turso-common is `fail` on one read
+  answering HTTP 520.
+- Vector load, 10000 x 384, 100 per op: Turso libSQL 202908 ms summed (index
+  maintained on insert), Turso engine 75052 ms (TD06 creates no vector index
+  on it, after the standalone probe below found index creation refused; one
+  batch failed and landed on its one retry), Postgres
+  95615 ms plus HNSW build 2728 ms.
+- Search: Turso engine exact top-10 p50 211 ms, recall@10 1; its ANN query
+  fails on every iteration (`no such table: vector_top_k`; no index was
+  created). Turso libSQL ANN
+  p50 201.5 ms, recall@10 mean 0.245 with the module's index arguments
+  (0.265 on 2026-10-15); exact 207.5 ms, recall 1. pgvector HNSW p50 257 ms,
+  recall 1. pgvector recall@10 over four full runs: 0.95 (2026-10-15, NRT), 1
+  (2026-10-15, SIN), 1 and 1 (2026-10-16 02:16 and 03:44); the 2026-10-15
+  smoke run (n = 5) is not counted. D1 has no
+  `vector32` (TD06f).
+- A standalone probe on a throwaway Turso-engine database (2026-10-16, not a
+  module row) found `CREATE INDEX ... USING fts` and `CREATE INDEX ... USING
+  vector` both refused with `index method is an experimental feature. Enable
+  with --experimental-index-method flag`, and `libsql_vector_idx` refused as
+  an invalid expression.
+
+### TD08 - embedded replica and Turso Sync, cut short by a write block
+
+Artifact `run-2026-10-16T03-59-43-029Z.json` (03:59-04:02, local).
+
+- TD08a: opening a fresh replica of the libSQL fixture database took
+  79749.385 ms (first sync 4782.131 ms, 1000/1000 seeded rows visible); the
+  usage counter moved 153862144 bytes for the run (2026-10-15: open
+  36143.833 ms, first sync 10032.968 ms). One open per run.
+- TD08c: local replica read p50 0.31 ms against 252.24 ms over HTTP.
+- TD08g: the same native embedded replica pointed at the Turso-engine
+  database does not open: `file is not a database`.
+- TD08b, TD08d and every Turso Sync row (TD08f) failed: after the seed the
+  Turso org refused all writes, `BLOCKED: Operation was blocked: SQL write
+  operations are forbidden (writes are blocked, do you need to upgrade your
+  plan?)`. Read by hand from the Platform API after the block (not in an
+  artifact): the org object showed `blocked_writes true`, `overages false`,
+  `plan_id starter` (taken here as the Free plan); usage for the billing
+  period from 2026-10-14 showed `rows_written` 11774888, past the Free plan's
+  10M rows written per month. Of that, the two fixture databases of this run
+  counted 9639906 (Turso engine) and 900317 (libSQL) rows written; the rest belongs to databases
+  already deleted (the 2026-10-15 battery and throwaway databases). The two
+  fixture databases ran overlapping but not identical workloads, so the
+  ratio is not a per-row comparison; why the Turso-engine database counted
+  ten times the writes was not isolated.
+- A standalone probe before the block (2026-10-16, two throwaway databases,
+  not a module row) ran Turso Sync 0.8.3 against both engines: it connected,
+  pushed (642 and 599 ms), pulled, and when A and B updated the same row
+  offline and pushed in turn, both pushes returned without error and both
+  clients then read B's value. These figures are one trial each and are not in
+  an artifact.

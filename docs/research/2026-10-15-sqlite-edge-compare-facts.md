@@ -22,6 +22,8 @@ re-read from the page before any write-up quotes them.
   lists `@libsql/client` concurrent writes as "Not supported"
   (https://docs.turso.tech/sdk/ts/reference.md). Docs disagree on the
   default and on whether `journal_mode` is settable on Cloud: measure.
+  Measured 2026-10-16 (sqlite-edge-compare RUNLOG, TD04m1): on Cloud the
+  Turso-engine database reports `mvcc` and refuses `PRAGMA journal_mode = wal`.
 - Vector: native, `F32_BLOB`, `vector32()`, `libsql_vector_idx()`
   (https://docs.turso.tech/features/ai-and-embeddings.md, written for libSQL).
 - Full-text: the Turso engine has a Tantivy-backed `USING fts` index, "not
