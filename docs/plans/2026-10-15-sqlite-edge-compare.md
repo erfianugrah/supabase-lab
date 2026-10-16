@@ -16,6 +16,12 @@
 > `out/2026-10-16/`, RUNLOG section "Re-run 2026-10-16". During TD08 the Turso
 > org refused writes (found past its Free plan's 10M rows written), so TD08's
 > write rows and the Turso Sync rows (TD08f) failed (follow-up tracked).
+> r3 battery 2026-10-16 (05:49 to 08:34 UTC): a SQLite-backed Durable Object
+> added as a backend, a second Turso account; TD08 and Turso Sync completed;
+> the Turso-engine rows-written gap traced to TD05's window-function query
+> `p95_by_colo`. RUNLOG
+> section "Battery 2026-10-16 (r3)". Self-hosted workerd/celld runs (Part B)
+> are a separate experiment, not this plan.
 
 **Goal:** Measure Turso, Supabase Postgres and Cloudflare Workers + D1 on the
 same workloads, from the same vantages, so a "which database for this use

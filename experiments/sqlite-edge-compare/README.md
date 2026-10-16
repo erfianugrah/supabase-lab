@@ -4,10 +4,13 @@ For seven application shapes (database per tenant, point reads, job-state
 writes, write contention, an analytics event log, search, transaction
 semantics, plus a local-first replica), what are the latency, throughput,
 failure shape and provisioning cost of Turso (libSQL, and since 2026-10-16
-the Turso engine), Supabase Postgres and Cloudflare D1, measured from one
-Cloudflare Worker and from one local client,
-with all three data planes in Sydney: Supabase `ap-southeast-2`, Turso
-`aws-ap-southeast-2`, D1 location hint `oc`.
+the Turso engine), Supabase Postgres, Cloudflare D1 and (since the r3 battery
+on 2026-10-16) a SQLite-backed Durable Object, measured from one Cloudflare
+Worker and from one local client,
+with data planes in Australia: Supabase `ap-southeast-2` and Turso
+`aws-ap-southeast-2` (Sydney); D1 and the Durable Object with location hint
+`oc` (D1's primary reported MEL on 2026-10-15 and BNE in r3; the Durable
+Object reported BNE).
 
 - Plan: `docs/plans/2026-10-15-sqlite-edge-compare.md` (use cases TD01-TD08,
   fairness rules).
@@ -25,9 +28,11 @@ Cloudflare account and both orgs hold other work, so the fixture, `down` and
 
 ## Results by use case (2026-10-15, re-run 2026-10-16)
 
-Two batteries: 2026-10-15 (`out/2026-10-15/`) and a re-run on 2026-10-16 with
-the Turso engine added as a fourth backend (`out/2026-10-16/`, Worker at SIN
-for every canonical row). Each table below keeps the 2026-10-15 rows and adds
+Three batteries: 2026-10-15 (`out/2026-10-15/`), a re-run on 2026-10-16 with
+the Turso engine added (`out/2026-10-16/`, Worker at SIN for every canonical
+row), and an r3 battery later on 2026-10-16 with a SQLite-backed Durable
+Object added and a second Turso account (`out/2026-10-16/`, runs from 05:49
+UTC; Worker colo per module: SIN, KIX or HKG, named on each r3 row). Each table below keeps the 2026-10-15 rows and adds
 the 2026-10-16 ones; per-module detail, superseded runs and every caveat in
 `RUNLOG.md`. "Turso engine" is a Turso Cloud database created with
 `use_tursodb: true` (the Rust rewrite, MVCC), in the same group and reached
@@ -42,7 +47,8 @@ overlap. Documented ceilings are vendor defaults from the facts doc
 Worker orderings depend on the colo. The first TD06 run landed every
 Worker row in NRT instead of SIN, and the order reversed: Postgres full-text
 p50 104-115 ms, Turso 123.5-134.5, D1 201.5-212.5, against Turso 192-205, D1
-219-232.5, Postgres 282-292.5 from SIN. Every Worker ordering below is SIN's.
+219-232.5, Postgres 282-292.5 from SIN. Every Worker ordering below is SIN's
+except the r3 rows, which name their colo.
 
 ### Database per tenant (TD01, local, n = 1 single plus a burst of 20)
 
@@ -55,6 +61,11 @@ p50 104-115 ms, Turso 123.5-134.5, D1 201.5-212.5, against Turso 192-205, D1
 | 2026-10-16: Turso engine (`use_tursodb: true`) | 3792.89 ms | 4651.5 (4934.59) ms | 4934.85 ms | 0 |
 | 2026-10-16: D1 | 2087.22 ms | 2177.16 (2841.78) ms | 2842.32 ms | 0 |
 | 2026-10-16: Postgres schema | 987.94 ms | 1012.95 (1062.97) ms | 3179.01 ms | 0 |
+| r3: Durable Object (one Worker request: create, insert, select on a named object) | 2344.93 ms | 1623.38 (1924.57) ms | 1924.79 ms | 0 |
+| r3: D1 | 2177.79 ms | 2289.56 (3079) ms | 3079.47 ms | 0 |
+| r3: Turso libSQL | 3256 ms | 4660.39 (5847.05) ms | 5847.78 ms | 0 |
+| r3: Turso engine | 3488.38 ms | 4389.07 (4752.56) ms | 4752.88 ms | 0 |
+| r3: Postgres schema | 1079.87 ms | 1019.74 (1068.9) ms | 3174.38 ms | 0 |
 
 Documented ceilings: Turso Free 100 databases (https://turso.tech/pricing,
 re-read 2026-10-15), and more than one group needs Scaler, Pro or
@@ -66,7 +77,15 @@ not readiness).
 Reading: every backend gave every tenant in a burst of 20 a working first
 query, the slowest at 5318.94 ms (Turso, 2026-10-15), with no refusals; the
 2026-10-16 run repeated the order (Postgres schema < D1 < Turso), the Turso
-engine's burst first-query p50 4651.5 ms against libSQL's 4080.64. The run does not reach any plan
+engine's burst first-query p50 4651.5 ms against libSQL's 4080.64. In r3 a
+Durable Object tenant (no create call; the object exists on first access)
+reached its first query at a burst p50 of 1623.38 ms, between the Postgres
+schema (1019.74) and D1 (2289.56); its single-tenant row (2344.93 ms) is one
+sample and sat above its own burst p50. The paths differ in shape (the
+Durable Object: one request to the Worker plus three RPCs, no retry; Turso: an
+API create, a token and three HTTP round trips, polled until ready; D1: a REST
+create and REST queries), so this is not a like-for-like provisioning
+comparison. The run does not reach any plan
 ceiling, does not measure a first query from a Worker (a D1 binding needs a
 redeploy per database), and says nothing about cost per tenant.
 
@@ -89,6 +108,11 @@ redeploy per database), and says nothing about cost per tenant.
 | 2026-10-16: Worker -> Turso engine | 186 (183-188), 732.05 |
 | 2026-10-16: Worker -> Hyperdrive (caching off) | 250 (249-282), 284 |
 | 2026-10-16: Worker -> PostgREST | 324 (290-327), 353 |
+| r3 (SIN): Worker -> Durable Object | 221 (216-225), 232.05; first-in-invocation 231.5 |
+| r3 (SIN): Worker -> D1 binding | 230 (225-234), 240 |
+| r3 (SIN): Worker -> Turso libSQL | 192 (188-199), 801.9 |
+| r3 (SIN): Worker -> Turso engine | 195 (192-201), 756.35 |
+| r3 (SIN): Worker -> Hyperdrive (caching off) | 283 (257-287), 293 |
 
 Documented ceilings: D1 1000 queries per Worker invocation on Paid (D1
 platform/limits); measured on this account (TD02m, TD02n): 10000 for D1
@@ -99,7 +123,9 @@ max_age 60 s, writes do not invalidate (Hyperdrive query-caching).
 Reading: from SIN the Worker order was `turso < d1 < pg ~ pg_cached <
 postgrest`, a 190 to 307 ms spread over a Singapore-Sydney path, and on
 2026-10-16 `turso ~ tursodb < d1 < pg ~ pg_cached < postgrest`: the two Turso
-engines read at the same speed; locally the
+engines read at the same speed; in r3 (SIN) `turso ~ tursodb < do ~ d1 < pg ~
+pg_cached < postgrest`, the Durable Object without a first-query cost
+(first-in-invocation 231.5 against 220 for the rest); locally the
 pooler was separated from the direct host and D1 REST, and Turso overlapped
 the pooler and D1 REST. Turso's first read per invocation cost 740 ms against
 189 for the rest, so its p95 is a cold-client figure. Client setup is not
@@ -131,6 +157,12 @@ this does not rank the backends for a Worker in another colo.
 | 2026-10-16: Worker -> Turso engine | 2002.5 (1981-2041.25) | SIN |
 | 2026-10-16: Worker -> Hyperdrive -> Postgres | 2262 (2002-2272) | SIN |
 | 2026-10-16: Worker -> PostgREST | 2541.5 (2469-2639.5), 80 client timeouts | SIN |
+| r3: Worker -> Hyperdrive -> Postgres | 901.5 (896-907) | KIX |
+| r3: Worker -> Durable Object | 1026 (1018-1085) | KIX |
+| r3: Worker -> Turso libSQL | 1055 (1018.75-1115.5) | KIX |
+| r3: Worker -> D1 | 1126.5 (1108-1164.75) | KIX |
+| r3: Worker -> PostgREST | 1261.5 (1226-1373.75) | KIX |
+| r3: Worker -> Turso engine | 1438 (1366.5-1488.25) | KIX |
 
 Documented ceilings: D1 processes one query at a time per database (D1
 platform/limits); 30 s query duration (D1 platform/limits).
@@ -138,7 +170,11 @@ platform/limits); 30 s query duration (D1 platform/limits).
 Reading: read-your-write held on every backend and every write changed one
 row. The Worker rows ran from mixed colos (HKG and SIN; Turso's row is from a
 separate re-run), so they do not rank the backends even where ranges separate; locally the pooler path was fastest (`local_pg_pooler <
-local_turso_http < local_pg_direct ~ local_d1_rest`). The main run's Turso
+local_turso_http < local_pg_direct ~ local_d1_rest`). In r3 every Worker row
+ran from KIX and the order was `pg < do ~ turso ~ d1 < postgrest ~ tursodb
+(also do < d1)`: the order changed between the SIN run (2026-10-16 02:28) and
+the KIX run (07:10); colo, time and fixture differ between them, so the cause
+is not isolated. The main run's Turso
 row lost one 10-job block to a client timeout twice (80 statements, cause
 not determined; the re-run was clean). On 2026-10-16 every Worker row ran from
 SIN and the order was `turso < d1 < tursodb ~ pg < postgrest`; the Turso
@@ -158,6 +194,11 @@ Concurrent claimers were not tested.
 | 2026-10-16: Turso libSQL | 4.77 / 18.48 / 50.77 / 24.4 | 4.74 / 18.25 / 49.42 / 24.1 | 2592.5 / 2502 ms |
 | 2026-10-16: Turso engine | 3.19 / 12.93 / 14.28 / 13.03 | 3.15 / 14.55 / 13.95 / 10.98 | 4575.5 / 5500 ms |
 | 2026-10-16: Postgres via Hyperdrive | fail / 14.75 / 56.78 / 152.47 | 3.51 / 14.48 / 53.55 / 155.25 | 253 / 280 ms |
+| r3: Durable Object | 5.22 / 20.65 / 74.46 / 224.36 | 5.14 / 20.62 / 74.88 / 140.74 | 226.5 / 225 ms |
+| r3: D1 | 4.95 / 19.63 / 72.34 / 179.65 | 4.98 / 19.43 / 77.74 / 174.62 | 244.5 / 245.5 ms |
+| r3: Turso libSQL | 5.55 / 20.54 / 48.18 / 25.9 | 5.65 / 21.18 / 56.12 / 28.42 | 2401 / 2099 ms |
+| r3: Turso engine | 3.57 / 11.86 / 13.8 / 9.74 | 3.54 / 11.46 / 11.93 / 10.51 | 6393.5 / 5705.5 ms |
+| r3: Postgres via Hyperdrive | 5.46 / 21.65 / 82.18 / 175.7 | 5.43 / 21.84 / 78.72 / 187 | 260 / 253.5 ms |
 
 2026-10-15: C16 and C64 cells ran over several colos (SIN, NRT, HKG, KIX);
 every cell 256 of 256 ok, 0 errors, no lost update. 2026-10-16 00:07 run
@@ -185,6 +226,12 @@ Cloud (TD04m0/m1, 2026-10-16): creating the database needs the org setting
 2026-10-15), the database then reports `journal_mode` `mvcc`, accepts `BEGIN
 CONCURRENT`, and refuses `PRAGMA journal_mode = wal` (`SQL not allowed
 statement`).
+
+r3 (canonical 08:12; C1/C4 HKG, C16 HKG+KIX, C64 KIX+HKG+SIN): the Durable
+Object kept a per-op p50 of 184-226.5 ms at every level and reached 224.36
+insert ops/s at C64; Turso libSQL's C64 drop repeated a fourth time (25.9 and
+28.42 ops/s); no lost update. The r3 TD04m2 cells, all but one, were lost to local
+`ConnectionRefused`, so the 2026-10-16 00:07 run stays the only complete one.
 
 Reading: at 64 concurrent writers Turso libSQL queued in all three runs
 (per-op p50 1690.5 to 2592.5 ms, 24.1 to 30.96 ops/s, fewer than at 16), runs 2
@@ -214,6 +261,11 @@ they do not find D1's overload point.
 | 2026-10-16: Turso libSQL | 33205 ms | 211.5 | 236.5 | 271.5 | 896.5 | 187 |
 | 2026-10-16: Turso engine | 43090 ms | 402.5 | 493.5 | 477 | 2413.5 | 195 |
 | 2026-10-16: Postgres via Hyperdrive | 64509 ms | 301 | 304 | 306 | 480 | 282 |
+| r3 (HKG): D1 | 29592 ms | 242 | 282 | 308 | 484.5 | 182 |
+| r3 (HKG): Turso libSQL | 29355 ms | 178 | 225 | 258 | 773 | 156 |
+| r3 (HKG): Turso engine | 39300 ms | 363 | 461 | 378.5 | skipped (rows written, below) | 165 |
+| r3 (HKG): Durable Object | 28581 ms | 228.5 | 252 | 278.5 | 426.5 | 177 |
+| r3 (HKG): Postgres via Hyperdrive | 45979 ms | 202 | 204 | 207 | 383.5 | 184.5 |
 
 Query columns are p50 ms; every aggregate returned the correct answer
 (2026-10-16: one Turso-engine `last_24h` read answered HTTP 520). On
@@ -256,6 +308,11 @@ concurrent ingest, Postgres-specific tools (partitioning, BRIN,
 | 2026-10-16: Turso libSQL | 11360 ms | 191-204 | 202908 ms | 201.5, 0.245 | 207.5 |
 | 2026-10-16: Turso engine | refused: `Virtual tables are not supported in MVCC mode` | - | 75052 ms (no index created) | fails: `no such table: vector_top_k` (no index created) | 211, recall 1 |
 | 2026-10-16: Postgres | 26321 ms | 269.5-283.5 | 95615 ms + 2728 ms build | 257, 1 | 259 |
+| r3 (HKG): Durable Object (FTS5) | 10856 ms | 174-195 | no vector type: `no such function: vector32` | - | - |
+| r3 (HKG): D1 | 10035 ms | 182.5-200 | no vector type | - | - |
+| r3 (HKG): Turso libSQL | 10292 ms | 158-176 | 187398 ms | 186, 0.24 | 177.5 |
+| r3 (HKG): Turso engine | refused (FTS5) | - | 63783 ms (no index created) | fails (no index created) | 175, recall 1 |
+| r3 (HKG): Postgres | 18274 ms | 182-194 | 64118 ms + 2812 ms build | 184.5, 1 | 189 |
 
 Documented: Turso native vector search (`F32_BLOB`, `libsql_vector_idx`);
 the Turso engine's Tantivy `USING fts` is a different surface from FTS5. On
@@ -264,6 +321,9 @@ engine refused `USING fts` and `USING vector` indexes (`index method is an
 experimental feature. Enable with --experimental-index-method flag`) and
 `libsql_vector_idx`, so it offers exact vector search only; D1 databases with virtual tables (FTS5) cannot be exported (D1
 best-practices/import-export-data). No D1 vector support found in its docs.
+
+In r3 (HKG) a Durable Object ran FTS5 with the same match counts and a top 10
+equal to D1's on every query; it has no `vector32`, like D1.
 
 Reading: full-text match counts were identical on all three; from SIN the
 order was Turso < D1 < Postgres, from NRT (superseded run) it reversed. The
@@ -302,6 +362,14 @@ Postgres rows repeated 2026-10-15. `@libsql/client` 0.18.0 maps
 (read from `@libsql/core` source, not measured), so concurrent transactions
 need a client that sends the statement itself (TD04m2).
 
+r3 (SIN): a Durable Object refuses `BEGIN TRANSACTION` in `sql.exec` (`To
+execute a transaction, please use the state.storage.transaction() or
+state.storage.transactionSync() APIs ...`) and commits a batch (run inside
+`transactionSync`) in 238 ms; read-your-write 30/30. In TD07d the second writer
+was sent 300 ms after a batch that took 241 ms, so the row shows no
+contention; a `transactionSync` batch cannot interleave with other requests to
+the object.
+
 Reading: only Turso and Postgres gave a Worker an interactive transaction;
 D1 needs the whole transaction known up front as a batch. Reading through
 Hyperdrive's cache after a write returned the old value 29 times in 30. The
@@ -339,9 +407,21 @@ engine, not in an artifact) found Turso Sync 0.8.3 working against both
 engines, and two clients that updated the same row offline both pushed
 without an error, after which both read the second pusher's value.
 
+r3 (the second Turso account), n = 30 after 3 warm-up: embedded replica open
+26978.08 ms, write-to-visible after one `sync()` p50 886.19 ms, replica read
+p50 0.21 against 243.97 ms. Turso Sync 0.8.3 on both engines (TD08f): push p50
+531.97 ms (libSQL) and 644.36 (Turso engine), pull p50 301.36 and 395.07, 30/30
+writes visible after one pull, local reads p50 0.03 ms; when A and B updated
+the same row offline and A pushed first, B's push returned without error and
+both clients then read B's value, in 30 of 30 trials on each engine (last push
+wins, A's update gone without a signal).
+
 ### Turso Cloud during the runs (2026-10-16)
 
-- HTTP 520 from Turso on 7 rows across TD02, TD04, TD05 and TD06 that day, on
+- r3 added 4 more rows with an HTTP 520 (TD05a-turso, retried and landed;
+  TD04b-turso-c64 in two runs; TD06b-turso-common).
+- HTTP 520 from Turso on 7 rows across TD02, TD04, TD05 and TD06 in the
+  re-run, on
   both databases (none on 2026-10-15). TD05 and TD06 now re-send a lost
   batch once where a count or a duplicate key shows whether it landed.
 - Free plan write block: after TD08's seed the org refused all writes
@@ -352,8 +432,15 @@ without an error, after which both read the second pusher's value.
   usage for the billing period from 2026-10-14 showed 11774888 rows written,
   past the documented 10 million per month; when the allowance was crossed
   was not observed. The Turso-engine fixture database alone counted 9639906 rows written
-  and the libSQL one 900317, over overlapping but not identical workloads;
-  the cause of the difference was not isolated.
+  and the libSQL one 900317, over overlapping but not identical workloads.
+  r3 isolated the cause (TD05c and `scripts/rows-written-probe.ts`, output in
+  `out/2026-10-16/rows-written-probe.txt`): inserts, GROUP BY and ORDER BY count
+  the same on both engines (about 1 per row, plus 1 per index entry; ANALYZE's
+  own share not isolated), while TD05's window-function query `p95_by_colo` counted 4 rows
+  written per input row per execution on the Turso engine and none on libSQL
+  (56000 for 7 executions over 2000 rows). TD05 now skips that cell on the
+  Turso engine by default (`TD05_SKIP`); with it skipped, the full TD05 counted
+  200002 on the Turso engine and 200028 on libSQL.
 - Turso Cloud answers an autocommit statement over Hrana HTTP with no baton
   on both engines (TD04m1), so a stream continues only inside a transaction;
   `@libsql/client` handles this by opening a new stream.
@@ -389,16 +476,17 @@ after the resources are gone.
 | Turso | group `sec-syd` (`aws-ap-southeast-2`), one libSQL database and, where the org allows `use_tursodb`, one Turso-engine database (`sec-tdb-<stamp>`), full-access DB tokens (7-day expiry) | Free allows one group; `down` deletes the group once it is empty; a refused Turso-engine create is recorded and the `tursodb` backend reports "not configured" |
 | D1 | one database, location hint `oc`, read replication at default | the landing region is undocumented; `served_by_region` is recorded per op |
 | Hyperdrive | two configs on the Supabase direct string: caching disabled (`HD`), caching enabled (`HD_CACHED`) | |
-| Worker | `sec-probe-<stamp>`, `nodejs_compat`, workers.dev, Smart Placement off | bindings `DB`, `HD`, `HD_CACHED`; secrets `PROBE_KEY`, `TURSO_TOKEN`, `TURSODB_TOKEN`, `SUPABASE_SECRET_KEY` |
+| Durable Object | class `ProbeDO` in the probe Worker (`new_sqlite_classes`), objects by name, `locationHint` `oc` | the namespace goes with the Worker; `make cleanup` lists `sec-` namespaces |
+| Worker | `sec-probe-<stamp>`, `nodejs_compat`, workers.dev, Smart Placement off | bindings `DB`, `HD`, `HD_CACHED`, `PDO`; secrets `PROBE_KEY`, `TURSO_TOKEN`, `TURSODB_TOKEN`, `SUPABASE_SECRET_KEY` |
 
 ## Probe Worker contract
 
 Types: `lib/contract.ts`. Every route needs `X-Probe-Key`.
 
-- `POST /run` `{backend, statements:[{sql, params} | {http}], repeat, concurrency, mode, returnRows, returnMeta, d1Session, noSplit, label}`
+- `POST /run` `{backend, statements:[{sql, params} | {http}], repeat, concurrency, mode, returnRows, returnMeta, d1Session, doName, doWipe, noSplit, label}`
   -> per-op timings (`performance.now()` around the driver call), error text
   verbatim, driver meta (D1 `meta` incl. `served_by_region`, `rows_read`,
-  `rows_written`), `colo`. Backends `d1 | turso | tursodb | pg | pg_cached | postgrest`;
+  `rows_written`), `colo`. Backends `d1 | turso | tursodb | do | pg | pg_cached | postgrest`;
   modes `each | batch | tx`. A request above 500 statement executions is
   refused unless `noSplit`; `runOnWorker` (lib/client.ts) splits for you.
 - `GET /meta` -> `select 1` (or a PostgREST GET) on every backend, with the
