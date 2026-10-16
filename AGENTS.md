@@ -2511,7 +2511,7 @@ logs endpoint returns them (metered bytes are not readable by PAT, OB03c).
   `directSession` uses `dns.resolve6` plus TLS `servername`. The logs endpoint
   throttles bursts of queries (`ThrottlerException`); `logsPatient` retries.
 
-## experiments/sqlite-edge-compare - key facts (validated 2026-10-15, re-run 2026-10-16 with the Turso engine; Turso libSQL and Turso engine vs Supabase Postgres vs Cloudflare D1, all in Sydney, probe Worker mostly SIN, local client in Singapore)
+## experiments/sqlite-edge-compare - key facts (validated 2026-10-15, re-run 2026-10-16 with the Turso engine, r3 2026-10-16 with a Durable Object; Turso libSQL and Turso engine vs Supabase Postgres vs Cloudflare D1 vs a SQLite-backed Durable Object, data in Sydney/OC, probe Worker SIN, KIX or HKG per module, local client in Singapore)
 
 Self-provisioning, no OpenTofu state: `make up` creates a Micro project on the
 Pro org (`ap-southeast-2`), Turso group `sec-syd` (`aws-ap-southeast-2`) with
@@ -2585,6 +2585,31 @@ per use case in its README, per module in its RUNLOG; artifacts
   failed on the Turso write block on 2026-10-16, and a standalone probe (one
   trial per engine, not in an artifact) found it working against both
   engines.
+- **Durable Object backend (r3)**: `do` = class `ProbeDO` (SQLite storage,
+  `new_sqlite_classes`) reached by name with `locationHint` `oc`; `/meta` at
+  fixture up (not in an artifact, via an in-object `/cdn-cgi/trace`) put it in
+  BNE, the colo D1's primary reported (TD05a-d1). One RPC per op; `batch` = `transactionSync`;
+  `sql.exec` refuses `BEGIN TRANSACTION` (`To execute a transaction, please use
+  the state.storage.transaction() or state.storage.transactionSync() APIs ...`)
+  and `sqlite_version()`. FTS5 works (top 10 equal to D1's), no `vector32`.
+  Point reads from SIN p50 221 ms with no first-query cost (`do ~ d1`); C64
+  inserts 224.36 ops/s, per-op p50 184-226.5 ms at every level; a tenant is a
+  named object (burst first query p50 1623.38 ms). `make cleanup` also lists
+  `sec-` Durable Object namespaces; the namespace went with its Worker.
+- **Colo per module (r3)**: with no change on this side the Worker landed in
+  SIN, KIX or HKG per module. In the KIX TD03 run Postgres via Hyperdrive led
+  (`pg < do ~ turso ~ d1`); in the SIN run it trailed; colo, hour and fixture
+  differ between them, so the cause is not isolated. Compare only within one
+  artifact.
+- **Turso rows_written (card #189, r3)**: inserts, GROUP BY and ORDER BY count
+  the same on both engines (about 1 per row plus 1 per index entry; ANALYZE's
+  own share not isolated); a window-function query (TD05 `p95_by_colo`) counted 4 rows written
+  per input row per execution on the Turso engine and none on libSQL
+  (`scripts/rows-written-probe.ts`, output `out/2026-10-16/rows-written-probe.txt`).
+  TD05 skips that cell on the Turso engine by default (`TD05_SKIP`). The usage
+  counter lags: read once after a few minutes, not every 20 s.
+- **Turso Sync (r3, card #188)**: works on both engines; when two clients
+  update one row offline, the second push wins with no error on either (30/30).
 - **Turso Free plan**: when TD08 hit a write block on 2026-10-16 the org was
   found past 10 million rows written in its billing period (read by hand from
   the Platform API, not in an artifact: `blocked_writes true`, rows_written
