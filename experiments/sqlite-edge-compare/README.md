@@ -439,8 +439,9 @@ wins, A's update gone without a signal).
   own share not isolated), while TD05's window-function query `p95_by_colo` counted 4 rows
   written per input row per execution on the Turso engine and none on libSQL
   (56000 for 7 executions over 2000 rows). TD05 now skips that cell on the
-  Turso engine by default (`TD05_SKIP`); with it skipped, the full TD05 counted
-  200002 on the Turso engine and 200028 on libSQL.
+  Turso engine by default (`TD05_SKIP`); with it skipped, the full TD05 run at
+  07:40 (ingest plus the dashboard queries, Worker HKG) counted 200002 on the
+  Turso engine and 200028 on libSQL (whose figure includes `p95_by_colo`).
 - Turso Cloud answers an autocommit statement over Hrana HTTP with no baton
   on both engines (TD04m1), so a stream continues only inside a transaction;
   `@libsql/client` handles this by opening a new stream.
