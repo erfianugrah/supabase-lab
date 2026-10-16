@@ -61,11 +61,11 @@ import type { Ctx, TestModule, TestResult } from "../../../harness/src/types";
 import { type Fixture, fixtureOrSkip, type RunResult, runOnWorker } from "../lib/client";
 import type { Mode, Param, Stmt, WorkerBackend } from "../lib/contract";
 import { roundRobin } from "../lib/stats";
-import { dialectOf, firstMeta, scalar, scrub, TD07_SQL, td07Sizes, topErrors } from "../lib/td04-07-plan";
+import { dialectOf, firstMeta, scalar, scrub, TD07_SQL, td07Sizes, topErrors, withTursodb } from "../lib/td04-07-plan";
 import { sleep } from "../lib/vendors";
 
 const ID = "TD07";
-const BACKENDS: WorkerBackend[] = ["d1", "turso", "pg"];
+const BASE_BACKENDS: WorkerBackend[] = ["d1", "turso", "pg"];
 /** B fires this long after A, so its first write lands while A is between its two reads. */
 const B_DELAY_MS = 300;
 const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -86,7 +86,7 @@ function sqlFor(b: WorkerBackend) {
 
 function dataRegion(fx: Fixture, b: WorkerBackend, r?: RunResult): string {
   if (b === "d1") return (r && firstMeta(r.ops, "served_by_region")) || "?";
-  if (b === "turso") return fx.turso?.location ?? "?";
+  if (b === "turso" || b === "tursodb") return fx.turso?.location ?? "?";
   return fx.supabase?.region ?? "?";
 }
 
@@ -257,7 +257,7 @@ async function rowD(fx: Fixture, b: WorkerBackend, fillers: number, writerOps: n
     measurements: {
       ...base(fx, b, aRes),
       a_mode: aMode,
-      isolation: b === "pg" ? (rr ? "repeatable read" : "read committed (default)") : b === "turso" ? "BEGIN IMMEDIATE (client.transaction write)" : "batch",
+      isolation: b === "pg" ? (rr ? "repeatable read" : "read committed (default)") : b === "turso" || b === "tursodb" ? "BEGIN IMMEDIATE (client.transaction write)" : "batch",
       fillers,
       a_ok: aOp?.ok ? 1 : 0,
       a_ms: aOp?.ms ?? -1,
@@ -288,8 +288,9 @@ const mod: TestModule = {
   async run(ctx: Ctx): Promise<TestResult[]> {
     const fx = await fixtureOrSkip(ctx);
     if ("skip" in fx) return [{ id: ID, title: this.title, status: "skip", detail: fx.skip }];
+    const BACKENDS = withTursodb(fx, BASE_BACKENDS);
     const sz = td07Sizes();
-    const lit = [fx.supabase?.ref, fx.d1?.id, fx.turso?.hostname, fx.turso?.org].filter((x): x is string => !!x);
+    const lit = [fx.supabase?.ref, fx.d1?.id, fx.turso?.hostname, fx.tursodb?.hostname, fx.turso?.org].filter((x): x is string => !!x);
     const out: TestResult[] = [];
     const guard = async (id: string, f: () => Promise<TestResult>) => {
       try {
