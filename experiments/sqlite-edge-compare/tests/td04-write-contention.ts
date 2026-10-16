@@ -66,7 +66,7 @@
  */
 import type { Ctx, TestModule, TestResult } from "../../../harness/src/types";
 import { type Fixture, fixtureOrSkip, mergeRuns, type RunResult, runOnWorker } from "../lib/client";
-import type { WorkerBackend } from "../lib/contract";
+import { DO_LOCATION_HINT, type WorkerBackend } from "../lib/contract";
 import { roundRobin, summarize, summaryColumns } from "../lib/stats";
 import { HranaStream, runTx, type TxOutcome } from "../lib/td04-07-hrana";
 import {
@@ -88,7 +88,7 @@ import {
 import { assertSec, deleteTursoDb, sleep, turso, tursoCreds, tursoDbToken } from "../lib/vendors";
 
 const ID = "TD04";
-const BASE_BACKENDS: WorkerBackend[] = ["d1", "turso", "pg"];
+const BASE_BACKENDS: WorkerBackend[] = ["d1", "turso", "do", "pg"];
 type Workload = "insert" | "incr";
 
 /** "SIN:3,MRS:1" in order of first appearance. */
@@ -103,6 +103,7 @@ const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 function dataRegion(fx: Fixture, b: WorkerBackend, r?: RunResult): string {
   if (b === "d1") return (r && firstMeta(r.ops, "served_by_region")) || "?";
   if (b === "turso" || b === "tursodb") return fx.turso?.location ?? "?";
+  if (b === "do") return `hint ${DO_LOCATION_HINT}`;
   return fx.supabase?.region ?? "?";
 }
 

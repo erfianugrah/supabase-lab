@@ -26,6 +26,8 @@ export const SUPABASE_REGION = "ap-southeast-2";
 export const TURSO_LOCATION = "aws-ap-southeast-2";
 export const TURSO_GROUP = "sec-syd";
 export const D1_LOCATION_HINT = "oc";
+/** Durable Object placement hint (best effort, first get() only; Durable Objects data-location docs). */
+export const DO_LOCATION_HINT = "oc";
 
 /**
  * Statement executions per Worker invocation before the client splits a
@@ -38,14 +40,14 @@ export const MAX_CONCURRENCY = 64;
 export const MAX_STATEMENTS = 100;
 
 /** Backends reachable from inside the probe Worker. */
-/** "turso" is the libSQL database; "tursodb" the Turso-engine (Rust rewrite) one in the same group. */
-export type WorkerBackend = "d1" | "turso" | "tursodb" | "pg" | "pg_cached" | "postgrest";
+/** "turso" is the libSQL database; "tursodb" the Turso-engine (Rust rewrite) one in the same group; "do" a SQLite-backed Durable Object. */
+export type WorkerBackend = "d1" | "turso" | "tursodb" | "do" | "pg" | "pg_cached" | "postgrest";
 /** Backends reachable from the local vantage (lib/client.ts runLocal). */
 export type LocalBackend = "turso_http" | "pg_pooler" | "pg_session" | "pg_direct" | "d1_rest" | "postgrest";
 export type Backend = WorkerBackend | LocalBackend;
 export type Mode = "each" | "batch" | "tx";
 
-export const WORKER_BACKENDS: readonly WorkerBackend[] = ["d1", "turso", "tursodb", "pg", "pg_cached", "postgrest"];
+export const WORKER_BACKENDS: readonly WorkerBackend[] = ["d1", "turso", "tursodb", "do", "pg", "pg_cached", "postgrest"];
 export const LOCAL_BACKENDS: readonly LocalBackend[] = ["turso_http", "pg_pooler", "pg_session", "pg_direct", "d1_rest", "postgrest"];
 
 export type Param = string | number | boolean | null;
@@ -85,6 +87,10 @@ export interface RunRequest<B extends Backend = Backend> {
   returnMeta?: boolean;
   /** D1 only: run through `env.DB.withSession(<this>)` ("first-primary", "first-unconstrained" or a bookmark). */
   d1Session?: string;
+  /** "do" only: the Durable Object's name (idFromName); default "main". */
+  doName?: string;
+  /** "do" only: after the run, delete the object's storage (`ctx.storage.deleteAll()`). */
+  doWipe?: boolean;
   /** Worker only: allow more than OPS_PER_INVOCATION in one invocation (TD02's deliberate ceiling row). */
   noSplit?: boolean;
   /** Free text echoed back, for the module's own bookkeeping. */

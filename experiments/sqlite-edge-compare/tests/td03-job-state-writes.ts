@@ -18,6 +18,7 @@
  *
  *   TD03a  Worker -> D1 binding
  *   TD03b  Worker -> Turso libSQL over HTTP
+ *   TD03p  Worker -> SQLite-backed Durable Object (RPC per op, locationHint oc)
  *   TD03o  Worker -> Turso-engine database over HTTP (when the fixture has one;
  *          printed as TD03undefined in the 2026-10-16 run, before the id existed)
  *   TD03c  Worker -> Hyperdrive (caching disabled) -> Postgres direct
@@ -77,7 +78,7 @@ import {
 
 const ID = "TD03";
 const SEED = 20261016;
-const ALL: TargetKey[] = ["d1", "turso", "pg", "postgrest", "local_turso_http", "local_pg_pooler", "local_pg_direct", "local_d1_rest"];
+const ALL: TargetKey[] = ["d1", "turso", "do", "pg", "postgrest", "local_turso_http", "local_pg_pooler", "local_pg_direct", "local_d1_rest"];
 const LETTER: Partial<Record<TargetKey, string>> = {
   d1: "a",
   turso: "b",
@@ -88,8 +89,9 @@ const LETTER: Partial<Record<TargetKey, string>> = {
   local_pg_direct: "g",
   local_d1_rest: "h",
   tursodb: "o",
+  do: "p",
 };
-const STORES: Store[] = ["d1", "turso", "supabase"];
+const STORES: Store[] = ["d1", "turso", "do", "supabase"];
 
 const mod: TestModule = {
   id: ID,
@@ -153,7 +155,7 @@ const mod: TestModule = {
           res = await runTarget(fx, t, { statements: stmts, returnRows: true, rowsLimit: 1, returnMeta: true, label: `${ID}-${slot.iter}-r1` });
         }
         results.get(t.key)!.push(res);
-        samples.get(t.key)!.push(...jobSamples(t, res.ops, plan, res.error));
+        samples.get(t.key)!.push(...jobSamples(t, res.ops, plan, res.error ?? res.errors[0]?.text));
         if (slot.pos === runnable.length - 1 && (slot.iter + 1) % 3 === 0) ctx.log(`${ID}: block ${slot.iter + 1}/${nBlocks}`);
       }
 

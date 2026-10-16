@@ -8,6 +8,7 @@
  *   pgLane       node-postgres; "batch" and "tx" are both BEGIN..COMMIT
  *   postgrestLane fetch to /rest/v1/ with the project's secret key as apikey
  *   d1RestLane   the D1 REST query endpoint (local admin path; "each" only)
+ *   doLane       a SQLite-backed Durable Object stub; one RPC per op
  */
 import type { createClient } from "@libsql/client/web";
 import pg from "pg";
@@ -39,6 +40,27 @@ export function d1Lane(db: D1Like): LaneConn {
     batch: async (ss) => (await db.batch(ss.map(prep))).map(out),
     // D1 has no interactive transaction through the binding; send it anyway
     // and let the error text be the measurement (TD07).
+    tx: (ss) => sequentialTx(each, ss, "BEGIN TRANSACTION"),
+    close: async () => undefined,
+  };
+}
+
+/** The probe Durable Object's RPC surface (worker/index.ts ProbeDO). */
+export interface DoStubLike {
+  run(stmts: Stmt[], mode: "each" | "batch"): Promise<StmtOut[]>;
+}
+
+/**
+ * One RPC per op: "each" sends one statement, "batch" all of them (the object
+ * runs them inside transactionSync). The Durable Object SQL API refuses
+ * BEGIN/COMMIT in sql.exec (Durable Objects SQLite storage API docs); "tx"
+ * sends them anyway so the error text is the measurement, as for D1.
+ */
+export function doLane(stub: DoStubLike): LaneConn {
+  const each = async (s: Stmt) => (await stub.run([s], "each"))[0] ?? {};
+  return {
+    each,
+    batch: (ss) => stub.run(ss, "batch"),
     tx: (ss) => sequentialTx(each, ss, "BEGIN TRANSACTION"),
     close: async () => undefined,
   };

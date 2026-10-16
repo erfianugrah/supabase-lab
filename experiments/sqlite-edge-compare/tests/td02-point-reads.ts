@@ -13,6 +13,7 @@
  *   TD02s  seed check: count, sum(n), max(id) equal across the three stores
  *   TD02a  Worker -> D1 binding
  *   TD02b  Worker -> Turso libSQL over HTTP (@libsql/client/web)
+ *   TD02p  Worker -> SQLite-backed Durable Object (RPC per op, locationHint oc)
  *   TD02o  Worker -> Turso-engine database, same client (when the fixture has one;
  *          printed as TD02undefined in the 2026-10-16 run, before the id existed)
  *   TD02c  Worker -> Hyperdrive (caching disabled) -> Postgres direct
@@ -109,9 +110,10 @@ const LETTER: Partial<Record<TargetKey, string>> = {
   local_pg_direct: "h",
   local_d1_rest: "i",
   tursodb: "o",
+  do: "p",
 };
-const ALL: TargetKey[] = ["d1", "turso", "pg", "pg_cached", "postgrest", "local_turso_http", "local_pg_pooler", "local_pg_direct", "local_d1_rest"];
-const STORES: Store[] = ["d1", "turso", "supabase"];
+const ALL: TargetKey[] = ["d1", "turso", "do", "pg", "pg_cached", "postgrest", "local_turso_http", "local_pg_pooler", "local_pg_direct", "local_d1_rest"];
+const STORES: Store[] = ["d1", "turso", "do", "supabase"];
 
 interface Pass {
   samples: Map<string, ReadSample[]>;
@@ -139,7 +141,7 @@ async function readPass(fx: Fixture, targets: readonly Target[], ids: readonly n
       res = await runTarget(fx, t, req);
     }
     results.get(t.key)!.push(res);
-    samples.get(t.key)!.push(...blockSamples(res.ops, bIds, rows, res.error));
+    samples.get(t.key)!.push(...blockSamples(res.ops, bIds, rows, res.error ?? res.errors[0]?.text));
     if (slot.pos === targets.length - 1 && (slot.iter + 1) % 5 === 0) log(`${ID} ${tag}: block ${slot.iter + 1}/${bl.length}`);
   }
   return { samples, results, retries };

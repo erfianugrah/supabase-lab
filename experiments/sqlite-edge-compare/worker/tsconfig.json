@@ -10,5 +10,5 @@
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["index.ts", "../lib/contract.ts", "../lib/exec.ts", "../lib/adapters.ts"]
+  "include": ["index.ts", "cloudflare-workers.d.ts", "../lib/contract.ts", "../lib/exec.ts", "../lib/adapters.ts"]
 }

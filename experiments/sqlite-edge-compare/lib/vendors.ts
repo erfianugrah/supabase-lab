@@ -112,6 +112,14 @@ export async function listWorkers(c: CfCreds): Promise<Named[]> {
   return (r.result ?? []).map((w) => ({ name: w.id, id: w.id }));
 }
 
+/** Durable Object namespaces on the account, named by the Worker script that owns them (listing only: a namespace goes with its script). */
+export async function listDoNamespaces(c: CfCreds): Promise<{ name: string; id: string; className: string }[]> {
+  const r = await cf<{ id: string; name?: string; script?: string; class?: string }[]>(c, "GET", "workers/durable_objects/namespaces");
+  if (!r.success) throw new Error(`list Durable Object namespaces: ${cfErr(r)}`);
+  // No script/name: fall back to the id so an unnamed namespace is still listed (and does not pass as non-sec-).
+  return (r.result ?? []).map((n) => ({ name: n.script ?? n.name ?? n.id, id: n.id, className: n.class ?? "" }));
+}
+
 export async function createD1(c: CfCreds, name: string, locationHint: string): Promise<{ id: string; raw: Record<string, unknown> }> {
   assertSec(name);
   const r = await cf<Record<string, unknown>>(c, "POST", "d1/database", { name, primary_location_hint: locationHint });
