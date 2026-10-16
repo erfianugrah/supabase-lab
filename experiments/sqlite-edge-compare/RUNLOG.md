@@ -765,15 +765,17 @@ ANALYZE" control, so ANALYZE's own writes are not isolated:
 | TD05 ingest + 7 x p95_by_colo | - | 60002 |
 | TD05 ingest + 7 x all five aggregates | 4003 | 60002 |
 
-On the Turso engine the window-function query (`p95_by_colo`, a
-`ROW_NUMBER() OVER (PARTITION BY ...)`) counted 56000 rows written for 7
+On the Turso engine the window-function query (`p95_by_colo`, a subquery with
+`row_number()` and `count(*)` `OVER (PARTITION BY colo)`) counted 56000 rows written for 7
 executions over 2000 rows: 4 per input row per execution. libSQL counted none.
 That accounts for the small run (10000 rows x 7 passes x 4 = 280000, plus
 about 2 per event for the ingest, against 300002 measured)
 and is consistent with the 9639906 rows written that the first account's
 Turso-engine database counted on the re-run above (one full TD05: 100000 rows
-x 23 passes x 4 = 9200000, plus the ingests; derived, not re-measured). The full TD05 at 07:40, with that cell
-skipped, counted 200002 on the Turso engine and 200028 on libSQL. Why the
+x 23 passes x 4 = 9200000, plus the ingests; derived, not re-measured). The full TD05 run at 07:40
+(100000-event ingest plus the dashboard queries, Worker HKG), with that cell
+skipped on the Turso engine, counted 200002 there and 200028 on libSQL (whose
+figure includes `p95_by_colo`). Why the
 engine counts window-function work as writes was not determined; whether
 other window functions or sorts behave the same was not measured.
 
