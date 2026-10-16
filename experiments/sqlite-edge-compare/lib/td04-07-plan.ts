@@ -4,13 +4,27 @@
  * Worker invocations, throughput and error shape from a RunResult's ops, the
  * per-dialect SQL both modules send, and the Turso engine check on a DbId.
  */
-import type { Backend, OpResult, RunResponse } from "./contract";
+import type { Backend, OpResult, RunResponse, WorkerBackend } from "./contract";
 
 export type Dialect = "sqlite" | "pg";
 
 /** D1 and libSQL speak SQLite with `?` placeholders; Postgres paths use `$1`. */
 export function dialectOf(b: Backend): Dialect {
-  return b === "d1" || b === "turso" || b === "turso_http" || b === "d1_rest" ? "sqlite" : "pg";
+  return b === "d1" || b === "turso" || b === "tursodb" || b === "turso_http" || b === "d1_rest" ? "sqlite" : "pg";
+}
+
+/**
+ * `base` with the Turso-engine backend right after the libSQL one, when the
+ * fixture holds a Turso-engine database (an org that refused use_tursodb
+ * leaves `tursodb.url` unset and the list unchanged).
+ */
+export function withTursodb<T extends string | { b: string }>(fx: { tursodb?: { url?: string; error?: string } }, base: readonly T[]): T[] {
+  const key = (x: T): string => (typeof x === "string" ? x : x.b);
+  const i = base.findIndex((x) => key(x) === "turso");
+  if (!fx.tursodb?.url || i < 0) return [...base];
+  const t = base[i]!;
+  const add = (typeof t === "string" ? "tursodb" : { ...(t as { b: string }), b: "tursodb" }) as T;
+  return [...base.slice(0, i + 1), add, ...base.slice(i + 1)];
 }
 
 const intList = (s: string | undefined): number[] | null => {

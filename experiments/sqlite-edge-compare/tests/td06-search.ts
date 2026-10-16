@@ -67,6 +67,7 @@ import { fixtureOrSkip, type RunResult, runLocal, runOnWorker } from "../lib/cli
 import type { RunRequest, Stmt, WorkerBackend } from "../lib/contract";
 import type { Fixture } from "../lib/fixture";
 import { roundRobin, summarize, summaryColumns } from "../lib/stats";
+import { withTursodb } from "../lib/td04-07-plan";
 import {
   chunk,
   type Dialect,
@@ -102,12 +103,12 @@ import {
 } from "../lib/td05-06-08-data";
 
 const ID = "TD06";
-const FTS: { b: WorkerBackend; d: Dialect }[] = [
+const BASE_FTS: { b: WorkerBackend; d: Dialect }[] = [
   { b: "d1", d: "sqlite" },
   { b: "turso", d: "sqlite" },
   { b: "pg", d: "pg" },
 ];
-const VEC: { b: WorkerBackend; d: Dialect }[] = [
+const BASE_VEC: { b: WorkerBackend; d: Dialect }[] = [
   { b: "turso", d: "sqlite" },
   { b: "pg", d: "pg" },
 ];
@@ -140,6 +141,9 @@ const mod: TestModule = {
   async run(ctx: Ctx): Promise<TestResult[]> {
     const fx = await fixtureOrSkip(ctx);
     if ("skip" in fx) return [{ id: ID, title: this.title, status: "skip", detail: fx.skip }];
+    // tursodb: FTS5 refused in MVCC mode, no vector index on Cloud (2026-10-16 probe); both recorded as measured.
+    const FTS = withTursodb(fx, BASE_FTS);
+    const VEC = withTursodb(fx, BASE_VEC);
     const sz = td06Sizes();
     const out: TestResult[] = [];
     const vantage = {
@@ -342,7 +346,7 @@ const mod: TestModule = {
       const vBroken = new Map<WorkerBackend, string>();
       const load = new Map<WorkerBackend, Record<string, number | string>>();
       for (const { b, d } of VEC) {
-        const r = await ddl(b, td06VecDdl(d, sz.dim));
+        const r = await ddl(b, td06VecDdl(d, sz.dim, "td06_vec", b === "tursodb" ? null : undefined));
         if (!r.ok) vBroken.set(b, `schema, 3 attempts: ${r.errors.join(" | ")}`);
         load.set(b, { ms_sum: 0, rows: 0, ops: 0, errors: 0, schema_attempts: r.attempts, ...(r.errors.length ? { schema_errors: r.errors.join(" | ").slice(0, 400) } : {}) });
       }
@@ -355,9 +359,22 @@ const mod: TestModule = {
         if (vBroken.has(b)) continue;
         const batch = vBatches[slot.iter]!;
         const statements: Stmt[] = d === "sqlite" ? chunk(batch, VECS_PER_STMT).map((r) => td06VecInsert("sqlite", r)) : [td06VecInsert("pg", batch)];
-        const r = await run(fx, { backend: b, statements, mode: d === "sqlite" ? "batch" : "each", returnMeta: false });
+        let r = await run(fx, { backend: b, statements, mode: d === "sqlite" ? "batch" : "each", returnMeta: false });
         const L = load.get(b)!;
-        const op = r.ops[0];
+        let op = r.ops[0];
+        if (!(r.ok && op?.ok)) {
+          // Explicit ids: one re-send; a UNIQUE/duplicate-key answer means the first attempt landed (a lost batch on 2026-10-16 left 9900/10000).
+          const first = op?.error ?? firstErr(r);
+          L.retries = ((L.retries as number | undefined) ?? 0) + 1;
+          if (!firstLoadErr.has(b)) firstLoadErr.set(b, `retried after: ${first}`);
+          r = await run(fx, { backend: b, statements, mode: d === "sqlite" ? "batch" : "each", returnMeta: false });
+          op = r.ops[0];
+          if (!(r.ok && op?.ok) && /UNIQUE|duplicate key/i.test(op?.error ?? firstErr(r))) {
+            L.rows = (L.rows as number) + batch.length;
+            L.landed_on_first_attempt = ((L.landed_on_first_attempt as number | undefined) ?? 0) + 1;
+            continue;
+          }
+        }
         if (r.ok && op?.ok) {
           L.ms_sum = (L.ms_sum as number) + op.ms;
           loadMs.get(b)!.push(op.ms);
@@ -398,7 +415,7 @@ const mod: TestModule = {
       for (const { b } of VEC) {
         const L = load.get(b)!;
         const ok = !vBroken.has(b) && L.rows === sz.vectors && L.errors === 0;
-        if (!ok && !vBroken.has(b)) vBroken.set(b, `load incomplete ${L.rows}/${sz.vectors}`);
+        if (!ok && !vBroken.has(b)) vBroken.set(b, `load incomplete ${L.rows}/${sz.vectors}${firstLoadErr.has(b) ? `; first error: ${firstLoadErr.get(b)}` : ""}`);
         const m: Record<string, number | string> = {
           backend: b,
           ...vantage,
@@ -413,10 +430,10 @@ const mod: TestModule = {
           op_ms_p50: summarize(loadMs.get(b)!).p50,
           op_ms_first: r3(loadMs.get(b)![0] ?? Number.NaN),
           op_ms_last: r3(loadMs.get(b)!.at(-1) ?? Number.NaN),
-          index_order: b === "pg" ? "HNSW after load" : "libsql_vector_idx before load (maintained on insert)",
-          index_args: b === "pg" ? "hnsw vector_cosine_ops, build defaults" : TD06_TURSO_IDX_ARGS.replace(/'/g, ""),
+          index_order: b === "pg" ? "HNSW after load" : b === "tursodb" ? "none (no vector index on the Turso engine)" : "libsql_vector_idx before load (maintained on insert)",
+          index_args: b === "pg" ? "hnsw vector_cosine_ops, build defaults" : b === "tursodb" ? "none" : TD06_TURSO_IDX_ARGS.replace(/'/g, ""),
         };
-        for (const k of ["index_build_ms", "index_build_vantage", "index_build_worker_error", "schema_attempts", "schema_errors"]) if (L[k] !== undefined) m[k] = L[k]!;
+        for (const k of ["index_build_ms", "index_build_vantage", "index_build_worker_error", "schema_attempts", "schema_errors", "retries", "landed_on_first_attempt"]) if (L[k] !== undefined) m[k] = L[k]!;
         if (b === "pg") {
           m.hnsw_used_by_ann_query = hnswUsed;
           m.hnsw_ef_search = efSearch;

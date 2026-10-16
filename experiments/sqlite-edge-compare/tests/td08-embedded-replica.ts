@@ -27,6 +27,13 @@
  *   TD08e-d1       no equivalent: recorded, not measured
  *   TD08e-pg       no equivalent: recorded, not measured
  *   TD08z          cleanup
+ *   TD08g          the same embedded replica against the Turso-engine database
+ *                  (when the fixture has one): opens and syncs, or the error
+ *   TD08f<k>-<engine>  Turso Sync (@tursodatabase/sync, lib/td08-sync.ts) on
+ *                  the libSQL database and the Turso-engine one: f1 connect,
+ *                  f2 B write + push then A pull (lag, visibility), f3 local
+ *                  PK read, f4 the same row updated offline on A and B, A
+ *                  pushes first (which write survives, push errors); n = TD08_N
  *
  * Sizes (env): full n=30, warm-up 3, 1000 seeded rows; TD_SMOKE=1: n=5,
  * warm-up 1, 100 rows (TD08_N, TD08_WARMUP, TD08_SEED_ROWS override).
@@ -48,6 +55,7 @@ import type { Ctx, TestModule, TestResult } from "../../../harness/src/types";
 import { fixtureOrSkip, tursoClient } from "../lib/client";
 import { rng, roundRobin, separated, summarize, summaryColumns } from "../lib/stats";
 import { chunk, multiInsert, r3, td08Sizes } from "../lib/td05-06-08-data";
+import { type SyncTarget, syncRows } from "../lib/td08-sync";
 import { turso, tursoCreds } from "../lib/vendors";
 
 const ID = "TD08";
@@ -249,6 +257,39 @@ const mod: TestModule = {
       remote.close();
       out.push({ id: `${ID}z`, title: "cleanup", status: bad.length ? "fail" : "pass", detail: bad.length ? bad.join("; ") : "dropped td08_kv on Turso, removed the local replica file" });
     }
+    // g: the same embedded replica (native @libsql/client, syncUrl) pointed at the Turso-engine database.
+    if (fx.tursodb?.url && fx.tursodb.token) {
+      const gdir = await mkdtemp(join(tmpdir(), "td08g-"));
+      const host = fx.tursodb.hostname;
+      let rep: Client | undefined;
+      let res: string;
+      let ok = false;
+      try {
+        rep = createClient({ url: `file:${join(gdir, "replica.db")}`, syncUrl: fx.tursodb.url, authToken: fx.tursodb.token, intMode: "number" });
+        const s = await rep.sync();
+        await rep.execute("SELECT 1");
+        ok = true;
+        res = `synced, ${s?.frames_synced ?? "?"} frames`;
+      } catch (e) {
+        res = host ? errMsg(e).split(host).join("<redacted>") : errMsg(e);
+      } finally {
+        rep?.close();
+        await rm(gdir, { recursive: true, force: true }).catch(() => undefined);
+      }
+      out.push({
+        id: `${ID}g`,
+        title: "Embedded replica (native @libsql/client, syncUrl) against the Turso-engine database (local)",
+        status: "info",
+        detail: ok ? `works: ${res}` : `does not open: ${res}`,
+        measurements: { backend: "turso_embedded_tursodb", vantage: "local", colo: "local", outcome: ok ? "synced" : "error" },
+      });
+    }
+    // f: Turso Sync on the libSQL database and, when the fixture has one, the Turso-engine database.
+    const lits = [fx.turso?.hostname, fx.tursodb?.hostname, fx.turso?.org].filter((x): x is string => !!x);
+    const red = (s: string) => lits.reduce((acc, l) => acc.split(l).join("<redacted>"), s);
+    const targets: SyncTarget[] = [{ engine: "libsql", url: fx.turso!.url, token: fx.turso!.token! }];
+    if (fx.tursodb?.url && fx.tursodb.token) targets.push({ engine: "tursodb", url: fx.tursodb.url, token: fx.tursodb.token });
+    for (const tg of targets) out.push(...(await syncRows(`${ID}f`, tg, sz, red)));
     return out;
   },
 };

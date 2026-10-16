@@ -12,7 +12,7 @@ import { rng, separated, type Summary, summarize } from "./stats";
 export type Vantage = "worker" | "local";
 export type Dialect = "sqlite" | "pg" | "http";
 /** Which database a target reads: the fixture holds one of each. */
-export type Store = "d1" | "turso" | "supabase";
+export type Store = "d1" | "turso" | "tursodb" | "supabase";
 
 export interface Target {
   /** Stable name used in rows and env lists: "d1", "local_pg_pooler", ... */
@@ -28,6 +28,7 @@ const t = (key: string, backend: Target["backend"], vantage: Vantage, dialect: D
 export const TARGETS = {
   d1: t("d1", "d1", "worker", "sqlite", "d1"),
   turso: t("turso", "turso", "worker", "sqlite", "turso"),
+  tursodb: t("tursodb", "tursodb", "worker", "sqlite", "tursodb"),
   pg: t("pg", "pg", "worker", "pg", "supabase"),
   pg_cached: t("pg_cached", "pg_cached", "worker", "pg", "supabase"),
   postgrest: t("postgrest", "postgrest", "worker", "http", "supabase"),
@@ -339,7 +340,7 @@ export function affected(t: Target, kind: "insert" | "update", out: StmtOut | un
   const num = (x: unknown) => (x === undefined || x === null || Number.isNaN(Number(x)) ? null : Number(x));
   if (t.dialect === "http") return kind === "insert" ? (m.status === 201 ? 1 : 0) : (out.rowCount ?? null);
   if (t.store === "d1") return num(m.changes);
-  if (t.store === "turso") return num(m.rowsAffected);
+  if (t.store === "turso" || t.store === "tursodb") return num(m.rowsAffected);
   return out.rowCount ?? null;
 }
 

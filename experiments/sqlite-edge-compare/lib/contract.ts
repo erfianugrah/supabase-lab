@@ -38,13 +38,14 @@ export const MAX_CONCURRENCY = 64;
 export const MAX_STATEMENTS = 100;
 
 /** Backends reachable from inside the probe Worker. */
-export type WorkerBackend = "d1" | "turso" | "pg" | "pg_cached" | "postgrest";
+/** "turso" is the libSQL database; "tursodb" the Turso-engine (Rust rewrite) one in the same group. */
+export type WorkerBackend = "d1" | "turso" | "tursodb" | "pg" | "pg_cached" | "postgrest";
 /** Backends reachable from the local vantage (lib/client.ts runLocal). */
 export type LocalBackend = "turso_http" | "pg_pooler" | "pg_session" | "pg_direct" | "d1_rest" | "postgrest";
 export type Backend = WorkerBackend | LocalBackend;
 export type Mode = "each" | "batch" | "tx";
 
-export const WORKER_BACKENDS: readonly WorkerBackend[] = ["d1", "turso", "pg", "pg_cached", "postgrest"];
+export const WORKER_BACKENDS: readonly WorkerBackend[] = ["d1", "turso", "tursodb", "pg", "pg_cached", "postgrest"];
 export const LOCAL_BACKENDS: readonly LocalBackend[] = ["turso_http", "pg_pooler", "pg_session", "pg_direct", "d1_rest", "postgrest"];
 
 export type Param = string | number | boolean | null;

@@ -89,7 +89,7 @@ describe("fixture file shape", () => {
     expect(s).not.toContain("sb_secret_x");
     expect(s).not.toContain('"tok"');
     expect(s).not.toContain('"pw"');
-    expect(Object.keys(workerSecrets(full())).sort()).toEqual(["PROBE_KEY", "SUPABASE_SECRET_KEY", "TURSO_TOKEN"]);
+    expect(Object.keys(workerSecrets(full())).sort()).toEqual(["PROBE_KEY", "SUPABASE_SECRET_KEY", "TURSODB_TOKEN", "TURSO_TOKEN"]);
   });
   test("probe exports carry identifiers and the fixture path, never a secret", () => {
     const e = exportsFor(full(), "/x/.fixture.json", { PVLAB_ORG_PRO: "pro-slug" });
@@ -159,6 +159,18 @@ describe("down", () => {
     expect(r.ok).toBe(false);
     expect(calls.length).toBe(7);
     expect(String(r.steps.find((s) => s.what === "d1")!.status)).toContain("boom");
+  });
+  test("a Turso-engine database is deleted before the group; a refused one is skipped", async () => {
+    const calls: string[] = [];
+    const f = emptyFixture("p2");
+    f.turso = full().turso;
+    f.tursodb = { db: "sec-tdb-p2", hostname: "h", url: "https://h", token: "t2" };
+    await downWith(f, ops({}, calls));
+    expect(calls).toEqual(["tursoDb:sec-td-abc123", "tursoDb:sec-tdb-p2", "tursoGroup:sec-syd"]);
+    const c2: string[] = [];
+    f.tursodb = { db: "sec-tdb-p2", error: "HTTP 400" };
+    await downWith(f, ops({}, c2));
+    expect(c2).toEqual(["tursoDb:sec-td-abc123", "tursoGroup:sec-syd"]);
   });
   test("a kept (non-empty) Turso group is not a failure", async () => {
     const r = await downWith(full(), ops({ tursoGroup: 0 }, []));

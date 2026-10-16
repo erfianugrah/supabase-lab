@@ -112,6 +112,8 @@ export interface Fixture {
     url: string;
     token?: string;
   };
+  /** Turso-engine database in the same group; `error` when the org refuses use_tursodb. */
+  tursodb?: { db: string; hostname?: string; url?: string; dbId?: string; token?: string; createMs?: number; error?: string };
   d1?: { name: string; id: string; locationHint: string; createInfo?: Record<string, unknown> };
   hyperdrive?: { nocache?: Named; cached?: Named };
   worker?: { name: string; url: string; probeKey: string; compatDate: string; deployedAt?: string };
@@ -132,6 +134,7 @@ export function names(stamp: string) {
     project: `${PREFIX}pg-${stamp}`,
     tursoGroup: TURSO_GROUP,
     tursoDb: `${PREFIX}td-${stamp}`,
+    tursodbDb: `${PREFIX}tdb-${stamp}`,
     d1: `${PREFIX}d1-${stamp}`,
     hdNocache: `${PREFIX}hd-nc-${stamp}`,
     hdCached: `${PREFIX}hd-c-${stamp}`,
@@ -148,7 +151,7 @@ export function emptyFixture(stamp = newStamp()): Fixture {
 export function parseFixture(text: string): Fixture {
   const f = JSON.parse(text) as Fixture;
   if (f?.version !== 1 || typeof f.stamp !== "string" || !f.stamp) throw new Error(".fixture.json: version 1 with a stamp expected");
-  const all = [f.supabase?.name, f.turso?.db, f.turso?.group, f.d1?.name, f.hyperdrive?.nocache?.name, f.hyperdrive?.cached?.name, f.worker?.name];
+  const all = [f.supabase?.name, f.turso?.db, f.turso?.group, f.tursodb?.db, f.d1?.name, f.hyperdrive?.nocache?.name, f.hyperdrive?.cached?.name, f.worker?.name];
   for (const n of all) if (n !== undefined && !n.startsWith(PREFIX)) throw new Error(`.fixture.json names a resource without the ${PREFIX} prefix: ${n}`);
   return f;
 }
@@ -179,6 +182,7 @@ export function renderWrangler(f: Fixture, drivers: { pg: string; libsql: string
     vars: {
       SUPABASE_URL: f.supabase.url,
       TURSO_URL: f.turso.url,
+      TURSODB_URL: f.tursodb?.url ?? "",
       DRIVER_PG: drivers.pg,
       DRIVER_LIBSQL: drivers.libsql,
       COMPAT_DATE: f.worker.compatDate,
@@ -189,7 +193,7 @@ export function renderWrangler(f: Fixture, drivers: { pg: string; libsql: string
 /** The Worker's secrets, as the JSON `wrangler secret bulk` reads on stdin. */
 export function workerSecrets(f: Fixture): Record<string, string> {
   if (!f.worker?.probeKey || !f.turso?.token || !f.supabase?.secretKey) throw new Error("workerSecrets: fixture incomplete");
-  return { PROBE_KEY: f.worker.probeKey, TURSO_TOKEN: f.turso.token, SUPABASE_SECRET_KEY: f.supabase.secretKey };
+  return { PROBE_KEY: f.worker.probeKey, TURSO_TOKEN: f.turso.token, TURSODB_TOKEN: f.tursodb?.token ?? "unset", SUPABASE_SECRET_KEY: f.supabase.secretKey };
 }
 
 const shq = (v: string) => `'${v.replace(/'/g, `'\\''`)}'`;
@@ -214,6 +218,7 @@ export function exportsFor(f: Fixture, file = FIXTURE_FILE, env: Record<string, 
     e.PVLAB_ENDPOINT_TURSO_URL = f.turso.url;
     e.PVLAB_ORG_TURSO = f.turso.org;
   }
+  if (f.tursodb?.url) e.PVLAB_PEER_TURSODB_DB = f.tursodb.db;
   if (f.d1) {
     e.PVLAB_PEER_D1 = f.d1.id;
     e.PVLAB_PEER_D1_NAME = f.d1.name;
@@ -238,6 +243,7 @@ export function literalsOf(f: Partial<Fixture>, env: Record<string, string | und
     f.supabase?.poolerHost,
     f.turso?.org,
     f.turso?.hostname,
+    f.tursodb?.hostname,
     f.d1?.id,
     f.hyperdrive?.nocache?.id,
     f.hyperdrive?.cached?.id,
@@ -257,6 +263,7 @@ export function idsOnly(f: Fixture): Partial<Fixture> {
     createdAt: f.createdAt,
     ...(f.supabase ? { supabase: { ...f.supabase, dbPass: "", secretKey: undefined, anonKey: undefined, serviceKey: undefined, publishableKey: undefined } } : {}),
     ...(f.turso ? { turso: { ...f.turso, token: undefined } } : {}),
+    ...(f.tursodb ? { tursodb: { ...f.tursodb, token: undefined } } : {}),
     ...(f.d1 ? { d1: f.d1 } : {}),
     ...(f.hyperdrive ? { hyperdrive: f.hyperdrive } : {}),
     ...(f.worker ? { worker: { ...f.worker, probeKey: "" } } : {}),
@@ -449,6 +456,44 @@ async function tursoUp(t: TursoCreds, f: Fixture): Promise<void> {
   log("turso: database answers");
 }
 
+/**
+ * Turso-engine database next to the libSQL one (same group). An org that has
+ * not enabled tursodb answers HTTP 400; that is recorded, not fatal, and the
+ * Worker's tursodb backend then reports "not configured".
+ */
+async function tursodbUp(t: TursoCreds, f: Fixture): Promise<void> {
+  const n = names(f.stamp);
+  if (!f.tursodb?.url) {
+    const t0 = Date.now();
+    try {
+      const db = await createTursoDb(t, n.tursodbDb, f.turso!.group, true);
+      f.tursodb = { db: n.tursodbDb, hostname: db.hostname, url: `https://${db.hostname}`, dbId: db.dbId, createMs: Date.now() - t0 };
+      log(`tursodb: database ${n.tursodbDb} created in ${f.tursodb.createMs} ms`);
+    } catch (e) {
+      f.tursodb = { db: n.tursodbDb, error: scrub(e instanceof Error ? e.message : String(e), f).slice(0, 300) };
+      log(`tursodb: not created (${f.tursodb.error})`);
+    }
+    await writeFixture(f);
+  }
+  if (!f.tursodb.url) return;
+  if (!f.tursodb.token) {
+    f.tursodb.token = await tursoDbToken(t, f.tursodb.db);
+    await writeFixture(f);
+  }
+  const ok = await until("tursodb pipeline", 24, 5_000, async () => {
+    const r = await fetch(`${f.tursodb!.url}/v2/pipeline`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${f.tursodb!.token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ requests: [{ type: "execute", stmt: { sql: "select 1" } }, { type: "close" }] }),
+      signal: AbortSignal.timeout(15_000),
+    });
+    await r.body?.cancel();
+    return r.status === 200;
+  });
+  if (!ok.ok) throw new Error("tursodb database does not answer /v2/pipeline");
+  log("tursodb: database answers");
+}
+
 /* ------------------------------ Cloudflare ------------------------------ */
 
 async function d1Up(c: CfCreds, f: Fixture): Promise<void> {
@@ -599,6 +644,7 @@ export async function up(): Promise<Fixture> {
     await writeFixture(f);
   }
   await tursoUp(v.t, f);
+  await tursodbUp(v.t, f);
   await d1Up(v.c, f);
   await writeFixture(f);
   if (f.supabase!.readyMs === undefined) {
@@ -644,6 +690,7 @@ export async function downWith(f: Fixture, ops: DownOps): Promise<DownReport> {
   if (f.d1) await step("d1", f.d1.name, () => ops.d1(f.d1!.id));
   if (f.turso) {
     await step("turso db", f.turso.db, () => ops.tursoDb(f.turso!.db));
+    if (f.tursodb?.url) await step("tursodb db", f.tursodb.db, () => ops.tursoDb(f.tursodb!.db));
     await step("turso group", f.turso.group, () => ops.tursoGroup(f.turso!.group));
   }
   if (f.supabase) await step("supabase project", f.supabase.name, () => ops.project(f.supabase!.ref));

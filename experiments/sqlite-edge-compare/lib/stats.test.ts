@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { interleave, percentile, rng, roundRobin, separated, summarize, summaryColumns } from "./stats";
+import { interleave, percentile, rng, rotate, roundRobin, separated, summarize, summaryColumns } from "./stats";
 
 describe("percentile", () => {
   test("type-7 interpolation", () => {
@@ -80,5 +80,15 @@ describe("rng", () => {
     expect(xs).toEqual(Array.from({ length: 100 }, () => b()));
     expect(xs.every((x) => x >= 0 && x < 1)).toBe(true);
     expect(rng(1)()).not.toBe(rng(2)());
+  });
+});
+
+describe("rotate", () => {
+  test("left-rotates by k, wraps, and every item leads once per cycle", () => {
+    expect(rotate(["a", "b", "c"], 0)).toEqual(["a", "b", "c"]);
+    expect(rotate(["a", "b", "c"], 1)).toEqual(["b", "c", "a"]);
+    expect(rotate(["a", "b", "c"], 5)).toEqual(["c", "a", "b"]);
+    expect([0, 1, 2].map((k) => rotate(["a", "b", "c"], k)[0])).toEqual(["a", "b", "c"]);
+    expect(rotate([], 3)).toEqual([]);
   });
 });

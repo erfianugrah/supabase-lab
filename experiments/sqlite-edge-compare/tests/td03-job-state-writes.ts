@@ -18,6 +18,8 @@
  *
  *   TD03a  Worker -> D1 binding
  *   TD03b  Worker -> Turso libSQL over HTTP
+ *   TD03o  Worker -> Turso-engine database over HTTP (when the fixture has one;
+ *          printed as TD03undefined in the 2026-10-16 run, before the id existed)
  *   TD03c  Worker -> Hyperdrive (caching disabled) -> Postgres direct
  *   TD03d  Worker -> PostgREST (secret key)
  *   TD03e  local  -> Turso libSQL over HTTP
@@ -51,6 +53,7 @@ import type { Ctx, TestModule, TestResult } from "../../../harness/src/types";
 import { type Fixture, fixtureOrSkip, type RunResult } from "../lib/client";
 import type { Stmt } from "../lib/contract";
 import { roundRobin, summarize } from "../lib/stats";
+import { withTursodb } from "../lib/td04-07-plan";
 import { coloCounts, runTarget, setupSql, targetUnavailable, transportLost, vantageFacts, waitPostgrest } from "../lib/td02-03-io";
 import {
   envInt,
@@ -84,6 +87,7 @@ const LETTER: Partial<Record<TargetKey, string>> = {
   local_pg_pooler: "f",
   local_pg_direct: "g",
   local_d1_rest: "h",
+  tursodb: "o",
 };
 const STORES: Store[] = ["d1", "turso", "supabase"];
 
@@ -99,7 +103,9 @@ const mod: TestModule = {
     const n = envInt(env, "TD03_N", 100, 10);
     const warmup = envInt(env, "TD03_WARMUP", 10, 2);
     const block = Math.min(12, Math.max(1, envInt(env, "TD03_BLOCK", 10, 4)));
-    const targets = pickTargets(envList(env, "TD03_TARGETS", ALL, ALL), ALL);
+    const all = withTursodb(fx, ALL);
+    const stores = withTursodb(fx, STORES);
+    const targets = pickTargets(envList(env, "TD03_TARGETS", all, all), all);
 
     const out: TestResult[] = [];
     const runnable: Target[] = [];
@@ -111,7 +117,7 @@ const mod: TestModule = {
     const touched: Store[] = [];
     const run = Date.now().toString(36);
     try {
-      for (const store of STORES) {
+      for (const store of stores) {
         touched.push(store);
         await setupSql(fx, store, jobsDdl(store === "supabase" ? "pg" : "sqlite"));
       }

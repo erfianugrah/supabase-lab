@@ -9,6 +9,7 @@
  * Vantage: the probe Worker for all rows (colo recorded), backends
  *   d1    the D1 binding (location hint oc; served_by_region recorded)
  *   turso @libsql/client/web over HTTP to the aws-ap-southeast-2 group
+ *   tursodb  same client and group, Turso-engine database (when the fixture has one)
  *   pg    node-postgres through Hyperdrive with caching OFF, Supabase
  *         ap-southeast-2 (Micro) direct connection
  *
@@ -25,7 +26,9 @@
  *                    no percentile aggregate), last_24h: warm-up iterations
  *                    dropped and counted, then n per query; one Worker
  *                    invocation per (iteration, backend) runs the five in
- *                    sequence; backends round-robin per iteration. `correct`
+ *                    sequence, the order rotated per iteration (each query
+ *                    leads equally often; p50 when first vs not first is
+ *                    recorded); backends round-robin per iteration. `correct`
  *                    = the rows equal the JavaScript truth. D1 rows: rows_read
  *                    and sql_duration_ms from the binding's meta.
  *   TD05c            Turso Platform API usage (rows read / written, storage)
@@ -54,7 +57,7 @@ import type { Ctx, TestModule, TestResult } from "../../../harness/src/types";
 import { fixtureOrSkip, type RunResult, runOnWorker } from "../lib/client";
 import type { RunRequest, Stmt, WorkerBackend } from "../lib/contract";
 import type { Fixture } from "../lib/fixture";
-import { roundRobin, summarize, summaryColumns } from "../lib/stats";
+import { rotate, roundRobin, summarize, summaryColumns } from "../lib/stats";
 import {
   chunk,
   type Dialect,
@@ -75,10 +78,11 @@ import {
   td05Sizes,
   td05Truth,
 } from "../lib/td05-06-08-data";
+import { withTursodb } from "../lib/td04-07-plan";
 import { tursoCreds, turso } from "../lib/vendors";
 
 const ID = "TD05";
-const BACKENDS: { b: WorkerBackend; d: Dialect }[] = [
+const BASE_BACKENDS: { b: WorkerBackend; d: Dialect }[] = [
   { b: "d1", d: "sqlite" },
   { b: "turso", d: "sqlite" },
   { b: "pg", d: "pg" },
@@ -113,6 +117,7 @@ const mod: TestModule = {
   async run(ctx: Ctx): Promise<TestResult[]> {
     const fx = await fixtureOrSkip(ctx);
     if ("skip" in fx) return [{ id: ID, title: this.title, status: "skip", detail: fx.skip }];
+    const BACKENDS = withTursodb(fx, BASE_BACKENDS);
     const sz = td05Sizes();
     const out: TestResult[] = [];
     const vantage = {
@@ -160,9 +165,21 @@ const mod: TestModule = {
         const rows = batches[slot.iter]!;
         const statements: Stmt[] = d === "sqlite" ? chunk(rows, per).map((r) => multiInsert("sqlite", "td05_events", TD05_COLS, r)) : [multiInsert("pg", "td05_events", TD05_COLS, rows)];
         const a = acc.get(b)!;
-        const r = await run(fx, { backend: b, statements, mode: d === "sqlite" ? "batch" : "each", returnMeta: b === "d1", label: `${ID} ingest ${slot.iter}` }).catch(
-          (e) => ({ ok: false, error: errMsg(e), ops: [], httpMs: [], colos: [] }) as unknown as RunResult,
-        );
+        const send = () =>
+          run(fx, { backend: b, statements, mode: d === "sqlite" ? "batch" : "each", returnMeta: b === "d1", label: `${ID} ingest ${slot.iter}` }).catch(
+            (e) => ({ ok: false, error: errMsg(e), ops: [], httpMs: [], colos: [] }) as unknown as RunResult,
+          );
+        let r = await send();
+        if (!(r.ok && r.ops?.[0]?.ok)) {
+          // ids are generated, so re-send only when the count shows the batch did not land (an HTTP 520 lost a batch per Turso database on 2026-10-16).
+          const t = r.ops?.[0]?.error ?? firstErr(r) ?? "no op";
+          const c = await run(fx, { backend: b, statements: [{ sql: "SELECT count(*) AS n FROM td05_events" }], returnRows: true, returnMeta: false }).catch(() => null);
+          const n = Number(Object.values((c?.ops?.[0]?.out?.[0]?.rows?.[0] ?? {}) as Record<string, unknown>)[0]);
+          if (n === a.rowsOk) {
+            a.errs.set(`retried after: ${t}`, (a.errs.get(`retried after: ${t}`) ?? 0) + 1);
+            r = await send();
+          }
+        }
         a.httpMs.push(...(r.httpMs ?? []));
         for (const c of r.colos ?? []) a.colos.add(c);
         const op = r.ops?.[0];
@@ -202,7 +219,8 @@ const mod: TestModule = {
           op_ms_p50: s.p50,
           op_ms_p95: s.p95,
           op_ms_max: s.max,
-          failed_ops: sum([...a.errs.values()]),
+          failed_ops: sum([...a.errs.entries()].filter(([t]) => !t.startsWith("retried after")).map(([, c]) => c)),
+          ingest_retries: sum([...a.errs.entries()].filter(([t]) => t.startsWith("retried after")).map(([, c]) => c)),
           analyze: an.ops[0]?.ok ? "ok" : (an.ops[0]?.error ?? firstErr(an)).slice(0, 200),
         });
         if (b === "d1") {
@@ -239,22 +257,24 @@ const mod: TestModule = {
       }
 
       // ---- timed aggregates: round-robin per iteration, warm-up first ----
-      type Sample = { ms: number; ok: boolean; warm: boolean; error?: string; meta?: Record<string, unknown> };
+      type Sample = { ms: number; ok: boolean; warm: boolean; error?: string; meta?: Record<string, unknown>; pos?: number };
       const samples = new Map<string, Sample[]>();
       const colos = new Map<WorkerBackend, Set<string>>();
       const served = new Map<string, unknown[]>();
       for (const slot of roundRobin(live(), sz.n + sz.warmup, sz.warmup)) {
         const { b, d } = slot.item;
         const aggs = td05Aggregates(d);
-        const r = await run(fx, { backend: b, statements: TD05_QUERIES.map((q) => aggs[q]), returnMeta: b === "d1", label: `${ID} agg ${slot.iter}` }).catch(
+        // Order rotates per iteration so the first-statement cost (client setup on the invocation) is spread over every query.
+        const order = rotate(TD05_QUERIES, slot.iter);
+        const r = await run(fx, { backend: b, statements: order.map((q) => aggs[q]), returnMeta: b === "d1", label: `${ID} agg ${slot.iter}` }).catch(
           (e) => ({ ok: false, error: errMsg(e), ops: [], colos: [] }) as unknown as RunResult,
         );
         for (const c of r.colos ?? []) (colos.get(b) ?? colos.set(b, new Set()).get(b)!).add(c);
-        for (const [k, q] of TD05_QUERIES.entries()) {
+        for (const [k, q] of order.entries()) {
           const op = r.ops?.find((o) => o.stmt === k);
           const key = `${b}/${q}`;
           const list = samples.get(key) ?? samples.set(key, []).get(key)!;
-          list.push(op ? { ms: op.ms, ok: op.ok, warm: slot.warmup, error: op.error, meta: op.out?.[0]?.meta } : { ms: Number.NaN, ok: false, warm: slot.warmup, error: firstErr(r) || "no op" });
+          list.push(op ? { ms: op.ms, ok: op.ok, warm: slot.warmup, error: op.error, meta: op.out?.[0]?.meta, pos: k } : { ms: Number.NaN, ok: false, warm: slot.warmup, error: firstErr(r) || "no op" });
           if (b === "d1" && op?.out?.[0]?.meta) (served.get(key) ?? served.set(key, []).get(key)!).push(op.out[0].meta);
         }
       }
@@ -274,7 +294,14 @@ const mod: TestModule = {
             ...summaryColumns("ms", s),
             failed: fails.length,
             correct: correct.get(key) ?? 0,
+            query_order: "rotated per iteration",
           };
+          const kk = list.filter((x) => !x.warm && x.ok);
+          const first = kk.filter((x) => x.pos === 0).map((x) => x.ms);
+          const later = kk.filter((x) => x.pos !== 0).map((x) => x.ms);
+          m.n_first_in_invocation = first.length;
+          if (first.length) m.ms_p50_first_in_invocation = summarize(first).p50;
+          if (later.length) m.ms_p50_not_first = summarize(later).p50;
           if (b === "d1") {
             const metas = (served.get(key) ?? []).map((meta) => ({ ok: true, ms: 0, stmt: 0, out: [{ meta: meta as Record<string, unknown> }] }));
             m.served_by_region = metaDistinct(metas, "served_by_region");

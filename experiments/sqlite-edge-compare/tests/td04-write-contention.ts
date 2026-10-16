@@ -71,6 +71,7 @@ import { roundRobin, summarize, summaryColumns } from "../lib/stats";
 import { HranaStream, runTx, type TxOutcome } from "../lib/td04-07-hrana";
 import {
   dialectOf,
+  withTursodb,
   firstMeta,
   isConflict,
   laneSplit,
@@ -87,7 +88,7 @@ import {
 import { assertSec, deleteTursoDb, sleep, turso, tursoCreds, tursoDbToken } from "../lib/vendors";
 
 const ID = "TD04";
-const BACKENDS: WorkerBackend[] = ["d1", "turso", "pg"];
+const BASE_BACKENDS: WorkerBackend[] = ["d1", "turso", "pg"];
 type Workload = "insert" | "incr";
 
 /** "SIN:3,MRS:1" in order of first appearance. */
@@ -101,7 +102,7 @@ const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 function dataRegion(fx: Fixture, b: WorkerBackend, r?: RunResult): string {
   if (b === "d1") return (r && firstMeta(r.ops, "served_by_region")) || "?";
-  if (b === "turso") return fx.turso?.location ?? "?";
+  if (b === "turso" || b === "tursodb") return fx.turso?.location ?? "?";
   return fx.supabase?.region ?? "?";
 }
 
@@ -199,11 +200,25 @@ async function waitAnswers(url: string, token: string, tries = 24): Promise<stri
   return last || "no answer";
 }
 
-async function oneShot(e: Pick<Engine, "url" | "token">, sql: string[]): Promise<{ ok: boolean; rows: unknown[][]; error?: string }> {
-  const s = new HranaStream(e.url, e.token);
+/**
+ * Run `sql` in order; returns the last statement's rows. Turso Cloud answers
+ * an autocommit statement with no baton, on the libSQL and the Turso-engine
+ * database alike (TD04m1, 2026-10-16), so the stream ends there and only a
+ * statement inside an open transaction gets one back; HranaStream then raises
+ * its own STREAM_CLOSED on the next exec. Statements get a stream each unless
+ * `sameStream` (needed for BEGIN ... ROLLBACK).
+ */
+async function oneShot(e: Pick<Engine, "url" | "token">, sql: string[], sameStream = false): Promise<{ ok: boolean; rows: unknown[][]; error?: string }> {
+  let s = new HranaStream(e.url, e.token);
   try {
     let rows: unknown[][] = [];
-    for (const q of sql) rows = (await s.exec(q)).rows;
+    for (const [i, q] of sql.entries()) {
+      if (i > 0 && !sameStream) {
+        await s.close();
+        s = new HranaStream(e.url, e.token);
+      }
+      rows = (await s.exec(q)).rows;
+    }
     await s.close();
     return { ok: true, rows };
   } catch (err) {
@@ -354,7 +369,11 @@ async function mvccRows(fx: Fixture, out: TestResult[], lit: string[]): Promise<
       // Docs disagree on the default; try the documented opt-in on the throwaway database only.
       setMvcc = await oneShot(mv, ["PRAGMA journal_mode = 'mvcc'"]);
     }
-    const bc = { tursodb: await oneShot(mv, ["BEGIN CONCURRENT", "ROLLBACK"]), libsql: await oneShot(lib, ["BEGIN CONCURRENT", "ROLLBACK"]) };
+    const bc = { tursodb: await oneShot(mv, ["BEGIN CONCURRENT", "ROLLBACK"], true), libsql: await oneShot(lib, ["BEGIN CONCURRENT", "ROLLBACK"], true) };
+    // Two autocommit statements on one Hrana stream: does the server keep the stream open between them?
+    const two = { tursodb: await oneShot(mv, ["SELECT 1", "SELECT 2"], true), libsql: await oneShot(lib, ["SELECT 1", "SELECT 2"], true) };
+    // Is journal_mode settable on Cloud? Throwaway database only; the answer is recorded, not relied on.
+    const setWal = await oneShot(mv, ["PRAGMA journal_mode = wal"]);
     const show = (x: Awaited<ReturnType<typeof oneShot>>) => (x.ok ? `ok ${JSON.stringify(x.rows[0] ?? [])}` : `error: ${scrub(x.error ?? "", lit)}`);
     out.push({
       id: `${ID}m1`,
@@ -362,7 +381,8 @@ async function mvccRows(fx: Fixture, out: TestResult[], lit: string[]): Promise<
       status: bc.tursodb.ok ? "pass" : "info",
       detail:
         `tursodb: journal_mode ${show(jm.tursodb)}${setMvcc ? `; set mvcc ${show(setMvcc)}` : ""}; BEGIN CONCURRENT ${show(bc.tursodb)}. ` +
-        `libsql: journal_mode ${show(jm.libsql)}; BEGIN CONCURRENT ${show(bc.libsql)}`,
+        `libsql: journal_mode ${show(jm.libsql)}; BEGIN CONCURRENT ${show(bc.libsql)}. ` +
+        `Second autocommit statement on one stream: tursodb ${show(two.tursodb)}, libsql ${show(two.libsql)}. tursodb PRAGMA journal_mode = wal: ${show(setWal)}`,
       measurements: {
         vantage: "local",
         tursodb_journal_mode: jm.tursodb.ok ? String(jm.tursodb.rows[0]?.[0] ?? "") : "error",
@@ -370,6 +390,9 @@ async function mvccRows(fx: Fixture, out: TestResult[], lit: string[]): Promise<
         tursodb_begin_concurrent: bc.tursodb.ok ? "accepted" : "error",
         libsql_journal_mode: jm.libsql.ok ? String(jm.libsql.rows[0]?.[0] ?? "") : "error",
         libsql_begin_concurrent: bc.libsql.ok ? "accepted" : "error",
+        tursodb_stream_after_autocommit: two.tursodb.ok ? "open" : "closed",
+        libsql_stream_after_autocommit: two.libsql.ok ? "open" : "closed",
+        tursodb_set_wal: setWal.ok ? "accepted" : "refused",
       },
     });
     if (!bc.tursodb.ok) return;
@@ -417,8 +440,9 @@ const mod: TestModule = {
   async run(ctx: Ctx): Promise<TestResult[]> {
     const fx = await fixtureOrSkip(ctx);
     if ("skip" in fx) return [{ id: ID, title: this.title, status: "skip", detail: fx.skip }];
+    const BACKENDS = withTursodb(fx, BASE_BACKENDS);
     const sz = td04Sizes();
-    const lit = [fx.supabase?.ref, fx.d1?.id, fx.turso?.hostname, fx.turso?.org].filter((x): x is string => !!x);
+    const lit = [fx.supabase?.ref, fx.d1?.id, fx.turso?.hostname, fx.tursodb?.hostname, fx.turso?.org].filter((x): x is string => !!x);
     const out: TestResult[] = [];
     const ready: WorkerBackend[] = [];
     try {

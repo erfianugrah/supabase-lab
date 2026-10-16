@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import type { OpResult } from "./contract";
+import type { OpResult, WorkerBackend } from "./contract";
 import { fromHrana, HranaStream, runTx, toHrana } from "./td04-07-hrana";
-import { dialectOf, firstMeta, isConflict, laneSplit, perInvocation, scalar, scrub, TD04_SQL, td04Sizes, td07Sizes, throughput, topErrors, tursoEngineOf } from "./td04-07-plan";
+import { dialectOf, firstMeta, isConflict, laneSplit, perInvocation, scalar, scrub, TD04_SQL, td04Sizes, td07Sizes, throughput, topErrors, tursoEngineOf, withTursodb } from "./td04-07-plan";
 
 const op = (p: Partial<OpResult>): OpResult => ({ inv: 0, lane: 0, i: 0, stmt: 0, t0: 0, ms: 1, ok: true, ...p });
 
@@ -174,5 +174,26 @@ describe("hrana", () => {
       throw new Error("busy");
     }, isConflict, 3);
     expect(r3).toMatchObject({ ok: false, attempts: 3, conflicts: 3 });
+  });
+});
+
+describe("withTursodb", () => {
+  const on = { tursodb: { url: "https://x" } };
+  const W = (...b: WorkerBackend[]) => b;
+  test("adds tursodb after turso when the fixture has a Turso-engine database", () => {
+    expect(withTursodb(on, W("d1", "turso", "pg"))).toEqual(["d1", "turso", "tursodb", "pg"]);
+    expect(withTursodb(on, [{ b: "turso", d: "sqlite" }, { b: "pg", d: "pg" }] as { b: WorkerBackend; d: string }[])).toEqual([
+      { b: "turso", d: "sqlite" },
+      { b: "tursodb", d: "sqlite" },
+      { b: "pg", d: "pg" },
+    ]);
+  });
+  test("unchanged without one (refused create, old fixture) or without a turso entry", () => {
+    expect(withTursodb({}, W("d1", "turso", "pg"))).toEqual(["d1", "turso", "pg"]);
+    expect(withTursodb({ tursodb: { error: "HTTP 400" } }, W("d1", "turso"))).toEqual(["d1", "turso"]);
+    expect(withTursodb(on, W("d1", "pg"))).toEqual(["d1", "pg"]);
+  });
+  test("tursodb is a SQLite dialect", () => {
+    expect(dialectOf("tursodb")).toBe("sqlite");
   });
 });

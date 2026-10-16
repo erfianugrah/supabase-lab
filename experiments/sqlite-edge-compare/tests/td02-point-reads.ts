@@ -13,6 +13,8 @@
  *   TD02s  seed check: count, sum(n), max(id) equal across the three stores
  *   TD02a  Worker -> D1 binding
  *   TD02b  Worker -> Turso libSQL over HTTP (@libsql/client/web)
+ *   TD02o  Worker -> Turso-engine database, same client (when the fixture has one;
+ *          printed as TD02undefined in the 2026-10-16 run, before the id existed)
  *   TD02c  Worker -> Hyperdrive (caching disabled) -> Postgres direct
  *   TD02d  Worker -> Hyperdrive (caching enabled, default max_age) -> Postgres;
  *          the same uniform ids as the others, so mostly cache misses
@@ -64,6 +66,7 @@
 import type { Ctx, TestModule, TestResult } from "../../../harness/src/types";
 import { type Fixture, fixtureOrSkip, type RunResult, runOnWorker } from "../lib/client";
 import { roundRobin, summarize, summaryColumns } from "../lib/stats";
+import { withTursodb } from "../lib/td04-07-plan";
 import { coloCounts, queryRow, runTarget, setupSql, targetUnavailable, transportLost, vantageFacts, waitPostgrest } from "../lib/td02-03-io";
 import {
   blocks,
@@ -105,6 +108,7 @@ const LETTER: Partial<Record<TargetKey, string>> = {
   local_pg_pooler: "g",
   local_pg_direct: "h",
   local_d1_rest: "i",
+  tursodb: "o",
 };
 const ALL: TargetKey[] = ["d1", "turso", "pg", "pg_cached", "postgrest", "local_turso_http", "local_pg_pooler", "local_pg_direct", "local_d1_rest"];
 const STORES: Store[] = ["d1", "turso", "supabase"];
@@ -247,7 +251,9 @@ const mod: TestModule = {
     const ladder = envList(env, "TD02_CEIL", ["1001", "10001"], ["1001"]).map(Number).filter((x) => Number.isInteger(x) && x > 0);
     const ceilKeys = envList(env, "TD02_CEIL_BACKENDS", ["d1", "turso"], ["d1"]);
     const conc = Math.min(64, Math.max(1, envInt(env, "TD02_CEIL_CONC", 16, 16)));
-    const targets = pickTargets(envList(env, "TD02_TARGETS", ALL, ALL), ALL);
+    const all = withTursodb(fx, ALL);
+    const stores = withTursodb(fx, STORES);
+    const targets = pickTargets(envList(env, "TD02_TARGETS", all, all), all);
     const ceilTargets = pickTargets(ceilKeys, ["d1", "turso"]);
 
     const out: TestResult[] = [];
@@ -263,7 +269,7 @@ const mod: TestModule = {
       // Seed: same rows, same literal INSERT text, in all three stores.
       const t0 = performance.now();
       const inserts = kvInserts(rows);
-      for (const store of STORES) {
+      for (const store of stores) {
         touched.push(store);
         await setupSql(fx, store, kvDdl(store === "supabase" ? "pg" : "sqlite"));
         for (const chunk of blocks(inserts, 4)) await setupSql(fx, store, chunk);
@@ -271,7 +277,7 @@ const mod: TestModule = {
       const want = kvExpected(rows);
       const got: Record<string, string> = {};
       let same = true;
-      for (const store of STORES) {
+      for (const store of stores) {
         const r = await queryRow(fx, store, KV_CHECK_SQL);
         got[store] = `${Number(r?.c)}/${Number(r?.s)}/${Number(r?.m)}`;
         if (Number(r?.c) !== want.c || Number(r?.s) !== want.s || Number(r?.m) !== want.m) same = false;
@@ -281,8 +287,8 @@ const mod: TestModule = {
         id: `${ID}s`,
         title: "seed check: identical rows in D1, Turso and Postgres",
         status: same ? "pass" : "fail",
-        detail: `expected count/sum(n)/max(id) ${want.c}/${want.s}/${want.m}; d1 ${got.d1}, turso ${got.turso}, supabase ${got.supabase}`,
-        measurements: { rows: nRows, seed: SEED, seed_ms: Math.round(performance.now() - t0), postgrest_visible_ms: pgrstWaitMs, d1: got.d1!, turso: got.turso!, supabase: got.supabase! },
+        detail: `expected count/sum(n)/max(id) ${want.c}/${want.s}/${want.m}; ${stores.map((s) => `${s} ${got[s]}`).join(", ")}`,
+        measurements: { rows: nRows, seed: SEED, seed_ms: Math.round(performance.now() - t0), postgrest_visible_ms: pgrstWaitMs, ...Object.fromEntries(stores.map((s) => [s, got[s]!])) },
       });
       if (!same) return out;
 
