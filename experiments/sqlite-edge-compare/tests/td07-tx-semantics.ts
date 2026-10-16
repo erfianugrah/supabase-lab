@@ -59,13 +59,15 @@
  */
 import type { Ctx, TestModule, TestResult } from "../../../harness/src/types";
 import { type Fixture, fixtureOrSkip, type RunResult, runOnWorker } from "../lib/client";
-import type { Mode, Param, Stmt, WorkerBackend } from "../lib/contract";
+import { DO_LOCATION_HINT, type Mode, type Param, type Stmt, type WorkerBackend } from "../lib/contract";
 import { roundRobin } from "../lib/stats";
 import { dialectOf, firstMeta, scalar, scrub, TD07_SQL, td07Sizes, topErrors, withTursodb } from "../lib/td04-07-plan";
 import { sleep } from "../lib/vendors";
 
 const ID = "TD07";
-const BASE_BACKENDS: WorkerBackend[] = ["d1", "turso", "pg"];
+const BASE_BACKENDS: WorkerBackend[] = ["d1", "turso", "do", "pg"];
+/** Backends with no interactive transaction from a Worker: D1 (binding refuses BEGIN) and a Durable Object (sql.exec refuses BEGIN; transactions run inside the object). Their transaction is a batch. */
+const NO_ITX = new Set<WorkerBackend>(["d1", "do"]);
 /** B fires this long after A, so its first write lands while A is between its two reads. */
 const B_DELAY_MS = 300;
 const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -87,6 +89,7 @@ function sqlFor(b: WorkerBackend) {
 function dataRegion(fx: Fixture, b: WorkerBackend, r?: RunResult): string {
   if (b === "d1") return (r && firstMeta(r.ops, "served_by_region")) || "?";
   if (b === "turso" || b === "tursodb") return fx.turso?.location ?? "?";
+  if (b === "do") return `hint ${DO_LOCATION_HINT}`;
   return fx.supabase?.region ?? "?";
 }
 
@@ -129,7 +132,7 @@ async function rowA(fx: Fixture, b: WorkerBackend, mode: "tx" | "batch", lit: st
   const inside = vAt(r, 1);
   const after = await readNum(fx, b, q.get("a"));
   const err = scrub(op?.error ?? r.error ?? "", lit);
-  const expectErr = b === "d1" && mode === "tx";
+  const expectErr = NO_ITX.has(b) && mode === "tx";
   const okShape = expectErr ? !op?.ok && after === null : !!op?.ok && inside === 1 && after === 1;
   return {
     id: `${ID}a-${b}${mode === "batch" ? "-batch" : ""}`,
@@ -163,14 +166,22 @@ async function rowCSame(fx: Fixture, b: WorkerBackend, n: number): Promise<TestR
   await run(fx, b, [q.ins("c", 0)]);
   const r = await run(fx, b, [q.incr("c"), q.get("c")], "each", { repeat: n });
   const reads = r.ops.filter((o) => o.stmt === 1);
+  // Expected value at iteration i = increments that succeeded up to and including i (a failed one must not shift the rest).
+  const okIncr = new Set(r.ops.filter((o) => o.stmt === 0 && o.ok).map((o) => o.i));
   let visible = 0;
-  for (const o of reads) if (o.ok && Number((o.out?.[0]?.rows?.[0] as { v?: unknown } | undefined)?.v) === o.i + 1) visible++;
+  for (const o of reads) {
+    let expected = 0;
+    for (const i of okIncr) if (i <= o.i) expected++;
+    if (o.ok && Number((o.out?.[0]?.rows?.[0] as { v?: unknown } | undefined)?.v) === expected) visible++;
+  }
+  // A read that failed, or one missing from a failed chunk, is unreadable, not stale.
+  const unreadable = reads.filter((o) => !o.ok).length + Math.max(0, n - reads.length);
   return {
     id: `${ID}c-${b}-same`,
     title: `read-your-write after commit, same invocation and connection, ${b}`,
     status: visible === n ? "pass" : "fail",
     detail: `${visible}/${n} reads saw their own preceding increment${r.errors.length ? `; errors: ${topErrors(r.errors)}` : ""}`,
-    measurements: { ...base(fx, b, r), n, visible, stale: n - visible, errors: r.errors.length },
+    measurements: { ...base(fx, b, r), n, visible, stale: n - visible - unreadable, unreadable, errors: r.errors.length },
   };
 }
 
@@ -190,27 +201,38 @@ async function rowCNext(fx: Fixture, v: NextVariant, n: number): Promise<TestRes
   await run(fx, v.writer, [qw.ins("c", 0)]);
   let visible = 0;
   let unreadable = 0;
+  // Reads are compared with the value the writer path holds. A write whose response failed may or may not have
+  // committed (a lost response looks the same as a refused write), so after one the expected value is re-read on
+  // the writer path; counting by loop index made every later read look one behind (2026-10-16 r3 attempt).
+  let expected = 0;
+  let writeFailed = 0;
   const seen: (number | null)[] = [];
   let last: RunResult | undefined;
   let primary = "";
   const colos = new Set<string>();
   for (let k = 1; k <= n; k++) {
-    await run(fx, v.writer, [qw.incr("c")]);
+    const w = await run(fx, v.writer, [qw.incr("c")]);
+    if (w.ok && w.ops[0]?.ok) expected++;
+    else {
+      writeFailed++;
+      expected = (await readNum(fx, v.writer, qw.get("c"))) ?? expected;
+    }
     last = await run(fx, v.reader, [sqlFor(v.reader).get("c")], "each", v.readerExtra ?? {});
     const x = scalar(last);
     const val = x === null || x === undefined ? null : Number(x);
     seen.push(val);
     for (const c of last.colos) colos.add(c);
     if (val === null) unreadable++;
-    else if (val === k) visible++;
+    else if (val === expected) visible++;
     if (v.reader === "d1") primary ||= firstMeta(last.ops, "served_by_primary");
   }
   const stale = n - visible - unreadable;
+  const failedNote = writeFailed ? `; ${writeFailed} write(s) reported failure, expected value re-read on the writer path after each` : "";
   return {
     id: `${ID}c-${v.id}-next`,
     title: `read-your-write in the next request (another invocation), ${v.label}`,
-    status: v.expect === "visible" ? (visible === n ? "pass" : "fail") : "info",
-    detail: `${visible}/${n} reads saw the preceding write, ${stale} stale, ${unreadable} unreadable; values ${seen.slice(0, 12).join(",")}${seen.length > 12 ? ",..." : ""}`,
+    status: v.expect === "visible" ? (visible === n ? (writeFailed ? "info" : "pass") : "fail") : "info",
+    detail: `${visible}/${n} reads saw the preceding successful write, ${stale} stale, ${unreadable} unreadable${failedNote}; values ${seen.slice(0, 12).join(",")}${seen.length > 12 ? ",..." : ""}`,
     measurements: {
       ...base(fx, v.reader, last!),
       colo: [...colos].join("+") || "?",
@@ -222,6 +244,7 @@ async function rowCNext(fx: Fixture, v: NextVariant, n: number): Promise<TestRes
       visible,
       stale,
       unreadable,
+      writes_failed: writeFailed,
     },
   };
 }
@@ -232,7 +255,7 @@ async function rowD(fx: Fixture, b: WorkerBackend, fillers: number, writerOps: n
   await run(fx, b, [q.ins("d", 0)]);
   const head: Stmt[] = rr ? [{ sql: "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ" }] : [];
   const aStmts: Stmt[] = [...head, q.get("d"), ...Array.from({ length: fillers }, () => q.get("none")), q.get("d"), q.incr("d")];
-  const aMode: Mode = b === "d1" ? "batch" : "tx";
+  const aMode: Mode = NO_ITX.has(b) ? "batch" : "tx";
   const aP = run(fx, b, aStmts, aMode);
   await sleep(B_DELAY_MS);
   const bRes = await run(fx, b, [q.incr("d")], "each", { repeat: writerOps });
@@ -246,7 +269,11 @@ async function rowD(fx: Fixture, b: WorkerBackend, fillers: number, writerOps: n
   const expected = (aOp?.ok ? 1 : 0) + bOk;
   const aErr = scrub(aOp?.error ?? aRes.error ?? "", lit);
   const bErr = scrub(topErrors(bRes.errors, 2), lit);
-  const reading = !aOp?.ok ? "A failed" : r1 === r2 ? "A's two reads equal" : "A's second read saw B's commit (non-repeatable read)";
+  // B is sent B_DELAY_MS after A; overlap is only possible when A's op took longer than that (Worker-side op time,
+  // an approximation: the two requests' network legs differ). A batch on D1 or a Durable Object often finishes first.
+  const overlapPossible = !!aOp?.ok && aOp.ms > B_DELAY_MS;
+  const overlapNote = overlapPossible ? "" : `; no overlap measured (A took ${aOp?.ms ?? "?"} ms, B sent at ${B_DELAY_MS} ms)${b === "do" ? "; a transactionSync batch cannot interleave with other requests to the object" : ""}`;
+  const reading = (!aOp?.ok ? "A failed" : r1 === r2 ? "A's two reads equal" : "A's second read saw B's commit (non-repeatable read)") + overlapNote;
   return {
     id: `${ID}d-${b}${rr ? "-rr" : ""}`,
     title: `concurrent writer during a ${aMode}${rr ? " (REPEATABLE READ)" : ""}, ${b}`,
@@ -257,10 +284,11 @@ async function rowD(fx: Fixture, b: WorkerBackend, fillers: number, writerOps: n
     measurements: {
       ...base(fx, b, aRes),
       a_mode: aMode,
-      isolation: b === "pg" ? (rr ? "repeatable read" : "read committed (default)") : b === "turso" || b === "tursodb" ? "BEGIN IMMEDIATE (client.transaction write)" : "batch",
+      isolation: b === "pg" ? (rr ? "repeatable read" : "read committed (default)") : b === "turso" || b === "tursodb" ? "BEGIN IMMEDIATE (client.transaction write)" : b === "do" ? "batch (transactionSync in the object)" : "batch",
       fillers,
       a_ok: aOp?.ok ? 1 : 0,
       a_ms: aOp?.ms ?? -1,
+      overlap_possible: overlapPossible ? 1 : 0,
       a_read1: r1 ?? "none",
       a_read2: r2 ?? "none",
       b_n: bRes.ops.length,
@@ -316,10 +344,10 @@ const mod: TestModule = {
       const order = (k: number) => roundRobin(ready, k + 1).filter((s) => s.iter === k).map((s) => s.item);
 
       for (const b of order(0)) await guard(`${ID}a-${b}`, () => rowA(fx, b, "tx", lit));
-      if (ready.includes("d1")) await guard(`${ID}a-d1-batch`, () => rowA(fx, "d1", "batch", lit));
+      for (const b of ready.filter((x) => NO_ITX.has(x))) await guard(`${ID}a-${b}-batch`, () => rowA(fx, b, "batch", lit));
 
       for (const b of order(1)) {
-        for (const m of (b === "d1" ? ["each", "batch"] : ["each", "batch", "tx"]) as Mode[]) await guard(`${ID}b-${b}-${m}`, () => rowB(fx, b, m, lit));
+        for (const m of (NO_ITX.has(b) ? ["each", "batch"] : ["each", "batch", "tx"]) as Mode[]) await guard(`${ID}b-${b}-${m}`, () => rowB(fx, b, m, lit));
       }
 
       for (const b of order(2)) await guard(`${ID}c-${b}-same`, () => rowCSame(fx, b, sz.ryw));

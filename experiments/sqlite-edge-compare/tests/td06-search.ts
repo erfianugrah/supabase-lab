@@ -106,6 +106,7 @@ const ID = "TD06";
 const BASE_FTS: { b: WorkerBackend; d: Dialect }[] = [
   { b: "d1", d: "sqlite" },
   { b: "turso", d: "sqlite" },
+  { b: "do", d: "sqlite" },
   { b: "pg", d: "pg" },
 ];
 const BASE_VEC: { b: WorkerBackend; d: Dialect }[] = [
@@ -164,6 +165,8 @@ const mod: TestModule = {
           ["DROP TABLE IF EXISTS td06_fts", ...["td06_vec", "td06_vecd", "td06_vecb"].flatMap((t) => [`DROP INDEX IF EXISTS ${t}_idx`, `DROP TABLE IF EXISTS ${t}`])],
         ],
         ["pg", ["DROP TABLE IF EXISTS td06_docs", "DROP TABLE IF EXISTS td06_vec"]],
+        ["do", ["DROP TABLE IF EXISTS td06_fts"]],
+        ...(VEC.some((x) => x.b === "tursodb") ? ([["tursodb", ["DROP TABLE IF EXISTS td06_vec"]]] as [WorkerBackend, string[]][]) : []),
       ];
       for (const [b, stmts] of plan) {
         const r = await run(fx, { backend: b, statements: stmts.map((sql) => ({ sql })) });
@@ -607,6 +610,16 @@ const mod: TestModule = {
         detail: d1op ? (d1op.ok ? "vector32() answered: D1 has a libSQL vector function after all" : `error: ${d1op.error}`) : `no op: ${firstErr(d1v)}`,
         measurements: { backend: "d1", ...vantage, colo: d1v.colos.join("/"), n: 1, vector32_ok: d1op?.ok ? 1 : 0, served_by_region: metaDistinct(d1v.ops, "served_by_region") },
       });
+      // Durable Object SQLite: same question (the docs name FTS5, JSON and math functions, no vector type).
+      const dov = await run(fx, { backend: "do", statements: [{ sql: "SELECT vector32('[1,2,3]') AS v" }], returnMeta: true });
+      const doop = dov.ops[0];
+      out.push({
+        id: `${ID}f-do-vector`,
+        title: "Durable Object SQLite: vector32() (no vector type in the Durable Objects SQL docs)",
+        status: "info",
+        detail: doop ? (doop.ok ? "vector32() answered" : `error: ${doop.error}`) : `no op: ${firstErr(dov)}`,
+        measurements: { backend: "do", ...vantage, colo: dov.colos.join("/"), n: 1, vector32_ok: doop?.ok ? 1 : 0 },
+      });
     } catch (e) {
       out.push({ id: ID, title: this.title, status: "fail", detail: `threw: ${errMsg(e)}` });
     } finally {
@@ -615,7 +628,7 @@ const mod: TestModule = {
         id: `${ID}z`,
         title: "cleanup",
         status: bad ? "fail" : "pass",
-        detail: `${bad ? `drop failed: ${bad}` : "dropped td06_fts (D1, Turso), td06_docs (pg), td06_vec (Turso, pg); vector extension left on the fixture project"}${left ? `; Turso vector-index leftovers found and removed: ${left}` : ""}`,
+        detail: `${bad ? `drop failed: ${bad}` : `dropped td06_fts (D1, Turso, Durable Object), td06_docs (pg), td06_vec (Turso, pg${VEC.some((x) => x.b === "tursodb") ? ", Turso engine" : ""}); vector extension left on the fixture project`}${left ? `; Turso vector-index leftovers found and removed: ${left}` : ""}`,
       });
     }
     return out;

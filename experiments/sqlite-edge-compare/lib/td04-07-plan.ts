@@ -10,7 +10,7 @@ export type Dialect = "sqlite" | "pg";
 
 /** D1 and libSQL speak SQLite with `?` placeholders; Postgres paths use `$1`. */
 export function dialectOf(b: Backend): Dialect {
-  return b === "d1" || b === "turso" || b === "tursodb" || b === "turso_http" || b === "d1_rest" ? "sqlite" : "pg";
+  return b === "d1" || b === "do" || b === "turso" || b === "tursodb" || b === "turso_http" || b === "d1_rest" ? "sqlite" : "pg";
 }
 
 /**

@@ -11,6 +11,8 @@
  *   DB          D1 database (location hint oc, read replication at default)
  *   HD          Hyperdrive, caching disabled, on the Supabase direct string
  *   HD_CACHED   Hyperdrive, caching enabled (default max_age), same origin
+ *   PDO         Durable Object namespace of ProbeDO (SQLite storage), objects
+ *               reached by name with locationHint oc
  *   SUPABASE_URL, TURSO_URL, TURSODB_URL, DRIVER_PG, DRIVER_LIBSQL,
  *   COMPAT_DATE                                                     vars
  *   PROBE_KEY, TURSO_TOKEN, TURSODB_TOKEN, SUPABASE_SECRET_KEY      secrets
@@ -25,8 +27,9 @@
  * (runOnWorker's `invocations` option).
  */
 import { createClient } from "@libsql/client/web";
-import { d1Lane, type D1Like, libsqlLane, pgLane, postgrestLane } from "../lib/adapters";
-import { type MetaBackend, type MetaResponse, type StmtOut, WORKER_BACKENDS, type WorkerBackend } from "../lib/contract";
+import { DurableObject } from "cloudflare:workers";
+import { d1Lane, type D1Like, type DoStubLike, doLane, libsqlLane, pgLane, postgrestLane } from "../lib/adapters";
+import { DO_LOCATION_HINT, type MetaBackend, type MetaResponse, type Stmt, type StmtOut, WORKER_BACKENDS, type WorkerBackend } from "../lib/contract";
 import { errText, executeRun, type OpenLane, validateRunRequest } from "../lib/exec";
 
 interface D1Database extends D1Like {
@@ -35,10 +38,19 @@ interface D1Database extends D1Like {
 interface Hyperdrive {
   connectionString: string;
 }
+interface DoStub extends DoStubLike {
+  colo(): Promise<string>;
+  wipe(): Promise<void>;
+}
+interface DoNamespace {
+  idFromName(name: string): unknown;
+  get(id: unknown, opts?: { locationHint?: string }): DoStub;
+}
 interface Env {
   DB: D1Database;
   HD: Hyperdrive;
   HD_CACHED: Hyperdrive;
+  PDO: DoNamespace;
   SUPABASE_URL: string;
   TURSO_URL: string;
   TURSODB_URL: string;
@@ -62,7 +74,39 @@ async function keyOk(got: string | null, want: string): Promise<boolean> {
   return d === 0;
 }
 
-function opener(env: Env, backend: WorkerBackend, d1Session?: string): { open: OpenLane; driver: { name: string; version: string } } {
+/**
+ * The probe Durable Object: runs SQL on its own SQLite storage. Rows come back
+ * as plain objects; rowsRead / rowsWritten from the cursor go in meta. Errors
+ * (including the SQL API's refusal of BEGIN) propagate to the caller verbatim.
+ */
+export class ProbeDO extends DurableObject<Env> {
+  run(stmts: Stmt[], mode: "each" | "batch"): StmtOut[] {
+    const sql = this.ctx.storage.sql;
+    const one = (s: Stmt): StmtOut => {
+      // total_changes() before and after: rows this statement changed (changes() alone repeats the last write's
+      // count after a SELECT). Read in-process, no extra round trip; rowsWritten also counts index writes.
+      const tc = () => Number(sql.exec("select total_changes() as n").toArray()[0]?.n ?? 0);
+      const before = tc();
+      const c = sql.exec(s.sql ?? "", ...((s.params ?? []) as unknown[]));
+      const rows = c.toArray();
+      const changes = tc() - before;
+      return { rowCount: rows.length, rows, meta: { rowsRead: c.rowsRead, rowsWritten: c.rowsWritten, changes } };
+    };
+    return mode === "batch" ? this.ctx.storage.transactionSync(() => stmts.map(one)) : stmts.map(one);
+  }
+  /** Where the object runs: the colo field of a /cdn-cgi/trace fetched from inside it (not a documented DO API). */
+  async colo(): Promise<string> {
+    const t = await (await fetch("https://www.cloudflare.com/cdn-cgi/trace")).text();
+    return /^colo=(.+)$/m.exec(t)?.[1] ?? "unknown";
+  }
+  async wipe(): Promise<void> {
+    await this.ctx.storage.deleteAll();
+  }
+}
+
+const doStub = (env: Env, name = "main") => env.PDO.get(env.PDO.idFromName(name), { locationHint: DO_LOCATION_HINT });
+
+function opener(env: Env, backend: WorkerBackend, d1Session?: string, doName?: string): { open: OpenLane; driver: { name: string; version: string } } {
   switch (backend) {
     case "d1": {
       const db: D1Like = d1Session ? env.DB.withSession(d1Session) : env.DB;
@@ -81,6 +125,8 @@ function opener(env: Env, backend: WorkerBackend, d1Session?: string): { open: O
         },
         driver: { name: "@libsql/client/web (tursodb)", version: env.DRIVER_LIBSQL },
       };
+    case "do":
+      return { open: async () => doLane(doStub(env, doName)), driver: { name: "durable-object-rpc(sqlite)", version: env.COMPAT_DATE } };
     case "pg":
       return { open: () => pgLane(env.HD.connectionString), driver: { name: "pg+hyperdrive(nocache)", version: env.DRIVER_PG } };
     case "pg_cached":
@@ -103,6 +149,8 @@ async function meta(env: Env, colo: string): Promise<MetaResponse> {
         if (b === "postgrest") out = await lane.each({ http: { method: "GET", path: "" } });
         // D1 refuses sqlite_version(): "not authorized to use function" (2026-10-15).
         else if (b === "d1") out = await lane.each({ sql: "select 1 as one" });
+        // The Durable Object SQL API refuses sqlite_version() ("not authorized to use function", 2026-10-16), as D1 does.
+        else if (b === "do") out = { ...(await lane.each({ sql: "select 1 as one" })), meta: { do_colo: await doStub(env).colo() } };
         else if (b === "turso" || b === "tursodb") out = await lane.each({ sql: "select 1 as one, sqlite_version() as sqlite_version" });
         else out = await lane.each({ sql: "select 1 as one, current_setting('server_version') as server_version, family(inet_server_addr()) as addr_family" });
         const row = (out.rows?.[0] ?? {}) as Record<string, unknown>;
@@ -110,6 +158,7 @@ async function meta(env: Env, colo: string): Promise<MetaResponse> {
         if (b === "d1") {
           for (const k of ["served_by_region", "served_by_primary", "served_by_colo", "duration"]) if (out.meta?.[k] !== undefined) detail[k] = out.meta[k];
         }
+        if (b === "do") detail.do_colo = out.meta?.do_colo;
         return { ok: true, ms: performance.now() - t0, detail };
       } finally {
         await lane.close().catch(() => undefined);
@@ -151,8 +200,10 @@ export default {
       if (!v.ok) return Response.json({ ok: false, error: v.error }, { status: 400 });
       const req = v.req;
       try {
-        const { open, driver } = opener(env, req.backend as WorkerBackend, req.d1Session);
-        return Response.json(await executeRun(req, open, { colo, driver, iOffset: Number(req.iOffset) || 0 }));
+        const { open, driver } = opener(env, req.backend as WorkerBackend, req.d1Session, req.doName);
+        const res = await executeRun(req, open, { colo, driver, iOffset: Number(req.iOffset) || 0 });
+        if (req.backend === "do" && req.doWipe) await doStub(env, req.doName).wipe();
+        return Response.json(res);
       } catch (e) {
         return Response.json({ ok: false, error: `executor threw: ${errText(e)}` }, { status: 500 });
       }

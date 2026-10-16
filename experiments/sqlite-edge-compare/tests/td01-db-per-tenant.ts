@@ -32,6 +32,9 @@
  *   TD01b  d1 single        n=1: same, plus created_in_region and served_by_region from the query meta
  *   TD01c  pg_schema single n=1: same, plus connect_ms
  *   TD01d  turso burst      n=TD01_BURST in parallel: created/ready/refused counts, p50/p95/max, verbatim refusal text, parallel delete p50/p95/max
+ *   TD01k/l  Durable Object single / burst: one Worker request runs create, insert, select
+ *            on a named object (created on first access); delete = deleteAll(); leftovers
+ *            checked by name (the table is gone)
  *   TD01i/j  tursodb single / burst: the TD01a/d path with use_tursodb: true (only when the fixture has a Turso-engine database;
  *            the 2026-10-16 run wrote them as TD01g/TD01h, TD01g colliding with the Supabase project row)
  *   TD01e  d1 burst         same
@@ -64,8 +67,8 @@
 import { createClient } from "@libsql/client/web";
 import pg from "pg";
 import type { Ctx, TestModule, TestResult } from "../../../harness/src/types";
-import { type Fixture, fixtureOrSkip, pgConfig } from "../lib/client";
-import { D1_LOCATION_HINT } from "../lib/contract";
+import { type Fixture, fixtureOrSkip, pgConfig, type RunResult, runOnWorker } from "../lib/client";
+import { D1_LOCATION_HINT, DO_LOCATION_HINT } from "../lib/contract";
 import { literalsOf } from "../lib/fixture";
 import { roundRobin } from "../lib/stats";
 import {
@@ -85,7 +88,7 @@ import { assertSec, type CfCreds, cf, cfCreds, cfErr, createD1, createTursoDb, d
 const ID = "TD01";
 const FIRST_QUERY_DEADLINE_MS = 180_000;
 
-type Key = "turso" | "tursodb" | "d1" | "pg_schema";
+type Key = "turso" | "tursodb" | "d1" | "do" | "pg_schema";
 
 interface Outcome extends TenantOutcome {
   connectMs?: number;
@@ -165,6 +168,63 @@ function tursoTenants(tc: TursoCreds, group: string, location: string, red: (s: 
     },
     async sweep(name) {
       await deleteTursoDb(tc, name);
+    },
+    async close() {},
+  };
+}
+
+/**
+ * A Durable Object per tenant: no create call exists; the object comes into
+ * being on first access (idFromName + sql.exec through the probe Worker) and
+ * is removed by deleting its storage. create-to-first-query is one Worker
+ * request from this machine running the three statements as three RPCs, so
+ * it carries the local -> Worker leg the other paths' API calls also carry.
+ */
+function doTenants(fx: Fixture, red: (s: string) => string, known: () => string[]): Tenants {
+  const q = firstQuerySql("sqlite");
+  const call = (name: string, sqls: string[], extra: { doWipe?: boolean; returnRows?: boolean } = {}) =>
+    runOnWorker(fx, { backend: "do", doName: name, statements: sqls.map((sql) => ({ sql })), label: "td01-do", ...extra }).catch(
+      (e) => ({ ok: false, error: msg(e), ops: [], colos: [] }) as unknown as RunResult,
+    );
+  return {
+    key: "do",
+    path: "Worker -> Durable Object RPC (idFromName, sql.exec); created on first access, removed by deleteAll()",
+    location: `hint ${DO_LOCATION_HINT}`,
+    async onboard(name) {
+      const t0 = now();
+      const r = await call(name, [q.create, q.insert, q.select], { returnRows: true });
+      const ms = r2(now() - t0);
+      const last = r.ops?.[2];
+      const v = (last?.out?.[0]?.rows?.[0] as { v?: unknown } | undefined)?.v;
+      const ok = !!r.ok && (r.ops ?? []).every((o) => o.ok) && v === "tenant";
+      const err = r.error ?? r.ops?.find((o) => !o.ok)?.error;
+      return {
+        name,
+        created: ok,
+        ready: ok,
+        attempts: 1,
+        facts: { worker_colo: (r.colos ?? []).join("/") },
+        ...(ok ? { firstQueryMs: ms, createToFirstQueryMs: ms } : { error: red(err ?? `read-back mismatch: ${JSON.stringify(v ?? null)}`) }),
+      };
+    },
+    async remove(name) {
+      const t0 = now();
+      const r = await call(name, ["select 1"], { doWipe: true });
+      const ms = r2(now() - t0);
+      if (!r.ok) throw new Error(`wipe: ${red(r.error ?? "unknown")}`);
+      return ms;
+    },
+    async leftovers() {
+      const left: string[] = [];
+      for (const n of known()) {
+        const r = await call(n, ["SELECT count(*) AS n FROM sqlite_master WHERE name = 't'"], { returnRows: true });
+        const c = Number((r.ops?.[0]?.out?.[0]?.rows?.[0] as { n?: unknown } | undefined)?.n ?? Number.NaN);
+        if (!(c === 0)) left.push(n);
+      }
+      return left;
+    },
+    async sweep(name) {
+      await call(name, ["select 1"], { doWipe: true });
     },
     async close() {},
   };
@@ -364,13 +424,14 @@ const mod: TestModule = {
       tursoTenants(tc, fx.turso.group, fx.turso.location, red),
       ...(fx.tursodb?.url ? [tursoTenants(tc, fx.turso.group, fx.turso.location, red, "tursodb")] : []),
       d1Tenants(c, red),
+      doTenants(fx, red, () => [names.single, ...names.burst]),
       pgTenants(fx, red),
     ];
     const byKey = new Map(backends.map((b) => [b.key, b]));
     const order = roundRobin(backends.map((b) => b.key), 2);
     const singles = order.filter((s) => s.iter === 0).map((s) => s.item);
     const bursts = order.filter((s) => s.iter === 1).map((s) => s.item);
-    const rowId: Record<Key, [string, string]> = { turso: ["TD01a", "TD01d"], d1: ["TD01b", "TD01e"], pg_schema: ["TD01c", "TD01f"], tursodb: ["TD01i", "TD01j"] };
+    const rowId: Record<Key, [string, string]> = { turso: ["TD01a", "TD01d"], d1: ["TD01b", "TD01e"], pg_schema: ["TD01c", "TD01f"], tursodb: ["TD01i", "TD01j"], do: ["TD01k", "TD01l"] };
     const base = (b: Tenants) => ({ backend: b.key, vantage: "local", colo: "local", path: b.path, location: b.location });
     const results: TestResult[] = [];
     ctx.log(`TD01: burst=${burst}, singles ${singles.join(",")}, bursts ${bursts.join(",")}`);
@@ -397,7 +458,7 @@ const mod: TestModule = {
             title,
             status: o.ready && deleteMs !== undefined ? "pass" : o.created ? "fail" : "info",
             detail: o.ready
-              ? `created in ${o.createMs} ms, first read-back at ${o.createToFirstQueryMs} ms after ${o.attempts} attempt(s); deleted in ${deleteMs ?? "-"} ms${deleteErr ? ` (delete failed: ${deleteErr})` : ""}`
+              ? `${o.createMs === undefined ? "no create call (created on first access)" : `created in ${o.createMs} ms`}, first read-back at ${o.createToFirstQueryMs} ms after ${o.attempts} attempt(s); deleted in ${deleteMs ?? "-"} ms${deleteErr ? ` (delete failed: ${deleteErr})` : ""}`
               : `not ready: ${o.error ?? "unknown"}`,
             measurements: cells({
               ...base(b),
@@ -450,7 +511,7 @@ const mod: TestModule = {
             id,
             title,
             status: allReady && delErrs.length === 0 ? "pass" : cols.n_refused ? "info" : "fail",
-            detail: `${cols.n_created}/${burst} created, ${cols.n_ready} ready; create p50 ${cols.create_ms_p50} ms, create-to-first-query p50 ${cols.create_to_first_query_ms_p50} ms (max ${cols.create_to_first_query_ms_max}); burst wall ${wallMs} ms; ${delMs.length} deleted${delErrs.length ? `, ${delErrs.length} delete failures` : ""}${cols.errors ? `; errors: ${cols.errors}` : ""}`,
+            detail: `${cols.n_created}/${burst} created, ${cols.n_ready} ready; ${cols.create_ms_p50 === undefined || cols.create_ms_p50 === "" ? "no create call" : `create p50 ${cols.create_ms_p50} ms`}, create-to-first-query p50 ${cols.create_to_first_query_ms_p50} ms (max ${cols.create_to_first_query_ms_max}); burst wall ${wallMs} ms; ${delMs.length} deleted${delErrs.length ? `, ${delErrs.length} delete failures` : ""}${cols.errors ? `; errors: ${cols.errors}` : ""}`,
             measurements: cells({
               ...base(b),
               n: burst,
