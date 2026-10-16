@@ -3498,7 +3498,9 @@ Setup:
   no such Dockerfile (404 at that ref); the Makefile builds a pinned `main`
   commit. This is NOT the Kubernetes operator path the blog describes.
 - 3 cells, `synchronous_standby_names = ANY 1 (3 poolers)`,
-  `synchronous_commit=on`, multiorch timers 500 ms, and
+  `synchronous_commit=on`, multiorch `recovery-cycle-interval` 500 ms
+  (`pooler-health-check-interval` 500 ms is also set but read by nothing,
+  2026-10-16 code read), and
   `allow-unsafe-initial-cohort: true` set by the entrypoint. A single cell
   never becomes ready; the shard needs 2 poolers to elect a leader.
 - Run from source (`bun harness/src/run.ts`), not the linux-x64 `pvlab`.
@@ -3514,10 +3516,30 @@ Measured (macOS Docker Desktop, 8 closed-loop writers; out/2026-10-10/run-2026-1
   14.7-15.1 s (MG03); hung primary (SIGSTOP) 20.0 and 25.1 s in run5 (the 25.1
   includes a client 5 s connect timeout) and 20.0 to 56.2 s over six runs in
   three artifacts: the pooler-level promote lands at about +20 s, multiorch
-  logs the promotion success at about +40 s (the recruit RPC to the frozen cell
-  times out first), and in the 56 s run the first promotion attempt failed and
-  a second succeeded at +57.8 s (MG04). Detection after a postgres kill varies
-  from about 1 s to about 6.7 s and the cause is unexplained.
+  logs the promotion success at about +40 s (the winning round's promote phase
+  waits about 20 s on the frozen cell's Promote; the about 20,250 ms recruits
+  are the losing rounds'), and in the 56 s run all three first rounds failed
+  and a second succeeded at +57.8 s (MG04). Detection after a postgres kill
+  varies from about 1 s to about 6.7 s; the measurement does not explain it.
+
+Proposed by the 2026-10-16 code read (RUNLOG section of that date; reasoned
+from upstream code at the tested commit, not measured):
+
+- Postgres crash 1.1-6.7 s (MG02, MG09): the pooler's 5 s health snapshot and 5 s postgres
+  monitor tick, plus the appointment's live re-check skipping while the old
+  primary restarts in place (open upstream PR #1545 targets the skip).
+- Lost cell about 15 s: the leader's 15 s liveness freshness.
+- Hung primary about 20 s to promote: the 20 s quorum-commit staleness; the
+  further 20 s to the success log is grpc-go's default 20 s connect timeout
+  against the frozen process.
+- Refused logins with the right password: an unclassified credential-lookup
+  error is answered with the opaque `28P01`.
+- In-flight statements fail: the gateway buffer defaults to off in the image
+  (the operator turns it on), and a statement cut off mid-execution is not
+  replay-safe either way.
+- These timers are constants or defaults the operator does not override, so
+  the windows should carry to an operator deployment (an operator run that
+  would test it is not yet done).
 - Clients are not shielded: in-flight statements fail (one per worker), new
   connections get `no writable primary is currently available` or `database is
   temporarily unavailable; please retry`, and 2-5 connects per postgres-kill
