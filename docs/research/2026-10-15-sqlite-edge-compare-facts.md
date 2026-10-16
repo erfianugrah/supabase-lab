@@ -101,3 +101,31 @@ All from https://developers.cloudflare.com/d1/ unless noted.
 - Caching (https://developers.cloudflare.com/hyperdrive/concepts/query-caching/):
   on by default, max_age 60 s; writes do not invalidate cached results;
   queries using STABLE/VOLATILE functions such as `NOW()` are not cached.
+
+## Cloudflare Durable Objects (SQLite storage), read 2026-10-16
+
+Raw excerpts: `docs/research/raw/2026-10-16-do-workerd-celld/durable-objects.md`.
+
+- SQLite-backed Durable Objects GA on 2025-04-07 per the release notes
+  (https://developers.cloudflare.com/durable-objects/release-notes/); a
+  2026-07-09 changelog says "generally available in 2024" (raw notes).
+- SQL API: `ctx.storage.sql.exec()`; "cannot execute transaction-related
+  statements like `BEGIN TRANSACTION` or `SAVEPOINT`"; transactions through
+  `ctx.storage.transaction()` / `transactionSync()`; FTS5 among the available
+  extensions (https://developers.cloudflare.com/durable-objects/api/sqlite-storage-api/).
+- Placement: `locationHint` values include `oc`; "Hints are a best effort and
+  not a guarantee"; objects "do not currently change locations after they are
+  created" (https://developers.cloudflare.com/durable-objects/reference/data-location/).
+- Limits: "An individual Object has a soft limit of 1,000 requests per
+  second"; 10 GB per object on Workers Paid (the same page's FAQ gives 1 GB on
+  Free; the plan that applies to this account was not determined)
+  (https://developers.cloudflare.com/durable-objects/platform/limits/).
+- D1 relation: "Each individual D1 database is backed by a single Durable
+  Object" (https://developers.cloudflare.com/d1/platform/limits/); SQLite in
+  Durable Objects is "a lower-level compute with storage building block"
+  (https://developers.cloudflare.com/workers/platform/storage-options/).
+- Measured against these (sqlite-edge-compare RUNLOG, r3 battery): `sql.exec`
+  refused `BEGIN TRANSACTION` and `sqlite_version()`; FTS5 worked; no
+  `vector32`; with hint `oc` the object reported BNE (from an in-object
+  `/cdn-cgi/trace`, not a documented Durable Objects API; `/meta` only).
+

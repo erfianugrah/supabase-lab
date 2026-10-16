@@ -1,0 +1,45 @@
+# scripts/rows-written-probe.ts output, 2026-10-16 (second Turso account, group sec-syd, aws-ap-southeast-2)
+# One throwaway database per (engine, shape); all writes first; one usage read per database after WAIT_MS=300000 ms,
+# then a second read 30 s later in brackets. 'delete' lines omitted. Run 2 (read shapes) lost its in-script readout to a
+# local network drop; its databases were read afterwards by a one-off script (rows_written and rows_read shown).
+
+## run: 1 (insert shapes)
+writes done; waiting 300 s for the usage counter
+libsql   100 single-row INSERTs (autocommit)              rows 100 ddl 1  rows_written 102 (30 s later 102)
+libsql   one 100-row INSERT                               rows 100 ddl 1  rows_written 102 (30 s later 102)
+libsql   batch of 10 x 10-row INSERTs                     rows 100 ddl 1  rows_written 102 (30 s later 102)
+libsql   batch of 10 x 10-row INSERTs, 1 secondary index  rows 100 ddl 2  rows_written 203 (30 s later 203)
+tursodb  100 single-row INSERTs (autocommit)              rows 100 ddl 1  rows_written 101 (30 s later 101)
+tursodb  one 100-row INSERT                               rows 100 ddl 1  rows_written 101 (30 s later 101)
+tursodb  batch of 10 x 10-row INSERTs                     rows 100 ddl 1  rows_written 101 (30 s later 101)
+tursodb  batch of 10 x 10-row INSERTs, 1 secondary index  rows 100 ddl 2  rows_written 202 (30 s later 202)
+
+## run: 2 (read shapes, readout)
+libsql  1000 rows, no reads (control)                  rows_written 1002 rows_read 1004
+libsql  1000 rows, then ANALYZE (1 index)              rows_written 2016 rows_read 2021
+libsql  1000 rows, then 10 x GROUP BY (reads)          rows_written 1002 rows_read 21004
+libsql  1000 rows, then 10 x ORDER BY v LIMIT 10 (reads) rows_written 1002 rows_read 21004
+tursodb 1000 rows, no reads (control)                  rows_written 1001 rows_read 1000
+tursodb 1000 rows, then ANALYZE (1 index)              rows_written 2004 rows_read 2000
+tursodb 1000 rows, then 10 x GROUP BY (reads)          rows_written 1001 rows_read 11000
+tursodb 1000 rows, then 10 x ORDER BY v LIMIT 10 (reads) rows_written 1001 rows_read 11000
+
+## run: 3 (TD05 ingest shapes)
+writes done; waiting 300 s for the usage counter
+libsql   TD05 ingest as sent (params, ts index), 2000 events rows 2000 ddl 2  rows_written 4003 (30 s later 4003)
+libsql   TD05 ingest, no ts index                         rows 2000 ddl 1  rows_written 2002 (30 s later 2002)
+libsql   TD05 ingest, literal values (ts index)           rows 2000 ddl 2  rows_written 4003 (30 s later 4003)
+tursodb  TD05 ingest as sent (params, ts index), 2000 events rows 2000 ddl 2  rows_written 4002 (30 s later 4002)
+tursodb  TD05 ingest, no ts index                         rows 2000 ddl 1  rows_written 2001 (30 s later 2001)
+tursodb  TD05 ingest, literal values (ts index)           rows 2000 ddl 2  rows_written 4002 (30 s later 4002)
+
+## run: 4 (TD05 aggregates)
+writes done; waiting 300 s for the usage counter
+tursodb  TD05 ingest + 7 x by_hour                        rows 2000 ddl 2  rows_written 4002 (30 s later 4002)
+tursodb  TD05 ingest + 7 x top_paths                      rows 2000 ddl 2  rows_written 4002 (30 s later 4002)
+tursodb  TD05 ingest + 7 x status_by_country              rows 2000 ddl 2  rows_written 4002 (30 s later 4002)
+tursodb  TD05 ingest + 7 x p95_by_colo                    rows 2000 ddl 2  rows_written 60002 (30 s later 60002)
+tursodb  TD05 ingest + 7 x last_24h                       rows 2000 ddl 2  rows_written 4002 (30 s later 4002)
+tursodb  TD05 ingest + 7 x all five aggregates            rows 2000 ddl 2  rows_written 60002 (30 s later 60002)
+writes done; waiting 300 s for the usage counter
+libsql   TD05 ingest + 7 x all five aggregates            rows 2000 ddl 2  rows_written 4003 (30 s later 4003)

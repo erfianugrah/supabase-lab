@@ -670,3 +670,256 @@ Artifact `run-2026-10-16T03-59-43-029Z.json` (03:59-04:02, local).
   offline and pushed in turn, both pushes returned without error and both
   clients then read B's value. These figures are one trial each and are not in
   an artifact.
+
+## Battery 2026-10-16 (r3): a Durable Object backend, a second Turso account
+
+The first Turso account refused all writes after the re-run above (Free plan
+monthly allowance), so this battery ran on a new Turso account with its own
+org (personal, `starter`, `tursodb_enabled true`; the slug is redacted like the
+first one). A new backend joins the probe Worker: `do`, a SQLite-backed Durable
+Object (`ProbeDO`, binding `PDO`, `new_sqlite_classes` migration) reached by
+name with `locationHint` `oc`. Each op is one RPC to the object, timed in the
+Worker like the others; `batch` runs the statements inside
+`ctx.storage.transactionSync`; `tx` sends `BEGIN TRANSACTION` so the refusal is
+the measurement, as for D1; rows changed come from an in-object
+`select changes()` (since replaced by a `total_changes()` difference, which reads 0
+after a SELECT). `/meta` reports where the object runs from the `colo` field of
+a `/cdn-cgi/trace` fetched inside it (not a documented Durable Objects API):
+BNE at fixture up (in `/meta` only, not in an artifact), the colo D1's primary
+reported (`served_by_colo` BNE in TD05a-d1).
+
+r3 ran from an uncommitted working tree on top of lab commit 54a4973 (the
+artifacts' `labCommit` does not contain the Durable Object backend, `TD05_SKIP`
+or the TD07 fix); the code is committed with this write-up.
+
+Code changes during this battery, each recorded because a row depends on it:
+
+- The Durable Object SQL API refuses `sqlite_version()` (`not authorized to use
+  function: sqlite_version`), as D1 does; `/meta` on `do` uses `select 1`.
+- TD05 skips `p95_by_colo` on the Turso engine by default (`TD05_SKIP`), after
+  the rows-written finding below; the skipped cell is a `skip` row.
+- TD07c compared each read with the loop counter, so one missing increment
+  made every later read count as stale (r3 attempt: `pg-next` 21 stale, values
+  `1,...,9,9,10,11`; the artifact does not record whether that write reported
+  an error). It now counts increments that reported success, re-reads the
+  value on the writer path after one that did not, and records
+  `writes_failed`. The re-run reads 30/30 with 0 failed writes.
+- TD02/TD03 now record a lane's connect error on a lost block instead of `no op
+  returned`; this battery's TD02h and TD03g each lost one block (artifact text
+  `no op returned`, recorded before this change, so the cause is not in them).
+- TD01's detail text printed `created in undefined ms` and `create p50  ms` for
+  the Durable Object rows (no create call exists); fixed after this battery.
+
+Artifacts (`out/2026-10-16/`):
+
+| module | artifact | UTC | Worker colo | note |
+|---|---|---|---|---|
+| TD05 | `run-2026-10-16T05-49-47-516Z.json` | 05:49 | SIN | small run, 10000 events, n = 5: the rows-written measurement |
+| TD02 | `run-2026-10-16T06-01-12-100Z.json` | 06:01 | SIN | smoke, `do` and `d1` only |
+| TD04 | `run-2026-10-16T06-02-09-795Z.json` | 06:02-06:22 | NRT, SIN, HKG, MRS | superseded: local network drops broke three Turso cells and TD04m |
+| TD07 | `run-2026-10-16T06-22-32-806Z.json` | 06:22-06:26 | SIN, HKG | superseded: TD07c counting bug (above) |
+| TD02 | `run-2026-10-16T06-26-30-683Z.json` | 06:26-07:10 | SIN | |
+| TD03 | `run-2026-10-16T07-10-13-894Z.json` | 07:10-07:40 | KIX | |
+| TD05 | `run-2026-10-16T07-40-52-624Z.json` | 07:40-07:48 | HKG | full size, Turso-engine `p95_by_colo` skipped |
+| TD06 | `run-2026-10-16T07-49-02-560Z.json` | 07:49-07:59 | HKG | |
+| TD01 | `run-2026-10-16T07-59-34-959Z.json` | 07:59 | local | Durable Object tenants via the Worker at SIN |
+| TD08 | `run-2026-10-16T08-00-45-692Z.json` | 08:00-08:07 | local | |
+| TD07 | `run-2026-10-16T08-08-03-753Z.json` | 08:08-08:12 | SIN (TD07d-d1 and -pg-rr HKG) | canonical |
+| TD04 | `run-2026-10-16T08-12-07-766Z.json` | 08:12-08:33 | C1/C4 HKG, C16 HKG+KIX, C64 KIX+HKG+SIN | canonical Worker cells; TD04m2 lost to local `ConnectionRefused` |
+
+The Worker colo moved between modules (SIN, KIX, HKG) with no change on this
+side; comparisons below hold within one artifact, never across two colos.
+
+### Turso rows_written: the window-function query (card #189)
+
+TD05c now reads usage for both Turso databases before and after, re-reading
+until `rows_written` repeats. Small run (05:49, 10000 events, the same ingest
+and the same five aggregates on both): libSQL `rows_written` +20029 (2.003 per
+ingested event), Turso engine +300002 (30 per event). Read again by hand from
+the Platform API 8 minutes later with no writes in between (not in an
+artifact): totals 20032 and 300006, against TD05c's after-reads of 20032 and
+300004 (the Turso-engine counter moved +2 after TD05c called it settled).
+
+`scripts/rows-written-probe.ts` then separated the causes: one throwaway
+database per (engine, shape), all writes first, one usage read per database
+after 300 s (a 20 s settle rule had misattributed writes between steps on one
+database). Its printed output is published as
+`out/2026-10-16/rows-written-probe.txt` (not a JSON artifact); the read-shape
+run (GROUP BY, ORDER BY, ANALYZE) lost its in-script readout to a local
+network drop and its databases were read afterwards by a one-off script, more
+than 300 s after the writes. The ANALYZE row has an index and no "index, no
+ANALYZE" control, so ANALYZE's own writes are not isolated:
+
+| shape | libSQL rows_written | Turso engine rows_written |
+|---|---|---|
+| 100 single-row INSERTs | 102 | 101 |
+| one 100-row INSERT | 102 | 101 |
+| batch of 10 x 10-row INSERTs | 102 | 101 |
+| the same, 1 secondary index | 203 | 202 |
+| 1000 rows, then 10 x GROUP BY | 1002 | 1001 |
+| 1000 rows, then 10 x ORDER BY v LIMIT 10 | 1002 | 1001 |
+| 1000 rows, then ANALYZE (1 index) | 2016 | 2004 |
+| TD05 ingest as sent, 2000 events (bound parameters, ts index) | 4003 | 4002 |
+| the same with literal values | 4003 | 4002 |
+| TD05 ingest + 7 x by_hour / top_paths / status_by_country / last_24h | - | 4002 each |
+| TD05 ingest + 7 x p95_by_colo | - | 60002 |
+| TD05 ingest + 7 x all five aggregates | 4003 | 60002 |
+
+On the Turso engine the window-function query (`p95_by_colo`, a
+`ROW_NUMBER() OVER (PARTITION BY ...)`) counted 56000 rows written for 7
+executions over 2000 rows: 4 per input row per execution. libSQL counted none.
+That accounts for the small run (10000 rows x 7 passes x 4 = 280000, plus
+about 2 per event for the ingest, against 300002 measured)
+and is consistent with the 9639906 rows written that the first account's
+Turso-engine database counted on the re-run above (one full TD05: 100000 rows
+x 23 passes x 4 = 9200000, plus the ingests; derived, not re-measured). The full TD05 at 07:40, with that cell
+skipped, counted 200002 on the Turso engine and 200028 on libSQL. Why the
+engine counts window-function work as writes was not determined; whether
+other window functions or sorts behave the same was not measured.
+
+### TD02 - point reads, with the Durable Object
+
+Worker at SIN for every row in this table (SIN:32; TD02j/k SIN:12; the TD02n
+ceiling ran from SIN and KIX); n = 300 after 20 warm-up, ms:
+
+| target | p25 | p50 | p75 | first in invocation p50 |
+|---|---|---|---|---|
+| D1 (TD02a) | 225 | 230 | 234 | 229 |
+| Turso libSQL (TD02b) | 188 | 192 | 199 | 755 |
+| Turso engine (TD02o) | 192 | 195 | 201 | 759.5 |
+| Durable Object (TD02p) | 216 | 221 | 225 | 231.5 |
+| Hyperdrive, caching off (TD02c) | 257 | 283 | 287 | 285 |
+| PostgREST (TD02e) | 347 | 370.5 | 381.25 | 407.5 |
+
+TD02l: `turso ~ tursodb < do ~ d1 < pg ~ pg_cached < postgrest`. The Durable
+Object has no first-query cost to speak of (231.5 against 220 for the rest);
+its range touches D1's (225), so neither is faster by the plan's rule. TD02h
+(local direct) lost one block of 10 reads.
+
+### TD03 - job-state writes, Worker at KIX
+
+All Worker rows ran from KIX:11 (Osaka), not SIN, and every Worker figure is
+lower than the SIN runs. p50 per op and per job, ms:
+
+| target | insert | update | read | job p25 | job p50 | job p75 |
+|---|---|---|---|---|---|---|
+| Hyperdrive -> Postgres (TD03c) | 113 | 113 | 112 | 896 | 901.5 | 907 |
+| Durable Object (TD03p) | 135 | 134 | 121 | 1018 | 1026 | 1085 |
+| Turso libSQL (TD03b) | 134 | 134 | 120 | 1018.75 | 1055 | 1115.5 |
+| D1 (TD03a) | 147 | 146 | 132 | 1108 | 1126.5 | 1164.75 |
+| PostgREST (TD03d) | 157 | 155 | 154 | 1226 | 1261.5 | 1373.75 |
+| Turso engine (TD03o) | 251 | 250 | 116 | 1366.5 | 1438 | 1488.25 |
+
+TD03l: `pg < do ~ turso ~ d1 < postgrest ~ tursodb (also do < d1)`. From KIX
+the Postgres path led; from SIN (2026-10-16 02:28) and from HKG+SIN
+(2026-10-15) it trailed. The colo, the hour, the Supabase project, the
+Hyperdrive configs and the Turso account all differ between those runs, so
+the change in order is not attributed to the colo alone. The Turso engine's writes were again slower than libSQL's on the same
+group (251 against 134 ms), its reads equal. Read-your-write held everywhere;
+TD03g (local direct) lost one block of 10 jobs.
+
+### TD04 - write contention, with the Durable Object
+
+Canonical: 08:12. ops/s at C1 / C4 / C16 / C64 and per-op p50 at C64; C1 and C4
+from HKG, C16 HKG+KIX, C64 KIX:2,HKG:4,SIN:10:
+
+| backend | inserts ops/s | increments ops/s | per-op p50 at C64 (insert / increment) |
+|---|---|---|---|
+| D1 | 4.95 / 19.63 / 72.34 / 179.65 | 4.98 / 19.43 / 77.74 / 174.62 | 244.5 / 245.5 |
+| Turso libSQL | 5.55 / 20.54 / 48.18 / 25.9 | 5.65 / 21.18 / 56.12 / 28.42 | 2401 / 2099 |
+| Turso engine | 3.57 / 11.86 / 13.8 / 9.74 | 3.54 / 11.46 / 11.93 / 10.51 | 6393.5 / 5705.5 |
+| Durable Object | 5.22 / 20.65 / 74.46 / 224.36 | 5.14 / 20.62 / 74.88 / 140.74 | 226.5 / 225 |
+| Postgres | 5.46 / 21.65 / 82.18 / 175.7 | 5.43 / 21.84 / 78.72 / 187 | 260 / 253.5 |
+
+No lost update anywhere; TD04b-turso-c64 had 1 op answer HTTP 520 (255/256,
+counter equal). The libSQL drop at C64 is a fourth sample. The Durable Object's
+per-op p50 went from 187 ms (C1) to 226.5 (C64 inserts), the C64 cells from a
+different colo mix, and it had the highest insert rate at C64 (one sample). TD04m0/m1 repeated (create 1284 ms; `mvcc`,
+`BEGIN CONCURRENT` accepted). TD04m2 lost every cell but one to local
+`ConnectionRefused`; the 2026-10-16 00:07 run above stays the only complete
+TD04m2.
+
+### TD05 - analytics event log, with the Durable Object
+
+Full size at 07:40, Worker HKG, query order rotated, n = 20. Ingest summed op
+time: D1 29592 ms, Turso libSQL 29355, Turso engine 39300, Durable Object 28581,
+Postgres 45979; every backend counted 100000 rows. p50 ms:
+
+| backend | by_hour | top_paths | status_by_country | p95_by_colo | last_24h |
+|---|---|---|---|---|---|
+| D1 | 242 | 282 | 308 | 484.5 | 182 |
+| Turso libSQL | 178 | 225 | 258 | 773 | 156 |
+| Turso engine | 363 | 461 | 378.5 | skipped | 165 |
+| Durable Object | 228.5 | 252 | 278.5 | 426.5 | 177 |
+| Postgres | 202 | 204 | 207 | 383.5 | 184.5 |
+
+Every answered aggregate matched the JavaScript truth. From HKG the libSQL
+first-query gap was within a few ms on four shapes; on status_by_country it
+was 716 against 256 (4 first-in-invocation samples per shape), unlike SIN on
+2026-10-16 03:20 where every shape showed it.
+
+### TD06 - search, with the Durable Object
+
+Worker HKG. The Durable Object ran FTS5: ingest 10856 ms summed, query p50 195 /
+176 / 174 / 174 ms (common / mid / rare / and2), the same match counts and a
+top-10 equal to D1's on every query (overlap 1). It has no `vector32`
+(`no such function: vector32`). The Turso engine refused FTS5 again and loaded
+10000 vectors in 63783 ms (exact top-10 p50 175, recall 1); libSQL ANN recall
+0.24; pgvector HNSW recall 1. TD06b-turso-common lost 3 reads to HTTP 520.
+
+### TD01 - database per tenant, with the Durable Object
+
+From the local machine. A Durable Object tenant has no create call: one Worker
+request runs create, insert and select on a named object (three RPCs).
+
+| backend | single: create to first query / delete (ms) | burst of 20: first query p50 (max) / wall (ms) |
+|---|---|---|
+| Postgres schema | 1079.87 / 267.37 | 1019.74 (1068.9) / 3174.38 |
+| Durable Object | 2344.93 / 642.54 | 1623.38 (1924.57) / 1924.79 |
+| D1 | 2177.79 / 971.45 | 2289.56 (3079) / 3079.47 |
+| Turso libSQL | 3256 / 724.38 | 4660.39 (5847.05) / 5847.78 |
+| Turso engine | 3488.38 / 1115.97 | 4389.07 (4752.56) / 4752.88 |
+
+All tenants answered and were deleted; TD01z found nothing left, the Durable
+Object tenants checked by name.
+
+### TD07 - transaction semantics, with the Durable Object
+
+Canonical 08:08, SIN. The Durable Object refuses an interactive transaction
+through `sql.exec` (`To execute a transaction, please use the
+state.storage.transaction() or state.storage.transactionSync() APIs instead of
+the SQL BEGIN TRANSACTION or SAVEPOINT statements`, 219 ms), commits a batch
+in 238 ms, rolls a failed batch back, reads its own and the previous request's
+writes 30/30. TD07d: B (sent 300 ms after A; A's batch took 241 ms, so B
+probably did not overlap it) wrote 6/6, slowest 230 ms, and A's reads were
+equal; a `transactionSync` batch cannot interleave with other requests to the
+object, so this row shows no contention. The same timing applies to D1's
+batch (TD07d-d1, A 200 ms). The other backends repeated their earlier rows;
+`pg_cached` read the pre-write value 29 of 30 times.
+
+### TD08 - embedded replica and Turso Sync (card #188)
+
+From the local machine. Embedded replica: open 26978.08 ms, first sync
+8200.804 ms, write-to-visible after one `sync()` p50 886.19 ms, replica read p50
+0.21 ms against 243.97 over HTTP, a write through the replica 1453.97 ms p50 and
+readable locally at once 30/30. TD08g: it still does not open a Turso-engine
+database (`file is not a database`).
+
+Turso Sync (`@tursodatabase/sync` 0.8.3), n = 30 after 3 warm-up:
+
+| engine | connect A / B (ms) | push p50 | pull p50 | visible after one pull | local read p50 | same row updated offline on A and B, A pushes first |
+|---|---|---|---|---|---|---|
+| libSQL | 39396.328 / 26574.376 | 531.97 | 301.36 | 30/30 | 0.03 | last-push-wins 30/30, no push error |
+| Turso engine | 6983.519 / 14248.956 | 644.36 | 395.07 | 30/30 | 0.03 | last-push-wins 30/30, no push error |
+
+### Teardown
+
+`make down` answered 200 for every resource. An audit 30 s later exited 1
+(counts not captured; whether a resource was still going away or the new
+namespace listing failed was not determined); the next, about a minute after
+`down`, read 0 for
+Supabase projects, Workers, D1, Hyperdrive, Durable Object namespaces (new in
+the audit), Turso databases and groups (audit output in this session, not in an
+artifact). The Turso account ended at 1127859
+rows written in its period (read by hand from the Platform API by the battery
+script, not in an artifact).
