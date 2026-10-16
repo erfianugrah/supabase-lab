@@ -2788,6 +2788,12 @@ Makefile to the `RUNNER`/`BUILD` block from Task O1 Step 7 if it still calls
   the all-in-one results; self-hosted-defaults Realtime and Edge Functions
   with `sb_` keys and `utils/upgrade-pg17.sh` on a PG15 data directory.
 - Prerequisite: kind and Docker; manifests and rig changes written.
+- Predictions to test (2026-10-16 code read, `experiments/multigres/RUNLOG.md`,
+  commit 8e53ee6): the operator passes no multiorch timer flags, so the
+  MG02/MG03/MG04 windows should match the all-in-one runs give or take the
+  1 s default cycle; the gateway buffer is on under the operator (off in the
+  image), so held vs refused connects should differ; whether Kubernetes
+  restarts the killed cell is assumed, not traced.
 - Artifact: MG-style runs; SD runs.
 - RUNLOG: "<date> kind operator: failover <s> s, lost commits <n>"; "sb_ keys:
   Realtime <...>, functions <...>; PG15 to PG17 upgrade <ok|fails at ...>."
