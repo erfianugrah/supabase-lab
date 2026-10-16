@@ -10,6 +10,12 @@
 > Spend: one Micro project on the Pro org from before the first smoke run
 > (04:04 UTC) to `make down` after 07:23 UTC; Turso and D1 inside their free
 > allowances.
+> Re-run 2026-10-16 (2026-10-15 23:56 UTC to 2026-10-16 04:02 UTC): the
+> Turso engine added as a backend after the org owner enabled `tursodb`; TD05
+> query order rotated; TD04 run twice more (runs 2 and 3); artifacts
+> `out/2026-10-16/`, RUNLOG section "Re-run 2026-10-16". During TD08 the Turso
+> org refused writes (found past its Free plan's 10M rows written), so TD08's
+> write rows and the Turso Sync rows (TD08f) failed (follow-up tracked).
 
 **Goal:** Measure Turso, Supabase Postgres and Cloudflare Workers + D1 on the
 same workloads, from the same vantages, so a "which database for this use
