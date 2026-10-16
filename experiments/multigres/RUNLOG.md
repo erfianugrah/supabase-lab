@@ -7,6 +7,121 @@ below were returned by a page-summarising fetch tool, not read in a browser;
 treat their wording as doc-cited-not-tested. The numbers in this file are the
 measurements.
 
+## 2026-10-16 - code read: where each window comes from (no new run)
+
+A read of the upstream source at the tested commit
+(https://github.com/multigres/multigres/tree/e3cbdbbb0b94453ca2ec43c9c40c05c98ed7bb73,
+below `MG@`), the operator at
+https://github.com/multigres/multigres-operator/tree/0bd97fe77495503c17b243686f2c776f81ac3730
+(`OP@`) and grpc-go v1.81.1 (the version in `MG@` go.mod), set against the
+run5, `final` and `full1` artifacts. No module was re-run. Everything here is
+reasoned from code and the existing logs, not measured, unless it quotes an
+artifact. Upstream `main` at ea2ca403 (2026-10-16) has 13 commits since the
+tested one; none changes the orchestrator's failover logic, the health stream,
+the gateway buffer or the credential lookup, though 599381f4 changes the error
+a cut-off statement returns (below). The only tag is still `v0.1.0`.
+
+Two corrections to the 2026-10-10 section, both applied in place below:
+
+- **MG04: the 20 s is the winner's promote phase; the 20 s recruits belong to
+  the losing rounds.** Each multiorch (one per cell) usually starts its own
+  round within about 20 ms of the others; in `final` MG04b only two rounds
+  started. In all six MG04 runs across run5, `final` and `full1`, the round
+  that succeeded had `recruit_ms` 111 to 128; in the five runs whose first
+  round succeeded its `promote_ms` was 20,126 to 20,140 (the `full1` MG04b
+  retry had 9,440). The `recruit_ms` 20,252 to 20,255 values all belong to
+  rounds that failed. The winner waits for every Promote, the frozen cell's included,
+  before it logs success
+  ([`rule_change.go` L180-L193](https://github.com/multigres/multigres/blob/e3cbdbbb0b94453ca2ec43c9c40c05c98ed7bb73/go/services/multiorch/consensus/rule_change.go#L180-L193)).
+  The losers wait on the frozen cell's Recruit. Both waits end on
+  `error reading server preface`, and multigres sets no gRPC connect
+  parameters (no `ConnectParams` or `MinConnectTimeout` anywhere in `MG@go/`),
+  so grpc-go's default `minConnectTimeout = 20 * time.Second` bounds them
+  ([clientconn.go L63](https://github.com/grpc/grpc-go/blob/v1.81.1/clientconn.go#L63)).
+  A stopped process's kernel still accepts the TCP connection; no HTTP/2
+  preface ever arrives.
+- **`pooler-health-check-interval` did nothing.** `GetPoolerHealthCheckInterval`
+  ([`config.go` L264](https://github.com/multigres/multigres/blob/e3cbdbbb0b94453ca2ec43c9c40c05c98ed7bb73/go/services/multiorch/config/config.go#L264))
+  has no caller outside tests. Of the two 500 ms settings in this rig only
+  `recovery-cycle-interval` (default 1 s) took effect.
+
+Where the measured windows come from:
+
+- **Postgres crash, 1.1 to 6.7 s (MG02, MG09; MG08 6.4 to 8.2 s).** The
+  orchestrator learns that postgres died from the pooler's health snapshot,
+  pushed when the pooler's postgres monitor sees a state change or every
+  `DefaultSnapshotInterval = 5 * time.Second`
+  ([`timeouts/rpc.go` L47](https://github.com/multigres/multigres/blob/e3cbdbbb0b94453ca2ec43c9c40c05c98ed7bb73/go/common/timeouts/rpc.go#L47)).
+  The pooler's own postgres monitor ticks every 5 s
+  ([`manager.go` L353](https://github.com/multigres/multigres/blob/e3cbdbbb0b94453ca2ec43c9c40c05c98ed7bb73/go/services/multipooler/internal/manager/manager.go#L353))
+  and starts a stopped postgres in place
+  ([`postgres_monitor.go` L1255-L1257](https://github.com/multigres/multigres/blob/e3cbdbbb0b94453ca2ec43c9c40c05c98ed7bb73/go/services/multipooler/internal/manager/postgres_monitor.go#L1255-L1257)),
+  and the appointment re-checks the old leader live before acting; the
+  `primary already exists, skipping leader appointment` lines in MG02 and MG09
+  are that re-check passing against a restarted or stale-cached leader. Open
+  PR https://github.com/multigres/multigres/pull/1545 ("refresh health before
+  recheck so appointment trusts the analyzer") targets that skip. Reading:
+  where the kill lands against two independent 5 s timers, plus zero to two
+  skipped cycles, gives the spread. Not tested by a run that varies the
+  phase; MG08's 5,765 to 6,288 ms to appointment is not separated by this reading.
+- **Whole-cell loss, 14.2 to 14.6 s to appointment (MG03).** With its pooler
+  dead the leader stops counting as live once its last snapshot is older than
+  `LeaderLivenessFreshness: 15 * time.Second`
+  ([`availability_policy.go` L95-L104](https://github.com/multigres/multigres/blob/e3cbdbbb0b94453ca2ec43c9c40c05c98ed7bb73/go/services/multiorch/recovery/analysis/availability_policy.go#L95-L104)),
+  measured from the last snapshot received, which, from the 14.2 to 14.6 s to
+  appointment, arrived under about 1 s before the kill (inferred, not logged).
+- **Hung primary, about 20 s to the pooler-level promote (MG04).** The
+  frozen primary's followers still look connected, so detection waits for
+  `DefaultQuorumCommitStaleAfter = 20 * time.Second`
+  ([`leader_fitness.go` L162](https://github.com/multigres/multigres/blob/e3cbdbbb0b94453ca2ec43c9c40c05c98ed7bb73/go/services/multiorch/consensus/leader_fitness.go#L162)),
+  reason `LeaderQuorumWritesStalled`.
+- **The 56.2 s MG04 run (`full1` MG04b).** All three rounds failed (`recruit_ms`
+  20,253 to 20,254 each, none succeeded), a new round started at +48,291 ms
+  and succeeded at +57,845 ms (`recruit_ms` 113, `promote_ms` 9,440). Reading:
+  a split vote, each healthy pooler accepting a different coordinator's
+  revocation for the term, then the collective recruitment backoff (base
+  10 s, doubling, with jitter) before the retry. The artifact carries no
+  attempt numbers, so this is not confirmed; why that retry's promote took
+  9,440 ms after `SIGCONT` at +45.2 s is not explained.
+- **`password authentication failed` with the right password (MG02, MG08,
+  MG09).** A credential-lookup error that the gateway cannot classify is
+  answered with the opaque auth error, and only structured errors pass
+  through as, for example, 57P03
+  ([`startup.go` L855-L872](https://github.com/multigres/multigres/blob/e3cbdbbb0b94453ca2ec43c9c40c05c98ed7bb73/go/common/pgprotocol/server/startup.go#L855-L872)).
+  Reading: these are lookups in flight on a postgres that died while its
+  pooler stayed up; MG03, where the pooler died too, got only `no writable
+  primary is currently available` (57P03 by the code's mapping) and no 28P01. The gateway logs
+  `credential lookup failed` with the underlying error, which would confirm
+  it; the gateway log was not kept. No upstream fix or open PR found.
+- **In-flight statements failed instead of being held.** The gateway's
+  failover buffer is off by default (`buffer-enabled`, `Default: false`,
+  [`buffer/config.go` L39-L44](https://github.com/multigres/multigres/blob/e3cbdbbb0b94453ca2ec43c9c40c05c98ed7bb73/go/services/multigateway/buffer/config.go#L39-L44)),
+  and the all-in-one image never sets it. The operator turns it on unless
+  told otherwise
+  ([`OP@pkg/resolver/cell.go` L197-L206](https://github.com/multigres/multigres-operator/blob/0bd97fe77495503c17b243686f2c776f81ac3730/pkg/resolver/cell.go#L197-L206)).
+  Upstream's design note
+  ([`failover_buffering.md`](https://github.com/multigres/multigres/blob/e3cbdbbb0b94453ca2ec43c9c40c05c98ed7bb73/docs/query_serving/failover_buffering.md))
+  describes it for planned failovers and buffers only `no writable primary`,
+  `MTF01`, a pre-execution unavailable marker and replay-safe `25006` /
+  recovery `0A000`. A statement whose backend dies mid-execution matches none
+  of them and may have committed, so by this reading the per-worker failed
+  INSERT would fail with the buffer on too. Since 599381f4 (2026-10-12, after
+  the tested commit) that failure reaches the client as `08006 connection to
+  server lost`; these runs saw `failed to read message: EOF`.
+- **Nothing restarted a killed cell (MG03).** The container's PID 1 only
+  watches `multigateway` and exits if it is gone
+  ([`cluster-entrypoint.sh` L220-L230](https://github.com/multigres/multigres/blob/e3cbdbbb0b94453ca2ec43c9c40c05c98ed7bb73/docker/cluster-entrypoint.sh#L220-L230));
+  it never restarts pgctld, multipooler or postgres. Under the operator the
+  containers would run with a Kubernetes restart policy (assumed, not traced in
+  the operator source); the operator itself was not run.
+
+What carries to an operator deployment, by reading: the 5 s snapshot, 5 s
+monitor tick, 15 s liveness, 20 s quorum-commit and 20 s gRPC connect values
+are constants or unset defaults, and the operator passes no timer flags to
+multiorch, so the MG02, MG03 and MG04 windows should carry over, give or take
+the 1 s default cycle. The buffer (on) and container restarts differ. An
+operator run would test it; not yet done.
+
 ## 2026-10-10 - run5, 17 failovers on a 3-cell all-in-one container
 
 Vantage: a Docker Desktop VM (Linux kernel 7.0.14-linuxkit, Docker server
@@ -36,7 +151,9 @@ What was run, and how it differs from the deployment the blog describes:
   shard the safe bootstrap rule can never hold), and the generated config sets
   multiorch `recovery-cycle-interval` and `pooler-health-check-interval` to
   500 ms. Those are the local provisioner's values; the operator's were not
-  read or run.
+  read or run on 2026-10-10 (2026-10-16: the operator passes neither;
+  `pooler-health-check-interval` is read by nothing; see the code-read section
+  above).
 - MG01: `synchronous_commit=on`, `synchronous_standby_names` of the form
   `ANY 1 (<3 ids>)`, 2 walsenders visible from the primary,
   `max_connections=110`. PostgreSQL acknowledges a commit under that setting
@@ -101,9 +218,12 @@ Reading the stall:
   (run a) and +20.1 s (run b), and the pooler-level promote of the new
   primary succeeded at +19.9 s (run a) and +20.6 s (run b). Multiorch itself
   logged the promotion as a success only at +39.7 s (run a) and +40.3 s
-  (run b) (`promote_ms` 20,126 and 20,140): the recruit RPC to the frozen
-  cell had to time out first (`recruit_ms` about 20,250), so the orchestrator
-  side lags the pooler-level promote by about 20 s. In run a the 20,016 stall
+  (run b): the winning round's recruit took 128 and 111 ms and its promote
+  phase 20,126 and 20,140 ms (`promote_ms`), because it waits for the frozen
+  cell's Promote too, so the orchestrator side lags the pooler-level promote
+  by about 20 s. The `recruit_ms` of about 20,250 belongs to the two other
+  orchestrators' rounds, which failed waiting on the frozen cell's Recruit
+  (corrected 2026-10-16; this paragraph first gave that recruit as the cause). In run a the 20,016 stall
   coincides with the client's own 20 s statement timeout (all 8 workers
   ended with "Query read timeout" at +20 s), so the client could not see
   recovery earlier than that. In run b the reconnects after the timeout hit
@@ -113,11 +233,13 @@ Reading the stall:
   The stall was NOT always about 20 s. Across the six MG04 runs in three
   artifacts it was 20.0 / 25.1 (run5), 20.0 / 20.0 (`final` (`out/2026-10-10/run-2026-10-10T01-19-34-842Z.json`)) and
   25.1 / 56.2 s (`full1` (`out/2026-10-10/run-2026-10-10T01-06-52-479Z.json`)). In the 56.2 s run (`full1` MG04b) the
-  first promotion attempt failed at +39.7 s (`recruit_ms` 20,254), a second
+  first promotion attempt failed at +39.7 s (all three orchestrators' rounds,
+  `recruit_ms` 20,253 to 20,254), a second
   attempt started at +48.3 s and succeeded at +57.8 s, and the client saw
   8 x "Query read timeout" plus 8 x "portal execution failed ... EOF". So
   recovery from a hung primary ranged from about 20 to 56 s here; the cause
-  of the failed first attempt in that one run was not investigated.
+  of the failed first attempt was not investigated on 2026-10-10; the
+  2026-10-16 code read proposes a split vote, unconfirmed.
   After SIGCONT (released at +45.2 s) the one demotion logged in
   `final` (`out/2026-10-10/run-2026-10-10T01-19-34-842Z.json`) MG04a was multiorch's "stale leader demoted successfully via SetPrimary" at +47.7 s;
   MG04b in that run logged none. All nodes ended with equal row counts.
@@ -199,10 +321,12 @@ Reading the stall:
   injected; a frozen process is not a partition). Loss of a gateway or of
   etcd. Loss of two cells other than MG08's two-postgres case.
 - Durability policies other than the local provisioner's `ANY 1` of 3.
-- Whether `allow-unsafe-initial-cohort` and the 500 ms orchestrator timers
-  change the results against a default deployment.
+- Whether `allow-unsafe-initial-cohort` and the 500 ms `recovery-cycle-interval`
+  change the results against a default deployment (the other 500 ms setting
+  is read by nothing, 2026-10-16).
 - The cause of the wide spread in detection time after a postgres kill, and
-  of the failed first promotion attempt in the 56 s MG04 run.
+  of the failed first promotion attempt in the 56 s MG04 run: the
+  2026-10-16 code read proposes causes for both; no run tested them.
 - Throughput and latency comparisons (`tps_before` is a closed-loop figure
   from a Docker Desktop VM, context only).
 - Earlier artifacts (`full1` (`out/2026-10-10/run-2026-10-10T01-06-52-479Z.json`), `final`, `final2`, `final3`, `final4`)
