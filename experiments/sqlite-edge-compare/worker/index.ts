@@ -11,8 +11,10 @@
  *   DB          D1 database (location hint oc, read replication at default)
  *   HD          Hyperdrive, caching disabled, on the Supabase direct string
  *   HD_CACHED   Hyperdrive, caching enabled (default max_age), same origin
- *   SUPABASE_URL, TURSO_URL, DRIVER_PG, DRIVER_LIBSQL, COMPAT_DATE  vars
- *   PROBE_KEY, TURSO_TOKEN, SUPABASE_SECRET_KEY                    secrets
+ *   SUPABASE_URL, TURSO_URL, TURSODB_URL, DRIVER_PG, DRIVER_LIBSQL,
+ *   COMPAT_DATE                                                     vars
+ *   PROBE_KEY, TURSO_TOKEN, TURSODB_TOKEN, SUPABASE_SECRET_KEY      secrets
+ * TURSODB_URL is "" when the org could not create a Turso-engine database.
  *
  * Timing: performance.now() around each driver call. Workers advance the
  * clock only across I/O, so a timing is I/O wall time; that is the quantity
@@ -39,11 +41,13 @@ interface Env {
   HD_CACHED: Hyperdrive;
   SUPABASE_URL: string;
   TURSO_URL: string;
+  TURSODB_URL: string;
   DRIVER_PG: string;
   DRIVER_LIBSQL: string;
   COMPAT_DATE: string;
   PROBE_KEY: string;
   TURSO_TOKEN: string;
+  TURSODB_TOKEN: string;
   SUPABASE_SECRET_KEY: string;
 }
 
@@ -69,6 +73,14 @@ function opener(env: Env, backend: WorkerBackend, d1Session?: string): { open: O
         open: async () => libsqlLane(createClient({ url: env.TURSO_URL, authToken: env.TURSO_TOKEN, intMode: "number" })),
         driver: { name: "@libsql/client/web", version: env.DRIVER_LIBSQL },
       };
+    case "tursodb":
+      return {
+        open: async () => {
+          if (!env.TURSODB_URL) throw new Error("tursodb: not configured (no Turso-engine database in the fixture)");
+          return libsqlLane(createClient({ url: env.TURSODB_URL, authToken: env.TURSODB_TOKEN, intMode: "number" }));
+        },
+        driver: { name: "@libsql/client/web (tursodb)", version: env.DRIVER_LIBSQL },
+      };
     case "pg":
       return { open: () => pgLane(env.HD.connectionString), driver: { name: "pg+hyperdrive(nocache)", version: env.DRIVER_PG } };
     case "pg_cached":
@@ -91,7 +103,7 @@ async function meta(env: Env, colo: string): Promise<MetaResponse> {
         if (b === "postgrest") out = await lane.each({ http: { method: "GET", path: "" } });
         // D1 refuses sqlite_version(): "not authorized to use function" (2026-10-15).
         else if (b === "d1") out = await lane.each({ sql: "select 1 as one" });
-        else if (b === "turso") out = await lane.each({ sql: "select 1 as one, sqlite_version() as sqlite_version" });
+        else if (b === "turso" || b === "tursodb") out = await lane.each({ sql: "select 1 as one, sqlite_version() as sqlite_version" });
         else out = await lane.each({ sql: "select 1 as one, current_setting('server_version') as server_version, family(inet_server_addr()) as addr_family" });
         const row = (out.rows?.[0] ?? {}) as Record<string, unknown>;
         const detail: Record<string, unknown> = b === "postgrest" ? { status: out.meta?.status } : { ...row };
@@ -109,7 +121,8 @@ async function meta(env: Env, colo: string): Promise<MetaResponse> {
   const results = await Promise.all(WORKER_BACKENDS.map(async (b) => [b, await probe(b)] as const));
   const backends = Object.fromEntries(results) as Record<WorkerBackend, MetaBackend>;
   return {
-    ok: results.every(([, r]) => r.ok),
+    // An unconfigured tursodb (org refused use_tursodb) does not fail /meta.
+    ok: results.every(([b, r]) => r.ok || (b === "tursodb" && !env.TURSODB_URL)),
     colo,
     compatibilityDate: env.COMPAT_DATE,
     drivers: { pg: env.DRIVER_PG, "@libsql/client": env.DRIVER_LIBSQL },

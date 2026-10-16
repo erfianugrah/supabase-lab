@@ -32,6 +32,8 @@
  *   TD01b  d1 single        n=1: same, plus created_in_region and served_by_region from the query meta
  *   TD01c  pg_schema single n=1: same, plus connect_ms
  *   TD01d  turso burst      n=TD01_BURST in parallel: created/ready/refused counts, p50/p95/max, verbatim refusal text, parallel delete p50/p95/max
+ *   TD01i/j  tursodb single / burst: the TD01a/d path with use_tursodb: true (only when the fixture has a Turso-engine database;
+ *            the 2026-10-16 run wrote them as TD01g/TD01h, TD01g colliding with the Supabase project row)
  *   TD01e  d1 burst         same
  *   TD01f  pg_schema burst  same
  *   TD01g  Supabase project create for scale: the fixture's own `make up`
@@ -83,7 +85,7 @@ import { assertSec, type CfCreds, cf, cfCreds, cfErr, createD1, createTursoDb, d
 const ID = "TD01";
 const FIRST_QUERY_DEADLINE_MS = 180_000;
 
-type Key = "turso" | "d1" | "pg_schema";
+type Key = "turso" | "tursodb" | "d1" | "pg_schema";
 
 interface Outcome extends TenantOutcome {
   connectMs?: number;
@@ -108,16 +110,16 @@ interface Tenants {
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const now = () => performance.now();
 
-function tursoTenants(tc: TursoCreds, group: string, location: string, red: (s: string) => string): Tenants {
+function tursoTenants(tc: TursoCreds, group: string, location: string, red: (s: string) => string, engine: "libsql" | "tursodb" = "libsql"): Tenants {
   return {
-    key: "turso",
-    path: "Platform API create + per-db token + Hrana HTTP (@libsql/client/web)",
+    key: engine === "tursodb" ? "tursodb" : "turso",
+    path: `Platform API create${engine === "tursodb" ? " (use_tursodb: true)" : ""} + per-db token + Hrana HTTP (@libsql/client/web)`,
     location,
     async onboard(name) {
       const t0 = now();
       let hostname: string;
       try {
-        hostname = (await createTursoDb(tc, name, group)).hostname;
+        hostname = (await createTursoDb(tc, name, group, engine === "tursodb")).hostname;
       } catch (e) {
         return { name, created: false, ready: false, error: red(msg(e)) };
       }
@@ -355,12 +357,20 @@ const mod: TestModule = {
     const burst = burstSize();
     const stamp = Date.now().toString(36);
     const names = tenantNames(stamp, burst);
-    const backends: Tenants[] = [tursoTenants(tc, fx.turso.group, fx.turso.location, red), d1Tenants(c, red), pgTenants(fx, red)];
+    // Turso-engine tenants (when the org allows use_tursodb) get their own run prefix so the libSQL leftovers check does not see them.
+    const namesM = tenantNames(`${stamp}m`, burst);
+    const namesFor = (k: Key) => (k === "tursodb" ? namesM : names);
+    const backends: Tenants[] = [
+      tursoTenants(tc, fx.turso.group, fx.turso.location, red),
+      ...(fx.tursodb?.url ? [tursoTenants(tc, fx.turso.group, fx.turso.location, red, "tursodb")] : []),
+      d1Tenants(c, red),
+      pgTenants(fx, red),
+    ];
     const byKey = new Map(backends.map((b) => [b.key, b]));
     const order = roundRobin(backends.map((b) => b.key), 2);
     const singles = order.filter((s) => s.iter === 0).map((s) => s.item);
     const bursts = order.filter((s) => s.iter === 1).map((s) => s.item);
-    const rowId: Record<Key, [string, string]> = { turso: ["TD01a", "TD01d"], d1: ["TD01b", "TD01e"], pg_schema: ["TD01c", "TD01f"] };
+    const rowId: Record<Key, [string, string]> = { turso: ["TD01a", "TD01d"], d1: ["TD01b", "TD01e"], pg_schema: ["TD01c", "TD01f"], tursodb: ["TD01i", "TD01j"] };
     const base = (b: Tenants) => ({ backend: b.key, vantage: "local", colo: "local", path: b.path, location: b.location });
     const results: TestResult[] = [];
     ctx.log(`TD01: burst=${burst}, singles ${singles.join(",")}, bursts ${bursts.join(",")}`);
@@ -372,12 +382,12 @@ const mod: TestModule = {
         const id = rowId[key][0];
         const title = `${key}: one tenant, create to first query, then delete`;
         try {
-          const o = await b.onboard(names.single);
+          const o = await b.onboard(namesFor(key).single);
           let deleteMs: number | undefined;
           let deleteErr: string | undefined;
           if (o.created) {
             try {
-              deleteMs = await b.remove(names.single);
+              deleteMs = await b.remove(namesFor(key).single);
             } catch (e) {
               deleteErr = red(msg(e));
             }
@@ -416,7 +426,7 @@ const mod: TestModule = {
         const title = `${key}: burst of ${burst} tenants in parallel, create to first query, then parallel delete`;
         try {
           const t0 = now();
-          const outs = await Promise.all(names.burst.map((n) => b.onboard(n)));
+          const outs = await Promise.all(namesFor(key).burst.map((n) => b.onboard(n)));
           const wallMs = r2(now() - t0);
           const created = outs.filter((o) => o.created).map((o) => o.name);
           const dels = await Promise.all(
@@ -486,9 +496,9 @@ const mod: TestModule = {
       let remaining = 0;
       for (const b of backends) {
         try {
-          let names0 = await b.leftovers(names.runPrefix);
+          let names0 = await b.leftovers(namesFor(b.key).runPrefix);
           for (const n of names0) await b.sweep(n).catch((e) => notes.push(`${b.key} ${n}: ${red(msg(e))}`));
-          if (names0.length) names0 = await b.leftovers(names.runPrefix);
+          if (names0.length) names0 = await b.leftovers(namesFor(b.key).runPrefix);
           left[`${b.key}_left`] = names0.length;
           remaining += names0.length;
         } catch (e) {
@@ -502,8 +512,8 @@ const mod: TestModule = {
         id: "TD01z",
         title: "cleanup: nothing under the run's sec-td01- prefix left on any backend",
         status: remaining === 0 ? "pass" : "fail",
-        detail: remaining === 0 ? `0 left on turso, d1, pg_schema (prefix ${names.runPrefix})` : `left: ${JSON.stringify(left)}${notes.length ? `; ${notes.join("; ").slice(0, 300)}` : ""}`,
-        measurements: { ...left, n_expected_deleted: 3 * (1 + burst) },
+        detail: remaining === 0 ? `0 left on ${backends.map((b) => b.key).join(", ")} (prefix ${names.runPrefix})` : `left: ${JSON.stringify(left)}${notes.length ? `; ${notes.join("; ").slice(0, 300)}` : ""}`,
+        measurements: { ...left, n_expected_deleted: backends.length * (1 + burst) },
       });
     }
     return results;

@@ -73,7 +73,7 @@ export function targetUnavailable(t: Target): string | null {
   return null;
 }
 
-const setupBackend: Record<Store, WorkerBackend> = { d1: "d1", turso: "turso", supabase: "pg" };
+const setupBackend: Record<Store, WorkerBackend> = { d1: "d1", turso: "turso", tursodb: "tursodb", supabase: "pg" };
 
 /**
  * Setup / teardown SQL through the probe Worker, one store at a time, as a
@@ -123,7 +123,7 @@ export function vantageFacts(fx: Fixture, t: Target, results: readonly RunResult
   const region =
     t.store === "d1"
       ? `served_by_region=${metaValues(ops, "served_by_region") || "?"} served_by_colo=${metaValues(ops, "served_by_colo") || "?"} hint=${fx.d1?.locationHint ?? "?"}`
-      : t.store === "turso"
+      : t.store === "turso" || t.store === "tursodb"
         ? (fx.turso?.location ?? "?")
         : (fx.supabase?.region ?? "?");
   return {

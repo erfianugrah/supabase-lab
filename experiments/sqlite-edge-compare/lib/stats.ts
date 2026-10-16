@@ -80,6 +80,13 @@ export interface Slot<T> {
   warmup: boolean;
 }
 
+/** `xs` rotated left by k (mod length): rotate(xs, iter) puts a different item first each iteration. */
+export function rotate<T>(xs: readonly T[], k: number): T[] {
+  if (!xs.length) return [];
+  const n = ((k % xs.length) + xs.length) % xs.length;
+  return [...xs.slice(n), ...xs.slice(0, n)];
+}
+
 /**
  * Round-robin schedule: `iterations` rounds over `items`, the starting item
  * rotating by one each round so no backend always goes first (or always

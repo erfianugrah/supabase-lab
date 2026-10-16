@@ -231,10 +231,11 @@ export async function createTursoGroup(t: TursoCreds, name: string, location: st
   throw new Error(`create Turso group ${name}: HTTP ${r.status} ${r.text.slice(0, 300)}`);
 }
 
-export async function createTursoDb(t: TursoCreds, name: string, group: string): Promise<{ hostname: string; dbId: string }> {
+/** `useTursodb` sends the field turso-cli sends for `db create --tursodb` (not in the API reference). */
+export async function createTursoDb(t: TursoCreds, name: string, group: string, useTursodb = false): Promise<{ hostname: string; dbId: string }> {
   assertSec(name);
   assertSec(group);
-  const r = await turso<{ database?: { Hostname?: string; DbId?: string } }>(t, "POST", "databases", { name, group });
+  const r = await turso<{ database?: { Hostname?: string; DbId?: string } }>(t, "POST", "databases", useTursodb ? { name, group, use_tursodb: true } : { name, group });
   if ((r.status !== 200 && r.status !== 201) || !r.json.database?.Hostname) throw new Error(`create Turso db ${name}: HTTP ${r.status} ${r.text.slice(0, 300)}`);
   return { hostname: r.json.database.Hostname, dbId: r.json.database.DbId ?? "" };
 }

@@ -186,7 +186,9 @@ export type PgPath = "pooler" | "session" | "direct";
  */
 export async function pgConfig(f: Fixture, path: PgPath): Promise<pg.ClientConfig> {
   const s = f.supabase!;
-  const base = { password: s.dbPass, database: "postgres", ssl: { rejectUnauthorized: false }, connectionTimeoutMillis: 15_000 };
+  // query_timeout + keepAlive: a local run hung 34 min on one query over a dead TCP connection (TD03, 2026-10-16);
+  // node-postgres has no client-side query timeout by default.
+  const base = { password: s.dbPass, database: "postgres", ssl: { rejectUnauthorized: false }, connectionTimeoutMillis: 15_000, query_timeout: 120_000, keepAlive: true };
   if (path === "direct") return { ...base, host: await directAddress(s.directHost), port: 5432, user: "postgres" };
   return { ...base, host: s.poolerHost, port: path === "pooler" ? 6543 : 5432, user: s.poolerUser };
 }
