@@ -1,5 +1,7 @@
 # Third-party auth on a multi-node read cluster - plan
 
+> **Status (2026-10-16): PLANNED - work-supabase-lab#56 (RC01-RC05), #57 (TPA05/TPA06).** Ledger Q1-Q6 open; RC01-RC05 and TPA05/TPA06 not written.
+
 **Goal:** Test whether turning on third-party auth (an external IdP's JWKS
 added to the data plane's verifiers) is safe on a topology where several
 independent PostgREST nodes sit behind a router, each node verifying tokens

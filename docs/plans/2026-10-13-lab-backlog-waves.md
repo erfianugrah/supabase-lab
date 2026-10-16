@@ -7,7 +7,7 @@
 > Steps 2-4 done; Task 20 Step 4 ran 2026-10-13 with O03 and W12 still
 > unverified (note under the step). Deviations are noted under each task.
 >
-> **STATUS 2026-10-13: PLANNED.** Covers every open card on the
+> **STATUS 2026-10-16: IN PROGRESS - remaining work: work-supabase-lab#128 (live half of Task 20), #87 (Task 18 Steps 2-3 skipped, no patched braces), #89 (W2) and the W3-W5 cards.** Planned 2026-10-13 to cover every open card on the
 > `work-supabase-lab` board (90 To-Do plus #127 In Review = 91; two non-lab
 > cards moved to another project on 2026-10-13). W1 (offline)
 > and the offline half of #128 are written out in full and were dry-run on a
@@ -2355,7 +2355,7 @@ Run: `bunx npm view braces versions --json | tail -3`
 Expected: a version above `3.0.3` in the list. If the last entry is
 `"3.0.3"`, stop here and go to Step 4.
 
-- [ ] **Step 2: Add the override**
+- [ ] **Step 2: Add the override** (skipped 2026-10-13: no braces release past 3.0.3, see fallback note)
 
 **Replace in `experiments/governed-starter-kit/app/package.json`:**
 
@@ -2377,7 +2377,7 @@ Expected: a version above `3.0.3` in the list. If the last entry is
 Run: `jq -r '.overrides.braces' experiments/governed-starter-kit/app/package.json`
 Expected: `^3.0.4`
 
-- [ ] **Step 3: Install, audit, sensors (NETWORK)**
+- [ ] **Step 3: Install, audit, sensors (NETWORK)** (skipped 2026-10-13, same fallback)
 
 ```bash
 (cd experiments/governed-starter-kit/app && bun install); echo "install exit $?"
@@ -2395,7 +2395,7 @@ git add experiments/governed-starter-kit/app/package.json experiments/governed-s
 git commit -m "fix(governed-starter-kit): override braces past 3.0.3 (#87)"
 ```
 
-- [ ] **Step 4: If no patched release exists**
+- [x] **Step 4: If no patched release exists**
 
 Remove the `"braces": "^3.0.4"` line (and the comma after `"0.35.5"`) if
 Step 2 was applied, and comment on the card:
