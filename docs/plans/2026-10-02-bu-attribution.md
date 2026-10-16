@@ -9,6 +9,8 @@ implement on their own control plane.
 answered. Open: Q9 (Task 3, second org), Q12 (Task 5, invoice), Q14 (Task 5b,
 scoped token on production), optional BA05 run (Task 4).
 
+**Status 2026-10-16:** still open, carded: work-supabase-lab#33 (Q14), #34 (Q9), #35 (Q10, BA05), #36 (Q12), #37 (Q13).
+
 **Scope boundary:** the operator builds the attribution system. This lab
 supplies the measured platform facts the pattern rests on, and the pattern
 itself as requirements. No gateway, ledger service or poller is built here;

@@ -2,6 +2,8 @@
 
 > **For agentic workers:** Execute this plan inline, task by task, in the current session. Steps use checkbox (`- [ ]`) syntax for tracking. Per-task subagents (subagent-driven-development) only if the user asks for them.
 
+> **STATUS 2026-10-16: IN PROGRESS - remaining work: batches B03-B18, H1, H2, P1-P3 (cards on the board; #41 board move open; B01 teardown Step 4 unverified).**
+>
 > **STATUS 2026-10-13: O1-O5, B01 and B02 EXECUTED; every other batch
 > planned, not run.** Each executed task carries an "Executed" note with its
 > deviations; commits and card moves are the operator's. Covers the 41 W3 cards of
@@ -2387,7 +2389,7 @@ logged.>
   next boot. <One clause on what that rules in or out.>
 ```
 
-- [ ] **Step 3: Commit and board**
+- [x] **Step 3: Commit and board** (commit 9d39466; board moves still open, see #41)
 
 ```bash
 git add experiments/platform-downtime/RUNLOG.md experiments/platform-downtime/out \
@@ -2610,7 +2612,7 @@ it. L01b needs `PVLAB_PAT2` in the env. L02 (<date>, work-supabase-lab#42):
 budget about 15 times; run nothing else with that token meanwhile.
 ```
 
-- [ ] **Step 4: Commit and board**
+- [x] **Step 4: Commit and board** (commit 9d39466; board moves still open)
 
 ```bash
 git add experiments/platform-facts/RUNLOG.md experiments/platform-facts/out \
