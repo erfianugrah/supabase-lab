@@ -9,6 +9,8 @@ implement on their own control plane.
 answered. Open: Q9 (Task 3, second org), Q12 (Task 5, invoice), Q14 (Task 5b,
 scoped token), optional BA05 run (Task 4).
 
+**Status 2026-10-16:** still open, carded: Q14, Q9, Q10 (BA05), Q12 and Q13 each have a board card.
+
 **Scope boundary:** the operator builds the attribution system. This lab
 supplies the measured platform facts the pattern rests on, and the pattern
 itself as requirements. No gateway, ledger service or poller is built here;
