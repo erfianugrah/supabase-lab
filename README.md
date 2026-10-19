@@ -354,10 +354,11 @@ facts):
   catalogue table: the installer as the non-superuser `postgres` role, the
   grants a reading role needs once an EQL index exists (measured for
   `authenticated` and a SELECT-only role), equality through PostgREST under
-  RLS, and a data key held in a storage-only encrypted column. Local Docker
-  rig, not managed (supabase/postgres 17.11 plus PostgREST 14.17), ciphertext
-  from CipherStash's own engine over an in-memory fake key source, so no
-  ZeroKMS. Measured 2026-10-19; see its RUNLOG.
+  RLS, and a data key held in a storage-only encrypted column. A local
+  Docker rig (supabase/postgres 17.11 plus PostgREST 14.17) and one managed
+  Pro-org project gave the same results; ciphertext from CipherStash's own
+  engine over an in-memory fake key source, so no ZeroKMS. Measured
+  2026-10-19; see its RUNLOG.
 - `pipelines` - Supabase Pipelines (public alpha): what a PAT can reach
   (nothing of the managed service), and replication behaviour of the
   open-source engine against a Pro project with a local DuckLake destination:

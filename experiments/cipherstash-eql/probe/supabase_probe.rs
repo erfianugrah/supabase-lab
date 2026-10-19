@@ -9,8 +9,9 @@
 //! authorisation, so nothing here says anything about key custody.
 //!
 //! Env: EQL_TEST_DATABASE_URL (a role that owns schema app, i.e. `postgres`),
-//! PGRST_URL, JWT_A / JWT_B (HS256 tokens, role authenticated, sub = UID_A /
-//! UID_B), UID_A, UID_B, OUT (file for the JSON result).
+//! PGRST_URL, JWT_A / JWT_B (access tokens, role authenticated, sub = UID_A /
+//! UID_B), UID_A, UID_B, OUT (file for the JSON result), and on managed APIKEY
+//! (the project API key the gateway requires beside the bearer token).
 //!
 //! Rows: owner A holds assets 1 (S-001) and 2 (S-002); owner B holds 3 (S-001)
 //! and 4 (S-003). Each row carries a random 32-byte data key, base64, encrypted
@@ -48,12 +49,16 @@ fn db_err(e: &postgres::Error) -> Value {
 /// One PostgREST GET with the caller's token; returns (status, body).
 fn get(path_and_query: &str, jwt: &str) -> (u16, String) {
     let url = format!("{}{}", env("PGRST_URL"), path_and_query);
-    let out = Command::new("curl")
-        .args(["-s", "-w", "\n%{http_code}", "-H"])
-        .arg(format!("Authorization: Bearer {jwt}"))
-        .arg(&url)
-        .output()
-        .expect("curl");
+    let mut cmd = Command::new("curl");
+    cmd.args(["-s", "-w", "\n%{http_code}", "-H"]).arg(format!("Authorization: Bearer {jwt}"));
+    // Schema `app` is the only exposed schema locally and one of several on
+    // managed, where PostgREST serves the first listed (`public`) by default.
+    cmd.args(["-H", "Accept-Profile: app"]);
+    // Managed: the gateway also wants the project's API key (APIKEY, optional).
+    if let Ok(k) = std::env::var("APIKEY") {
+        cmd.arg("-H").arg(format!("apikey: {k}"));
+    }
+    let out = cmd.arg(&url).output().expect("curl");
     let text = String::from_utf8_lossy(&out.stdout).to_string();
     let (body, code) = text.rsplit_once('\n').unwrap_or((&text, "0"));
     (code.trim().parse().unwrap_or(0), body.to_owned())

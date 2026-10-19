@@ -3670,12 +3670,14 @@ partial rows: `experiments/client-keyed-objects/RUNLOG.md`; generated table
   sleeps breaks long transfers and skews the Docker VM clock); `make sweep`
   for `ck-` leftovers.
 
-## experiments/cipherstash-eql - key facts (validated 2026-10-19 on a local Docker rig, not managed: supabase/postgres 17.11.0.004, PostgREST v14.17, EQL 3.0.6)
+## experiments/cipherstash-eql - key facts (validated 2026-10-19 on a local Docker rig, supabase/postgres 17.11.0.004 + PostgREST v14.17, and one managed Pro-org micro project in ap-southeast-1; EQL 3.0.6)
 
 Ciphertext from cipherstash/stack `66092fe` (`stack-encrypt` over
 `FakeDataKeySource`, keys in process memory): real EQL v3 payloads, no
 CipherStash account, nothing about ZeroKMS. Results:
-`experiments/cipherstash-eql/RUNLOG.md`, artifact `out/2026-10-19/ce-local.json`.
+`experiments/cipherstash-eql/RUNLOG.md`, artifacts `out/2026-10-19/ce-local.json`
+and `out/2026-10-19-managed/ce-managed.json`; every CE value matched between
+the two targets apart from plan costs and the encoded path length.
 
 - The release SQL installs as `postgres` (not a superuser, psql exit 0); it
   skips the `ore_block_256` operator class and reports 20 ORE-backed domains
@@ -3704,6 +3706,14 @@ CipherStash account, nothing about ZeroKMS. Results:
 - One 32-byte data key (row 1) in a storage-only `eql_v3_text` column
   round-tripped through PostgREST. `stack-encrypt` derives no `EncryptFrom`
   for that domain at this commit (seal natively, wrap).
-- Not run: managed, the compose stack, ZeroKMS, the TS wrapper, OPE/range,
-  match, JSON, any write through PostgREST, writes without grants, timing,
-  poolers, gateway logging of query strings.
+- Managed runner gotchas: in the first attempt the API said
+  `ACTIVE_HEALTHY` within a second and every lookup of the `db.` host through
+  the laptop's resolver failed for the whole wait; the next two runs asked
+  1.1.1.1 for the AAAA record and had it within a second (local negative
+  caching suspected, not separated), so query a public resolver and connect
+  by address; a managed
+  PostgREST serves `public` first, so requests to another exposed schema need
+  `Accept-Profile`.
+- Not run: the compose stack, ZeroKMS, the TS wrapper, OPE/range, match,
+  JSON, any write through PostgREST, writes without grants, timing, poolers,
+  gateway logging of query strings.
