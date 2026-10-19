@@ -1,0 +1,138 @@
+{
+  "CE01": {
+    "plaintext_deks_in_rows": 0,
+    "plaintext_refs_in_rows": [],
+    "rows": 4
+  },
+  "CE02": {
+    "pgrst_eq_as_a": {
+      "ids": {
+        "error": {
+          "code": "42501",
+          "details": null,
+          "hint": null,
+          "message": "permission denied for schema eql_v3"
+        }
+      },
+      "status": 403
+    },
+    "pgrst_plaintext_select_as_a": {
+      "ids": {
+        "error": {
+          "code": "42501",
+          "details": null,
+          "hint": null,
+          "message": "permission denied for schema eql_v3_internal"
+        }
+      },
+      "status": 403
+    },
+    "sql_eq_as_a": {
+      "context": null,
+      "error": "permission denied for schema eql_v3"
+    },
+    "sql_plaintext_as_a": {
+      "count_star": {
+        "context": "SQL function \"eq_term\" during inlining",
+        "error": "permission denied for schema eql_v3_internal"
+      },
+      "order_by_id": {
+        "context": "SQL function \"eq_term\" during inlining",
+        "error": "permission denied for schema eql_v3_internal"
+      },
+      "where_id": {
+        "context": "SQL function \"eq_term\" during inlining",
+        "error": "permission denied for schema eql_v3_internal"
+      }
+    },
+    "sql_plaintext_as_a_index_dropped": {
+      "count_star": 2,
+      "order_by_id": 2,
+      "where_id": 1
+    },
+    "sql_plaintext_as_a_warm_backend": {
+      "count_star": 2,
+      "order_by_id": 2,
+      "where_id": 1
+    }
+  },
+  "CE03": {
+    "pgrst_query_envelope_as_a": {
+      "ids": {
+        "error": {
+          "code": "23514",
+          "details": null,
+          "hint": null,
+          "message": "value for domain eql_v3_text_eq violates check constraint \"eql_v3_text_eq_check\""
+        }
+      },
+      "status": 400
+    },
+    "pgrst_stored_operand_as_a": {
+      "ids": [
+        1
+      ],
+      "status": 200
+    },
+    "pgrst_stored_operand_as_b": {
+      "ids": [
+        3
+      ],
+      "status": 200
+    },
+    "pgrst_unfiltered_as_a": {
+      "ids": [
+        1,
+        2
+      ],
+      "status": 200
+    },
+    "sql_eq_as_a": [
+      1
+    ],
+    "sql_eq_as_b": [
+      3
+    ],
+    "sql_plaintext_as_a": {
+      "count_star": 2,
+      "order_by_id": 2,
+      "where_id": 1
+    },
+    "sql_plaintext_as_reader_no_eql_grant": {
+      "count_star": {
+        "context": "SQL function \"eq_term\" during inlining",
+        "error": "permission denied for schema eql_v3_internal"
+      },
+      "order_by_id": {
+        "context": "SQL function \"eq_term\" during inlining",
+        "error": "permission denied for schema eql_v3_internal"
+      },
+      "where_id": {
+        "context": "SQL function \"eq_term\" during inlining",
+        "error": "permission denied for schema eql_v3_internal"
+      }
+    }
+  },
+  "CE04": [
+    {
+      "dek_bytes": 32,
+      "dek_matches": true,
+      "id": 1,
+      "subject_ref": "S-001"
+    }
+  ],
+  "CE05": {
+    "plan": [
+      "Bitmap Heap Scan on assets  (cost=4.19..12.68 rows=4 width=4)",
+      "  Recheck Cond: (((subject_ref)::jsonb ->> 'hm'::text) = ((('{\"i\": {\"c\": \"subject_ref\", \"t\": \"assets\"}, \"v\": 3, \"hm\": \"048bcad2e1a2a832ddd498e3bd7c9c552ea4f8f401a397ee5a4b568f491b6273\"}'::jsonb)::eql_v3.query_text_eq)::jsonb ->> 'hm'::text))",
+      "  ->  Bitmap Index Scan on assets_subject_ref_idx  (cost=0.00..4.19 rows=4 width=0)",
+      "        Index Cond: (((subject_ref)::jsonb ->> 'hm'::text) = ((('{\"i\": {\"c\": \"subject_ref\", \"t\": \"assets\"}, \"v\": 3, \"hm\": \"048bcad2e1a2a832ddd498e3bd7c9c552ea4f8f401a397ee5a4b568f491b6273\"}'::jsonb)::eql_v3.query_text_eq)::jsonb ->> 'hm'::text))"
+    ],
+    "uses_index": true
+  },
+  "operand_bytes": {
+    "query_envelope": 116,
+    "stored_envelope": 275,
+    "url_path_and_query": 427
+  }
+}

@@ -350,6 +350,14 @@ facts):
   refusal, a ciphertext-only scan, key service down, user-token multipart
   resume, a browser client, and error-shape parity (CK01-CK13).
   Self-provisioning; needs Docker. Measured 2026-10-12; see its RUNLOG.
+- `cipherstash-eql` - CipherStash EQL v3 searchable ciphertext in a Supabase
+  catalogue table: the installer as the non-superuser `postgres` role, the
+  grants a reading role needs once an EQL index exists (measured for
+  `authenticated` and a SELECT-only role), equality through PostgREST under
+  RLS, and a data key held in a storage-only encrypted column. Local Docker
+  rig, not managed (supabase/postgres 17.11 plus PostgREST 14.17), ciphertext
+  from CipherStash's own engine over an in-memory fake key source, so no
+  ZeroKMS. Measured 2026-10-19; see its RUNLOG.
 - `pipelines` - Supabase Pipelines (public alpha): what a PAT can reach
   (nothing of the managed service), and replication behaviour of the
   open-source engine against a Pro project with a local DuckLake destination:
