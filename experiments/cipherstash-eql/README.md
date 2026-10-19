@@ -8,8 +8,8 @@ operands work, and can a storage-only encrypted column hold a per-object data
 key for a client-side-encrypted object store such as the one in
 [client-keyed-objects](../client-keyed-objects/)?
 
-Run on a local Docker rig, not on managed Supabase, and outside the pvlab
-harness. The ciphertext comes from CipherStash's own Rust engine
+Run on a local Docker rig and on one managed Pro-org project
+(`run-managed.sh`), outside the pvlab harness. The ciphertext comes from CipherStash's own Rust engine
 (`stack-encrypt`) over the in-memory `FakeDataKeySource` from `stack-kms`, so
 no CipherStash account and no ZeroKMS are involved. These are real EQL v3
 payloads, but nothing here says anything about ZeroKMS: its key derivation,
@@ -20,7 +20,7 @@ says it "models none of ZeroKMS's authorization semantics".
 
 | part | what |
 |---|---|
-| Postgres | `supabase/postgres:17.11.0.004`; its `postgres` role is not a superuser (`install.txt`: `superuser=false`); EQL's permissions doc says the `postgres` role on cloud-hosted Supabase cannot create its ORE operator class; managed not tested here |
+| Postgres | `supabase/postgres:17.11.0.004`; its `postgres` role is not a superuser (`install.txt`: `superuser=false`); the managed project's is not either (`out/2026-10-19-managed/install.txt`) |
 | EQL | `cipherstash-encrypt.sql` from the `eql-3.0.6` release of cipherstash/stack, installed with psql as `postgres`; SHA-256 and psql exit status in `out/<date>/install.txt` |
 | PostgREST | `postgrest/postgrest:v14.17` (the self-hosted compose pin until it moved to v14.18), `db-schemas=app`, HS256 JWTs signed by `run-local.sh` |
 | `auth.uid()` | replaced with GoTrue's definition (supabase/auth `migrations/20220224000811_update_auth_functions.up.sql`): the bare image's version reads only `request.jwt.claim.sub`, and of the two JWT settings PostgREST 14 sets `request.jwt.claims`, not `request.jwt.claim.sub` |
@@ -56,7 +56,16 @@ connection.
 ```sh
 STACK_SRC=<cipherstash/stack checkout at the commit above> ./run-local.sh
 ./run-local.sh down
+
+# managed: one Pro-org micro project in ap-southeast-1, deleted on exit;
+# needs IPv6 to the direct database host
+SUPABASE_ACCESS_TOKEN=... PVLAB_ORG_PRO=<org slug> STACK_SRC=... ./run-managed.sh
 ```
+
+The managed run writes `out/<date>-managed/` (`install.txt`,
+`install-notices.txt`, `install-exit.txt`, `postgrest-config.json`,
+`vendor-text_eq.txt`, `ce-managed.json`, `ce-managed.log`), with no project
+ref in any of them.
 
 Writes `out/<date>/`: `install.txt`, `install-exit.txt`, `install-notices.txt`
 (the installer's EQL notices), `vendor-text_eq.txt`, `ce-local.json`,

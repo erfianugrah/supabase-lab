@@ -1,25 +1,23 @@
-19/Oct/2026:01:02:01 +0000: Starting PostgREST 14.17...
-19/Oct/2026:01:02:01 +0000: API server listening on 0.0.0.0:3000
-19/Oct/2026:01:02:01 +0000: Successfully connected to PostgreSQL 17.11 on aarch64-unknown-linux-gnu, compiled by gcc (GCC) 15.2.0, 64-bit
-19/Oct/2026:01:02:01 +0000: Connection Pool initialized with a maximum size of 10 connections
-19/Oct/2026:01:02:01 +0000: Listener connected to PostgreSQL 17.11 on aarch64-unknown-linux-gnu, compiled by gcc (GCC) 15.2.0, 64-bit on "eql-probe:5432" and listening for database notifications on the "pgrst" channel
-19/Oct/2026:01:02:01 +0000: Config reloaded
-19/Oct/2026:01:02:01 +0000: {"code":"PGRST002","details":null,"hint":null,"message":"Could not query the database for the schema cache. Retrying."}
-192.168.65.1 - anon [19/Oct/2026:01:02:01 +0000] "GET / HTTP/1.1" 503 119 "" "curl/8.7.1"
-19/Oct/2026:01:02:01 +0000: Schema cache queried in 21.2 milliseconds
-19/Oct/2026:01:02:01 +0000: Schema cache loaded 0 Relations, 0 Relationships, 0 RPCs, 0 Domain Representations, 4 Media Type Handlers, 598 Timezones
-19/Oct/2026:01:02:01 +0000: Schema cache loaded in 0.2 milliseconds
-19/Oct/2026:01:02:07 +0000: Received a schema cache reload message on the "pgrst" channel
-19/Oct/2026:01:02:07 +0000: Successfully connected to PostgreSQL 17.11 on aarch64-unknown-linux-gnu, compiled by gcc (GCC) 15.2.0, 64-bit
-19/Oct/2026:01:02:07 +0000: Connection Pool initialized with a maximum size of 10 connections
-19/Oct/2026:01:02:07 +0000: Config reloaded
-19/Oct/2026:01:02:07 +0000: Schema cache queried in 28.8 milliseconds
-19/Oct/2026:01:02:07 +0000: Schema cache loaded 1 Relations, 0 Relationships, 0 RPCs, 0 Domain Representations, 4 Media Type Handlers, 598 Timezones
-19/Oct/2026:01:02:07 +0000: Schema cache loaded in 0.2 milliseconds
-19/Oct/2026:01:02:07 +0000: Received a schema cache reload message on the "pgrst" channel
-19/Oct/2026:01:02:07 +0000: Successfully connected to PostgreSQL 17.11 on aarch64-unknown-linux-gnu, compiled by gcc (GCC) 15.2.0, 64-bit
-19/Oct/2026:01:02:07 +0000: Connection Pool initialized with a maximum size of 10 connections
-19/Oct/2026:01:02:07 +0000: Config reloaded
-19/Oct/2026:01:02:07 +0000: Schema cache queried in 20.8 milliseconds
-19/Oct/2026:01:02:07 +0000: Schema cache loaded 1 Relations, 0 Relationships, 0 RPCs, 0 Domain Representations, 4 Media Type Handlers, 598 Timezones
-19/Oct/2026:01:02:07 +0000: Schema cache loaded in 0.2 milliseconds
+19/Oct/2026:02:13:51 +0000: Starting PostgREST 14.17...
+19/Oct/2026:02:13:51 +0000: API server listening on 0.0.0.0:3000
+19/Oct/2026:02:13:51 +0000: Successfully connected to PostgreSQL 17.11 on aarch64-unknown-linux-gnu, compiled by gcc (GCC) 15.2.0, 64-bit
+19/Oct/2026:02:13:51 +0000: Connection Pool initialized with a maximum size of 10 connections
+19/Oct/2026:02:13:51 +0000: Listener connected to PostgreSQL 17.11 on aarch64-unknown-linux-gnu, compiled by gcc (GCC) 15.2.0, 64-bit on "eql-probe:5432" and listening for database notifications on the "pgrst" channel
+19/Oct/2026:02:13:51 +0000: Config reloaded
+19/Oct/2026:02:13:51 +0000: Schema cache queried in 20.8 milliseconds
+19/Oct/2026:02:13:51 +0000: Schema cache loaded 0 Relations, 0 Relationships, 0 RPCs, 0 Domain Representations, 4 Media Type Handlers, 598 Timezones
+19/Oct/2026:02:13:51 +0000: Schema cache loaded in 1.1 milliseconds
+19/Oct/2026:02:13:57 +0000: Received a schema cache reload message on the "pgrst" channel
+19/Oct/2026:02:13:57 +0000: Successfully connected to PostgreSQL 17.11 on aarch64-unknown-linux-gnu, compiled by gcc (GCC) 15.2.0, 64-bit
+19/Oct/2026:02:13:57 +0000: Connection Pool initialized with a maximum size of 10 connections
+19/Oct/2026:02:13:57 +0000: Config reloaded
+19/Oct/2026:02:13:57 +0000: Schema cache queried in 25.2 milliseconds
+19/Oct/2026:02:13:57 +0000: Schema cache loaded 1 Relations, 0 Relationships, 0 RPCs, 0 Domain Representations, 4 Media Type Handlers, 598 Timezones
+19/Oct/2026:02:13:57 +0000: Schema cache loaded in 0.2 milliseconds
+19/Oct/2026:02:13:57 +0000: Received a schema cache reload message on the "pgrst" channel
+19/Oct/2026:02:13:57 +0000: Successfully connected to PostgreSQL 17.11 on aarch64-unknown-linux-gnu, compiled by gcc (GCC) 15.2.0, 64-bit
+19/Oct/2026:02:13:57 +0000: Connection Pool initialized with a maximum size of 10 connections
+19/Oct/2026:02:13:57 +0000: Config reloaded
+19/Oct/2026:02:13:57 +0000: Schema cache queried in 21.0 milliseconds
+19/Oct/2026:02:13:57 +0000: Schema cache loaded 1 Relations, 0 Relationships, 0 RPCs, 0 Domain Representations, 4 Media Type Handlers, 598 Timezones
+19/Oct/2026:02:13:57 +0000: Schema cache loaded in 0.2 milliseconds

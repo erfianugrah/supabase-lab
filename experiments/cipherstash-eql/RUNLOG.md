@@ -55,8 +55,7 @@ expands some base64 characters of the fresh ciphertext and not others.
 What it shows:
 
 - The EQL installer runs as this image's non-superuser `postgres` role. The
-  equality domain works (CE03). Managed was not tested (no project was created
-  in this run).
+  equality domain works (CE03). The managed run below gave the same results.
 - The installer grants nothing: its permissions doc says so, `eql_schema_acl`
   is null on both schemas after the install, and CE02 ran on that state (no
   REVOKE before it). With an EQL functional index on the table, a role with none of
@@ -109,8 +108,7 @@ the grants returned `[]` for both owners, because PostgREST 14 sets
 `request.jwt.claims` and not `request.jwt.claim.sub`; installing GoTrue's
 definition fixed it. Not reproduced in the final run, which installs it first.
 
-Not run: managed Supabase (needs a Management API token and a Pro org), the
-self-hosted compose stack (bare image plus PostgREST here), ZeroKMS (needs a
+Not run on this rig: the self-hosted compose stack (bare image plus PostgREST here), ZeroKMS (needs a
 CipherStash account), the TypeScript `encryptedSupabase` wrapper, OPE ordering
 and range filters, free-text match, encrypted JSON, any write through
 PostgREST, writes by a role without grants, any timing, any pooler, and the managed gateway's handling of
@@ -118,3 +116,52 @@ ciphertext in query strings. EQL has no bytes type (the 11 installed domain
 families above; CipherStash's TypeScript plaintext enum agrees, source-read,
 see `docs/research/raw/2026-10-19-cipherstash/findings.md`), so large objects
 stay with client-side encryption in Storage; nothing here tests otherwise.
+
+## 2026-10-19 - managed, one Pro-org micro project, ap-southeast-1
+
+`run-managed.sh`: one throwaway project created through the Management API
+and deleted at the end of the same script (`delete project: 200`). SQL checks
+over the direct connection (the `db.` host's AAAA record, connected by
+address, so a new connection is a new backend, not a pooler slot); PostgREST
+through the project's API gateway with the legacy `anon` key as `apikey` and
+the access tokens of two Auth users created through the admin API. Schema
+`app` added to the exposed schemas (`postgrest-config.json`:
+`public,graphql_public,app`). The probe source is the same as the final local
+run's (it sends `Accept-Profile: app`, which managed needs because PostgREST
+serves the first exposed schema, `public`, by default; the first managed
+attempt failed on `PGRST205` without it; an attempt before that never
+reached the database because every lookup of the direct host through the
+laptop's resolver failed, while later runs got the AAAA record from 1.1.1.1
+within a second, so local negative caching is suspected, not separated; both
+projects were deleted). Artifacts: `out/2026-10-19-managed/`.
+
+Install (`install.txt`): `eql_version=3.0.6`, `install_role=postgres
+superuser=false`, `pg=17.11`, `eql_domain_count=52`,
+`eql_schema_acl=eql_v3:null eql_v3_internal:null`, `pgcrypto_schema=extensions`,
+`psql_exit=0`, and `auth_uid_reads_claims=t` (managed's `auth.uid()` reads
+`request.jwt.claims`). The installer printed the same two notices as on the
+local rig (`install-notices.txt`).
+
+Vendor test (`vendor-text_eq.txt`): `9 passed; 0 failed`, its ignored database
+test included, as `postgres` over the direct connection.
+
+Probe (`ce-managed.json`): every CE01-CE05 value is identical to the local
+`ce-local.json` except the EXPLAIN plan text (costs) and the percent-encoded
+path length (429 bytes against 427). In particular, on managed:
+
+- CE02: before any grant, `authenticated` got `permission denied for schema
+  eql_v3_internal` (context `SQL function "eq_term" during inlining`) on all
+  three plaintext-only SQL shapes in a new connection, and PostgREST
+  `select=id&order=id` answered 403 `42501`; with the index dropped, and in a
+  connection where `postgres` planned first, the same reads counted 2, 1 and 2
+  rows.
+- CE03: equality over SQL A `[1]`, B `[3]`; PostgREST with the stored envelope
+  A `[1]` (200), B `[3]` (200); the term-only envelope 400 `23514`;
+  `eql_probe_reader` failed the three plaintext shapes as on the local rig.
+- CE04: row 1 decrypted to the original 32-byte key and `S-001`.
+- CE05: Bitmap Index Scan on `assets_subject_ref_idx`.
+
+Not run on managed: any pooler (Supavisor session or transaction mode), the
+new `sb_publishable_` key as `apikey`, the PostgREST version (not recorded),
+the API gateway's logs, and everything listed as not run for the local rig
+apart from managed itself.
