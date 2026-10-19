@@ -286,6 +286,10 @@ and destroyed the same afternoon.
   override is rather than a measurement.
 - The wall clock on a FREE project (documented 150 s active): only a paid
   project was used.
+- A Docker-less CLI deploy UNDER 5 MB (EF04 re-run 2026-10-19 tested only
+  8 MB): expected to land via the API path with exit 0, so the fallback would
+  be silent below 5 MB. Inferred from EF04a and EF04g, not measured.
+  Card: work-supabase-lab#195.
 
 ## Operational notes
 
@@ -294,6 +298,15 @@ and destroyed the same afternoon.
 - Run the destructive battery detached (`setsid nohup make probe-destructive`)
   or in a shell without a command timeout: EF04's Docker rows plus EF05 take
   ~3 minutes on this machine, and a killed run leaves functions deployed.
+- Running on macOS (EF04 re-run 2026-10-19): the root `secrets.tfvars` has
+  `supabase_access_token` commented out (the first-run trap in AGENTS.md), so
+  the Makefile's `TOK` is empty and the PAT comes from the vault. tofu needs
+  `TF_VAR_supabase_access_token`, and `make -e` lets an environment `TOK`
+  override the Makefile's. `dist/pvlab` is linux-x64, so run from source:
+  `sx SUPABASE_ACCESS_TOKEN -- sh -c 'TOK="$SUPABASE_ACCESS_TOKEN" make -e
+  probe-destructive ONLY=EF04 BUILD=0 RUNNER="bun $HOME/work/supabase-lab/harness/src/run.ts"'`.
+  `make probe-bg` uses `setsid`, which macOS does not ship; background the
+  plain target instead. A fresh host needs `tofu init` first.
 - EF05 is built to provoke the control-plane rate limit; the deploy responses
   themselves never returned 429 on this run, and whether the follow-up GET and
   DELETE calls did is not recorded, because `landedPatiently` and

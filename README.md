@@ -152,7 +152,10 @@ facts):
   RATE_LIMIT_EXCEEDED across ~59.6k chains, ~119k nested calls), and ten
   delete-during-deploy rounds plus
   five 4-wide same-slug rounds showed no corruption. Pure triage classifier
-  under `lib/`, unit tested on the verbatim strings. Write-up:
+  under `lib/`, unit tested on the verbatim strings. Re-run 2026-10-19 on
+  CLI 2.121.0: explicit `--use-docker` lands 8 MB with Docker up, and with
+  Docker unreachable falls back to the API path (413 at 8 MB) like the
+  default, so the flag does not fail closed. Write-up:
   https://erfi.dev/reference/supabase-edge-function-limits/
 - `self-hosted-auth` - a GoTrue you run yourself against a managed project's
   Postgres (session pooler, `postgres` role, `search_path=auth`): it shares
