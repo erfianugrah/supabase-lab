@@ -12,8 +12,12 @@
  *   EF04c  CLI --use-api, 8 MB  same path by construction - refused
  *   EF04d  CLI default,  8 MB  local bundling (docs: 20 MB) - lands
  *   EF04e  CLI default, 24 MB  over the local ceiling - refused
- *   EF04f  CLI --use-docker, 8 MB  only if EF04d did NOT land: tells whether
- *                      this CLI version's default was the API path
+ *   EF04f  CLI --use-docker, 8 MB  explicit local bundling with Docker up - lands
+ *   EF04g  CLI --use-docker, 8 MB  Docker unreachable (DOCKER_HOST points at a
+ *                      socket that does not exist): fails closed, or falls back
+ *                      to the API path and its 5 MB ceiling (supabase/cli#7214)
+ *   EF04h  CLI default, 8 MB  Docker unreachable: the documented fallback to
+ *                      API bundling - refused at the 5 MB ceiling
  *
  * Sources are random base64 in a string literal so no bundler can shrink
  * them; the handler returns the literal's length so the invocation proves
@@ -180,13 +184,10 @@ const mod: TestModule = {
       }
 
       // EF04d - CLI default at 8 MB.
-      let defaultLanded = false;
-      {
+          {
         const slug = `${P}cli-def-8mb`;
         const res = await cliDeploy(ctx, [{ slug, files: [{ name: "index.ts", content: bigSource(SIZES.overApi) }] }]);
-        const proof = await prove(ctx, slug);
-        defaultLanded = proof.present && proof.invokeStatus === 200;
-        out.push(cliRow("EF04d", "CLI default bundling, 8 MB", SIZES.overApi, true, FUNCTION_SIZE_MB.cli, res, proof));
+        out.push(cliRow("EF04d", "CLI default bundling, 8 MB", SIZES.overApi, true, FUNCTION_SIZE_MB.cli, res, await prove(ctx, slug)));
       }
       // EF04e - CLI default at 24 MB.
       {
@@ -194,11 +195,27 @@ const mod: TestModule = {
         const res = await cliDeploy(ctx, [{ slug, files: [{ name: "index.ts", content: bigSource(SIZES.overCli) }] }]);
         out.push(cliRow("EF04e", "CLI default bundling, 24 MB (over the local ceiling)", SIZES.overCli, false, FUNCTION_SIZE_MB.cli, res, await prove(ctx, slug)));
       }
-      // EF04f - only informative if the default did not behave like local bundling.
-      if (!defaultLanded) {
+      // EF04f - the explicit flag with Docker up. Ran only when EF04d failed
+      // until 2026-10-19; the flag is what support pages tell customers to use.
+      {
         const slug = `${P}cli-docker-8mb`;
         const res = await cliDeploy(ctx, [{ slug, files: [{ name: "index.ts", content: bigSource(SIZES.overApi) }] }], { bundling: "use-docker" });
-        out.push(cliRow("EF04f", "CLI --use-docker, 8 MB (default did not land)", SIZES.overApi, true, FUNCTION_SIZE_MB.cli, res, await prove(ctx, slug)));
+        out.push(cliRow("EF04f", "CLI --use-docker, 8 MB (Docker up)", SIZES.overApi, true, FUNCTION_SIZE_MB.cli, res, await prove(ctx, slug)));
+      }
+      // EF04g/h - a CI runner without Docker. Pointing DOCKER_HOST at a missing
+      // socket makes Docker unreachable for the CLI only, without stopping the
+      // daemon. Both expected refused: the question is HOW (the error text says
+      // whether the CLI failed closed or posted to the 5 MB API path).
+      const noDocker = { DOCKER_HOST: "unix:///nonexistent/pvlab-no-docker.sock" };
+      {
+        const slug = `${P}cli-docker-nod-8mb`;
+        const res = await cliDeploy(ctx, [{ slug, files: [{ name: "index.ts", content: bigSource(SIZES.overApi) }] }], { bundling: "use-docker", env: noDocker });
+        out.push(cliRow("EF04g", "CLI --use-docker, 8 MB, Docker unreachable", SIZES.overApi, false, FUNCTION_SIZE_MB.cli, res, await prove(ctx, slug)));
+      }
+      {
+        const slug = `${P}cli-def-nod-8mb`;
+        const res = await cliDeploy(ctx, [{ slug, files: [{ name: "index.ts", content: bigSource(SIZES.overApi) }] }], { env: noDocker });
+        out.push(cliRow("EF04h", "CLI default bundling, 8 MB, Docker unreachable", SIZES.overApi, false, FUNCTION_SIZE_MB.api, res, await prove(ctx, slug)));
       }
     } catch (e) {
       out.push({ id: "EF04", title: this.title, status: "fail", detail: `threw: ${e instanceof Error ? e.message : String(e)}` });

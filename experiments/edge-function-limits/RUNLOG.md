@@ -19,7 +19,7 @@ Full write-up: https://erfi.dev/reference/supabase-edge-function-limits/
 | EF01 | read-only   | Do the four secrets limits declared in the published OpenAPI request schema match the docs? Is 413 a declared response of the deploy endpoint? Is `static_patterns` in the API contract? |
 | EF02 | read-only   | Per org plan: does `function.max_count` match the docs table (Free 100 / Pro 1000 / Team 2000)? An override is `info`, not a fail - it is the lever. `function.size_limit_mb` recorded per plan. |
 | EF03 | destructive | Secrets: reserved prefix, name length 256/257, value 24,576/24,577 chars, the same count in three-byte characters, and the 101st user secret. |
-| EF04 | destructive | Function size by deploy path: API 2 MB / 8 MB, CLI `--use-api` 8 MB, CLI default 8 MB / 24 MB, then `--use-docker` at 8 MB only if the 8 MB default did not land. Every acceptance proven by GET + invoke. |
+| EF04 | destructive | Function size by deploy path: API 2 MB / 8 MB, CLI `--use-api` 8 MB, CLI default 8 MB / 24 MB, CLI `--use-docker` 8 MB with Docker up, then `--use-docker` and default at 8 MB with Docker unreachable (`DOCKER_HOST` at a missing socket). Every acceptance proven by GET + invoke. Until 2026-10-19 the `--use-docker` row ran only if the 8 MB default did not land, so the 2026-09-02 run never exercised the flag. |
 | EF05 | destructive | 24 API deploys 8-wide, 8 concurrent CLI processes, a same-slug race, a delete during a deploy: reported success vs landed, 409 vs 413 vs 429 kept apart, version regressions. |
 | EF06 | destructive | Restrictions: HTML rewritten to text/plain, ports 25/587 blocked (443 control), Worker and node:vm unavailable, static files via API vs via CLI, `npm:sharp`. |
 | EF07 | destructive | Runtime ceilings: CPU 500 ms vs 3 s, memory 64 MB vs 400 MB. Idle timeout referenced to edge-resilience W13, not re-run. |
@@ -41,6 +41,38 @@ classifier's tests include the strings the platform actually returned below.
    merged with 429.
 3. Whether anyone checked the functions landed rather than trusting the exit
    code. Exit 0 or 2xx with the function absent afterwards is `silent-loss`.
+
+## EF04 re-run 2026-10-19 (micro, ap-southeast-1, Pro org; CLI 2.121.0, Docker present)
+
+Evidence: `out/2026-10-19/run-2026-10-19T06-18-50-032Z.json`, 9 pass, 0
+fail. One fresh project, destroyed after the run. Question: does the explicit
+`--use-docker` flag do anything the default does not, and what happens on a
+runner with no Docker? Rows EF04a-e repeat the 2026-09-02 results (API 2 MB
+lands, API 8 MB and CLI `--use-api` 8 MB get 413, CLI default 8 MB lands, CLI
+default 24 MB gets 413 on "create function").
+
+- EF04f, CLI `--use-docker` 8 MB, Docker up: exit 0 in 6,552 ms, landed,
+  invoke reports 8,388,460 bytes. stderr: `Bundling Function: ...` then
+  `Deploying Function: ... (script size: 12 MB)`. Same outcome as the default.
+- EF04g, CLI `--use-docker` 8 MB, Docker unreachable: exit 1 in 828 ms,
+  `unexpected deploy status 413: {"message":"request entity too large"}`.
+  stderr: `WARNING: Docker is not running`, then `Uploading asset (...)`. The
+  explicit flag does not fail closed: the CLI fell back to server-side
+  bundling and its 5 MB ceiling, the same error text as `--use-api` (EF04c).
+  This is the behaviour reported in supabase/cli#7214 against 2.121.0.
+- EF04h, CLI default 8 MB, Docker unreachable: exit 1 in 653 ms, the same
+  413 text and the same two stderr lines as EF04g. This is the documented
+  fallback.
+- `supabase functions deploy --help` on 2.121.0 lists `--use-api` and does
+  not list `--use-docker` (read 2026-10-19, not a harness row).
+
+Read for a customer: `--use-docker` adds nothing over "CLI with Docker
+running", and does not protect a runner without Docker. A pipeline that needs
+the 20 MB path has to check Docker is up before deploying and treat the
+`WARNING: Docker is not running` line as a failure. Not run: a Docker-less
+deploy UNDER 5 MB with `--use-docker` (it would land via the API path and
+exit 0, so the fallback is silent below 5 MB - inferred from EF04a and EF04g,
+not measured).
 
 ## EF12 validated 2026-09-08 (Free + Pro + Team orgs, ap-southeast-1)
 
