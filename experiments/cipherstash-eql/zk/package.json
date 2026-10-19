@@ -1,0 +1,11 @@
+{
+  "name": "cipherstash-eql-zk",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@cipherstash/stack": "1.2.1",
+    "@cipherstash/stack-supabase": "1.2.1",
+    "@supabase/supabase-js": "2.118.0",
+    "pg": "8.23.1"
+  }
+}

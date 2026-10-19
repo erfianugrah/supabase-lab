@@ -165,3 +165,193 @@ Not run on managed: any pooler (Supavisor session or transaction mode), the
 new `sb_publishable_` key as `apikey`, the PostgREST version (not recorded),
 the API gateway's logs, and everything listed as not run for the local rig
 apart from managed itself.
+
+## 2026-10-19 - ZeroKMS: managed project, @cipherstash/stack 1.2.1, encryptedSupabase
+
+Real ZeroKMS keys this time. `run-zk-managed.sh` creates one Pro-org micro
+project in ap-southeast-1, installs EQL 3.0.6 from the release SQL as
+`postgres`, applies `zk/schema.sql` (tables in `public`, which the wrapper
+introspects; RLS `owner = auth.uid()`; the EQL grants to `anon`,
+`authenticated` and `service_role`), creates two Auth users and runs
+`zk/probe.ts` with `@cipherstash/stack` 1.2.1, `@cipherstash/stack-supabase`
+1.2.1 (protect-ffi 0.33.0) and supabase-js 2.118.0. CipherStash credentials:
+the CLI device session (`stash auth login --region ap-southeast-2`, stash
+1.1.1), no `CS_*` variables. The probe routes CipherStash traffic through an
+in-process CONNECT proxy (`HTTPS_PROXY`, Supabase hosts in `NO_PROXY`; ZK05
+shows the SDK's requests go through it, and the proxy logged no Supabase
+host), which records the hosts it is asked for and can refuse or black-hole
+them. A pre-run check with a dead proxy, not archived, saw `Encryption()`
+fail in 5 ms with `Failed to load keyset: SendRequest`. Vantage: one laptop
+in Singapore; ZeroKMS workspace in ap-southeast-2 (Sydney); project in
+ap-southeast-1.
+
+Runs, all on 2026-10-19, each on its own project, all deleted:
+
+- run 1 (`zk-managed-run1.json`, `install-run1.txt`): ZK01-ZK07 with
+  `KEEP=1`. Its ZK06 ciphertext check was a raw substring test against
+  whichever `edge_logs` row carried the operand's `hm` slice, and it returned
+  `rowHasCiphertextSlice: false` (see ZK06 below); the probe was then changed
+  to decode the stored query string and compare it with the request sent.
+- follow-up (`zk-followup-run1.json`): `run-zk-followup.sh` on run 1's
+  project after the project's issuer was registered by hand as an OIDC
+  provider in the CipherStash workspace dashboard: ZK06b and ZK07b, with two
+  new Auth users.
+- run 2 (`zk-managed.json`, `install.txt`): ZK01-ZK07 with the probe as
+  committed.
+- An attempt before run 1 failed before any test (node-postgres read the
+  runner's `PGSSLMODE=require` as verify-full: `self signed certificate in
+  certificate chain`); the runner now unsets it and uses
+  `sslmode=no-verify`. Its project was deleted.
+
+Install (`install.txt`, `install-notices.txt`): `eql_version=3.0.6`,
+`pg=17.11`, `psql_exit=0`, the same two ORE notices as the local rig. The ZK
+install recorded only these; pgcrypto, the domain count and the superuser
+check were recorded for the CE targets only. The `stack_commit_for_eql_ref`
+line in both `install*.txt` files came from an earlier version of the
+runner, which no longer writes it.
+
+| id | run 1 | run 2 |
+|---|---|---|
+| ZK01 insert 6 rows as A / 3 as B (one wrapper call each) | 714 / 413 ms | 615 / 390 ms |
+| ZK01 stored rows | 9 (A 6, B 3), `plaintextHits: []` | same |
+| ZK01 payload keys | `text_eq` c,hm,i,v; `text_ord` c,hm,i,op,v; `integer_ord` and `date_ord` c,i,op,v; `text` c,i,v | same |
+| ZK01 three rows with subject `S-001` (A 2, B 1) | same `hm`, different `c` | same |
+| ZK02 checks with an expected result (18 reads plus the update; 9 with an encrypted operand) | 19 of 19 pass, 0 fail | 19 of 19, 0 |
+| ZK02 decrypted values for A's 6 rows | 0 mismatches; `score` number, `seen` Date | same |
+| ZK02 update as A, delete as B, B updating A's rows | pass, `["b2"]`, 0 rows | same |
+| ZK03 32-byte data key in `eql_v3_text` | round trip, stored keys c,i,v, no plaintext | same |
+| ZK07 federation, issuer not registered | `401: Authorization failed: No OIDC provider found for issuer` | same |
+| proxy, hosts asked for | `ap-southeast-2.aws.viturhosted.net` 13, `ap-southeast-2.aws.cts.cipherstashmanaged.net` 1; no Supabase host | same |
+
+ZK02's 19 checks: select all as A and as B (RLS); equality on `text_eq` as
+A and as B, `in`, `neq`; `gte`/`lt` on `integer_ord`; `gt` on `text_ord`;
+`gte` on `date_ord`; equality on `integer_ord`; ordering ascending and
+descending on `integer_ord`, ascending on `text_ord`, descending on
+`date_ord`; `range(0,1)` paging; an encrypted and a plaintext filter
+together; `is(subject, null)`; a plaintext-only select; the update as A.
+Expected results were computed in the probe from the inserted values. Refused
+by the wrapper in 2 ms or less, too fast for a network request (`.csv()`
+threw and was not timed), with these messages: equality on `eql_v3_text` ("does not support
+equality queries"), ordering on `eql_v3_text_eq` ("cannot order by encrypted
+column ... carries no ordering term"), `gt` on `eql_v3_text_eq` ("does not
+support orderAndRange queries"), `.csv()` ("unavailable on encrypted
+queries because PostgREST serializes rows before the adapter can decrypt
+them").
+
+ZK04 latency, ms (SDK single operations n = 20 per run; wrapper and plain
+supabase-js n = 10 per run; bulk and client init one call per run; p95 is
+the largest of the n samples):
+
+| measurement | run 1 p50 / p95 | run 2 p50 / p95 |
+|---|---|---|
+| SDK encrypt, one value | 257 / 321 | 269 / 335 |
+| SDK decrypt, one value | 255 / 358 | 269 / 359 |
+| wrapper insert, one row (one `text_eq` column) | 312 / 419 | 297 / 313 |
+| supabase-js insert, plaintext table | 44 / 93 | 44 / 96 |
+| wrapper select with an encrypted `eq` filter, one row | 562 / 580 | 554 / 620 |
+| supabase-js select, plaintext `eq` filter | 43 / 82 | 47 / 83 |
+
+| bulk, values | run 1 encrypt / decrypt | run 2 encrypt / decrypt |
+|---|---|---|
+| 10 | 261 / 359 | 273 / 272 |
+| 100 | 766 / 2918 | 896 / 280 |
+| 500 | 1066 / 813 | 581 / 312 |
+
+Client init (`Encryption()`): 773 and 1056 ms; wrapper init
+(`encryptedSupabase()`, introspection included): 1521 and 1286 ms. In ZK02 a
+query with an encrypted filter operand that selected only the plaintext
+`note` (so no decrypt) took 282-371 ms, and an ordering that selected only a
+plaintext column 33-85 ms (both runs).
+
+ZK05, ZeroKMS unreachable after init (wrapper and SDK already initialised;
+the proxy drops its tunnels on each switch). Time to result, ms:
+
+| operation | refused, run 1 / 2 | black-holed, run 1 / 2 | result |
+|---|---|---|---|
+| wrapper insert | 2 / 5 | 10005 / 10003 | `EncryptionError` ("ZeroKMS error 'Unexpected error (SendRequest: Failed to send request)'") |
+| wrapper select of encrypted columns | 63 / 47 | 10047 / 10059 | `DecryptionError` ("Failed to retrieve key") |
+| wrapper select, plaintext columns only | 39 / 47 | 60 / 55 | 7 rows, no error |
+| wrapper encrypted `eq` filter | 2 / 4 | 10003 / 10004 | `EncryptionError` |
+| SDK decrypt of a value encrypted before the outage | 2 / 3 | 10003 / 10004 | `DecryptionError` |
+| supabase-js select of the same table | 37 / 40 | 46 / 58 | 7 rows, no error |
+
+Recovery after the proxy passed traffic again: the first query succeeded in
+903 and 838 ms, with no client re-initialisation.
+
+ZK06 logs. The S-001 equality GET carried a 250-byte operand (keys c, hm, i,
+v) in a 478 / 466-byte URL. `edge_logs` rows on the managed API gateway
+carrying its `hm` slice: 2 / 3, each with the query string in
+`request.search` (the row read: 421 / 410 characters). In run 2 the decoded
+operand's `c` and `hm` equal the ones sent (`storedOperandMatchesSent:
+true`). In run 1 the sampled GET itself had no row (ZK06b's earliest row is
+the later `eq` on `score`), so the row read belonged to another S-001
+request, whose `c` differs because each operand is encrypted afresh. That
+alone explains `rowHasCiphertextSlice: false`; percent-encoding may also
+have contributed (the earlier probe is not committed). ZK06b decoded every
+logged `/rest/v1/records` request with an `eq.` parameter on run 1's
+project: 8 rows (GET 5, PATCH 2, DELETE 1), 6 of them written out. 4 of
+those 6 carried an encrypted operand with its full key set: `subject` with
+keys c, hm, i, v (c 130 characters, hm 64) and, for the equality filter on
+`score` (`integer_ord`), keys c, i, op, v (c 132); the other 2 had only a
+plaintext `note=eq.`. ZK06b recorded keys and lengths and did not compare
+them with what was sent. By the probe source, 10 requests with an `eq.`
+parameter went to that path on run 1's project (7 GET, 2 PATCH, 1 DELETE),
+so 2 had no row when read. Range, `in` and `neq` operands were not decoded.
+`postgres_logs`: no row contained either operand slice in either run; 6
+logged statements mentioned the table, and the 3 written out are DDL run over
+psql.
+
+ZK07b, federation (run 1's project, issuer registered, two new Auth users
+A and B): as user A,
+`OidcFederationStrategy` (CRN plus A's Supabase access token) encrypt and
+decrypt worked; user B, federated the same way, decrypted A's unlocked value.
+With the lock context `{ identityClaim: ["sub"] }` A encrypted and decrypted;
+B's decrypt failed with `DecryptionError` "Failed to retrieve key: Failed to
+send request: Forbidden: Request forbidden". CipherStash's Supabase Auth page
+says lock context requires a Business or Enterprise workspace plan; it worked
+on this newly created workspace, whose plan was not read.
+
+What it shows:
+
+- The wrapper runs equality, `in`, `neq`, range and ordering on encrypted
+  `text_eq`, `text_ord`, `integer_ord` and `date_ord` columns through
+  PostgREST under RLS on managed, with the results equal to the same filter
+  on plaintext, in both runs. Unsupported combinations fail in the client.
+- Every encrypt or decrypt is a round trip to ZeroKMS (inferred from
+  latency; requests not counted): 255-269 ms p50 from this vantage to
+  Sydney, so a wrapper select with an encrypted filter costs one encrypt (the
+  operand) plus one decrypt (the rows) on top of the request: 554-562 ms
+  against 43-47 ms. Per CipherStash's docs a bulk call makes one ZeroKMS
+  call; measured, 500 values took 581-1066 ms to encrypt against 257-269 ms
+  p50 for one value. The distances (Singapore to Sydney for ZeroKMS,
+  Singapore to Singapore for the project) dominate (reasoned, not varied);
+  another vantage or a ZeroKMS region next to the application was not run.
+- With ZeroKMS unreachable, nothing encrypted can be read or written, a value
+  encrypted just before the outage included (so no cached key served these
+  calls; SDK source not read), while Postgres,
+  PostgREST and plaintext columns are unaffected. A black-holed connection
+  fails after 10.0 s per operation in every case, consistent with a 10 s
+  request timeout in the client (not source-read). The client recovered on
+  its own.
+- The managed gateway's `edge_logs` keep the encrypted filter operand of
+  each logged request, ciphertext and index terms included, for GET, PATCH
+  and DELETE (8 of 10 `eq.` requests had a row when read).
+  CipherStash's supabase-js guide asks for logs not to retain query strings;
+  on managed Supabase the gateway's log does. Retention follows the plan's
+  log retention (not measured here).
+- Federation and the lock context did what CipherStash documents: the lock
+  bound the value to A's `sub`, and B's valid federated session could not
+  derive the key.
+- Observed in the CipherStash dashboard during the follow-up (screenshot not
+  archived): its readiness check for run 1's project showed "EQL
+  installed" and "Encrypted columns detected" as not done, while
+  `eql_v3.version()` returned 3.0.6 and the tables held six encrypted
+  columns. The dashboard suggests `stash db install --supabase --migration`;
+  this run installed from the release SQL. Cause not checked.
+
+Not run: Supavisor (both modes), the Drizzle and Prisma integrations (free
+text and encrypted JSON), the access-key and client-key credentials (device
+session only), ZeroKMS from a second vantage or region, timing beyond the two
+runs, concurrency, range, `in` and `neq` operands in `edge_logs`, edge_logs
+retention, the TypeScript wrapper inside an Edge Function (WebAssembly
+build).

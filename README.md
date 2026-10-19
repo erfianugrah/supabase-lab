@@ -356,9 +356,11 @@ facts):
   `authenticated` and a SELECT-only role), equality through PostgREST under
   RLS, and a data key held in a storage-only encrypted column. A local
   Docker rig (supabase/postgres 17.11 plus PostgREST 14.17) and one managed
-  Pro-org project gave the same results; ciphertext from CipherStash's own
-  engine over an in-memory fake key source, so no ZeroKMS. Measured
-  2026-10-19; see its RUNLOG.
+  Pro-org project gave the same results with ciphertext from an in-memory
+  fake key source; a second part with real ZeroKMS keys runs CipherStash's
+  supabase-js wrapper on managed projects: filters, ranges and ordering under
+  RLS, latency, ZeroKMS outages, what the gateway logs keep, federation and
+  lock context (ZK01-ZK07, ZK06b, ZK07b). Measured 2026-10-19; see its RUNLOG.
 - `pipelines` - Supabase Pipelines (public alpha): what a PAT can reach
   (nothing of the managed service), and replication behaviour of the
   open-source engine against a Pro project with a local DuckLake destination:

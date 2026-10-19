@@ -1,0 +1,748 @@
+DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+      at <anonymous> (internal:util/deprecate:11:28)
+      at deprecated (internal:util/deprecate:20:29)
+      at query (<lab>/experiments/cipherstash-eql/zk/node_modules/pg/lib/client.js:780:7)
+      at introspect (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack-supabase/dist/index.js:2234:14)
+      at async construct (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack-supabase/dist/index.js:2073:74)
+
+[2m03:37:16.574[0m [31mERROR[0m [36m[@cipherstash/stack][0m [2min 0ms[0m
+  [2m└─[0m [36merror:[0m name=Error message=Supabase encrypted query failed on table "records": [supabase v3]: column "wrapped_dek" (public.eql_v3_text) does not support equality queries — declare the column with a domain that carries that capability stack=Error: Supabase encrypted query failed on table "records": [supabase v3]: column "wrapped_dek" (public.eql_v3_text) does not support equality queries — declare the column with a domain that carries that capability
+    at error (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack/dist/chunk-BJQKAFHX.js:240:51)
+    at error (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack/dist/chunk-BJQKAFHX.js:356:9)
+    at execute (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack-supabase/dist/index.js:1672:15)
+    at processTicksAndRejections (native:7:39)
+[2m03:37:16.576[0m [31mERROR[0m [36m[@cipherstash/stack][0m [2min 0ms[0m
+  [2m└─[0m [36merror:[0m name=Error message=Supabase encrypted query failed on table "records": [supabase v3]: cannot order by encrypted column "subject" (public.eql_v3_text_eq) — it carries no ordering term to sort by. Order by a plaintext column, or use an OPE-backed ordering domain (`*_ord`, `text_ord`, `text_search`), or use the EQL v3 Drizzle integration. stack=Error: Supabase encrypted query failed on table "records": [supabase v3]: cannot order by encrypted column "subject" (public.eql_v3_text_eq) — it carries no ordering term to sort by. Order by a plaintext column, or use an OPE-backed ordering domain (`*_ord`, `text_ord`, `text_search`), or use the EQL v3 Drizzle integration.
+    at error (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack/dist/chunk-BJQKAFHX.js:240:51)
+    at error (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack/dist/chunk-BJQKAFHX.js:356:9)
+    at execute (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack-supabase/dist/index.js:1672:15)
+    at processTicksAndRejections (native:7:39)
+[2m03:37:16.576[0m [31mERROR[0m [36m[@cipherstash/stack][0m [2min 0ms[0m
+  [2m└─[0m [36merror:[0m name=Error message=Supabase encrypted query failed on table "records": [supabase v3]: column "subject" (public.eql_v3_text_eq) does not support orderAndRange queries — declare the column with a domain that carries that capability stack=Error: Supabase encrypted query failed on table "records": [supabase v3]: column "subject" (public.eql_v3_text_eq) does not support orderAndRange queries — declare the column with a domain that carries that capability
+    at error (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack/dist/chunk-BJQKAFHX.js:240:51)
+    at error (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack/dist/chunk-BJQKAFHX.js:356:9)
+    at execute (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack-supabase/dist/index.js:1672:15)
+    at processTicksAndRejections (native:7:39)
+[2m03:37:47.386[0m [31mERROR[0m [36m[@cipherstash/stack][0m [2min 0ms[0m
+  [2m└─[0m [36merror:[0m name=Error message=Supabase: failed to encrypt model for table "lat" stack=Error: Supabase: failed to encrypt model for table "lat"
+    at error (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack/dist/chunk-BJQKAFHX.js:240:51)
+    at error (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack/dist/chunk-BJQKAFHX.js:356:9)
+    at encryptMutationData (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack-supabase/dist/index.js:1145:13)
+    at async execute (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack-supabase/dist/index.js:1654:39)
+    at processTicksAndRejections (native:7:39)
+[2m03:37:47.387[0m [31mERROR[0m [36m[@cipherstash/stack][0m [2min 0ms[0m
+  [2m└─[0m [36merror:[0m name=Error message=Supabase encrypted query failed on table "lat": Failed to encrypt model: ZeroKMS error 'Unexpected error (SendRequest: Failed to send request)' stack=Error: Supabase encrypted query failed on table "lat": Failed to encrypt model: ZeroKMS error 'Unexpected error (SendRequest: Failed to send request)'
+    at error (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack/dist/chunk-BJQKAFHX.js:240:51)
+    at error (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack/dist/chunk-BJQKAFHX.js:356:9)
+    at execute (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack-supabase/dist/index.js:1672:15)
+    at processTicksAndRejections (native:7:39)
+[2m03:37:47.449[0m [31mERROR[0m [36m[@cipherstash/stack][0m [2min 0ms[0m
+  [2m└─[0m [36merror:[0m name=Error message=Supabase: failed to decrypt models for table "records" stack=Error: Supabase: failed to decrypt models for table "records"
+    at error (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack/dist/chunk-BJQKAFHX.js:240:51)
+    at error (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack/dist/chunk-BJQKAFHX.js:356:9)
+    at decryptResults (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack-supabase/dist/index.js:1281:13)
+    at async execute (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack-supabase/dist/index.js:1664:20)
+    at processTicksAndRejections (native:7:39)
+[2m03:37:47.450[0m [31mERROR[0m [36m[@cipherstash/stack][0m [2min 1ms[0m
+  [2m└─[0m [36merror:[0m name=Error message=Supabase encrypted query failed on table "records": Failed to decrypt models: Failed to retrieve key: Failed to send request: SendRequest: Failed to send request stack=Error: Supabase encrypted query failed on table "records": Failed to decrypt models: Failed to retrieve key: Failed to send request: SendRequest: Failed to send request
+    at error (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack/dist/chunk-BJQKAFHX.js:240:51)
+    at error (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack/dist/chunk-BJQKAFHX.js:356:9)
+    at execute (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack-supabase/dist/index.js:1672:15)
+    at processTicksAndRejections (native:7:39)
+[2m03:37:47.491[0m [31mERROR[0m [36m[@cipherstash/stack][0m [2min 0ms[0m
+  [2m└─[0m [36merror:[0m name=Error message=Supabase: failed to encrypt query terms for table "records" stack=Error: Supabase: failed to encrypt query terms for table "records"
+    at error (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack/dist/chunk-BJQKAFHX.js:240:51)
+    at error (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack/dist/chunk-BJQKAFHX.js:356:9)
+    at encryptionFailure (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack-supabase/dist/index.js:753:10)
+    at bulkEncryptGroup (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack-supabase/dist/index.js:842:5)
+    at async <anonymous> (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack-supabase/dist/index.js:784:45)
+    at async encryptCollectedTerms (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack-supabase/dist/index.js:782:17)
+    at async encryptFilterValues (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack-supabase/dist/index.js:766:33)
+    at async execute (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack-supabase/dist/index.js:1657:38)
+    at processTicksAndRejections (native:7:39)
+[2m03:37:47.491[0m [31mERROR[0m [36m[@cipherstash/stack][0m [2min 0ms[0m
+  [2m└─[0m [36merror:[0m name=Error message=Supabase encrypted query failed on table "records": Failed to encrypt query terms: ZeroKMS error 'Unexpected error (SendRequest: Failed to send request)' stack=Error: Supabase encrypted query failed on table "records": Failed to encrypt query terms: ZeroKMS error 'Unexpected error (SendRequest: Failed to send request)'
+    at error (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack/dist/chunk-BJQKAFHX.js:240:51)
+    at error (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack/dist/chunk-BJQKAFHX.js:356:9)
+    at execute (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack-supabase/dist/index.js:1672:15)
+    at processTicksAndRejections (native:7:39)
+[2m03:37:57.534[0m [31mERROR[0m [36m[@cipherstash/stack][0m [2min 0ms[0m
+  [2m└─[0m [36merror:[0m name=Error message=Supabase: failed to encrypt model for table "lat" stack=Error: Supabase: failed to encrypt model for table "lat"
+    at error (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack/dist/chunk-BJQKAFHX.js:240:51)
+    at error (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack/dist/chunk-BJQKAFHX.js:356:9)
+    at encryptMutationData (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack-supabase/dist/index.js:1145:13)
+    at async execute (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack-supabase/dist/index.js:1654:39)
+    at processTicksAndRejections (native:7:39)
+[2m03:37:57.534[0m [31mERROR[0m [36m[@cipherstash/stack][0m [2min 0ms[0m
+  [2m└─[0m [36merror:[0m name=Error message=Supabase encrypted query failed on table "lat": Failed to encrypt model: ZeroKMS error 'Unexpected error (SendRequest: Failed to send request)' stack=Error: Supabase encrypted query failed on table "lat": Failed to encrypt model: ZeroKMS error 'Unexpected error (SendRequest: Failed to send request)'
+    at error (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack/dist/chunk-BJQKAFHX.js:240:51)
+    at error (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack/dist/chunk-BJQKAFHX.js:356:9)
+    at execute (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack-supabase/dist/index.js:1672:15)
+    at processTicksAndRejections (native:7:39)
+[2m03:38:07.581[0m [31mERROR[0m [36m[@cipherstash/stack][0m [2min 0ms[0m
+  [2m└─[0m [36merror:[0m name=Error message=Supabase: failed to decrypt models for table "records" stack=Error: Supabase: failed to decrypt models for table "records"
+    at error (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack/dist/chunk-BJQKAFHX.js:240:51)
+    at error (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack/dist/chunk-BJQKAFHX.js:356:9)
+    at decryptResults (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack-supabase/dist/index.js:1281:13)
+    at async execute (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack-supabase/dist/index.js:1664:20)
+    at processTicksAndRejections (native:7:39)
+[2m03:38:07.581[0m [31mERROR[0m [36m[@cipherstash/stack][0m [2min 0ms[0m
+  [2m└─[0m [36merror:[0m name=Error message=Supabase encrypted query failed on table "records": Failed to decrypt models: Failed to retrieve key: Failed to send request: SendRequest: Failed to send request stack=Error: Supabase encrypted query failed on table "records": Failed to decrypt models: Failed to retrieve key: Failed to send request: SendRequest: Failed to send request
+    at error (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack/dist/chunk-BJQKAFHX.js:240:51)
+    at error (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack/dist/chunk-BJQKAFHX.js:356:9)
+    at execute (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack-supabase/dist/index.js:1672:15)
+    at processTicksAndRejections (native:7:39)
+[2m03:38:17.644[0m [31mERROR[0m [36m[@cipherstash/stack][0m [2min 0ms[0m
+  [2m└─[0m [36merror:[0m name=Error message=Supabase: failed to encrypt query terms for table "records" stack=Error: Supabase: failed to encrypt query terms for table "records"
+    at error (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack/dist/chunk-BJQKAFHX.js:240:51)
+    at error (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack/dist/chunk-BJQKAFHX.js:356:9)
+    at encryptionFailure (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack-supabase/dist/index.js:753:10)
+    at bulkEncryptGroup (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack-supabase/dist/index.js:842:5)
+    at async <anonymous> (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack-supabase/dist/index.js:784:45)
+    at async encryptCollectedTerms (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack-supabase/dist/index.js:782:17)
+    at async encryptFilterValues (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack-supabase/dist/index.js:766:33)
+    at async execute (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack-supabase/dist/index.js:1657:38)
+    at processTicksAndRejections (native:7:39)
+[2m03:38:17.644[0m [31mERROR[0m [36m[@cipherstash/stack][0m [2min 0ms[0m
+  [2m└─[0m [36merror:[0m name=Error message=Supabase encrypted query failed on table "records": Failed to encrypt query terms: ZeroKMS error 'Unexpected error (SendRequest: Failed to send request)' stack=Error: Supabase encrypted query failed on table "records": Failed to encrypt query terms: ZeroKMS error 'Unexpected error (SendRequest: Failed to send request)'
+    at error (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack/dist/chunk-BJQKAFHX.js:240:51)
+    at error (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack/dist/chunk-BJQKAFHX.js:356:9)
+    at execute (<lab>/experiments/cipherstash-eql/zk/node_modules/@cipherstash/stack-supabase/dist/index.js:1672:15)
+    at processTicksAndRejections (native:7:39)
+{
+  "startedAt": "2026-10-19T03:37:07.592Z",
+  "wrapperInitMs": 1521,
+  "ZK01": {
+    "insertA": {
+      "ms": 714,
+      "rows": 6,
+      "error": null
+    },
+    "insertB": {
+      "ms": 413,
+      "rows": 3,
+      "error": null
+    },
+    "stored": {
+      "rows": 9,
+      "owners": {
+        "a": 6,
+        "b": 3
+      },
+      "plaintextHits": [],
+      "payloadKeys": {
+        "subject": "c,hm,i,v",
+        "label": "c,hm,i,op,v",
+        "score": "c,i,op,v",
+        "seen": "c,i,op,v",
+        "wrapped_dek": "c,i,v"
+      },
+      "identifier": {
+        "c": "subject",
+        "t": "records"
+      },
+      "sameSubjectSameHm": true,
+      "sameSubjectDifferentC": true
+    }
+  },
+  "ZK02": {
+    "selectAllA": {
+      "ms": 332,
+      "error": null,
+      "got": [
+        "a1",
+        "a2",
+        "a3",
+        "a4",
+        "a5",
+        "a6"
+      ],
+      "expected": [
+        "a1",
+        "a2",
+        "a3",
+        "a4",
+        "a5",
+        "a6"
+      ],
+      "pass": true
+    },
+    "selectAllB": {
+      "ms": 330,
+      "error": null,
+      "got": [
+        "b1",
+        "b2",
+        "b3"
+      ],
+      "expected": [
+        "b1",
+        "b2",
+        "b3"
+      ],
+      "pass": true
+    },
+    "decryptedValuesA": {
+      "error": null,
+      "mismatches": [],
+      "sampleTypes": {
+        "note": "string",
+        "subject": "string",
+        "label": "string",
+        "score": "number",
+        "seen": "Date",
+        "wrapped_dek": "string"
+      }
+    },
+    "eqSubjectA": {
+      "ms": 321,
+      "error": null,
+      "got": [
+        "a1",
+        "a3"
+      ],
+      "expected": [
+        "a1",
+        "a3"
+      ],
+      "pass": true
+    },
+    "eqSubjectB": {
+      "ms": 308,
+      "error": null,
+      "got": [
+        "b1"
+      ],
+      "expected": [
+        "b1"
+      ],
+      "pass": true
+    },
+    "inSubject": {
+      "ms": 323,
+      "error": null,
+      "got": [
+        "a2",
+        "a5",
+        "a6"
+      ],
+      "expected": [
+        "a2",
+        "a5",
+        "a6"
+      ],
+      "pass": true
+    },
+    "neqSubject": {
+      "ms": 296,
+      "error": null,
+      "got": [
+        "a2",
+        "a4",
+        "a5",
+        "a6"
+      ],
+      "expected": [
+        "a2",
+        "a4",
+        "a5",
+        "a6"
+      ],
+      "pass": true
+    },
+    "rangeScore": {
+      "ms": 323,
+      "error": null,
+      "got": [
+        "a1",
+        "a2",
+        "a3",
+        "a6"
+      ],
+      "expected": [
+        "a1",
+        "a2",
+        "a3",
+        "a6"
+      ],
+      "pass": true
+    },
+    "gtLabel": {
+      "ms": 316,
+      "error": null,
+      "got": [
+        "a2",
+        "a4",
+        "a6"
+      ],
+      "expected": [
+        "a2",
+        "a4",
+        "a6"
+      ],
+      "pass": true
+    },
+    "gteSeen": {
+      "ms": 308,
+      "error": null,
+      "got": [
+        "a1",
+        "a2",
+        "a4",
+        "a5"
+      ],
+      "expected": [
+        "a1",
+        "a2",
+        "a4",
+        "a5"
+      ],
+      "pass": true
+    },
+    "eqScore": {
+      "ms": 325,
+      "error": null,
+      "got": [
+        "a5"
+      ],
+      "expected": [
+        "a5"
+      ],
+      "pass": true
+    },
+    "orderScoreAsc": {
+      "ms": 61,
+      "error": null,
+      "got": [
+        "a4",
+        "a6",
+        "a1",
+        "a3",
+        "a2",
+        "a5"
+      ],
+      "expected": [
+        "a4",
+        "a6",
+        "a1",
+        "a3",
+        "a2",
+        "a5"
+      ],
+      "pass": true
+    },
+    "orderScoreDesc": {
+      "ms": 33,
+      "error": null,
+      "got": [
+        "a5",
+        "a2",
+        "a3",
+        "a1",
+        "a6",
+        "a4"
+      ],
+      "expected": [
+        "a5",
+        "a2",
+        "a3",
+        "a1",
+        "a6",
+        "a4"
+      ],
+      "pass": true
+    },
+    "orderLabelAsc": {
+      "ms": 63,
+      "error": null,
+      "got": [
+        "a1",
+        "a3",
+        "a5",
+        "a2",
+        "a4",
+        "a6"
+      ],
+      "expected": [
+        "a1",
+        "a3",
+        "a5",
+        "a2",
+        "a4",
+        "a6"
+      ],
+      "pass": true
+    },
+    "orderSeenDesc": {
+      "ms": 80,
+      "error": null,
+      "got": [
+        "a4",
+        "a2",
+        "a5",
+        "a1",
+        "a3",
+        "a6"
+      ],
+      "expected": [
+        "a4",
+        "a2",
+        "a5",
+        "a1",
+        "a3",
+        "a6"
+      ],
+      "pass": true
+    },
+    "pageScoreAsc": {
+      "ms": 54,
+      "error": null,
+      "got": [
+        "a4",
+        "a6"
+      ],
+      "expected": [
+        "a4",
+        "a6"
+      ],
+      "pass": true
+    },
+    "encryptedPlusPlain": {
+      "ms": 366,
+      "error": null,
+      "got": [
+        "a5"
+      ],
+      "expected": [
+        "a5"
+      ],
+      "pass": true
+    },
+    "isNullSubject": {
+      "ms": 50,
+      "error": null,
+      "got": [],
+      "expected": [],
+      "pass": true
+    },
+    "plaintextOnlySelect": {
+      "ms": 73,
+      "error": null,
+      "got": [
+        "a1",
+        "a2",
+        "a3",
+        "a4",
+        "a5",
+        "a6"
+      ],
+      "expected": [
+        "a1",
+        "a2",
+        "a3",
+        "a4",
+        "a5",
+        "a6"
+      ],
+      "pass": true
+    },
+    "eqStorageOnly": {
+      "ms": 2,
+      "error": {
+        "message": "[supabase v3]: column \"wrapped_dek\" (public.eql_v3_text) does not support equality queries — declare the column with a domain that carries that capability",
+        "code": null,
+        "encryptionError": null
+      },
+      "expected": null,
+      "pass": null
+    },
+    "orderEqOnly": {
+      "ms": 1,
+      "error": {
+        "message": "[supabase v3]: cannot order by encrypted column \"subject\" (public.eql_v3_text_eq) — it carries no ordering term to sort by. Order by a plaintext column, or use an OPE-backed ordering domain (`*_ord`, `text_ord`, `text_search`), or use the EQL v3 Drizzle integration.",
+        "code": null,
+        "encryptionError": null
+      },
+      "got": null,
+      "expected": null,
+      "pass": null
+    },
+    "gtEqOnly": {
+      "ms": 0,
+      "error": {
+        "message": "[supabase v3]: column \"subject\" (public.eql_v3_text_eq) does not support orderAndRange queries — declare the column with a domain that carries that capability",
+        "code": null,
+        "encryptionError": null
+      },
+      "expected": null,
+      "pass": null
+    },
+    "csv": {
+      "threw": "[supabase v3]: csv() is unavailable on encrypted queries because PostgREST serializes rows before the adapter can decrypt them. Select rows normally, then serialize the decrypted data to CSV."
+    },
+    "updateA": {
+      "error": null,
+      "back": {
+        "score": 11,
+        "label": "alpha2"
+      },
+      "pass": true
+    },
+    "deleteB": {
+      "error": null,
+      "deleted": [
+        "b2"
+      ]
+    },
+    "crossOwnerUpdateB": {
+      "error": null,
+      "updated": 0
+    }
+  },
+  "ZK03": {
+    "insertError": null,
+    "readError": null,
+    "roundTrip": true,
+    "keyBytes": 32,
+    "storedKeys": [
+      "c",
+      "i",
+      "v"
+    ],
+    "plaintextInStore": false
+  },
+  "ZK04": {
+    "clientInitMs": 773,
+    "singleEncrypt": {
+      "n": 20,
+      "p50": 257,
+      "p95": 321,
+      "min": 253,
+      "max": 321
+    },
+    "singleDecrypt": {
+      "n": 20,
+      "p50": 255,
+      "p95": 358,
+      "min": 254,
+      "max": 358
+    },
+    "bulk": {
+      "10": {
+        "encryptMs": 261,
+        "decryptMs": 359,
+        "ok": true
+      },
+      "100": {
+        "encryptMs": 766,
+        "decryptMs": 2918,
+        "ok": true
+      },
+      "500": {
+        "encryptMs": 1066,
+        "decryptMs": 813,
+        "ok": true
+      }
+    },
+    "wrapperInsert": {
+      "n": 10,
+      "p50": 312,
+      "p95": 419,
+      "min": 293,
+      "max": 419
+    },
+    "plainInsert": {
+      "n": 10,
+      "p50": 44,
+      "p95": 93,
+      "min": 33,
+      "max": 93
+    },
+    "wrapperSelectEq": {
+      "n": 10,
+      "p50": 562,
+      "p95": 580,
+      "min": 550,
+      "max": 580
+    },
+    "plainSelectEq": {
+      "n": 10,
+      "p50": 43,
+      "p95": 82,
+      "min": 32,
+      "max": 82
+    }
+  },
+  "ZK05": {
+    "warm": {
+      "error": null,
+      "rows": 2,
+      "preEncrypt": true
+    },
+    "refuse": {
+      "wrapperInsert": {
+        "ms": 2,
+        "error": {
+          "message": "Failed to encrypt model: ZeroKMS error 'Unexpected error (SendRequest: Failed to send request)'",
+          "code": null,
+          "encryptionError": {
+            "type": "EncryptionError",
+            "message": "ZeroKMS error 'Unexpected error (SendRequest: Failed to send request)'"
+          }
+        },
+        "rows": 0
+      },
+      "wrapperSelectDecrypt": {
+        "ms": 63,
+        "error": {
+          "message": "Failed to decrypt models: Failed to retrieve key: Failed to send request: SendRequest: Failed to send request",
+          "code": null,
+          "encryptionError": {
+            "type": "DecryptionError",
+            "message": "Failed to retrieve key: Failed to send request: SendRequest: Failed to send request"
+          }
+        },
+        "rows": 0
+      },
+      "wrapperSelectPlaintextOnly": {
+        "ms": 39,
+        "error": null,
+        "rows": 7
+      },
+      "wrapperEqFilter": {
+        "ms": 2,
+        "error": {
+          "message": "Failed to encrypt query terms: ZeroKMS error 'Unexpected error (SendRequest: Failed to send request)'",
+          "code": null,
+          "encryptionError": {
+            "type": "EncryptionError",
+            "message": "ZeroKMS error 'Unexpected error (SendRequest: Failed to send request)'"
+          }
+        },
+        "rows": 0
+      },
+      "sdkDecryptEarlierCiphertext": {
+        "ms": 2,
+        "failure": "DecryptionError",
+        "message": "Failed to retrieve key: Failed to send request: SendRequest: Failed to send request"
+      },
+      "plainSupabaseSelect": {
+        "ms": 37,
+        "error": null,
+        "rows": 7
+      }
+    },
+    "blackhole": {
+      "wrapperInsert": {
+        "ms": 10005,
+        "error": {
+          "message": "Failed to encrypt model: ZeroKMS error 'Unexpected error (SendRequest: Failed to send request)'",
+          "code": null,
+          "encryptionError": {
+            "type": "EncryptionError",
+            "message": "ZeroKMS error 'Unexpected error (SendRequest: Failed to send request)'"
+          }
+        },
+        "rows": 0
+      },
+      "wrapperSelectDecrypt": {
+        "ms": 10047,
+        "error": {
+          "message": "Failed to decrypt models: Failed to retrieve key: Failed to send request: SendRequest: Failed to send request",
+          "code": null,
+          "encryptionError": {
+            "type": "DecryptionError",
+            "message": "Failed to retrieve key: Failed to send request: SendRequest: Failed to send request"
+          }
+        },
+        "rows": 0
+      },
+      "wrapperSelectPlaintextOnly": {
+        "ms": 60,
+        "error": null,
+        "rows": 7
+      },
+      "wrapperEqFilter": {
+        "ms": 10003,
+        "error": {
+          "message": "Failed to encrypt query terms: ZeroKMS error 'Unexpected error (SendRequest: Failed to send request)'",
+          "code": null,
+          "encryptionError": {
+            "type": "EncryptionError",
+            "message": "ZeroKMS error 'Unexpected error (SendRequest: Failed to send request)'"
+          }
+        },
+        "rows": 0
+      },
+      "sdkDecryptEarlierCiphertext": {
+        "ms": 10003,
+        "failure": "DecryptionError",
+        "message": "Failed to retrieve key: Failed to send request: SendRequest: Failed to send request"
+      },
+      "plainSupabaseSelect": {
+        "ms": 46,
+        "error": null,
+        "rows": 7
+      }
+    },
+    "recovery": {
+      "try1": {
+        "ms": 903,
+        "error": null,
+        "rows": 2
+      }
+    }
+  },
+  "ZK06": {
+    "request": {
+      "recordedEqGets": 4,
+      "operandBytes": 250,
+      "operandKeys": [
+        "c",
+        "hm",
+        "i",
+        "v"
+      ],
+      "urlBytes": 478
+    },
+    "edgeLogs": {
+      "status": 200,
+      "error": "",
+      "waitedMs": 1567,
+      "rowsWithHmSlice": 2,
+      "searchLength": 421,
+      "rowHasCiphertextSlice": false,
+      "path": "/rest/v1/records"
+    },
+    "postgresLogs": {
+      "status": 200,
+      "error": "",
+      "rowsWithOperandSlices": 0,
+      "sample": []
+    },
+    "postgresLogsMentioningTable": {
+      "status": 200,
+      "rows": 6,
+      "sample": [
+        "statement: CREATE OR REPLACE FUNCTION eql_v3.lints()\nRETURNS TABLE (\n  severity text,\n  category text,\n  object_name text,\n  message text\n)\nLANGUAGE sql STABLE\nAS $$\n  WITH\n  -- User-column encrypted domains now live in public so applicatio",
+        "statement: create table public.records (\n  id bigint generated always as identity primary key,\n  owner uuid not null default auth.uid(),\n  subject public.eql_v3_text_eq,      -- equality only\n  label public.eql_v3_text_ord,       -- equalit",
+        "statement: create index records_subject_eq on public.records using btree (eql_v3.eq_term(subject));"
+      ]
+    }
+  },
+  "ZK07": {
+    "crnSupplied": true,
+    "create": "ok",
+    "encrypt": {
+      "threw": "[encryption]: Server error: 401: Authorization failed: No OIDC provider found for issuer: `https://<ref>.supabase.co/auth/v1`"
+    }
+  },
+  "proxy": {
+    "hostsConnected": {
+      "ap-southeast-2.aws.viturhosted.net": 13,
+      "ap-southeast-2.aws.cts.cipherstashmanaged.net": 1
+    },
+    "supabaseThroughProxy": false
+  },
+  "finishedAt": "2026-10-19T03:38:34.261Z"
+}

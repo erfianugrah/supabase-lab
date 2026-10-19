@@ -8,13 +8,18 @@ operands work, and can a storage-only encrypted column hold a per-object data
 key for a client-side-encrypted object store such as the one in
 [client-keyed-objects](../client-keyed-objects/)?
 
-Run on a local Docker rig and on one managed Pro-org project
-(`run-managed.sh`), outside the pvlab harness. The ciphertext comes from CipherStash's own Rust engine
-(`stack-encrypt`) over the in-memory `FakeDataKeySource` from `stack-kms`, so
-no CipherStash account and no ZeroKMS are involved. These are real EQL v3
-payloads, but nothing here says anything about ZeroKMS: its key derivation,
-authorisation, availability, regions or latency. The fake's own doc comment
-says it "models none of ZeroKMS's authorization semantics".
+Two parts, both outside the pvlab harness:
+
+- CE01-CE05 run on a local Docker rig and on one managed Pro-org project
+  (`run-managed.sh`). The ciphertext comes from CipherStash's own Rust engine
+  (`stack-encrypt`) over the in-memory `FakeDataKeySource` from `stack-kms`:
+  real EQL v3 payloads, no CipherStash account, nothing about ZeroKMS. The
+  fake's own doc comment says it "models none of ZeroKMS's authorization
+  semantics".
+- ZK01-ZK07 (and the follow-up ZK06b, ZK07b) run against managed projects
+  with real ZeroKMS keys, through CipherStash's TypeScript SDK and its
+  supabase-js wrapper (`zk/`, `run-zk-managed.sh`, `run-zk-followup.sh`).
+  See [ZeroKMS checks](#zerokms-checks-zk).
 
 ## Rig
 
@@ -72,5 +77,42 @@ Writes `out/<date>/`: `install.txt`, `install-exit.txt`, `install-notices.txt`
 `ce-local.log` and `pgrst.log`. The cipherstash/stack checkout stays outside
 this repo; `stack-encrypt` and `stack-kms` are under the PolyForm Internal Use
 licence.
+
+## ZeroKMS checks (ZK)
+
+| part | what |
+|---|---|
+| SDK | `@cipherstash/stack` 1.2.1, `@cipherstash/stack-supabase` 1.2.1 (protect-ffi 0.33.0), supabase-js 2.118.0, pg 8.23.1 (`zk/package.json`, `zk/bun.lock`), run with bun |
+| credentials | the CipherStash CLI device session from `bunx stash@1.1.1 auth login --region ap-southeast-2`, stored in `~/.cipherstash/`; no `CS_*` credential variables (`CS_FED_CRN` only names the workspace for ZK07 and ZK07b) |
+| project | one Pro-org micro project in ap-southeast-1 per run, EQL 3.0.6 from the release SQL, `zk/schema.sql` (tables in `public`, which `encryptedSupabase` introspects; RLS `owner = auth.uid()`; the EQL grants to `anon`, `authenticated`, `service_role`), two Auth users created through the admin API |
+| network | (ZK01-ZK07 only; the follow-up runs without the proxy) CipherStash traffic goes through a CONNECT proxy inside `zk/probe.ts` (`HTTPS_PROXY`), Supabase hosts direct (`NO_PROXY`); the proxy logs the hosts asked for and can refuse or black-hole them |
+
+| id | asks |
+|---|---|
+| ZK01 | Wrapper inserts as two users; what Postgres stores per domain (`text_eq`, `text_ord`, `integer_ord`, `date_ord`, `text`): plaintext absent, payload keys, identifier, equality term and ciphertext for equal values |
+| ZK02 | Wrapper reads under RLS: 19 checks (18 filter, range, ordering and paging reads, 9 of them with an encrypted operand, plus the update) compared with the expected result computed in the probe from the inserted plaintext; delete, delete, a cross-owner update; misuse cases (equality on storage-only, ordering or range on equality-only, `.csv()`) |
+| ZK03 | A 32-byte data key in a storage-only `eql_v3_text` column, round trip and stored shape |
+| ZK04 | Latency: SDK encrypt and decrypt (n = 20), bulk 10 / 100 / 500, wrapper against plain supabase-js for one-row insert and `eq` select (n = 10) |
+| ZK05 | ZeroKMS refused, then black-holed, after init: wrapper insert, encrypted read, plaintext-only read, encrypted filter, SDK decrypt of earlier ciphertext, plain supabase-js read; time to result; recovery |
+| ZK06 | Whether the encrypted filter operand reaches the project's `edge_logs` and `postgres_logs` (Management API logs endpoint) |
+| ZK07 | Federation (`OidcFederationStrategy`) before the project's issuer is registered in the CipherStash workspace |
+| ZK06b | (follow-up) every logged `/rest/v1/records` request with an `eq.` filter decoded (first 6 written out): method, query string length, encrypted operand keys and lengths |
+| ZK07b | (follow-up, issuer registered) federated encrypt and decrypt per user; lock context `{ identityClaim: ["sub"] }` encrypt as A, decrypt as A and as B |
+
+```sh
+bunx stash@1.1.1 auth login --region ap-southeast-2   # once, device approval in the browser
+(cd zk && bun install)
+SUPABASE_ACCESS_TOKEN=... PVLAB_ORG_PRO=<org slug> CS_FED_CRN=crn:<region>.aws:<workspace> \
+  [KEEP=1] ./run-zk-managed.sh
+# after registering https://<ref>.supabase.co/auth/v1 as an OIDC provider in the workspace:
+SUPABASE_ACCESS_TOKEN=... ZK_REF=<ref> CS_FED_CRN=... ./run-zk-followup.sh   # deletes the project
+```
+
+Writes `out/<date>-zk/`: `install.txt`, `install-notices.txt`,
+`install-exit.txt`, `schema.txt`, `zk-managed.json`, `zk-managed.log`,
+`zk-followup.json`, `zk-followup.log`, with the project ref replaced by
+`<ref>`. In `out/2026-10-19-zk/` the first run's files and the follow-up
+(which ran on that first run's project) carry a `-run1` suffix. `zk/smoke.ts` is a local credential check
+(encrypt and decrypt per type, one bulk call) that needs no project.
 
 Results: [RUNLOG.md](RUNLOG.md).
