@@ -155,7 +155,8 @@ facts):
   under `lib/`, unit tested on the verbatim strings. Re-run 2026-10-19 on
   CLI 2.121.0: explicit `--use-docker` lands 8 MB with Docker up, and with
   Docker unreachable falls back to the API path (413 at 8 MB) like the
-  default, so the flag does not fail closed. Write-up:
+  default, so the flag does not fail closed; under 5 MB that fallback exits
+  0 and lands. Write-up:
   https://erfi.dev/reference/supabase-edge-function-limits/
 - `self-hosted-auth` - a GoTrue you run yourself against a managed project's
   Postgres (session pooler, `postgres` role, `search_path=auth`): it shares
