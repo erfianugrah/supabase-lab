@@ -3669,3 +3669,41 @@ partial rows: `experiments/client-keyed-objects/RUNLOG.md`; generated table
   port; run the managed suite detached under `caffeinate` (a laptop that
   sleeps breaks long transfers and skews the Docker VM clock); `make sweep`
   for `ck-` leftovers.
+
+## experiments/cipherstash-eql - key facts (validated 2026-10-19 on a local Docker rig, not managed: supabase/postgres 17.11.0.004, PostgREST v14.17, EQL 3.0.6)
+
+Ciphertext from cipherstash/stack `66092fe` (`stack-encrypt` over
+`FakeDataKeySource`, keys in process memory): real EQL v3 payloads, no
+CipherStash account, nothing about ZeroKMS. Results:
+`experiments/cipherstash-eql/RUNLOG.md`, artifact `out/2026-10-19/ce-local.json`.
+
+- The release SQL installs as `postgres` (not a superuser, psql exit 0); it
+  skips the `ore_block_256` operator class and reports 20 ORE-backed domains
+  disabled and OPE ordering domains unaffected (neither exercised). The
+  equality domain works (CE03). 52 EQL domains in 11 families, none binary,
+  so large objects stay client-side encrypted.
+- The installer grants nothing (its permissions doc; schema ACLs null after
+  install). With an EQL functional index on the table, a role with none of the
+  EQL grants fails even plaintext-only SELECTs on that table in a fresh
+  connection (`permission denied for schema
+  eql_v3_internal`, context `SQL function "eq_term" during inlining`);
+  dropping the index or granting USAGE on `eql_v3` and `eql_v3_internal` plus
+  EXECUTE on their functions makes them work (no subset tested). In a
+  connection where `postgres` already planned against the table the same
+  reads succeed without grants (likely mechanism: per-backend relcache of
+  index expressions, not measured further), so test grants in a NEW
+  connection.
+- PostgREST equality needs a full stored envelope as the `eq.` operand (A
+  `[1]`, B `[3]` under RLS); the term-only query envelope fails the domain
+  check (400 `23514`). The operand, ciphertext and index terms, sits in the GET
+  query string.
+- The bare image's `auth.uid()` reads only `request.jwt.claim.sub`; of the
+  two JWT settings PostgREST 14 sets `request.jwt.claims`, so RLS on
+  `auth.uid()` matched no rows in an earlier, unarchived run until GoTrue's
+  definition was installed (`run-local.sh` now does it first).
+- One 32-byte data key (row 1) in a storage-only `eql_v3_text` column
+  round-tripped through PostgREST. `stack-encrypt` derives no `EncryptFrom`
+  for that domain at this commit (seal natively, wrap).
+- Not run: managed, the compose stack, ZeroKMS, the TS wrapper, OPE/range,
+  match, JSON, any write through PostgREST, writes without grants, timing,
+  poolers, gateway logging of query strings.
