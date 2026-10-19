@@ -1,0 +1,10 @@
+target=managed ap-southeast-1, Pro org, micro
+eql_version=3.0.6
+pg=17.11
+psql_exit=0
+stack=1.2.1
+stack_supabase=1.2.1
+protect_ffi=0.33.0
+supabase_js=2.118.0
+zerokms_region=ap-southeast-2 (CLI device session)
+stack_commit_for_eql_ref=n/a (SDK from npm, versions above)

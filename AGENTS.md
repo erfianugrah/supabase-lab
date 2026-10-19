@@ -3670,7 +3670,7 @@ partial rows: `experiments/client-keyed-objects/RUNLOG.md`; generated table
   sleeps breaks long transfers and skews the Docker VM clock); `make sweep`
   for `ck-` leftovers.
 
-## experiments/cipherstash-eql - key facts (validated 2026-10-19 on a local Docker rig, supabase/postgres 17.11.0.004 + PostgREST v14.17, and one managed Pro-org micro project in ap-southeast-1; EQL 3.0.6)
+## experiments/cipherstash-eql - key facts (validated 2026-10-19 on a local Docker rig, supabase/postgres 17.11.0.004 + PostgREST v14.17, and managed Pro-org micro projects in ap-southeast-1; EQL 3.0.6; ZeroKMS in ap-southeast-2)
 
 Ciphertext from cipherstash/stack `66092fe` (`stack-encrypt` over
 `FakeDataKeySource`, keys in process memory): real EQL v3 payloads, no
@@ -3714,6 +3714,30 @@ the two targets apart from plan costs and the encoded path length.
   by address; a managed
   PostgREST serves `public` first, so requests to another exposed schema need
   `Accept-Profile`.
-- Not run: the compose stack, ZeroKMS, the TS wrapper, OPE/range, match,
-  JSON, any write through PostgREST, writes without grants, timing, poolers,
-  gateway logging of query strings.
+- ZeroKMS part (ZK01-ZK07, ZK06b, ZK07b; 2026-10-19, two managed runs plus a
+  follow-up, @cipherstash/stack and stack-supabase 1.2.1, CLI device session,
+  workspace in ap-southeast-2): the supabase-js wrapper's equality, `in`,
+  `neq`, range and ordering on `text_eq`/`text_ord`/`integer_ord`/`date_ord`
+  matched the expected plaintext result in 19 of 19 checks per run (9 with an
+  encrypted operand) under RLS; misuse is refused in the client. Each encrypt
+  or decrypt is a ZeroKMS round trip (inferred from latency; p50 255-269 ms
+  Singapore to Sydney): wrapper `eq` select p50 554-562 ms against 43-47 ms
+  plain. ZeroKMS unreachable: every encrypted read or write fails (refused
+  within ms, black-holed after 10.0 s), a value encrypted just before
+  included; plaintext columns and Postgres unaffected; recovery without
+  re-init. The managed gateway's `edge_logs` keep the encrypted filter
+  operand of each logged request (GET, PATCH, DELETE; 8 of 10 `eq.` requests
+  had a row). Federation and the lock context worked (B's decrypt
+  of A's locked value: `Forbidden`) on a new workspace whose plan was not
+  read, although the docs say lock context needs Business or Enterprise.
+- ZK runner gotchas: node-postgres reads `PGSSLMODE=require` as verify-full
+  with no Supabase CA (unset it, use `sslmode=no-verify`); the native SDK
+  honours `HTTPS_PROXY` (ZK05; an unarchived pre-run check saw a dead proxy
+  fail `Encryption()` in 5 ms), and with the Supabase hosts in `NO_PROXY` no
+  Supabase request reached the proxy, so the probe makes ZeroKMS unreachable
+  without touching Supabase; `encryptedSupabase` introspects `public` only
+  (source-read).
+- Not run: the compose stack, Supavisor, the Drizzle/Prisma paths (match,
+  JSON), access-key and client-key credentials, a second ZeroKMS region or
+  vantage, concurrency, writes without grants, edge_logs retention, the
+  wrapper inside an Edge Function (WebAssembly build).
