@@ -18,6 +18,9 @@
  *                      to the API path and its 5 MB ceiling (supabase/cli#7214)
  *   EF04h  CLI default, 8 MB  Docker unreachable: the documented fallback to
  *                      API bundling - refused at the 5 MB ceiling
+ *   EF04i  CLI --use-docker, 2 MB  Docker unreachable, under the API ceiling:
+ *                      does the fallback land with exit 0 (silent apart from
+ *                      the stderr warning)?
  *
  * Sources are random base64 in a string literal so no bundler can shrink
  * them; the handler returns the literal's length so the invocation proves
@@ -131,7 +134,11 @@ function cliRow(
       present_after: proof.present ? 1 : 0,
       invoke_status: proof.invokeStatus,
       bytes_reported: proof.bytes,
-      stderr_mentions_docker: /docker/i.test(res.stderr) ? 1 : 0,
+      // Matches the fallback warning only. Until 2026-10-19 this was
+      // stderr_mentions_docker (/docker/i), which also matched slugs containing
+      // "docker", so EF04f read 1 with Docker up; the published 2026-10-19
+      // artifacts carry that field, ignore it.
+      docker_not_running_warning: /Docker is not running/.test(res.stderr) ? 1 : 0,
       triage_bucket: t.bucket,
     },
     evidence: `${res.command}\n--- stdout\n${res.stdout.slice(0, 800)}\n--- stderr\n${res.stderr.slice(-800)}`,
@@ -202,7 +209,7 @@ const mod: TestModule = {
         const res = await cliDeploy(ctx, [{ slug, files: [{ name: "index.ts", content: bigSource(SIZES.overApi) }] }], { bundling: "use-docker" });
         out.push(cliRow("EF04f", "CLI --use-docker, 8 MB (Docker up)", SIZES.overApi, true, FUNCTION_SIZE_MB.cli, res, await prove(ctx, slug)));
       }
-      // EF04g/h - a CI runner without Docker. Pointing DOCKER_HOST at a missing
+      // EF04g/h/i - a CI runner without Docker. Pointing DOCKER_HOST at a missing
       // socket makes Docker unreachable for the CLI only, without stopping the
       // daemon. Both expected refused: the question is HOW (the error text says
       // whether the CLI failed closed or posted to the 5 MB API path).
@@ -216,6 +223,11 @@ const mod: TestModule = {
         const slug = `${P}cli-def-nod-8mb`;
         const res = await cliDeploy(ctx, [{ slug, files: [{ name: "index.ts", content: bigSource(SIZES.overApi) }] }], { env: noDocker });
         out.push(cliRow("EF04h", "CLI default bundling, 8 MB, Docker unreachable", SIZES.overApi, false, FUNCTION_SIZE_MB.api, res, await prove(ctx, slug)));
+      }
+      {
+        const slug = `${P}cli-docker-nod-2mb`;
+        const res = await cliDeploy(ctx, [{ slug, files: [{ name: "index.ts", content: bigSource(SIZES.control) }] }], { bundling: "use-docker", env: noDocker });
+        out.push(cliRow("EF04i", "CLI --use-docker, 2 MB, Docker unreachable", SIZES.control, true, FUNCTION_SIZE_MB.api, res, await prove(ctx, slug)));
       }
     } catch (e) {
       out.push({ id: "EF04", title: this.title, status: "fail", detail: `threw: ${e instanceof Error ? e.message : String(e)}` });
