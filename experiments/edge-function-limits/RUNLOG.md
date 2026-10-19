@@ -19,7 +19,7 @@ Full write-up: https://erfi.dev/reference/supabase-edge-function-limits/
 | EF01 | read-only   | Do the four secrets limits declared in the published OpenAPI request schema match the docs? Is 413 a declared response of the deploy endpoint? Is `static_patterns` in the API contract? |
 | EF02 | read-only   | Per org plan: does `function.max_count` match the docs table (Free 100 / Pro 1000 / Team 2000)? An override is `info`, not a fail - it is the lever. `function.size_limit_mb` recorded per plan. |
 | EF03 | destructive | Secrets: reserved prefix, name length 256/257, value 24,576/24,577 chars, the same count in three-byte characters, and the 101st user secret. |
-| EF04 | destructive | Function size by deploy path: API 2 MB / 8 MB, CLI `--use-api` 8 MB, CLI default 8 MB / 24 MB, CLI `--use-docker` 8 MB with Docker up, then `--use-docker` and default at 8 MB with Docker unreachable (`DOCKER_HOST` at a missing socket). Every acceptance proven by GET + invoke. Until 2026-10-19 the `--use-docker` row ran only if the 8 MB default did not land, so the 2026-09-02 run never exercised the flag. |
+| EF04 | destructive | Function size by deploy path: API 2 MB / 8 MB, CLI `--use-api` 8 MB, CLI default 8 MB / 24 MB, CLI `--use-docker` 8 MB with Docker up, then `--use-docker` and default at 8 MB, and `--use-docker` at 2 MB, with Docker unreachable (`DOCKER_HOST` at a missing socket). Every acceptance proven by GET + invoke. Until 2026-10-19 the `--use-docker` row ran only if the 8 MB default did not land, so the 2026-09-02 run never exercised the flag. |
 | EF05 | destructive | 24 API deploys 8-wide, 8 concurrent CLI processes, a same-slug race, a delete during a deploy: reported success vs landed, 409 vs 413 vs 429 kept apart, version regressions. |
 | EF06 | destructive | Restrictions: HTML rewritten to text/plain, ports 25/587 blocked (443 control), Worker and node:vm unavailable, static files via API vs via CLI, `npm:sharp`. |
 | EF07 | destructive | Runtime ceilings: CPU 500 ms vs 3 s, memory 64 MB vs 400 MB. Idle timeout referenced to edge-resilience W13, not re-run. |
@@ -59,7 +59,9 @@ default 24 MB gets 413 on "create function").
   stderr: `WARNING: Docker is not running`, then `Uploading asset (...)`. The
   explicit flag does not fail closed: the CLI fell back to server-side
   bundling and its 5 MB ceiling, the same error text as `--use-api` (EF04c).
-  This is the behaviour reported in supabase/cli#7214 against 2.121.0.
+  supabase/cli#7214 reports the same fallback on 2.121.0 for
+  `--use-api=false`; its repro does not use `--use-docker` (the mutex rejects
+  the two together), so these rows add `--use-docker` to it.
 - EF04h, CLI default 8 MB, Docker unreachable: exit 1 in 653 ms, the same
   413 text and the same two stderr lines as EF04g. This is the documented
   fallback.
@@ -69,10 +71,27 @@ default 24 MB gets 413 on "create function").
 Read for a customer: `--use-docker` adds nothing over "CLI with Docker
 running", and does not protect a runner without Docker. A pipeline that needs
 the 20 MB path has to check Docker is up before deploying and treat the
-`WARNING: Docker is not running` line as a failure. Not run: a Docker-less
-deploy UNDER 5 MB with `--use-docker` (it would land via the API path and
-exit 0, so the fallback is silent below 5 MB - inferred from EF04a and EF04g,
-not measured).
+`WARNING: Docker is not running` line as a failure. Below 5 MB the fallback
+is silent apart from that line: see EF04i in the second run below.
+
+## EF04i 2026-10-19, second run (fresh project; CLI 2.121.0)
+
+Evidence: `out/2026-10-19/run-2026-10-19T07-37-20-468Z.json`, 10 pass, 0
+fail, EF04a-h repeated with the same outcomes as the first run that day.
+Second fresh project, destroyed after the run (work-supabase-lab#195).
+
+- EF04i, CLI `--use-docker` 2 MB, Docker unreachable: exit 0 in 3,759 ms,
+  stdout `"message":"Deployed Functions."`, landed, invoke reports 2,097,004
+  bytes. stderr: `WARNING: Docker is not running`, then `Uploading asset
+  (...)`, the same two lines as EF04g. The deploy went through the API path
+  and succeeded, so a pipeline that reads only the exit code sees no failure
+  at 2 MB, while 8 MB fails (EF04g); the API-path ceiling between them is the
+  documented 5 MB, not probed here. One run.
+- Measurement fix after both runs: `stderr_mentions_docker` (`/docker/i`)
+  also matched the slug in stderr, so EF04f reads 1 with Docker up in both
+  2026-10-19 artifacts. The field is replaced by `docker_not_running_warning`
+  for later runs; for these two, read the evidence field's stderr instead
+  (the warning appears in EF04g, h and i only).
 
 ## EF12 validated 2026-09-08 (Free + Pro + Team orgs, ap-southeast-1)
 
@@ -286,10 +305,6 @@ and destroyed the same afternoon.
   override is rather than a measurement.
 - The wall clock on a FREE project (documented 150 s active): only a paid
   project was used.
-- A Docker-less CLI deploy UNDER 5 MB (EF04 re-run 2026-10-19 tested only
-  8 MB): expected to land via the API path with exit 0, so the fallback would
-  be silent below 5 MB. Inferred from EF04a and EF04g, not measured.
-  Card: work-supabase-lab#195.
 
 ## Operational notes
 

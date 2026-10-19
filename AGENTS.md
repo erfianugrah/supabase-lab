@@ -1337,8 +1337,10 @@ RUNLOG has the module table and per-row evidence.
 - CLI 2.121.0 (EF04 re-run 2026-10-19): `--use-docker` still absent from
   `--help`; with Docker up it lands 8 MB like the default; with Docker
   unreachable it prints `WARNING: Docker is not running` and falls back to
-  the API path, 413 at 8 MB, same as the default (supabase/cli#7214). The
-  flag does not fail closed.
+  the API path, 413 at 8 MB, same as the default (supabase/cli#7214 reports
+  the same for `--use-api=false`, not `--use-docker`). The
+  flag does not fail closed; at 2 MB (EF04i) the fallback deploy exits 0
+  and lands, with only the stderr warning.
 - Run the destructive battery detached; a killed run leaves functions deployed.
 
 ## experiments/self-hosted-auth - key facts (validated 2026-09-02, micro, Pro org, GoTrue v2.196.0)
