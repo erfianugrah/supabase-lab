@@ -1,0 +1,2 @@
+psql:cipherstash-encrypt-eql-3.0.6.sql:59330: NOTICE:  EQL: skipped operator class eql_v3_internal.ore_block_256_operator_class (requires superuser); ORE ordered indexes on ore_block_256 unavailable, OPE ordering domains unaffected
+psql:cipherstash-encrypt-eql-3.0.6.sql:59462: NOTICE:  EQL: ORE operator class absent (creation requires superuser) — 20 ORE-backed domains disabled and will raise on use; use the _ord_ope (ordering) and _eq (equality) domains — and text_match for text pattern match — instead

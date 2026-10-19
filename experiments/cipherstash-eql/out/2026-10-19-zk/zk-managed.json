@@ -1,0 +1,637 @@
+{
+  "startedAt": "2026-10-19T03:45:09.329Z",
+  "wrapperInitMs": 1286,
+  "ZK01": {
+    "insertA": {
+      "ms": 615,
+      "rows": 6,
+      "error": null
+    },
+    "insertB": {
+      "ms": 390,
+      "rows": 3,
+      "error": null
+    },
+    "stored": {
+      "rows": 9,
+      "owners": {
+        "a": 6,
+        "b": 3
+      },
+      "plaintextHits": [],
+      "payloadKeys": {
+        "subject": "c,hm,i,v",
+        "label": "c,hm,i,op,v",
+        "score": "c,i,op,v",
+        "seen": "c,i,op,v",
+        "wrapped_dek": "c,i,v"
+      },
+      "identifier": {
+        "c": "subject",
+        "t": "records"
+      },
+      "sameSubjectSameHm": true,
+      "sameSubjectDifferentC": true
+    }
+  },
+  "ZK02": {
+    "selectAllA": {
+      "ms": 347,
+      "error": null,
+      "got": [
+        "a1",
+        "a2",
+        "a3",
+        "a4",
+        "a5",
+        "a6"
+      ],
+      "expected": [
+        "a1",
+        "a2",
+        "a3",
+        "a4",
+        "a5",
+        "a6"
+      ],
+      "pass": true
+    },
+    "selectAllB": {
+      "ms": 303,
+      "error": null,
+      "got": [
+        "b1",
+        "b2",
+        "b3"
+      ],
+      "expected": [
+        "b1",
+        "b2",
+        "b3"
+      ],
+      "pass": true
+    },
+    "decryptedValuesA": {
+      "error": null,
+      "mismatches": [],
+      "sampleTypes": {
+        "note": "string",
+        "subject": "string",
+        "label": "string",
+        "score": "number",
+        "seen": "Date",
+        "wrapped_dek": "string"
+      }
+    },
+    "eqSubjectA": {
+      "ms": 300,
+      "error": null,
+      "got": [
+        "a1",
+        "a3"
+      ],
+      "expected": [
+        "a1",
+        "a3"
+      ],
+      "pass": true
+    },
+    "eqSubjectB": {
+      "ms": 302,
+      "error": null,
+      "got": [
+        "b1"
+      ],
+      "expected": [
+        "b1"
+      ],
+      "pass": true
+    },
+    "inSubject": {
+      "ms": 288,
+      "error": null,
+      "got": [
+        "a2",
+        "a5",
+        "a6"
+      ],
+      "expected": [
+        "a2",
+        "a5",
+        "a6"
+      ],
+      "pass": true
+    },
+    "neqSubject": {
+      "ms": 295,
+      "error": null,
+      "got": [
+        "a2",
+        "a4",
+        "a5",
+        "a6"
+      ],
+      "expected": [
+        "a2",
+        "a4",
+        "a5",
+        "a6"
+      ],
+      "pass": true
+    },
+    "rangeScore": {
+      "ms": 313,
+      "error": null,
+      "got": [
+        "a1",
+        "a2",
+        "a3",
+        "a6"
+      ],
+      "expected": [
+        "a1",
+        "a2",
+        "a3",
+        "a6"
+      ],
+      "pass": true
+    },
+    "gtLabel": {
+      "ms": 283,
+      "error": null,
+      "got": [
+        "a2",
+        "a4",
+        "a6"
+      ],
+      "expected": [
+        "a2",
+        "a4",
+        "a6"
+      ],
+      "pass": true
+    },
+    "gteSeen": {
+      "ms": 371,
+      "error": null,
+      "got": [
+        "a1",
+        "a2",
+        "a4",
+        "a5"
+      ],
+      "expected": [
+        "a1",
+        "a2",
+        "a4",
+        "a5"
+      ],
+      "pass": true
+    },
+    "eqScore": {
+      "ms": 292,
+      "error": null,
+      "got": [
+        "a5"
+      ],
+      "expected": [
+        "a5"
+      ],
+      "pass": true
+    },
+    "orderScoreAsc": {
+      "ms": 85,
+      "error": null,
+      "got": [
+        "a4",
+        "a6",
+        "a1",
+        "a3",
+        "a2",
+        "a5"
+      ],
+      "expected": [
+        "a4",
+        "a6",
+        "a1",
+        "a3",
+        "a2",
+        "a5"
+      ],
+      "pass": true
+    },
+    "orderScoreDesc": {
+      "ms": 67,
+      "error": null,
+      "got": [
+        "a5",
+        "a2",
+        "a3",
+        "a1",
+        "a6",
+        "a4"
+      ],
+      "expected": [
+        "a5",
+        "a2",
+        "a3",
+        "a1",
+        "a6",
+        "a4"
+      ],
+      "pass": true
+    },
+    "orderLabelAsc": {
+      "ms": 33,
+      "error": null,
+      "got": [
+        "a1",
+        "a3",
+        "a5",
+        "a2",
+        "a4",
+        "a6"
+      ],
+      "expected": [
+        "a1",
+        "a3",
+        "a5",
+        "a2",
+        "a4",
+        "a6"
+      ],
+      "pass": true
+    },
+    "orderSeenDesc": {
+      "ms": 49,
+      "error": null,
+      "got": [
+        "a4",
+        "a2",
+        "a5",
+        "a1",
+        "a3",
+        "a6"
+      ],
+      "expected": [
+        "a4",
+        "a2",
+        "a5",
+        "a1",
+        "a3",
+        "a6"
+      ],
+      "pass": true
+    },
+    "pageScoreAsc": {
+      "ms": 39,
+      "error": null,
+      "got": [
+        "a4",
+        "a6"
+      ],
+      "expected": [
+        "a4",
+        "a6"
+      ],
+      "pass": true
+    },
+    "encryptedPlusPlain": {
+      "ms": 282,
+      "error": null,
+      "got": [
+        "a5"
+      ],
+      "expected": [
+        "a5"
+      ],
+      "pass": true
+    },
+    "isNullSubject": {
+      "ms": 42,
+      "error": null,
+      "got": [],
+      "expected": [],
+      "pass": true
+    },
+    "plaintextOnlySelect": {
+      "ms": 56,
+      "error": null,
+      "got": [
+        "a1",
+        "a2",
+        "a3",
+        "a4",
+        "a5",
+        "a6"
+      ],
+      "expected": [
+        "a1",
+        "a2",
+        "a3",
+        "a4",
+        "a5",
+        "a6"
+      ],
+      "pass": true
+    },
+    "eqStorageOnly": {
+      "ms": 1,
+      "error": {
+        "message": "[supabase v3]: column \"wrapped_dek\" (public.eql_v3_text) does not support equality queries — declare the column with a domain that carries that capability",
+        "code": null,
+        "encryptionError": null
+      },
+      "expected": null,
+      "pass": null
+    },
+    "orderEqOnly": {
+      "ms": 0,
+      "error": {
+        "message": "[supabase v3]: cannot order by encrypted column \"subject\" (public.eql_v3_text_eq) — it carries no ordering term to sort by. Order by a plaintext column, or use an OPE-backed ordering domain (`*_ord`, `text_ord`, `text_search`), or use the EQL v3 Drizzle integration.",
+        "code": null,
+        "encryptionError": null
+      },
+      "got": null,
+      "expected": null,
+      "pass": null
+    },
+    "gtEqOnly": {
+      "ms": 0,
+      "error": {
+        "message": "[supabase v3]: column \"subject\" (public.eql_v3_text_eq) does not support orderAndRange queries — declare the column with a domain that carries that capability",
+        "code": null,
+        "encryptionError": null
+      },
+      "expected": null,
+      "pass": null
+    },
+    "csv": {
+      "threw": "[supabase v3]: csv() is unavailable on encrypted queries because PostgREST serializes rows before the adapter can decrypt them. Select rows normally, then serialize the decrypted data to CSV."
+    },
+    "updateA": {
+      "error": null,
+      "back": {
+        "score": 11,
+        "label": "alpha2"
+      },
+      "pass": true
+    },
+    "deleteB": {
+      "error": null,
+      "deleted": [
+        "b2"
+      ]
+    },
+    "crossOwnerUpdateB": {
+      "error": null,
+      "updated": 0
+    }
+  },
+  "ZK03": {
+    "insertError": null,
+    "readError": null,
+    "roundTrip": true,
+    "keyBytes": 32,
+    "storedKeys": [
+      "c",
+      "i",
+      "v"
+    ],
+    "plaintextInStore": false
+  },
+  "ZK04": {
+    "clientInitMs": 1056,
+    "singleEncrypt": {
+      "n": 20,
+      "p50": 269,
+      "p95": 335,
+      "min": 265,
+      "max": 335
+    },
+    "singleDecrypt": {
+      "n": 20,
+      "p50": 269,
+      "p95": 359,
+      "min": 265,
+      "max": 359
+    },
+    "bulk": {
+      "10": {
+        "encryptMs": 273,
+        "decryptMs": 272,
+        "ok": true
+      },
+      "100": {
+        "encryptMs": 896,
+        "decryptMs": 280,
+        "ok": true
+      },
+      "500": {
+        "encryptMs": 581,
+        "decryptMs": 312,
+        "ok": true
+      }
+    },
+    "wrapperInsert": {
+      "n": 10,
+      "p50": 297,
+      "p95": 313,
+      "min": 280,
+      "max": 313
+    },
+    "plainInsert": {
+      "n": 10,
+      "p50": 44,
+      "p95": 96,
+      "min": 32,
+      "max": 96
+    },
+    "wrapperSelectEq": {
+      "n": 10,
+      "p50": 554,
+      "p95": 620,
+      "min": 538,
+      "max": 620
+    },
+    "plainSelectEq": {
+      "n": 10,
+      "p50": 47,
+      "p95": 83,
+      "min": 35,
+      "max": 83
+    }
+  },
+  "ZK05": {
+    "warm": {
+      "error": null,
+      "rows": 2,
+      "preEncrypt": true
+    },
+    "refuse": {
+      "wrapperInsert": {
+        "ms": 5,
+        "error": {
+          "message": "Failed to encrypt model: ZeroKMS error 'Unexpected error (SendRequest: Failed to send request)'",
+          "code": null,
+          "encryptionError": {
+            "type": "EncryptionError",
+            "message": "ZeroKMS error 'Unexpected error (SendRequest: Failed to send request)'"
+          }
+        },
+        "rows": 0
+      },
+      "wrapperSelectDecrypt": {
+        "ms": 47,
+        "error": {
+          "message": "Failed to decrypt models: Failed to retrieve key: Failed to send request: SendRequest: Failed to send request",
+          "code": null,
+          "encryptionError": {
+            "type": "DecryptionError",
+            "message": "Failed to retrieve key: Failed to send request: SendRequest: Failed to send request"
+          }
+        },
+        "rows": 0
+      },
+      "wrapperSelectPlaintextOnly": {
+        "ms": 47,
+        "error": null,
+        "rows": 7
+      },
+      "wrapperEqFilter": {
+        "ms": 4,
+        "error": {
+          "message": "Failed to encrypt query terms: ZeroKMS error 'Unexpected error (SendRequest: Failed to send request)'",
+          "code": null,
+          "encryptionError": {
+            "type": "EncryptionError",
+            "message": "ZeroKMS error 'Unexpected error (SendRequest: Failed to send request)'"
+          }
+        },
+        "rows": 0
+      },
+      "sdkDecryptEarlierCiphertext": {
+        "ms": 3,
+        "failure": "DecryptionError",
+        "message": "Failed to retrieve key: Failed to send request: SendRequest: Failed to send request"
+      },
+      "plainSupabaseSelect": {
+        "ms": 40,
+        "error": null,
+        "rows": 7
+      }
+    },
+    "blackhole": {
+      "wrapperInsert": {
+        "ms": 10003,
+        "error": {
+          "message": "Failed to encrypt model: ZeroKMS error 'Unexpected error (SendRequest: Failed to send request)'",
+          "code": null,
+          "encryptionError": {
+            "type": "EncryptionError",
+            "message": "ZeroKMS error 'Unexpected error (SendRequest: Failed to send request)'"
+          }
+        },
+        "rows": 0
+      },
+      "wrapperSelectDecrypt": {
+        "ms": 10059,
+        "error": {
+          "message": "Failed to decrypt models: Failed to retrieve key: Failed to send request: SendRequest: Failed to send request",
+          "code": null,
+          "encryptionError": {
+            "type": "DecryptionError",
+            "message": "Failed to retrieve key: Failed to send request: SendRequest: Failed to send request"
+          }
+        },
+        "rows": 0
+      },
+      "wrapperSelectPlaintextOnly": {
+        "ms": 55,
+        "error": null,
+        "rows": 7
+      },
+      "wrapperEqFilter": {
+        "ms": 10004,
+        "error": {
+          "message": "Failed to encrypt query terms: ZeroKMS error 'Unexpected error (SendRequest: Failed to send request)'",
+          "code": null,
+          "encryptionError": {
+            "type": "EncryptionError",
+            "message": "ZeroKMS error 'Unexpected error (SendRequest: Failed to send request)'"
+          }
+        },
+        "rows": 0
+      },
+      "sdkDecryptEarlierCiphertext": {
+        "ms": 10004,
+        "failure": "DecryptionError",
+        "message": "Failed to retrieve key: Failed to send request: SendRequest: Failed to send request"
+      },
+      "plainSupabaseSelect": {
+        "ms": 58,
+        "error": null,
+        "rows": 7
+      }
+    },
+    "recovery": {
+      "try1": {
+        "ms": 838,
+        "error": null,
+        "rows": 2
+      }
+    }
+  },
+  "ZK06": {
+    "request": {
+      "recordedEqGets": 4,
+      "operandBytes": 250,
+      "operandKeys": [
+        "c",
+        "hm",
+        "i",
+        "v"
+      ],
+      "urlBytes": 466
+    },
+    "edgeLogs": {
+      "status": 200,
+      "error": "",
+      "waitedMs": 2460,
+      "rowsWithHmSlice": 3,
+      "searchLength": 410,
+      "storedOperandMatchesSent": true,
+      "path": "/rest/v1/records"
+    },
+    "postgresLogs": {
+      "status": 200,
+      "error": "",
+      "rowsWithOperandSlices": 0,
+      "sample": []
+    },
+    "postgresLogsMentioningTable": {
+      "status": 200,
+      "rows": 6,
+      "sample": [
+        "statement: CREATE OR REPLACE FUNCTION eql_v3.lints()\nRETURNS TABLE (\n  severity text,\n  category text,\n  object_name text,\n  message text\n)\nLANGUAGE sql STABLE\nAS $$\n  WITH\n  -- User-column encrypted domains now live in public so applicatio",
+        "statement: create table public.records (\n  id bigint generated always as identity primary key,\n  owner uuid not null default auth.uid(),\n  subject public.eql_v3_text_eq,      -- equality only\n  label public.eql_v3_text_ord,       -- equalit",
+        "statement: create index records_subject_eq on public.records using btree (eql_v3.eq_term(subject));"
+      ]
+    }
+  },
+  "ZK07": {
+    "crnSupplied": true,
+    "create": "ok",
+    "encrypt": {
+      "threw": "[encryption]: Server error: 401: Authorization failed: No OIDC provider found for issuer: `https://<ref>.supabase.co/auth/v1`"
+    }
+  },
+  "proxy": {
+    "hostsConnected": {
+      "ap-southeast-2.aws.viturhosted.net": 13,
+      "ap-southeast-2.aws.cts.cipherstashmanaged.net": 1
+    },
+    "supabaseThroughProxy": false
+  },
+  "finishedAt": "2026-10-19T03:46:31.957Z"
+}

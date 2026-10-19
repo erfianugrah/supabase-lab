@@ -1,0 +1,144 @@
+{
+  "startedAt": "2026-10-19T03:42:59.281Z",
+  "ZK06b": {
+    "status": 200,
+    "error": "",
+    "rows": 8,
+    "byMethod": {
+      "GET": 5,
+      "PATCH": 2,
+      "DELETE": 1
+    },
+    "sample": [
+      {
+        "method": "GET",
+        "searchLen": 452,
+        "encryptedOperands": {
+          "score": {
+            "keys": [
+              "c",
+              "i",
+              "op",
+              "v"
+            ],
+            "cLen": 132,
+            "hmLen": 0,
+            "identifier": {
+              "t": "records",
+              "c": "score"
+            }
+          }
+        },
+        "plainParams": [
+          "select"
+        ]
+      },
+      {
+        "method": "GET",
+        "searchLen": 425,
+        "encryptedOperands": {
+          "subject": {
+            "keys": [
+              "c",
+              "hm",
+              "i",
+              "v"
+            ],
+            "cLen": 130,
+            "hmLen": 64,
+            "identifier": {
+              "t": "records",
+              "c": "subject"
+            }
+          }
+        },
+        "plainParams": [
+          "select",
+          "note"
+        ]
+      },
+      {
+        "method": "PATCH",
+        "searchLen": 61,
+        "encryptedOperands": {},
+        "plainParams": [
+          "select",
+          "note"
+        ]
+      },
+      {
+        "method": "DELETE",
+        "searchLen": 404,
+        "encryptedOperands": {
+          "subject": {
+            "keys": [
+              "c",
+              "hm",
+              "i",
+              "v"
+            ],
+            "cLen": 130,
+            "hmLen": 64,
+            "identifier": {
+              "t": "records",
+              "c": "subject"
+            }
+          }
+        },
+        "plainParams": [
+          "select"
+        ]
+      },
+      {
+        "method": "PATCH",
+        "searchLen": 406,
+        "encryptedOperands": {
+          "subject": {
+            "keys": [
+              "c",
+              "hm",
+              "i",
+              "v"
+            ],
+            "cLen": 130,
+            "hmLen": 64,
+            "identifier": {
+              "t": "records",
+              "c": "subject"
+            }
+          }
+        },
+        "plainParams": [
+          "select"
+        ]
+      },
+      {
+        "method": "GET",
+        "searchLen": 49,
+        "encryptedOperands": {},
+        "plainParams": [
+          "select",
+          "note"
+        ]
+      }
+    ]
+  },
+  "ZK07b": {
+    "federatedEncryptA": "ok",
+    "federatedDecryptA": {
+      "ok": true
+    },
+    "federatedDecryptUnlockedByB": {
+      "ok": true
+    },
+    "lockedEncryptA": "ok",
+    "lockedDecryptA": {
+      "ok": true
+    },
+    "lockedDecryptB": {
+      "failure": "DecryptionError",
+      "message": "Failed to retrieve key: Failed to send request: Forbidden: Request forbidden"
+    }
+  },
+  "finishedAt": "2026-10-19T03:43:07.795Z"
+}

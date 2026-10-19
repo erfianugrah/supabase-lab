@@ -41,3 +41,11 @@ https://cipherstash.com/docs/llms-full.txt
 ## Licences
 
 - stack monorepo root, EQL, protect-ffi: MIT. `stack-encrypt`, `stack-kms`, `cipherstash-client`, Proxy: PolyForm Internal Use 1.0.0.
+
+## Docs against what the ZK runs observed (2026-10-19)
+
+- Lock context plan gate. Docs: "Lock context also requires a Business or Enterprise workspace plan" (https://cipherstash.com/docs/integrations/supabase/auth). Observed: on a workspace created the same day (plan not read), a value encrypted with `{ identityClaim: ["sub"] }` under federation decrypted for its user and was refused for another (`Forbidden`). experiments/cipherstash-eql RUNLOG, ZK07b.
+- Query strings. Docs: "configure application and proxy logs not to retain query strings" (https://cipherstash.com/docs/integrations/supabase/supabase-js). Observed: the managed Supabase API gateway's `edge_logs` keep the encrypted filter operand (ciphertext, terms, identifier) of each logged filtered GET, PATCH and DELETE request; 8 of the 10 `eq.` requests sent had a row when read (ZK06, ZK06b).
+- Outage. Docs: "While ZeroKMS is unavailable, your applications cannot perform cryptographic operations" (disaster recovery page above). Observed: refused connections fail each operation within milliseconds; black-holed ones after 10.0 s; ciphertext encrypted before the outage cannot be decrypted during it; recovery without re-initialisation (ZK05).
+- Hosts the SDK contacted in ap-southeast-2, from a laptop in Singapore: `ap-southeast-2.aws.viturhosted.net` and `ap-southeast-2.aws.cts.cipherstashmanaged.net` (proxy log, ZK runs).
+- `OidcFederationStrategy.create` returns `{ data }` / `{ failure }` at runtime in @cipherstash/stack 1.2.1, while the type re-exported from `@cipherstash/stack` declares the strategy instance; `@cipherstash/auth`'s own `wasm-inline.d.ts` declares the result type (source-read).
