@@ -291,7 +291,7 @@ export async function dockerAvailable(): Promise<boolean> {
 export async function cliDeploy(
   ctx: Ctx,
   functions: { slug: string; files: DeployFile[] }[],
-  opts: { bundling?: Bundling; jobs?: number; timeoutMs?: number; rootFiles?: DeployFile[] } = {},
+  opts: { bundling?: Bundling; jobs?: number; timeoutMs?: number; rootFiles?: DeployFile[]; env?: Record<string, string> } = {},
 ): Promise<CliDeployResult> {
   const workdir = await mkdtemp(join(tmpdir(), "pvlab-ef-"));
   try {
@@ -330,7 +330,7 @@ export async function cliDeploy(
     const command = `supabase ${args.join(" ").replace(workdir, "<workdir>")}`;
     const t0 = performance.now();
     const proc = Bun.spawn(["supabase", ...args], {
-      env: { ...process.env, SUPABASE_ACCESS_TOKEN: ctx.pat ?? "" },
+      env: { ...process.env, ...opts.env, SUPABASE_ACCESS_TOKEN: ctx.pat ?? "" },
       stdout: "pipe",
       stderr: "pipe",
     });

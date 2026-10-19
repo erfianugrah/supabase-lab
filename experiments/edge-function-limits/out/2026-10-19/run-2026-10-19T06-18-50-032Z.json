@@ -1,0 +1,197 @@
+{
+  "startedAt": "2026-10-19T06:18:50.032Z",
+  "finishedAt": "2026-10-19T06:19:45.905Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "projectRegion": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "edge-function-limits",
+  "labCommit": "da306dd",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "EF04a",
+      "title": "API deploy, 2 MB (control)",
+      "status": "pass",
+      "detail": "HTTP 201, landed, invoke 200 reports 2097004 bytes",
+      "measurements": {
+        "path": "api",
+        "size_mb": 2,
+        "docs_ceiling_mb": 5,
+        "deploy_status": 201,
+        "deploy_ms": 3765,
+        "error": "none",
+        "present_after": 1,
+        "invoke_status": 200,
+        "bytes_reported": 2097004,
+        "triage_bucket": "unknown"
+      },
+      "durationMs": 55873
+    },
+    {
+      "id": "EF04b",
+      "title": "API deploy, 8 MB (over the server-side ceiling)",
+      "status": "pass",
+      "detail": "refused HTTP 413: \"request entity too large\" [size-limit]",
+      "measurements": {
+        "path": "api",
+        "size_mb": 8,
+        "docs_ceiling_mb": 5,
+        "deploy_status": 413,
+        "deploy_ms": 282,
+        "error": "request entity too large",
+        "present_after": 0,
+        "invoke_status": 0,
+        "bytes_reported": "n/a",
+        "triage_bucket": "size-limit"
+      },
+      "evidence": "{\"message\":\"request entity too large\"}",
+      "durationMs": 55873
+    },
+    {
+      "id": "EF04c",
+      "title": "CLI --use-api, 8 MB",
+      "status": "pass",
+      "detail": "refused exit 1: \"unexpected deploy status 413: {\"message\":\"request entity too large\"}\" [size-limit]",
+      "measurements": {
+        "path": "cli-use-api",
+        "size_mb": 8,
+        "docs_ceiling_mb": 5,
+        "exit_code": 1,
+        "deploy_ms": 823,
+        "error": "unexpected deploy status 413: {\"message\":\"request entity too large\"}",
+        "present_after": 0,
+        "invoke_status": 0,
+        "bytes_reported": "n/a",
+        "stderr_mentions_docker": 0,
+        "triage_bucket": "size-limit"
+      },
+      "evidence": "supabase functions deploy pvlab-ef04-cli-api-8mb --project-ref <ref> --workdir <workdir> --no-verify-jwt --output-format json --use-api\n--- stdout\n{\"_tag\":\"Error\",\"error\":{\"code\":\"FunctionsApiStatusError\",\"message\":\"unexpected deploy status 413: {\\\"message\\\":\\\"request entity too large\\\"}\"}}\n\n--- stderr\nUploading asset (pvlab-ef04-cli-api-8mb): supabase/functions/pvlab-ef04-cli-api-8mb/index.ts\n",
+      "durationMs": 55874
+    },
+    {
+      "id": "EF04d",
+      "title": "CLI default bundling, 8 MB",
+      "status": "pass",
+      "detail": "exit 0, landed, invoke 200 reports 8388460 bytes in 16s",
+      "measurements": {
+        "path": "cli-default",
+        "size_mb": 8,
+        "docs_ceiling_mb": 20,
+        "exit_code": 0,
+        "deploy_ms": 16057,
+        "error": "none",
+        "present_after": 1,
+        "invoke_status": 200,
+        "bytes_reported": 8388460,
+        "stderr_mentions_docker": 0,
+        "triage_bucket": "unknown"
+      },
+      "evidence": "supabase functions deploy pvlab-ef04-cli-def-8mb --project-ref <ref> --workdir <workdir> --no-verify-jwt --output-format json\n--- stdout\n{\"project_ref\":\"<ref>\",\"functions\":[\"pvlab-ef04-cli-def-8mb\"],\"dashboard_url\":\"https://supabase.com/dashboard/project/<ref>/functions\",\"message\":\"Deployed Functions.\"}\n\n--- stderr\niting\n537667444544: Download complete\nd54923630cca: Verifying Checksum\nd54923630cca: Download complete\n333125b5cee9: Verifying Checksum\n333125b5cee9: Download complete\n333125b5cee9: Pull complete\n8c0ca94a0db1: Verifying Checksum\n8c0ca94a0db1: Download complete\nd54923630cca: Pull complete\n537667444544: Pull complete\n74d4886ba15e: Verifying Checksum\n74d4886ba15e: Download complete\n74d4886ba15e: Pull complete\n363120ff76af: Verifying Checksum\n363120ff76af: Download complete\n363120ff76af: Pull complete\n8c0ca94a0db1: Pull complete\nDigest: sha256:ad45164b7548bf5820ed7be714789c17ac2865edce79a09cfb4c3756c3d365a8\nStatus: Downloaded newer image for public.ecr.aws/supabase/edge-runtime:v1.77.4\npublic.ecr.aws/supabase/edge-runtime:v1.77.4\nDeploying Function: pvlab-ef04-cli-def-8mb (script size: 12 MB)\n",
+      "durationMs": 55874
+    },
+    {
+      "id": "EF04e",
+      "title": "CLI default bundling, 24 MB (over the local ceiling)",
+      "status": "pass",
+      "detail": "refused exit 1: \"unexpected create function status 413: {\"message\":\"request entity too large\"}\" [size-limit]",
+      "measurements": {
+        "path": "cli-default",
+        "size_mb": 24,
+        "docs_ceiling_mb": 20,
+        "exit_code": 1,
+        "deploy_ms": 11276,
+        "error": "unexpected create function status 413: {\"message\":\"request entity too large\"}",
+        "present_after": 0,
+        "invoke_status": 0,
+        "bytes_reported": "n/a",
+        "stderr_mentions_docker": 0,
+        "triage_bucket": "size-limit"
+      },
+      "evidence": "supabase functions deploy pvlab-ef04-cli-def-24mb --project-ref <ref> --workdir <workdir> --no-verify-jwt --output-format json\n--- stdout\n{\"_tag\":\"Error\",\"error\":{\"code\":\"FunctionsApiStatusError\",\"message\":\"unexpected create function status 413: {\\\"message\\\":\\\"request entity too large\\\"}\"}}\n\n--- stderr\nBundling Function: pvlab-ef04-cli-def-24mb\nDeploying Function: pvlab-ef04-cli-def-24mb (script size: 37 MB)\n",
+      "durationMs": 55874
+    },
+    {
+      "id": "EF04f",
+      "title": "CLI --use-docker, 8 MB (Docker up)",
+      "status": "pass",
+      "detail": "exit 0, landed, invoke 200 reports 8388460 bytes in 7s",
+      "measurements": {
+        "path": "cli-use-docker",
+        "size_mb": 8,
+        "docs_ceiling_mb": 20,
+        "exit_code": 0,
+        "deploy_ms": 6552,
+        "error": "none",
+        "present_after": 1,
+        "invoke_status": 200,
+        "bytes_reported": 8388460,
+        "stderr_mentions_docker": 1,
+        "triage_bucket": "unknown"
+      },
+      "evidence": "supabase functions deploy pvlab-ef04-cli-docker-8mb --project-ref <ref> --workdir <workdir> --no-verify-jwt --output-format json --use-docker\n--- stdout\n{\"project_ref\":\"<ref>\",\"functions\":[\"pvlab-ef04-cli-docker-8mb\"],\"dashboard_url\":\"https://supabase.com/dashboard/project/<ref>/functions\",\"message\":\"Deployed Functions.\"}\n\n--- stderr\nBundling Function: pvlab-ef04-cli-docker-8mb\nDeploying Function: pvlab-ef04-cli-docker-8mb (script size: 12 MB)\n",
+      "durationMs": 55874
+    },
+    {
+      "id": "EF04g",
+      "title": "CLI --use-docker, 8 MB, Docker unreachable",
+      "status": "pass",
+      "detail": "refused exit 1: \"unexpected deploy status 413: {\"message\":\"request entity too large\"}\" [size-limit]",
+      "measurements": {
+        "path": "cli-use-docker",
+        "size_mb": 8,
+        "docs_ceiling_mb": 20,
+        "exit_code": 1,
+        "deploy_ms": 828,
+        "error": "unexpected deploy status 413: {\"message\":\"request entity too large\"}",
+        "present_after": 0,
+        "invoke_status": 0,
+        "bytes_reported": "n/a",
+        "stderr_mentions_docker": 1,
+        "triage_bucket": "size-limit"
+      },
+      "evidence": "supabase functions deploy pvlab-ef04-cli-docker-nod-8mb --project-ref <ref> --workdir <workdir> --no-verify-jwt --output-format json --use-docker\n--- stdout\n{\"_tag\":\"Error\",\"error\":{\"code\":\"FunctionsApiStatusError\",\"message\":\"unexpected deploy status 413: {\\\"message\\\":\\\"request entity too large\\\"}\"}}\n\n--- stderr\nWARNING: Docker is not running\nUploading asset (pvlab-ef04-cli-docker-nod-8mb): supabase/functions/pvlab-ef04-cli-docker-nod-8mb/index.ts\n",
+      "durationMs": 55874
+    },
+    {
+      "id": "EF04h",
+      "title": "CLI default bundling, 8 MB, Docker unreachable",
+      "status": "pass",
+      "detail": "refused exit 1: \"unexpected deploy status 413: {\"message\":\"request entity too large\"}\" [size-limit]",
+      "measurements": {
+        "path": "cli-default",
+        "size_mb": 8,
+        "docs_ceiling_mb": 5,
+        "exit_code": 1,
+        "deploy_ms": 653,
+        "error": "unexpected deploy status 413: {\"message\":\"request entity too large\"}",
+        "present_after": 0,
+        "invoke_status": 0,
+        "bytes_reported": "n/a",
+        "stderr_mentions_docker": 1,
+        "triage_bucket": "size-limit"
+      },
+      "evidence": "supabase functions deploy pvlab-ef04-cli-def-nod-8mb --project-ref <ref> --workdir <workdir> --no-verify-jwt --output-format json\n--- stdout\n{\"_tag\":\"Error\",\"error\":{\"code\":\"FunctionsApiStatusError\",\"message\":\"unexpected deploy status 413: {\\\"message\\\":\\\"request entity too large\\\"}\"}}\n\n--- stderr\nWARNING: Docker is not running\nUploading asset (pvlab-ef04-cli-def-nod-8mb): supabase/functions/pvlab-ef04-cli-def-nod-8mb/index.ts\n",
+      "durationMs": 55874
+    },
+    {
+      "id": "EF04z",
+      "title": "cleanup: delete pvlab-ef04-* functions",
+      "status": "pass",
+      "detail": "deleted 3",
+      "measurements": {
+        "deleted": 3,
+        "left": 0,
+        "cli_version": "2.121.0",
+        "docker": 1,
+        "docs_read_at": "2026-09-02"
+      },
+      "durationMs": 55874
+    }
+  ]
+}
