@@ -1,0 +1,12 @@
+eql_version=3.0.6
+install_role=postgres superuser=false
+sql_sha256=9b6dab789248f911707f7c1c468c5d455987b47aac4a30fc421bc813073fffb1
+pg=17.11
+pg_image=supabase/postgres:17.11.0.004
+eql_domain_count=52
+eql_domain_families=bigint,boolean,date,double,integer,json,numeric,real,smallint,text,timestamp
+eql_schema_acl=eql_v3:null eql_v3_internal:null
+pgcrypto_schema=extensions
+psql_exit=0
+stack_commit=stack-66092fe450b555353a138d0d104f204cfcf255b1
+pgrst=postgrest/postgrest:v14.17
