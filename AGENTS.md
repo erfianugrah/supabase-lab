@@ -2761,7 +2761,7 @@ when present, so a new module is invisible until it is regenerated).
 - Retire FAILURE-MATRIX 10.1 `[doc]` for the measured halves (create and
   restart lifecycle surfaces); capacity-driven failures remain `[doc]`.
 
-## experiments/restore-paths - key facts (2026-10-10, ap-southeast-1, one IPv4-only vantage)
+## experiments/restore-paths - key facts (2026-10-10 and 2026-10-20, ap-southeast-1, one IPv4-only vantage)
 
 Which restore paths a Pro org can drive through the Management API, and what
 each does to the db password, Storage and the per-path outage. Self-provisioning
@@ -2825,8 +2825,27 @@ because `harness/dist/pvlab` is a linux-x64 build.
   the disk at 715 MB, the next rotation call failed and the restore request was
   refused as "database appears to be unreachable" until 301 s (R4). What filled
   it was not separated.
+- **Team is the same as Pro for `backups/restore` (2026-10-20, RP04, n=2).**
+  In each of 2 runs a fresh Team project on default (Micro) compute listed one
+  completed physical backup on the first read; `backups/restore {id}` answered
+  `400` "This endpoint is unavailable at the moment" on 4 attempts over 180 s,
+  and one `GET restore-point` answered the same.
+  Daily-backup restore downtime therefore has no lab figure. The org's
+  retention is readable as an entitlement: `backup.retention_days` 14 on Team
+  (artifact) and 7 on Pro (manual call). In the second Team run (09:53 UTC, R13 in the RUNLOG) the project's
+  `created_at` (manual read, no artifact) and its first backup preceded the
+  create call; not explained.
+- **The migrations rollback route refuses production (2026-10-20, RP05).**
+  `DELETE database/migrations?gte=<version>` answers `400` "You cannot
+  rollback a production branch." on the project itself (n=2), with schema and
+  history unchanged. On a git-less preview branch it answered `200`, removed
+  every history row from the cut onward (B2 and B3) and ran the one stored
+  `rollback` (B2's `drop column`, from the apply body's optional `rollback`
+  field); B3, applied without one, kept its table (n=1). A failing apply is one transaction: `400`
+  with the Postgres error, no table, no history row (n=2).
 - Pending: clone (Dashboard session needed), `backups/restore` on an older
-  project, a restore target hours old, a database over 1 GB, direct 5432.
+  project, a restore target hours old, a database over 1 GB, direct 5432, a
+  failing stored rollback on a branch.
 
 ## experiments/pooler-checkout - key facts (validated 2026-10-10, Micro, ap-southeast-1 and us-east-1, Pro org, Supavisor aws-0 hosts)
 
