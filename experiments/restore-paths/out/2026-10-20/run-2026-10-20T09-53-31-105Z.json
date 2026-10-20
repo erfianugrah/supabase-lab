@@ -1,0 +1,126 @@
+{
+  "startedAt": "2026-10-20T09:53:31.105Z",
+  "finishedAt": "2026-10-20T09:54:34.775Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "restore-paths",
+  "labCommit": "abe720d",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "RP05a",
+      "title": "three migrations applied, two with a rollback field",
+      "status": "info",
+      "detail": "apply HTTP 200/200/200; history [rp05_m1,rp05_m2,rp05_m3]",
+      "measurements": {
+        "m1_http": 200,
+        "m2_http": 200,
+        "m3_http": 200,
+        "versions": "20261020095335,20261020095337,20261020095339",
+        "seed_row_insert_http": 201,
+        "m2_get_http": 200,
+        "m2_statements": "[\"alter table public.rp_m add column b text\"]",
+        "m2_rollback_stored": "[\"alter table public.rp_m drop column if exists b\"]",
+        "m3_rollback_stored": "null"
+      },
+      "durationMs": 63670
+    },
+    {
+      "id": "RP05b",
+      "title": "DELETE ?gte=M3 where M3 stored no rollback",
+      "status": "info",
+      "detail": "HTTP 400; history [rp05_m1,rp05_m2,rp05_m3]; rp_m3 exists true",
+      "measurements": {
+        "delete_http": 400,
+        "delete_body": "{\"message\":\"You cannot rollback a production branch.\"}",
+        "history_after": "rp05_m1,rp05_m2,rp05_m3",
+        "m3_table_exists_after": "true"
+      },
+      "durationMs": 63670
+    },
+    {
+      "id": "RP05c",
+      "title": "DELETE ?gte=M2 where M2 stored `drop column`",
+      "status": "info",
+      "detail": "HTTP 400; history [rp05_m1,rp05_m2,rp05_m3]; column b exists true",
+      "measurements": {
+        "delete_http": 400,
+        "delete_body": "{\"message\":\"You cannot rollback a production branch.\"}",
+        "history_after": "rp05_m1,rp05_m2,rp05_m3",
+        "m2_column_exists_after": "true",
+        "m1_table_exists_after": "true",
+        "m1_row_after": "kept"
+      },
+      "durationMs": 63670
+    },
+    {
+      "id": "RP05d",
+      "title": "DELETE ?gte=M4 where M4's rollback errors after its first statement",
+      "status": "info",
+      "detail": "apply HTTP 200; DELETE HTTP 400; column c exists true",
+      "measurements": {
+        "m4_http": 200,
+        "delete_http": 400,
+        "delete_body": "{\"message\":\"You cannot rollback a production branch.\"}",
+        "history_after": "rp05_m1,rp05_m2,rp05_m3,rp05_m4",
+        "m4_column_exists_after": "true"
+      },
+      "durationMs": 63670
+    },
+    {
+      "id": "RP05e",
+      "title": "failing apply: second statement errors",
+      "status": "info",
+      "detail": "apply HTTP 400; rp_m5 exists false; in history no",
+      "measurements": {
+        "apply_http": 400,
+        "apply_body": "{\"message\":\"Failed to apply database migration: ERROR:  22012: division by zero\\n\"}",
+        "m5_table_exists_after": "false",
+        "m5_in_history": "no",
+        "history_after": "rp05_m1,rp05_m2,rp05_m3,rp05_m4"
+      },
+      "durationMs": 63670
+    },
+    {
+      "id": "RP05g",
+      "title": "DELETE ?gte= on a git-less preview branch: B2 stored `drop column`, B3 stored no rollback",
+      "status": "info",
+      "detail": "branch ACTIVE_HEALTHY after 27s; DELETE HTTP 200; column b exists false; rp_b3 exists true",
+      "measurements": {
+        "branch_create_http": 201,
+        "branch_status": "ACTIVE_HEALTHY",
+        "history_pulled_from_parent": "rp05_m1,rp05_m2,rp05_m3,rp05_m4",
+        "b_apply_http": "200/200/200",
+        "history_before": "rp05_m1,rp05_m2,rp05_m3,rp05_m4,rp05_b1,rp05_b2,rp05_b3",
+        "delete_http": 200,
+        "delete_body": "[]",
+        "history_after": "rp05_m1,rp05_m2,rp05_m3,rp05_m4,rp05_b1",
+        "b2_column_exists_after": "false",
+        "b3_table_exists_after": "true",
+        "b1_table_exists_after": "true",
+        "b1_row_after": "kept"
+      },
+      "durationMs": 63670
+    },
+    {
+      "id": "RP05h",
+      "title": "cleanup: branch deleted",
+      "status": "info",
+      "detail": "DELETE HTTP 200",
+      "durationMs": 63670
+    },
+    {
+      "id": "RP05f",
+      "title": "cleanup: project deleted",
+      "status": "info",
+      "detail": "DELETE HTTP 200",
+      "durationMs": 63670
+    }
+  ]
+}

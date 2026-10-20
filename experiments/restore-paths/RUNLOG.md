@@ -266,13 +266,109 @@ the project.
 
 ## Not measured
 
-- Restore to a new project (clone): Dashboard only, refused a PAT; password and
-  Storage behaviour after a clone are unread. The docs list what is not copied
+- Restore to a new project (clone): Dashboard only, refused a PAT; the
+  password after a clone is unread. Storage after a clone is in the lexicanum
+  major-upgrade guide (dashboard clones, 2026-07-29 and 2026-08-04), not this
+  experiment. The docs list what is not copied
   (Storage objects and settings among them); not tested.
 - The Dashboard's physical-backup restore, and `backups/restore` on any
-  project where it answers.
+  project where it answers (still "unavailable" on Team, RP04, 2026-10-20).
 - A restore target hours or days old; a database over 1 GB; a Free project
   parked longer than minutes; auto-pause.
 - Direct 5432 (IPv6 only; no IPv6 route from the vantage).
 - Why the PITR window at enable time ends before the create call.
 - Restore time at production data sizes.
+
+## 2026-10-20 - RP04 (Team daily-backup restore) and RP05 (migration rollback)
+
+Same vantage (IPv4-only workstation), ap-southeast-1, default compute on
+every project (Micro by default; size not read back). Question behind both: what a project with no PITR add-on
+can use to recover from a deleted-data mistake or a bad release.
+
+| run | module | start (UTC) | org | what | artifact |
+|---|---|---|---|---|---|
+| R10 | RP04 | 09:49 | Team | daily-backup restore route, retention recorded as the entitlement flag only | `out/2026-10-20/run-2026-10-20T09-49-42-217Z.json` |
+| R11 | RP05 | 09:52 | Pro | migration rollback on the production project (RP05a-e) | `out/2026-10-20/run-2026-10-20T09-52-11-293Z.json` |
+| R12 | RP05 | 09:53 | Pro | as R11, plus a git-less preview branch (RP05g) | `out/2026-10-20/run-2026-10-20T09-53-31-105Z.json` |
+| R13 | RP04 | 09:53 | Team | as R10, with the retention value recorded | `out/2026-10-20/run-2026-10-20T09-53-54-870Z.json` |
+
+The artifacts record lab commit `abe720d`; RP04 and RP05 ran from the
+working tree, revised between R10 and R13 (retention value recorded) and
+between R11 and R12 (RP05g added), and the committed sources are the R12 and
+R13 revisions.
+
+Every project and the R12 branch were deleted in `finally` (`DELETE 200` in
+each artifact). A `GET /v1/projects` after R13 listed no `rp-*` project
+(author's check, no snapshot saved).
+
+### RP04 - daily-backup restore on a Team org (R10, R13)
+
+- Entitlements on the Team org: `project_cloning` true,
+  `backup.restore_to_new_project` true, `pitr.available_variants` true,
+  `backup.schedule` false, `backup.retention_days` 14 (R13; R10 recorded only
+  the access flag). A manual call on the same day (no artifact) read 7 for
+  `backup.retention_days` on the Pro org and the PITR variants
+  `pitr_7, pitr_14, pitr_28` (the Team artifacts record only that
+  `pitr.available_variants` is granted, not the set; the same manual call
+  read the same set on Team).
+- One COMPLETED physical backup was listed on the first read after the
+  project reported healthy, in both runs.
+- `POST database/backups/restore {id}` with that backup's id answered `400`
+  "This endpoint is unavailable at the moment" on 4 attempts over 180 s in
+  both runs; `GET database/backups/restore-point` answered the same. That is
+  the RP01 answer on Pro (2026-10-10); sfp-platforms recorded the same body
+  on Pro and a `400` status for restore points on Team (2026-09-03). No restore ran, so there is no downtime figure.
+- Before the restore attempt the module rotated the db password (new one
+  logged in, old one refused) and wrote a marker row and an object; with no
+  restore those are unexercised.
+- Observation, not explained: in R13 the project named from a timestamp of
+  09:53:54.871Z (the module's create call) reported `created_at`
+  09:48:11Z in `GET /v1/projects` (the author's manual call during the run,
+  no artifact; the value is 09:48:11.168Z, within a second of R10's backup
+  `inserted_at` 09:48:11.128Z), and its listed backup carried
+  `inserted_at` 09:53:07.981Z (artifact). Both precede the create call. One reading is
+  a pre-provisioned instance handed to the request; it was not tested. R10's
+  backup also predates that run's start.
+
+### RP05 - the migrations rollback route (R11, R12)
+
+The published OpenAPI document lists `DELETE
+/v1/projects/{ref}/database/migrations?gte=<version>` ("Rollback database
+migrations and remove them from history table", no description) and an
+optional `rollback` string on the apply and upsert bodies.
+
+Production project (R11 and R12 agree on every row):
+
+| step | answer |
+|---|---|
+| apply M1 (create table, `rollback` = drop table), M2 (add column, `rollback` = drop column), M3 (create table, no `rollback`) | `200` each; versions `YYYYMMDDHHMMSS` |
+| `GET migrations/{M2}` | `statements` and `rollback` both returned as stored |
+| `GET migrations/{M3}` | `rollback` null |
+| `DELETE ?gte=M3`, `DELETE ?gte=M2` | `400` "You cannot rollback a production branch." each time; history, schema and M1's row unchanged |
+| apply M4 (add column, `rollback` that errors), `DELETE ?gte=M4` | apply `200`; DELETE `400`, same message; column kept |
+| apply M5 (`create table ...; select 1/0`) | `400` `Failed to apply database migration: ERROR:  22012: division by zero`; M5's table absent, M5 not in history |
+
+Preview branch of the R12 project (`POST /projects/{ref}/branches`,
+`with_data: false`), n=1:
+
+- Branch create `201`, then `ACTIVE_HEALTHY` (10 s polling). The module's
+  detail line reads "after 27s", but that figure is taken when the RP05g row
+  is written, after the applies and the DELETE, so it bounds the time to
+  healthy (at most 27 s) without measuring it. The module records
+  `branch_healthy_s` from the next run on.
+  Its history held the parent's M1-M4 when the module read it.
+- Applied B1 (create table + row, `rollback` = drop table), B2 (add column,
+  `rollback` = drop column), B3 (create table, no `rollback`): `200` each.
+- `DELETE ?gte=B2`: `200`, body `[]`. History afterwards ended at B1 (B2 and
+  B3 removed). B2's column was gone; B3's table was still there; B1's table
+  and row were kept.
+- Reading: the route removes every history row from the cut onward and runs
+  the stored `rollback` SQL of those rows; a row with none stored leaves its
+  change in place. Two rows were cut in one call; the order the rollbacks run
+  in, and what happens when a stored rollback fails on a branch, were not
+  run (M4's erroring rollback was only tried on production, where the route
+  refuses before running anything).
+
+Not measured: `supabase migration repair` and `supabase db push` against
+the same history; a branch merge after a rollback; a rollback on a branch
+created with git; a stored rollback that fails on a branch.

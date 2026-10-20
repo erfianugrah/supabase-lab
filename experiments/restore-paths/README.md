@@ -20,14 +20,18 @@ is built for linux-x64.
 | RP01 | Pro surface: pause and unpause refused; `backups/restore` and `restore-point` answer "unavailable"; `restore-pitr` without PITR refused; no clone path in the OpenAPI document; the dashboard clone route rejects a PAT |
 | RP02 | PITR restore on a Small Pro project: time until a target is accepted, per-path outage, which password the pooler accepts afterwards, Storage, plus a control restore to an instant after a second password rotation. `RP02_SEED_MB` grows the database first |
 | RP03 | Free-plan pause and unpause (two cycles): timing, password change while paused, password after unpause, Storage |
+| RP04 | Daily (physical) backup restore without PITR on a Team-org Micro project (`RP04_ORG_ROLE=pro` for Pro): retention entitlement, first backup listed, whether `backups/restore` runs; if it does, per-path outage, password and Storage as in RP02 |
+| RP05 | What `DELETE database/migrations?gte=` and the stored `rollback` SQL do to schema, data and history, on the production project and on a git-less preview branch; plus a failing apply |
 
 ## Run
 
 ```bash
-# PVLAB_ORG_PRO / PVLAB_ORG_FREE are org slugs; SUPABASE_ACCESS_TOKEN is a PAT.
+# PVLAB_ORG_PRO / PVLAB_ORG_TEAM / PVLAB_ORG_FREE are org slugs; SUPABASE_ACCESS_TOKEN is a PAT.
 make surface   # RP01, minutes
 make pitr      # RP02, ~10 minutes; RP02_SEED_MB=500 make pitr for a bigger database
 make pause     # RP03, ~15 minutes, Free org (2 active projects allowed)
+make daily     # RP04, ~4 minutes while backups/restore refuses, up to ~30 if a restore runs; PVLAB_ORG_TEAM
+make rollback  # RP05, ~1-2 minutes including the preview branch; PVLAB_ORG_PRO
 ```
 
 Output lands in `evidence/<timestamp>/` (gitignored: reports carry project
@@ -51,7 +55,12 @@ workstation), ap-southeast-1 projects:
 | Free-plan pause then unpause | `INACTIVE` after 62 or 63 s (5 of 6 cycles; 276 s once); unpause to healthy 183 to 212 s (5 of 6; 444 s once) | RP03 |
 | Password change while paused | refused, `400` "Cannot reset password for non-active projects" | RP03 |
 | Password after unpause | the one set before the pause works; the verifier is set again | RP03 |
+| Team: in-place physical-backup restore (`backups/restore`), no PITR | `400` "This endpoint is unavailable at the moment" on 4 attempts over 180 s, and on one `GET restore-point`, 2026-10-20; no downtime figure exists | RP04 |
+| Backup retention as an entitlement | `backup.retention_days` 14 on the Team org (RP04); 7 on the Pro org (manual call, no artifact), 2026-10-20 | RP04 |
+| Migration rollback route on a production project | `400` "You cannot rollback a production branch."; schema and history unchanged; the stored `rollback` SQL is returned by `GET migrations/{version}` | RP05 |
+| Migration rollback route on a git-less preview branch | `200`; history rows from the cut onward removed; the one stored `rollback` ran (column dropped); a migration with none stored kept its table (n=1) | RP05 |
+| Failing migration apply | `400` with the Postgres error; the first statement's table absent and no history row | RP05 |
 
-Not measured: restore-to-new-project, the Dashboard's physical-backup restore,
+Not measured: restore-to-new-project, the Dashboard's physical-backup restore (so no daily-backup restore downtime),
 direct 5432 (IPv6-only), restore time at production data sizes, and any
 restore on a project older than a few minutes.
