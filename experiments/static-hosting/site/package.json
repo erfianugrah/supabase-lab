@@ -6,9 +6,9 @@
     "build": "astro build"
   },
   "dependencies": {
-    "@astrojs/react": "7.0.0",
+    "@astrojs/react": "7.1.0",
     "@fontsource/ibm-plex-mono": "5.2.7",
-    "astro": "7.3.5",
+    "astro": "7.4.1",
     "react": "19.2.0",
     "react-dom": "19.2.0"
   },
