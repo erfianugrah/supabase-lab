@@ -1,4 +1,5 @@
 ROOT := $(abspath ../..)
+include $(ROOT)/harness/pvlab.mk
 VARS := -var-file=$(ROOT)/secrets.tfvars -var-file=experiment.tfvars
 REF := $(shell tofu output -raw project_ref 2>/dev/null)
 TOK := $(shell grep -E '^supabase_access_token' $(ROOT)/secrets.tfvars 2>/dev/null | cut -d'"' -f2)
@@ -28,7 +29,7 @@ probe: export SUPABASE_ACCESS_TOKEN := $(TOK)
 probe:
 	@test -n "$(REF)" || (echo "no project_ref output - run 'make apply' first"; exit 1)
 	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "no PAT in $(ROOT)/secrets.tfvars - run 'make secrets-decrypt' at the root"; exit 1)
-	@cd $(ROOT)/harness && bun run build >/dev/null
+	@$(HARNESS_BUILD)
 	@mkdir -p evidence/$(TS)
 	@keys=$$(printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -s -H @- \
 		"https://api.supabase.com/v1/projects/$(REF)/api-keys?reveal=true"); \
@@ -42,7 +43,7 @@ probe:
 		CF_ACCESS_CLIENT_ID="$$(tofu output -raw svc_token_client_id 2>/dev/null)" \
 		CF_ACCESS_CLIENT_SECRET="$$(tofu output -raw svc_token_client_secret 2>/dev/null)" \
 		PVLAB_JWKS_DIR="$(abspath jwks)" \
-		$(ROOT)/harness/dist/pvlab --where local --experiment iap-lockdown \
+		$(HARNESS_RUN) --where local --experiment iap-lockdown \
 		--only "$(IDS)" --destructive --out evidence/$(TS)
 	@echo "== evidence/$(TS)/run-<stamp>.md =="
 

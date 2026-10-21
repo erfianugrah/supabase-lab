@@ -1,4 +1,5 @@
 ROOT := $(abspath ../..)
+include $(ROOT)/harness/pvlab.mk
 VARS := -var-file=$(ROOT)/secrets.tfvars -var-file=experiment.tfvars
 REF := $(shell tofu output -raw project_ref 2>/dev/null)
 REGION := $(shell tofu output -raw region 2>/dev/null || echo ap-southeast-1)
@@ -128,14 +129,14 @@ gotrue-down:
 # BUILD=0 RUNNER="bun $(ROOT)/harness/src/run.ts" runs from source without
 # recompiling dist/pvlab - needed when another experiment's battery is running
 # from that binary (Linux refuses to overwrite a running executable).
-RUNNER ?= $(ROOT)/harness/dist/pvlab
+RUNNER ?= $(HARNESS_RUN)
 BUILD ?= 1
 probe: export SUPABASE_ACCESS_TOKEN := $(TOK)
 probe: export DB_PASSWORD := $(PW)
 probe:
 	@test -n "$(REF)" || (echo "no project_ref - run 'make apply' first"; exit 1)
 	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "no PAT in $(ROOT)/secrets.tfvars"; exit 1)
-	@if [ "$(BUILD)" = "1" ]; then cd $(ROOT)/harness && bun run build >/dev/null; else cd $(ROOT)/harness && bun run gen >/dev/null; fi
+	@if [ "$(BUILD)" = "1" ]; then $(HARNESS_BUILD); else cd $(ROOT)/harness && bun run gen >/dev/null; fi
 	@mkdir -p evidence/$(TS)
 	@keys=$$(printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -s -H @- "https://api.supabase.com/v1/projects/$(REF)/api-keys?reveal=true"); \
 	anon=$$(echo "$$keys" | jq -r '.[] | select(.name=="anon") | .api_key' | head -1); \

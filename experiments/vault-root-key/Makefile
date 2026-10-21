@@ -1,4 +1,5 @@
 ROOT := $(abspath ../..)
+include $(ROOT)/harness/pvlab.mk
 VARS := -var-file=$(ROOT)/secrets.tfvars -var-file=experiment.tfvars
 SRC := $(shell tofu output -raw source_ref 2>/dev/null)
 DST := $(shell tofu output -raw target_ref 2>/dev/null)
@@ -35,10 +36,10 @@ probe:
 	@test -n "$(DST)" || (echo "no target_ref output - run 'make apply' first"; exit 1)
 	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "no PAT in $(ROOT)/secrets.tfvars - run 'make secrets-decrypt' at the root"; exit 1)
 	@test -n "$$DB_PASSWORD" || (echo "no db_password in $(ROOT)/secrets.tfvars"; exit 1)
-	@cd $(ROOT)/harness && bun run build >/dev/null
+	@$(HARNESS_BUILD)
 	@mkdir -p evidence/$(TS)
 	@PVLAB_REF="$(SRC)" PVLAB_PEER_TARGET="$(DST)" \
-		$(ROOT)/harness/dist/pvlab --where local --destructive --only V01,V02,V03 --experiment vault-root-key \
+		$(HARNESS_RUN) --where local --destructive --only V01,V02,V03 --experiment vault-root-key \
 		--out evidence/$(TS)
 	@echo "== evidence/$(TS)/ =="
 
@@ -53,10 +54,10 @@ probe-deleted-source:
 	@echo "capturing dead ref: $(SRC)"
 	tofu plan -destroy $(VARS) -target='supabase_project.source' -out=tfplan-destroy-source
 	tofu apply tfplan-destroy-source
-	@cd $(ROOT)/harness && bun run build >/dev/null
+	@$(HARNESS_BUILD)
 	@mkdir -p evidence/$(TS)-deleted
 	@PVLAB_REF="$(DST)" PVLAB_DEAD_REF="$(SRC)" \
-		$(ROOT)/harness/dist/pvlab --where local --destructive --only V04 --experiment vault-root-key \
+		$(HARNESS_RUN) --where local --destructive --only V04 --experiment vault-root-key \
 		--out evidence/$(TS)-deleted
 	@echo "== evidence/$(TS)-deleted/ =="
 

@@ -1,4 +1,5 @@
 ROOT := $(abspath ../..)
+include $(ROOT)/harness/pvlab.mk
 VARS := -var-file=$(ROOT)/secrets.tfvars -var-file=experiment.tfvars
 REF := $(shell tofu output -raw project_ref 2>/dev/null)
 TOK := $(shell grep -E '^supabase_access_token' $(ROOT)/secrets.tfvars 2>/dev/null | cut -d'"' -f2)
@@ -39,10 +40,10 @@ probe:
 	@test -n "$(REF)" || (echo "no project_ref output - run 'make apply' first"; exit 1)
 	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "no PAT in $(ROOT)/secrets.tfvars - run 'make secrets-decrypt' at the root"; exit 1)
 	@test -n "$(ORGS)" || echo "note: ORGS empty - F01 will skip. Re-run with 'make probe ORGS=slug-a,slug-b'"
-	@cd $(ROOT)/harness && bun run build >/dev/null
+	@$(HARNESS_BUILD)
 	@mkdir -p evidence/$(TS)
 	@PVLAB_REF="$(REF)" PVLAB_ORG_SLUGS="$(ORGS)" \
-		$(ROOT)/harness/dist/pvlab --where local --only F01,F02,F03 --experiment platform-facts \
+		$(HARNESS_RUN) --where local --only F01,F02,F03 --experiment platform-facts \
 		--out evidence/$(TS)
 	@echo "== evidence/$(TS)/ =="
 
@@ -67,12 +68,12 @@ publish-evidence:
 # Compare the two most recent runs. Offline: no PAT, no network - the diff is
 # a pure function over two artifacts.
 diff:
-	@cd $(ROOT)/harness && bun run build >/dev/null
+	@$(HARNESS_BUILD)
 	@ls -1 evidence/*/run-*.json 2>/dev/null | tail -2 | { \
 		read prev; read cur; \
 		test -n "$$cur" || (echo "need two runs under evidence/ - run 'make probe' twice"; exit 1); \
 		echo "prev: $$prev"; echo "cur:  $$cur"; \
-		$(ROOT)/harness/dist/pvlab --diff "$$prev,$$cur" --out evidence/diff-$(TS); }
+		$(HARNESS_RUN) --diff "$$prev,$$cur" --out evidence/diff-$(TS); }
 
 destroy:
 	tofu plan -destroy $(VARS) -out=tfplan-destroy

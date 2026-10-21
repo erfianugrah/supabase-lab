@@ -1,4 +1,5 @@
 ROOT := $(abspath ../..)
+include $(ROOT)/harness/pvlab.mk
 VARS := -var-file=$(ROOT)/secrets.tfvars -var-file=experiment.tfvars
 REF := $(shell tofu output -raw project_ref 2>/dev/null)
 TOK := $(shell grep -E '^supabase_access_token' $(ROOT)/secrets.tfvars 2>/dev/null | cut -d'"' -f2)
@@ -38,10 +39,10 @@ ORGS ?= $(ORG)
 probe: export SUPABASE_ACCESS_TOKEN := $(TOK)
 probe:
 	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "no PAT in $(ROOT)/secrets.tfvars - run 'make secrets-decrypt' at the root"; exit 1)
-	@cd $(ROOT)/harness && bun run build >/dev/null
+	@$(HARNESS_BUILD)
 	@mkdir -p evidence/$(TS)
 	@PVLAB_REF="$(REF)" PVLAB_ORG_SLUGS="$(ORGS)" \
-		$(ROOT)/harness/dist/pvlab --where local --experiment edge-function-limits \
+		$(HARNESS_RUN) --where local --experiment edge-function-limits \
 		--only $(READONLY) --out evidence/$(TS)
 	@echo "== evidence/$(TS) =="
 
@@ -50,13 +51,13 @@ probe:
 # src/run.ts" runs from source without recompiling dist/pvlab (Linux refuses
 # to overwrite a running executable while another battery uses it).
 ONLY ?= $(DESTRUCTIVE)
-RUNNER ?= $(ROOT)/harness/dist/pvlab
+RUNNER ?= $(HARNESS_RUN)
 BUILD ?= 1
 probe-destructive: export SUPABASE_ACCESS_TOKEN := $(TOK)
 probe-destructive:
 	@test -n "$(REF)" || (echo "no project_ref output - run 'make apply' first"; exit 1)
 	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "no PAT in $(ROOT)/secrets.tfvars"; exit 1)
-	@if [ "$(BUILD)" = "1" ]; then cd $(ROOT)/harness && bun run build >/dev/null; else cd $(ROOT)/harness && bun run gen >/dev/null; fi
+	@if [ "$(BUILD)" = "1" ]; then $(HARNESS_BUILD); else cd $(ROOT)/harness && bun run gen >/dev/null; fi
 	@mkdir -p evidence/$(TS)
 	@keys=$$(printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -s -H @- \
 		"https://api.supabase.com/v1/projects/$(REF)/api-keys"); \

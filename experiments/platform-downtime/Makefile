@@ -1,16 +1,11 @@
 ROOT := $(abspath ../..)
+include $(ROOT)/harness/pvlab.mk
 VARS := -var-file=$(ROOT)/secrets.tfvars -var-file=experiment.tfvars
 TS := $(shell date +%Y%m%d-%H%M%S)
 
-# The harness build is linux-x64 only; elsewhere run the same entry from source
-# (the governed-starter-kit Makefile's switch).
-ifeq ($(shell uname -s),Linux)
-RUNNER := $(ROOT)/harness/dist/pvlab
-BUILD  := cd $(ROOT)/harness && bun run build >/dev/null
-else
-RUNNER := bun $(ROOT)/harness/src/run.ts
-BUILD  := cd $(ROOT)/harness && bun scripts/gen-registry.ts >/dev/null
-endif
+# Binary on Linux, source elsewhere: harness/pvlab.mk.
+RUNNER := $(HARNESS_RUN)
+BUILD  := $(HARNESS_BUILD)
 
 # A project ref is 20 lowercase letters. Filtering on that SHAPE is what makes
 # the `test -n` guard below actually fire: with no state, `tofu output -raw`

@@ -1,4 +1,5 @@
 ROOT := $(abspath ../..)
+include $(ROOT)/harness/pvlab.mk
 VARS := -var-file=$(ROOT)/secrets.tfvars -var-file=experiment.tfvars
 TS := $(shell date +%Y%m%d-%H%M%S)
 
@@ -46,7 +47,7 @@ probe:
 	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "no PAT - export SUPABASE_ACCESS_TOKEN"; exit 1)
 	@case "$$SUPABASE_ACCESS_TOKEN" in *REPLACE_ME*) echo "PAT is the committed placeholder - export SUPABASE_ACCESS_TOKEN"; exit 1;; esac
 	@test -n "$(ONLY)" || (echo "refusing to run with an empty ONLY: the registry spans every experiment"; exit 1)
-	@cd $(ROOT)/harness && bun run build >/dev/null
+	@$(HARNESS_BUILD)
 	@mkdir -p evidence/$(TS)
 	@keys=$$(printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -s -H @- "https://api.supabase.com/v1/projects/$(REF)/api-keys?reveal=true"); \
 	anon=$$(echo "$$keys" | jq -r '.[] | select(.name=="anon") | .api_key' | head -1); \
@@ -55,7 +56,7 @@ probe:
 	PVLAB_REF="$(REF)" AWS_REGION="$(REGION)" \
 		SUPABASE_ANON_KEY="$$anon" SUPABASE_SERVICE_ROLE_KEY="$$svc" \
 		PVLAB_ENDPOINT_CUSTOM_HOST="$(CUSTOM_HOST)" \
-		$(ROOT)/harness/dist/pvlab --where local --experiment tls-surface \
+		$(HARNESS_RUN) --where local --experiment tls-surface \
 		--only $(ONLY) $(RUNNER_FLAGS) --out evidence/$(TS)
 	@echo "== evidence/$(TS)/ =="
 
@@ -81,12 +82,12 @@ full:
 # Compare the two most recent runs of the same module set. Offline. The
 # per-suite (TL02) and per-route (TL05) columns are what move between runs.
 diff:
-	@cd $(ROOT)/harness && bun run build >/dev/null
+	@$(HARNESS_BUILD)
 	@ls -1 evidence/*/run-*.json 2>/dev/null | tail -2 | { \
 		read prev; read cur; \
 		test -n "$$cur" || (echo "need two runs under evidence/"; exit 1); \
 		echo "prev: $$prev"; echo "cur:  $$cur"; \
-		$(ROOT)/harness/dist/pvlab --diff "$$prev,$$cur" --out evidence/diff-$(TS); }
+		$(HARNESS_RUN) --diff "$$prev,$$cur" --out evidence/diff-$(TS); }
 
 publish-evidence:
 	@test -n "$(RUN)" || (echo "RUN=evidence/<ts>/run-<stamp>.json required"; exit 1)

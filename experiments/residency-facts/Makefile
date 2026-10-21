@@ -1,4 +1,5 @@
 ROOT := $(abspath ../..)
+include $(ROOT)/harness/pvlab.mk
 VARS := -var-file=$(ROOT)/secrets.tfvars -var-file=experiment.tfvars
 REF := $(shell tofu output -raw project_ref 2>/dev/null)
 # The PAT is NOT in secrets.tfvars - it lives in the operator's env as
@@ -30,10 +31,10 @@ probe: export SUPABASE_ACCESS_TOKEN := $(TOK)
 probe: export DB_PASSWORD := $(DBPW)
 probe:
 	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "no PAT in $(ROOT)/secrets.tfvars - run 'make secrets-decrypt' at the root"; exit 1)
-	@cd $(ROOT)/harness && bun run build >/dev/null
+	@$(HARNESS_BUILD)
 	@mkdir -p evidence/$(TS)
 	@PVLAB_REF="$(REF)" \
-		$(ROOT)/harness/dist/pvlab --where local --only R01,R03,R07 --experiment residency-facts \
+		$(HARNESS_RUN) --where local --only R01,R03,R07 --experiment residency-facts \
 		--out evidence/$(TS)
 	@echo "== evidence/$(TS)/ =="
 
@@ -44,20 +45,20 @@ probe-full: export DB_PASSWORD := $(DBPW)
 probe-full:
 	@test -n "$(REF)" || (echo "no project_ref output - run 'make apply' first"; exit 1)
 	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "no PAT in $(ROOT)/secrets.tfvars - run 'make secrets-decrypt' at the root"; exit 1)
-	@cd $(ROOT)/harness && bun run build >/dev/null
+	@$(HARNESS_BUILD)
 	@mkdir -p evidence/$(TS)
 	@PVLAB_REF="$(REF)" \
-		$(ROOT)/harness/dist/pvlab --where local --experiment residency-facts --destructive \
+		$(HARNESS_RUN) --where local --experiment residency-facts --destructive \
 		--out evidence/$(TS)
 	@echo "== evidence/$(TS)/ =="
 
 diff:
-	@cd $(ROOT)/harness && bun run build >/dev/null
+	@$(HARNESS_BUILD)
 	@ls -1 evidence/*/run-*.json 2>/dev/null | tail -2 | { \
 		read prev; read cur; \
 		test -n "$$cur" || (echo "need two runs under evidence/ - run 'make probe' twice"; exit 1); \
 		echo "prev: $$prev"; echo "cur:  $$cur"; \
-		$(ROOT)/harness/dist/pvlab --diff "$$prev,$$cur" --out evidence/diff-$(TS); }
+		$(HARNESS_RUN) --diff "$$prev,$$cur" --out evidence/diff-$(TS); }
 
 destroy: export TF_VAR_supabase_access_token := $(TOK)
 destroy:

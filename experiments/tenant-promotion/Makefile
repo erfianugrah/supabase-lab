@@ -1,4 +1,5 @@
 ROOT := $(abspath ../..)
+include $(ROOT)/harness/pvlab.mk
 VARS := -var-file=$(ROOT)/secrets.tfvars -var-file=experiment.tfvars
 SHARED := $(shell tofu output -raw shared_ref 2>/dev/null)
 DEDICATED := $(shell tofu output -raw dedicated_ref 2>/dev/null)
@@ -33,10 +34,10 @@ probe:
 	@test -n "$(SHARED)" || (echo "no shared_ref output - run 'make apply' first"; exit 1)
 	@test -n "$(DEDICATED)" || (echo "no dedicated_ref output - run 'make apply' first"; exit 1)
 	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "no PAT in $(ROOT)/secrets.tfvars - run 'make secrets-decrypt' at the root"; exit 1)
-	@cd $(ROOT)/harness && bun run build >/dev/null
+	@$(HARNESS_BUILD)
 	@mkdir -p evidence/$(TS)
 	@PVLAB_REF="$(SHARED)" PVLAB_PEER_DEDICATED="$(DEDICATED)" \
-		$(ROOT)/harness/dist/pvlab --where local --destructive --only P01,P02,P03,P04 \
+		$(HARNESS_RUN) --where local --destructive --only P01,P02,P03,P04 \
 		--experiment tenant-promotion --out evidence/$(TS)
 	@echo "== evidence/$(TS)/REPORT.md =="
 
