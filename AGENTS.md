@@ -31,7 +31,9 @@ platform behaviour or writing it into docs
   `$(HARNESS_RUN) --where ...`): the compiled `dist/pvlab` on Linux, `bun
   harness/src/run.ts` elsewhere, because `bun run build` targets linux-x64
   and the binary dies on the macOS orchestrator with "exec format error".
-  `harness/src/makefile-runner.test.ts` fails on a hardcoded `dist/pvlab`.
+  `harness/src/makefile-runner.test.ts` fails on a hardcoded `dist/pvlab`
+  and on a bare `setsid` (util-linux, absent on macOS): detached batteries
+  use `$(HARNESS_DETACH) nohup sh -c '...' &`.
 - Tests live in `harness/` (shared contract + runner + report renderer) and
   `experiments/<name>/tests/*.ts` (the test modules). Adding a test is ONE
   file exporting a `TestModule`: `where` picks the vantage (runner vs local
