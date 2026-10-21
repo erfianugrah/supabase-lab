@@ -1,4 +1,5 @@
 ROOT := $(abspath ../..)
+include $(ROOT)/harness/pvlab.mk
 VARS := -var-file=$(ROOT)/secrets.tfvars -var-file=experiment.tfvars
 REF  := $(shell tofu output -raw project_ref 2>/dev/null)
 POOL := $(shell tofu output -raw pooler_host 2>/dev/null)
@@ -73,23 +74,23 @@ probe:
 	@test -n "$(REF)" || (echo "no project_ref output - run 'make apply' first"; exit 1)
 	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "no PAT in $(ROOT)/secrets.tfvars - run 'make secrets-decrypt' at the root"; exit 1)
 	@$(MAKE) --no-print-directory gate >/dev/null
-	@cd $(ROOT)/harness && bun run build >/dev/null
+	@$(HARNESS_BUILD)
 	@mkdir -p evidence/$(TS)
 	@PVLAB_REF="$(REF)" \
 	 PVLAB_ENDPOINT_POOLER="$(POOL)" \
-		$(ROOT)/harness/dist/pvlab --where local --only E01,E02,E03 \
+		$(HARNESS_RUN) --where local --only E01,E02,E03 \
 		--experiment stripe-sync-schema --out evidence/$(TS)
 	@echo "== evidence/$(TS)/ =="
 
 # Two runs either side of a Stripe API version change is the actual experiment;
 # a single run only photographs one side of it.
 diff:
-	@cd $(ROOT)/harness && bun run build >/dev/null
+	@$(HARNESS_BUILD)
 	@ls -1 evidence/*/run-*.json 2>/dev/null | tail -2 | { \
 		read prev; read cur; \
 		test -n "$$cur" || (echo "need two runs under evidence/ - run 'make probe' twice"; exit 1); \
 		echo "prev: $$prev"; echo "cur:  $$cur"; \
-		$(ROOT)/harness/dist/pvlab --diff "$$prev,$$cur" --out evidence/diff-$(TS); }
+		$(HARNESS_RUN) --diff "$$prev,$$cur" --out evidence/diff-$(TS); }
 
 destroy:
 	tofu plan -destroy $(VARS) -out=tfplan-destroy

@@ -1,4 +1,5 @@
 ROOT := $(abspath ../..)
+include $(ROOT)/harness/pvlab.mk
 VARS := -var-file=$(ROOT)/secrets.tfvars -var-file=experiment.tfvars
 REF := $(shell tofu output -raw project_ref 2>/dev/null)
 TOK := $(shell grep -E '^supabase_access_token' $(ROOT)/secrets.tfvars 2>/dev/null | cut -d'"' -f2)
@@ -89,7 +90,7 @@ probe: export PVLAB_DB_PASSWORD := $(PW)
 probe:
 	@test -n "$(REF)" || (echo "no project_ref output - run 'make apply' first"; exit 1)
 	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "no PAT in $(ROOT)/secrets.tfvars"; exit 1)
-	@cd $(ROOT)/harness && bun run build >/dev/null
+	@$(HARNESS_BUILD)
 	@mkdir -p evidence/$(TS)
 	@keys=$$(printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -s -H @- \
 		"https://api.supabase.com/v1/projects/$(REF)/api-keys?reveal=true"); \
@@ -102,7 +103,7 @@ probe:
 		PVLAB_ENDPOINT_RATELIMIT="http://localhost:$(RL_PORT)" \
 		PVLAB_ENDPOINT_RATELIMIT_WORKER="http://localhost:$(RLW_PORT)" \
 		PVLAB_ENDPOINT_EDGE="http://localhost:$(EDGE_PORT)" \
-		$(ROOT)/harness/dist/pvlab --where local --experiment security-lockdown \
+		$(HARNESS_RUN) --where local --experiment security-lockdown \
 		--only "$(IDS)" --destructive --out evidence/$(TS)
 	@echo "== evidence/$(TS)/run-<stamp>.md =="
 

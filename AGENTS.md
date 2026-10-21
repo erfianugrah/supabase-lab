@@ -26,6 +26,12 @@ platform behaviour or writing it into docs
   others. Registering all of them costs nothing - a test whose project ref is
   absent self-skips with a reason. Pass `--experiment <name>` so the report
   titles itself correctly.
+- Experiment Makefiles call the harness through `harness/pvlab.mk`
+  (`include $(ROOT)/harness/pvlab.mk`, then `@$(HARNESS_BUILD)` and
+  `$(HARNESS_RUN) --where ...`): the compiled `dist/pvlab` on Linux, `bun
+  harness/src/run.ts` elsewhere, because `bun run build` targets linux-x64
+  and the binary dies on the macOS orchestrator with "exec format error".
+  `harness/src/makefile-runner.test.ts` fails on a hardcoded `dist/pvlab`.
 - Tests live in `harness/` (shared contract + runner + report renderer) and
   `experiments/<name>/tests/*.ts` (the test modules). Adding a test is ONE
   file exporting a `TestModule`: `where` picks the vantage (runner vs local

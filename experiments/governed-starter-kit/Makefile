@@ -1,4 +1,5 @@
 ROOT  := $(abspath ../..)
+include $(ROOT)/harness/pvlab.mk
 VARS  := -var-file=$(ROOT)/secrets.tfvars -var-file=experiment.tfvars
 # -json, not -raw: with no state, -raw prints its "No outputs found" warning to
 # stdout, which would land in these variables instead of leaving them empty.
@@ -8,14 +9,9 @@ REGION := $(shell tofu output -json 2>/dev/null | jq -r '.region.value // empty'
 PW    := $(shell grep -E '^db_password' $(ROOT)/secrets.tfvars 2>/dev/null | cut -d'"' -f2)
 TS    := $(shell date +%Y%m%d-%H%M%S)
 
-# The harness build is linux-x64 only; elsewhere run the same entry from source.
-ifeq ($(shell uname -s),Linux)
-RUNNER := $(ROOT)/harness/dist/pvlab
-BUILD  := cd $(ROOT)/harness && bun run build >/dev/null
-else
-RUNNER := bun $(ROOT)/harness/src/run.ts
-BUILD  := cd $(ROOT)/harness && bun scripts/gen-registry.ts >/dev/null
-endif
+# Binary on Linux, source elsewhere: harness/pvlab.mk.
+RUNNER := $(HARNESS_RUN)
+BUILD  := $(HARNESS_BUILD)
 
 # PAT from the ENVIRONMENT, never secrets.tfvars - see pdf-corpus-graph/Makefile
 # for why a placeholder in the var-file must not be quoted.

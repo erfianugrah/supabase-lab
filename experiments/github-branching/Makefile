@@ -1,4 +1,5 @@
 ROOT := $(abspath ../..)
+include $(ROOT)/harness/pvlab.mk
 VARS := -var-file=$(ROOT)/secrets.tfvars -var-file=experiment.tfvars
 TS := $(shell date +%Y%m%d-%H%M%S)
 
@@ -55,10 +56,10 @@ probe:
 	@test -n "$(REF)" -a -n "$(REF_B)" || (echo "no project refs - run 'make apply' first"; exit 1)
 	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "no PAT - export SUPABASE_ACCESS_TOKEN"; exit 1)
 	@test -n "$(REPO)" || (echo "REPO=owner/name required"; exit 1)
-	@cd $(ROOT)/harness && bun run build >/dev/null
+	@$(HARNESS_BUILD)
 	@mkdir -p evidence/$(TS)
 	@PVLAB_REF="$(REF)" PVLAB_PEER_B="$(REF_B)" PVLAB_ENDPOINT_REPO="$(REPO)" \
-		$(ROOT)/harness/dist/pvlab --where local --experiment github-branching \
+		$(HARNESS_RUN) --where local --experiment github-branching \
 		--only "$(ONLY)" --destructive --out evidence/$(TS)
 	@echo "== evidence/$(TS)/ =="
 

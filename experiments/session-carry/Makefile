@@ -1,4 +1,5 @@
 ROOT := $(abspath ../..)
+include $(ROOT)/harness/pvlab.mk
 # The PAT in the decrypted secrets.tfvars is a placeholder (commented out
 # locally, per the root convention); the live one is the supabase CLI's token
 # file. tofu gets it as TF_VAR_ (environment), not -var (ps-visible argv) - which
@@ -38,10 +39,10 @@ probe:
 	@test -n "$(SOURCE)" || (echo "no source_ref output - run 'make apply' first"; exit 1)
 	@test -n "$(TARGET)" || (echo "no target_ref output - run 'make apply' first"; exit 1)
 	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "no PAT - log in with the supabase CLI or pass TOK="; exit 1)
-	@cd $(ROOT)/harness && bun run build >/dev/null
+	@$(HARNESS_BUILD)
 	@mkdir -p evidence/$(TS)
 	@PVLAB_REF="$(SOURCE)" PVLAB_PEER_TARGET="$(TARGET)" PVLAB_PEER_XORG="$(XORG)" \
-		$(ROOT)/harness/dist/pvlab --where local --destructive --only S00,S01,S02,S03,S04 \
+		$(HARNESS_RUN) --where local --destructive --only S00,S01,S02,S03,S04 \
 		--experiment session-carry --out evidence/$(TS)
 	@echo "== evidence/$(TS)/REPORT.md =="
 
