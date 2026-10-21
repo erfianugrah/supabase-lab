@@ -1,4 +1,5 @@
 ROOT := $(abspath ../..)
+include $(ROOT)/harness/pvlab.mk
 VARS := -var-file=$(ROOT)/secrets.tfvars -var-file=experiment.tfvars
 TS := $(shell date +%Y%m%d-%H%M%S)
 
@@ -93,7 +94,7 @@ probe:
 	@test -n "$(REF)" || (echo "no project_ref output - run 'make apply' first"; exit 1)
 	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "no PAT - export SUPABASE_ACCESS_TOKEN or run 'make secrets-decrypt' at the root"; exit 1)
 	@test -n "$(ONLY)" || (echo "refusing to run with an empty ONLY"; exit 1)
-	@cd $(ROOT)/harness && bun run build >/dev/null
+	@$(HARNESS_BUILD)
 	@mkdir -p evidence/$(TS)
 	@pub=$$(printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -s -H @- \
 		"https://api.supabase.com/v1/projects/$(REF)/api-keys?reveal=true" \
@@ -103,7 +104,7 @@ probe:
 	PVLAB_REF="$(REF)" SUPABASE_ANON_KEY="$$pub" \
 		AWS_REGION="$(REGION)" PVLAB_ENDPOINT_EDGE_URL="$$edge" \
 		PVLAB_ENDPOINT_JWKS_PRIV="$(CURDIR)/jwks/private.json" \
-		$(ROOT)/harness/dist/pvlab --where local --experiment edge-resilience \
+		$(HARNESS_RUN) --where local --experiment edge-resilience \
 		--only $(ONLY) $(RUNNER_FLAGS) --out evidence/$(TS)
 	@echo "== evidence/$(TS)/ =="
 

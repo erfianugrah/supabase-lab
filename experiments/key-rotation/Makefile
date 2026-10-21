@@ -1,4 +1,5 @@
 ROOT := $(abspath ../..)
+include $(ROOT)/harness/pvlab.mk
 VARS := -var-file=$(ROOT)/secrets.tfvars -var-file=experiment.tfvars
 HUB := $(shell tofu output -raw hub_ref 2>/dev/null)
 SPOKE := $(shell tofu output -raw spoke_ref 2>/dev/null)
@@ -33,10 +34,10 @@ probe:
 	@test -n "$(HUB)" || (echo "no hub_ref output - run 'make apply' first"; exit 1)
 	@test -n "$(SPOKE)" || (echo "no spoke_ref output - run 'make apply' first"; exit 1)
 	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "no PAT in $(ROOT)/secrets.tfvars - run 'make secrets-decrypt' at the root"; exit 1)
-	@cd $(ROOT)/harness && bun run build >/dev/null
+	@$(HARNESS_BUILD)
 	@mkdir -p evidence/$(TS)
 	@PVLAB_REF="$(HUB)" PVLAB_PEER_SPOKE="$(SPOKE)" \
-		$(ROOT)/harness/dist/pvlab --where local --destructive --only R01,R02,R03 \
+		$(HARNESS_RUN) --where local --destructive --only R01,R02,R03 \
 		--experiment key-rotation --out evidence/$(TS)
 	@echo "== evidence/$(TS)/REPORT.md =="
 

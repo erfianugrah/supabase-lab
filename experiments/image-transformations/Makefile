@@ -1,4 +1,5 @@
 ROOT := $(abspath ../..)
+include $(ROOT)/harness/pvlab.mk
 VARS := -var-file=$(ROOT)/secrets.tfvars -var-file=experiment.tfvars
 REF := $(shell tofu output -raw project_ref 2>/dev/null)
 TOK := $(shell grep -E '^supabase_access_token' $(ROOT)/secrets.tfvars 2>/dev/null | cut -d'"' -f2)
@@ -29,7 +30,7 @@ probe: export SUPABASE_ACCESS_TOKEN := $(TOK)
 probe:
 	@test -n "$(REF)" || (echo "no project_ref output - run 'make apply' first"; exit 1)
 	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "no PAT in $(ROOT)/secrets.tfvars - run 'make secrets-decrypt' at the root"; exit 1)
-	@cd $(ROOT)/harness && bun run build >/dev/null
+	@$(HARNESS_BUILD)
 	@mkdir -p evidence/$(TS)
 	@keys=$$(printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -s -H @- \
 		"https://api.supabase.com/v1/projects/$(REF)/api-keys"); \
@@ -39,7 +40,7 @@ probe:
 	PVLAB_REF="$(REF)" \
 		SUPABASE_ANON_KEY="$$anon" SUPABASE_SERVICE_ROLE_KEY="$$svc" \
 		PVLAB_ORG_SLUGS="$(ORG)" \
-		$(ROOT)/harness/dist/pvlab --where local --experiment image-transformations \
+		$(HARNESS_RUN) --where local --experiment image-transformations \
 		--only I01,I02,I03,I04,I05,I06,I07,I08,I10 \
 		--out evidence/$(TS)
 	@echo "== evidence/$(TS) =="
@@ -48,7 +49,7 @@ probe-destructive: export SUPABASE_ACCESS_TOKEN := $(TOK)
 probe-destructive:
 	@test -n "$(REF)" || (echo "no project_ref output - run 'make apply' first"; exit 1)
 	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "no PAT in $(ROOT)/secrets.tfvars"; exit 1)
-	@cd $(ROOT)/harness && bun run build >/dev/null
+	@$(HARNESS_BUILD)
 	@mkdir -p evidence/$(TS)
 	@keys=$$(printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -s -H @- \
 		"https://api.supabase.com/v1/projects/$(REF)/api-keys"); \
@@ -57,7 +58,7 @@ probe-destructive:
 	PVLAB_REF="$(REF)" \
 		SUPABASE_ANON_KEY="$$anon" SUPABASE_SERVICE_ROLE_KEY="$$svc" \
 		PVLAB_ORG_SLUGS="$(ORG)" \
-		$(ROOT)/harness/dist/pvlab --where local --experiment image-transformations \
+		$(HARNESS_RUN) --where local --experiment image-transformations \
 		--destructive --only I09 \
 		--out evidence/$(TS)
 	@echo "== evidence/$(TS) =="

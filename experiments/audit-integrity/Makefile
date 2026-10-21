@@ -1,4 +1,5 @@
 ROOT := $(abspath ../..)
+include $(ROOT)/harness/pvlab.mk
 VARS := -var-file=$(ROOT)/secrets.tfvars -var-file=experiment.tfvars
 TS := $(shell date +%Y%m%d-%H%M%S)
 
@@ -50,7 +51,7 @@ probe: export PVLAB_DB_PASSWORD := $(PW)
 probe:
 	@test -n "$(REF)" || (echo "no project_ref output - run 'make apply' first"; exit 1)
 	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "no PAT - export SUPABASE_ACCESS_TOKEN or run 'make secrets-decrypt' at the root"; exit 1)
-	@cd $(ROOT)/harness && bun run build >/dev/null
+	@$(HARNESS_BUILD)
 	@mkdir -p evidence/$(TS)-$(ORG)
 	@keys=$$(printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -s -H @- \
 		"https://api.supabase.com/v1/projects/$(REF)/api-keys?reveal=true"); \
@@ -58,7 +59,7 @@ probe:
 	test -n "$$anon" || (echo "could not fetch the anon key"; exit 1); \
 	PVLAB_REF="$(REF)" SUPABASE_ANON_KEY="$$anon" \
 		AWS_REGION="$(REGION)" \
-		$(ROOT)/harness/dist/pvlab --where local --experiment audit-integrity \
+		$(HARNESS_RUN) --where local --experiment audit-integrity \
 		--only "$(ONLY)" $(RUNNER_FLAGS) --out evidence/$(TS)-$(ORG)
 	@echo "== evidence/$(TS)-$(ORG)/ =="
 

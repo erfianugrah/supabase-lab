@@ -1,4 +1,5 @@
 ROOT := $(abspath ../..)
+include $(ROOT)/harness/pvlab.mk
 VARS := -var-file=$(ROOT)/secrets.tfvars -var-file=experiment.tfvars
 TS := $(shell date +%Y%m%d-%H%M%S)
 
@@ -80,7 +81,7 @@ probe:
 	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "no PAT - export SUPABASE_ACCESS_TOKEN"; exit 1)
 	@case "$$SUPABASE_ACCESS_TOKEN" in *REPLACE_ME*) echo "PAT is the committed placeholder - export SUPABASE_ACCESS_TOKEN"; exit 1;; esac
 	@test -n "$(ONLY)" || (echo "refusing to run with an empty ONLY - see the comment above"; exit 1)
-	@cd $(ROOT)/harness && bun run build >/dev/null
+	@$(HARNESS_BUILD)
 	@mkdir -p evidence/$(TS)
 	@keys=$$(printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -s -H @- "https://api.supabase.com/v1/projects/$(REF)/api-keys?reveal=true"); \
 	anon=$$(echo "$$keys" | jq -r '.[] | select(.name=="anon") | .api_key' | head -1); \
@@ -92,7 +93,7 @@ probe:
 		PVLAB_ENDPOINT_POOLER_TXN="$(POOLER_TXN)" PVLAB_ENDPOINT_POOLER_TXN_USER="$(POOLER_TXN_USER)" \
 		PVLAB_ENDPOINT_SHARED_TXN="$(SHARED_TXN)" PVLAB_ENDPOINT_POOLER_USER="$(POOLER_USER)" \
 		PVLAB_SBPERF="$${PVLAB_SBPERF:-$$(command -v pg-analyser || true)}" \
-		$(ROOT)/harness/dist/pvlab --where local --experiment $(EXPERIMENT) \
+		$(HARNESS_RUN) --where local --experiment $(EXPERIMENT) \
 		--only $(ONLY) $(RUNNER_FLAGS) --out evidence/$(TS)
 	@echo "== evidence/$(TS)/ =="
 

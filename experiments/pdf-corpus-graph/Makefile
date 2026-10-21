@@ -1,4 +1,5 @@
 ROOT := $(abspath ../..)
+include $(ROOT)/harness/pvlab.mk
 VARS := -var-file=$(ROOT)/secrets.tfvars -var-file=experiment.tfvars
 REF  := $(shell tofu output -raw project_ref 2>/dev/null)
 SIZE := $(shell tofu output -raw instance_size 2>/dev/null)
@@ -96,21 +97,21 @@ up: guard-tok
 probe: export DB_PASSWORD := $(PW)
 probe: guard-tok
 	@test -n "$(REF)" || (echo "no project_ref - run 'make apply' first"; exit 1)
-	@cd $(ROOT)/harness && bun run build >/dev/null
+	@$(HARNESS_BUILD)
 	@mkdir -p evidence/$(TS)
 	@PVLAB_REF="$(REF)" PVLAB_REGION="$(REGION)" \
 	 PVLAB_ENDPOINT_POOLER="$$($(MAKE) --no-print-directory pooler)" \
 	 PVLAB_INSTANCE_SIZE="$(SIZE)" \
-		$(ROOT)/harness/dist/pvlab --where local $(ONLY) \
+		$(HARNESS_RUN) --where local $(ONLY) \
 		--experiment pdf-corpus-graph --out evidence/$(TS)
 	@echo "== evidence/$(TS)/ =="
 
 diff:
-	@cd $(ROOT)/harness && bun run build >/dev/null
+	@$(HARNESS_BUILD)
 	@ls -1 evidence/*/run-*.json 2>/dev/null | tail -2 | { \
 		read prev; read cur; \
 		test -n "$$cur" || (echo "need two runs under evidence/ - run 'make probe' twice"; exit 1); \
-		$(ROOT)/harness/dist/pvlab --diff "$$prev,$$cur" --out evidence/diff-$(TS); }
+		$(HARNESS_RUN) --diff "$$prev,$$cur" --out evidence/diff-$(TS); }
 
 destroy: guard-tok
 	tofu plan -destroy $(VARS) -out=tfplan-destroy
