@@ -158,7 +158,7 @@ probe:
 probe-bg:
 	@mkdir -p evidence
 	@log=evidence/probe-$(TS).log; \
-	setsid nohup sh -c '$(MAKE) probe IDS="$(IDS)" BUILD="$(BUILD)"; echo "=== make exit $$? $$(date +%T)"' > $$log 2>&1 < /dev/null & \
+	$(HARNESS_DETACH) nohup sh -c '$(MAKE) probe IDS="$(IDS)" BUILD="$(BUILD)"; echo "=== make exit $$? $$(date +%T)"' > $$log 2>&1 < /dev/null & \
 	echo "running detached; log: $$log"
 
 # Redact and publish a run artifact to out/<date>/ (committed).
