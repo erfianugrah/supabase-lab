@@ -21,8 +21,10 @@ export function scanRunner(file: string, src: string): string[] {
   lines.forEach((text, i) => {
     if (/^\s*#/.test(text)) return;
     if (text.includes("dist/pvlab")) out.push(`${file}:${i + 1} hardcoded dist/pvlab (use $(HARNESS_RUN))`);
+    // setsid(1) is util-linux: absent on macOS (work-supabase-lab#198).
+    if (/(^|[\s;&|(])setsid\s/.test(text)) out.push(`${file}:${i + 1} bare setsid (use $(HARNESS_DETACH))`);
   });
-  if (/\$\(HARNESS_(RUN|BUILD)\)/.test(src) && !lines.some((l) => l.trim() === INCLUDE)) {
+  if (/\$\(HARNESS_(RUN|BUILD|DETACH)\)/.test(src) && !lines.some((l) => l.trim() === INCLUDE)) {
     out.push(`${file}: uses $(HARNESS_RUN) without '${INCLUDE}'`);
   }
   return out;
@@ -36,8 +38,12 @@ describe("scanner", () => {
   test("flags $(HARNESS_RUN) without the include", () => {
     expect(scanRunner("t", "probe:\n\t$(HARNESS_RUN) --where local")).toEqual([`t: uses $(HARNESS_RUN) without '${INCLUDE}'`]);
   });
+  test("flags a bare setsid", () => {
+    const src = ["probe-bg:", "\tsetsid nohup sh -c 'x' > log 2>&1 &"].join("\n");
+    expect(scanRunner("t", src)).toEqual(["t:2 bare setsid (use $(HARNESS_DETACH))"]);
+  });
   test("accepts the include form", () => {
-    const src = ["ROOT := $(abspath ../..)", INCLUDE, "probe:", "\t@$(HARNESS_BUILD)", "\t$(HARNESS_RUN) --where local"].join("\n");
+    const src = ["ROOT := $(abspath ../..)", INCLUDE, "probe:", "\t@$(HARNESS_BUILD)", "\t$(HARNESS_DETACH) nohup sh -c 'x' &", "\t$(HARNESS_RUN) --where local"].join("\n");
     expect(scanRunner("t", src)).toEqual([]);
   });
 });
