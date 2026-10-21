@@ -3,7 +3,7 @@
 Chronological record of what was run. Org slugs and project refs are not
 recorded; the org class is (a Pro-plan organization). Published artifacts
 (refs, hostnames and the vantage address redacted) are in `out/2026-10-10/`
-(SS01, SS02) and `out/2026-10-12/` (SS03 to SS07);
+(SS01, SS02), `out/2026-10-12/` (SS03 to SS07) and `out/2026-10-21/` (SS08);
 the file names below are those artifacts' names, and each cell cites a module
 id. Pin the citations to the lab commit that adds this directory.
 
@@ -776,3 +776,123 @@ when the API call fails and prints a count. After run 4: `sweep: 0 ss-
 projects` (10:58 UTC). Operator notes; the sweep output is not an artifact. Each self-hosted stack was removed with `make clean` in
 self-hosted-defaults before the next variant and after the last. The fixtures
 in `evidence/fixtures/` were deleted with `make clean-fixtures`.
+
+## 2026-10-21 - SS08 (managed Pro project in ap-southeast-1)
+
+SS03d measured cache state on a public bucket only, for `/object/authenticated`,
+`/object/public`, signed URLs and presigned S3 GETs. Not run there: a private
+bucket, the request supabase-js `download()` sends, a second user reading what
+the first warmed, a long `cacheControl`, and whether a plain object is
+compressed on the wire. SS08 covers those.
+
+Shape: n = 2 runs, each on its own new project, created and deleted by the
+module: run 1 `run-2026-10-21T04-10-39-084Z`, run 2
+`run-2026-10-21T04-12-12-527Z` (published in `out/2026-10-21/`). Storage
+server 1.80.2 in both (`SS08_setup storage_version`). Gateway host only. One
+generated `application/json` payload of 800,118 B (134,693 B after
+client-side gzip with Node `zlib` defaults; `json_bytes`, `json_gzip_bytes`).
+Every series of reads uploads its own key with the service key, so its first
+read is the first request for that key. Reads within a series are 1.5 s
+apart, except SS08e's last public-URL read, its `download()`-path read and
+its SDK `download()`, which run back to back. Users A and B are signed in through supabase-js 2.112.3. Both
+buckets carry a select policy for any authenticated user (`createSignedUrl`
+needs one on a public bucket too). Two earlier runs the same day are not
+published; their cache states agreed with these in every cell both produced
+(operator note), and the first of them had no policy on `pub`, so its
+public-bucket signed URLs were never created. Both published artifacts record
+`labCommit` bc42ddd, the commit before this module was added; the module that
+produced them is the one committed with this section.
+
+### SS08c - the request `download()` sends
+
+`GET /storage/v1/object/<bucket>/<key>` (first recorded:
+`/storage/v1/object/pub/<key>`, `pub` being the bucket id), with the header
+names supabase-js set on the first request: `apikey,authorization,x-client-info`
+(`download_path_shape`, `download_header_names`; headers Bun's `fetch` adds are
+not visible). 14 `download()` requests recorded per run, 8 on `pub` and 6 on
+`priv`. The path is neither `/object/authenticated/` nor `/object/public/`.
+
+### SS08a, SS08b - cache state per read path
+
+`cf-cache-status` per read, run 1 / run 2. A, B: the two signed-in users.
+
+| cell | public bucket (SS08a) | private bucket (SS08b) |
+|---|---|---|
+| `download()` A, then A again | `MISS, HIT` / same | `MISS, HIT` / same |
+| `download()` B, after A | `HIT` / `HIT` | `HIT` / `HIT` |
+| `download()` with the anon key (outside both `to authenticated` policies), after A and B | `HIT` / `HIT` | not run |
+| public URL, twice | `MISS, HIT` / same | - |
+| public URL, then `download()` A | `MISS -> HIT` / same | - |
+| `/object/authenticated` A, A, B | `MISS, HIT, HIT` / same | `MISS, HIT, HIT` / same |
+| one signed URL, read three times | `MISS, MISS, REVALIDATED` / `MISS, MISS, HIT` | `MISS, MISS, HIT` / `MISS, REVALIDATED, REVALIDATED` |
+| a new signed URL for each of three reads | `MISS, MISS, MISS` / same | `MISS, MISS, MISS` / same |
+| uploaded with `cacheControl` 31536000: `download()` A, A, B | `MISS, HIT, HIT` / same | `MISS, HIT, HIT` / same |
+
+Response `Cache-Control`: `private, max-age=3600` on `download()` and
+`/object/authenticated`, `public, max-age=3600` on the public URL,
+`private, max-age=31536000` on the object uploaded with 31536000, none on
+signed-URL responses. Every read in the table above went through Bun's
+`fetch` (for `download()`, via supabase-js); the `Accept-Encoding` it sent was
+not recorded, and every response came back `ce=br`.
+
+What this shows, for these runs:
+
+- The `download()` path is cached at the edge in both bucket types. A
+  second user's first read of an object the first user had read was a `HIT`,
+  in the private bucket as well, under a policy that allowed both users.
+  Not measured: whether the origin refuses the anon key on this path (no
+  cold anon read was made; the anon row above was served from a warm entry),
+  and a signed-in user the policy denies reading a whole object another user
+  warmed (SS05d's deny case was a 16-byte range and read `BYPASS`).
+- On a public bucket a public-URL read warmed the `download()` read of the
+  same key (`MISS -> HIT`); the reverse order was not run. That matches SS03d's finding for
+  `/object/public` and `/object/authenticated`.
+- A new signed URL for every read never hit: 12 of 12 reads `MISS`. One
+  signed URL reused was `MISS` on its first read in 4 of 4 bucket-and-run
+  pairs and `MISS` again on its second in 3 of 4; its third read was `HIT` in
+  2 pairs and `REVALIDATED` in 2.
+- `cacheControl` 31536000 changed the response header only. Edge state within
+  these seconds-long windows was the same as with 3600; eviction over hours
+  was not measured.
+
+### SS08d, SS08e - compression on the wire
+
+Read with curl, which does not decode, so `wire` is the bytes received.
+
+| read (SS08d: stored plain) | run 1 | run 2 |
+|---|---|---|
+| public URL, `Accept-Encoding: gzip, br`, first | `ce=br cf=MISS wire=135039` | `ce=br cf=MISS wire=135366` |
+| same, repeat | `ce=br cf=HIT wire=135398` | `ce=br cf=HIT wire=135051` |
+| public URL, no `Accept-Encoding`, third read of the same key | `ce=- cf=HIT wire=800118` | same |
+| `download()` path, user A, `Accept-Encoding: gzip`, first | `ce=gzip cf=MISS wire=131970` | `ce=gzip cf=MISS wire=131968` |
+| same, repeat | `ce=gzip cf=HIT wire=131967` | `ce=gzip cf=HIT wire=131966` |
+| `download()` path, no `Accept-Encoding`, third read of the same key | `ce=- cf=HIT wire=800118` | same |
+| private bucket, `download()` path, `Accept-Encoding: gzip`, first and repeat | `ce=gzip cf=MISS wire=131969`, `ce=gzip cf=HIT wire=131969` | `ce=gzip cf=MISS wire=131913`, `ce=gzip cf=HIT wire=131859` |
+
+| read (SS08e: gzipped by the client, uploaded with `Content-Encoding: gzip`) | run 1 | run 2 |
+|---|---|---|
+| public URL, `Accept-Encoding: gzip`, first and repeat | `ce=gzip cf=MISS wire=134693`, `ce=gzip cf=HIT wire=134693` | same |
+| public URL, no `Accept-Encoding`, third read | `ce=- cf=HIT wire=800118` | same |
+| `download()` path, `Accept-Encoding: gzip`, same key after the three public-URL reads | `ce=gzip cf=HIT wire=134693` | same |
+| what supabase-js `download()` returned | `800118 chars, equals original JSON: true` (pass) | same (pass) |
+| `storage.objects` metadata | `contentLength=134693 size=134693` | same |
+
+What this shows: the edge compressed the plain JSON object for a client that
+asked: 131,859-131,970 B with gzip (`download()` path, `Accept-Encoding: gzip`)
+and 135,039-135,398 B with br (public URL, `Accept-Encoding: gzip, br`), of
+800,118 (about 16.5-17%). It sent all 800,118 B to a client that sent no
+`Accept-Encoding`. An object stored gzipped went out as 134,693 B to a client
+accepting gzip, and on the public URL as 800,118 B with no `Content-Encoding`
+(`cf=HIT`) to one that sent none; the module does not show where it was
+decoded. `storage.objects` records `size=134693` for it instead of 800,118.
+
+Not measured in SS08: which of these byte counts the platform's usage meter
+records (the lab cannot see it); the direct storage host; objects other than
+one 800 KB JSON payload (images, audio and video were not tested);
+eviction over hours; a denied user after a warm read; repeat runs beyond two.
+
+### Cleanup
+
+Both projects were deleted in `finally` (`SS08_teardown`, DELETE 200 in both
+runs), as were the two unpublished runs' projects. `make sweep` after the last
+run: `sweep: 0 ss- projects` (operator note, not an artifact).
