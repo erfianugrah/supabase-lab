@@ -57,6 +57,7 @@ same project) and `heap_heap` (a heap table in the heap control).
 | OR08 | `ALTER TABLE ... SET ACCESS METHOD orioledb` on a heap table, and what the server does next |
 | OR09 | the PITR add-on on the OrioleDB project and the heap control |
 | OR10 | creating an OrioleDB project in a Free org |
+| OR11 | the experimental S3-mode settings on a hosted OrioleDB project, and whether the hosted role or the Management API can turn them on (separate run, `make probe ONLY=OR11`) |
 | OR99 | teardown |
 
 ## Running

@@ -1,0 +1,51 @@
+{
+  "startedAt": "2026-10-21T04:50:25.155Z",
+  "finishedAt": "2026-10-21T04:53:29.470Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "orioledb",
+  "labCommit": "02d3083",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "OR11",
+      "title": "OrioleDB S3-mode settings on a hosted project",
+      "status": "info",
+      "detail": "orioledb.s3_mode off [postmaster]; ALTER SYSTEM refused: permission denied to set parame; mgmt config s3 keys: none",
+      "measurements": {
+        "create_status": 201,
+        "final_status": "ACTIVE_HEALTHY",
+        "mgmt_postgres_config_http": 200,
+        "mgmt_postgres_config_keys": 0,
+        "mgmt_postgres_config_s3_keys": "none",
+        "version": "PostgreSQL 17.6 on aarch64-unknown-linux-gnu, compiled by gcc (GCC) 15.2.0, 64-bit",
+        "orioledb_version": "OrioleDB public beta 14",
+        "settings_rows": 16,
+        "setting_archive_command": "(disabled) [sighup]",
+        "setting_archive_library": "(empty) [sighup]",
+        "setting_archive_mode": "off [postmaster]",
+        "setting_orioledb.s3_accesskey": "(empty) [postmaster]",
+        "setting_orioledb.s3_cainfo": "(empty) [postmaster]",
+        "setting_orioledb.s3_desired_size": "10000 [sighup]",
+        "setting_orioledb.s3_headers_buffers": "1024 [postmaster]",
+        "setting_orioledb.s3_host": "(empty) [postmaster]",
+        "setting_orioledb.s3_mode": "off [postmaster]",
+        "setting_orioledb.s3_num_workers": "3 [postmaster]",
+        "setting_orioledb.s3_prefix": "(empty) [postmaster]",
+        "setting_orioledb.s3_queue_size": "1024 [postmaster]",
+        "setting_orioledb.s3_region": "(empty) [postmaster]",
+        "setting_orioledb.s3_secretkey": "(empty) [postmaster]",
+        "setting_orioledb.s3_use_https": "on [postmaster]",
+        "setting_wal_level": "logical [postmaster]",
+        "alter_system_s3_mode": "refused: permission denied to set parameter \"orioledb.s3_mode\""
+      },
+      "durationMs": 184314
+    }
+  ]
+}

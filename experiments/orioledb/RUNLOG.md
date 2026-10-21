@@ -372,6 +372,37 @@ All four projects were deleted.
 No restore was attempted on either project. A development repeat on another
 pair the same day (manual, not published) gave the same 400 and 200.
 
+## OR11 - S3-mode settings on a hosted project (2026-10-21)
+
+One OrioleDB project in the Pro org, default compute, `ap-southeast-1`,
+created and deleted by the module; `run-2026-10-21T04-50-25-155Z`, published
+in `out/2026-10-21/`. n = 1.
+
+| read | value |
+|---|---|
+| `version()` / `orioledb_version()` | `PostgreSQL 17.6 on aarch64-unknown-linux-gnu` / `OrioleDB public beta 14` |
+| `orioledb.s3_mode` | `off [postmaster]` |
+| `orioledb.s3_host`, `s3_prefix`, `s3_region`, `s3_accesskey`, `s3_secretkey` | empty, all `[postmaster]` |
+| `orioledb.s3_desired_size`, `s3_num_workers` | `10000 [sighup]`, `3 [postmaster]` |
+| `archive_mode` / `archive_library` / `archive_command` | `off` / empty / `(disabled)` |
+| `wal_level` | `logical` |
+| `ALTER SYSTEM SET orioledb.s3_mode = on` as `postgres` | `refused: permission denied to set parameter "orioledb.s3_mode"` |
+| Management API `GET /v1/projects/{ref}/config/database/postgres` | HTTP 200, 0 keys, no S3, archive or OrioleDB key |
+
+The S3-mode settings exist on a hosted OrioleDB project and are off. The
+hosted `postgres` role cannot change them, and the Management API's GET of the
+Postgres config returned an empty object (0 keys), so it shows no S3 setting;
+whether its update endpoint accepts one was not tried. Since beta17 the
+OrioleDB source ignores `s3_mode` in builds without `IS_DEV=1`
+("orioledb.s3_mode is only available in development builds (IS_DEV=1),
+ignoring", `src/orioledb.c` at tag beta19; introduced in
+https://github.com/orioledb/orioledb/commit/60b7e6310ed69d7684f2f8e5c283e9e99de8d30f).
+This project ran OrioleDB public beta 14, which predates that gate, so the
+refusal above is a role permission, not the build flag; supabase/postgres at
+1bc542d builds beta19 without `IS_DEV=1` (wal-on-s3 raw notes, section 8).
+What S3 mode does when it is on is measured on a local rig in
+`experiments/wal-on-s3` (WS01).
+
 ## What this experiment did not do
 
 - Compute sizes other than `small`; regions other than `ap-southeast-1`; one
