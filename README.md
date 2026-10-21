@@ -376,7 +376,11 @@ facts):
   after repeated UPDATEs, a pgbench pair, per-table access methods, what
   refuses or crashes on an OrioleDB table, PITR, logical replication and
   Realtime. Live, about five small projects in a Pro org. Measured 2026-10-10;
-  see its RUNLOG.
+  OR11 (the S3-mode settings on a hosted project) 2026-10-21. See its RUNLOG.
+- `wal-on-s3` - OrioleDB's experimental S3 mode on a local Docker rig
+  (OrioleDB beta19, RustFS): bucket contents at a checkpoint, restores after
+  losing the instance, eviction and cold reads, commit rate with S3 on and
+  off (WS01). Docker only. Measured 2026-10-21; see its RUNLOG.
 - `branching-nogit` - branching without git: a change written to a git-less
   branch through the SQL route reaches `GET /diff` but not the parent on `POST
   /merge`; the same objects through the migrations route do (BN01-BN03).

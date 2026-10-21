@@ -1,0 +1,151 @@
+{
+  "startedAt": "2026-10-21T06:06:20.830Z",
+  "finishedAt": "2026-10-21T06:19:52.903Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "wal-on-s3",
+  "labCommit": "02d3083",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "WS01a",
+      "title": "bucket contents after the first CHECKPOINT",
+      "status": "info",
+      "detail": "checkpoint 867 ms; listed right after: 2, after 10 s: 2",
+      "measurements": {
+        "image": "orioledb/orioledb:beta19-pg17",
+        "network": "ws3",
+        "version": "PostgreSQL 17.11 OrioleDB beta 19 PGTAG=patches17_22 alpine:3.21+clang build:2026-10-01T04",
+        "orioledb_version": "1.10",
+        "objects_after_start": 143,
+        "objects_before_checkpoint": 143,
+        "checkpoint_before": 1,
+        "checkpoint_ms": 867,
+        "checkpoint_listed_right_after": 2,
+        "checkpoint_listed_after_10s": 2,
+        "objects_after_10s": 270,
+        "bytes_after_10s": 148206023,
+        "prefix_data": "144 objects, 26053239 B",
+        "prefix_orioledb_data": "122 objects, 55043920 B",
+        "prefix_wal": "4 objects, 67108864 B",
+        "table_bytes_local": "54624256"
+      },
+      "durationMs": 812070
+    },
+    {
+      "id": "WS01b",
+      "title": "late commits after the last checkpoint, then instance and disk lost: what a restore returns",
+      "status": "info",
+      "detail": "documented restore: failed: FATAL:  A lock file from a different OrioleDB instan; lock deleted: failed: FATAL:  could not open file \"glo, A rows - of 100000, B rows - of 1000",
+      "measurements": {
+        "checkpoint_listed_before_late_commit": 2,
+        "rows_committed_A": 100000,
+        "rows_committed_B": 1000,
+        "bucket_wal_segments_at_loss": 3,
+        "restore_loader_exit": 0,
+        "restore_start": "failed: FATAL:  A lock file from a different OrioleDB instance already exists on the S3 bucket",
+        "adopt_lock_loader_exit": 0,
+        "adopt_lock_start": "failed: FATAL:  could not open file \"global/2672\": No such file or directory",
+        "adopt_lock_start_errors_logged": 79,
+        "delete_lock_lock_delete_exit": 0,
+        "delete_lock_loader_exit": 0,
+        "delete_lock_start": "failed: FATAL:  could not open file \"global/2672\": No such file or directory",
+        "delete_lock_start_errors_logged": 77
+      },
+      "durationMs": 812071
+    },
+    {
+      "id": "WS01c",
+      "title": "late commits, WAL segment switched and archived, then instance and disk lost: what a restore returns",
+      "status": "info",
+      "detail": "documented restore: failed: FATAL:  A lock file from a different OrioleDB instan; lock deleted: failed: FATAL:  could not open file \"glo, A rows - of 100000, B rows - of 1000",
+      "measurements": {
+        "checkpoint_listed_before_late_commit": 2,
+        "rows_committed_A": 100000,
+        "rows_committed_B": 1000,
+        "late_segment": "000000010000000000000004",
+        "late_segment_archived_s": 0.5,
+        "bucket_wal_segments_at_loss": 4,
+        "restore_loader_exit": 0,
+        "restore_start": "failed: FATAL:  A lock file from a different OrioleDB instance already exists on the S3 bucket",
+        "adopt_lock_loader_exit": 0,
+        "adopt_lock_start": "failed: FATAL:  could not open file \"global/2672\": No such file or directory",
+        "adopt_lock_start_errors_logged": 78,
+        "delete_lock_lock_delete_exit": 0,
+        "delete_lock_loader_exit": 0,
+        "delete_lock_start": "failed: FATAL:  could not open file \"global/2672\": No such file or directory",
+        "delete_lock_start_errors_logged": 78
+      },
+      "durationMs": 812071
+    },
+    {
+      "id": "WS01f",
+      "title": "clean restart, then late commits, then instance and disk lost: what a restore returns",
+      "status": "info",
+      "detail": "documented restore:         ^^^^^^^^^^^^^^^^^^^^ ValueError: too many values to ; lock deleted:         ^^^^^^^^^^^^^^^^^^^^ ValueError:, A rows - of 100000, B rows - of 1000; patched loader: ready, A 100000, B 0",
+      "measurements": {
+        "clean_restart": "stop, start",
+        "checkpoint_listed_before_late_commit": 3,
+        "rows_committed_A": 100000,
+        "rows_committed_B": 1000,
+        "bucket_wal_segments_at_loss": 5,
+        "restore_loader_exit": 1,
+        "restore_loader_error": "        ^^^^^^^^^^^^^^^^^^^^ ValueError: too many values to unpack (expected 2)",
+        "adopt_lock_loader_exit": 1,
+        "adopt_lock_loader_error": "        ^^^^^^^^^^^^^^^^^^^^ ValueError: too many values to unpack (expected 2)",
+        "delete_lock_lock_delete_exit": 0,
+        "delete_lock_loader_exit": 1,
+        "delete_lock_loader_error": "        ^^^^^^^^^^^^^^^^^^^^ ValueError: too many values to unpack (expected 2)",
+        "patched_loader_delete_lock_lock_delete_exit": 0,
+        "patched_loader_delete_lock_loader_exit": 0,
+        "patched_loader_delete_lock_start": "ready",
+        "patched_loader_delete_lock_rows_total": "100000",
+        "patched_loader_delete_lock_rows_before_checkpoint": "100000",
+        "patched_loader_delete_lock_rows_after_checkpoint": "0"
+      },
+      "durationMs": 812071
+    },
+    {
+      "id": "WS01d",
+      "title": "eviction to S3 at s3_desired_size 20MB: local size, cold against warm reads",
+      "status": "pass",
+      "detail": "local 134416 -> 700 kB; full count 43205, 247730, 10962 ms",
+      "measurements": {
+        "local_orioledb_data_kb_after_checkpoint": 134416,
+        "local_orioledb_data_kb_after_eviction": 700,
+        "eviction_wait_s": 6,
+        "point_read_ms_cold": "15049.6,91.6,126.7,127.0,127.3,132.8,127.1,0.6",
+        "point_read_ms_warm": "108.0,1.2,1.2,1.0,0.6,0.6,0.7,0.6",
+        "local_kb_before_count_1": 134280,
+        "local_kb_before_count_2": 3024,
+        "local_kb_before_count_3": 134176,
+        "count_ms_cold": 43205,
+        "count_ms_second": 247730,
+        "count_ms_third": 10962,
+        "count_result": "50000",
+        "local_orioledb_data_kb_after_reads": 134176
+      },
+      "durationMs": 812071
+    },
+    {
+      "id": "WS01e",
+      "title": "commit latency with S3 mode on and off",
+      "status": "info",
+      "detail": "on 23706.629666 tps / 0.169 ms; off 24042.922573 tps / 0.166 ms",
+      "measurements": {
+        "s3_on_tps": "23706.629666",
+        "s3_on_latency_avg_ms": "0.169",
+        "s3_off_tps": "24042.922573",
+        "s3_off_latency_avg_ms": "0.166",
+        "pgbench_shape": "4 clients, 15 s, one single-row INSERT per transaction, inside the container"
+      },
+      "durationMs": 812071
+    }
+  ]
+}
