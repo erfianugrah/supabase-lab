@@ -9,16 +9,16 @@
     "check": "astro check && tsc --noEmit"
   },
   "dependencies": {
-    "@astrojs/react": "7.0.0",
+    "@astrojs/react": "7.1.0",
     "@fontsource/ibm-plex-mono": "5.2.7",
     "@supabase/supabase-js": "2.112.2",
-    "astro": "7.3.5",
+    "astro": "7.4.1",
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "zod": "4.4.3"
   },
   "devDependencies": {
-    "@astrojs/check": "0.9.10",
+    "@astrojs/check": "0.9.11",
     "@cloudflare/workers-types": "^5.20260814.1",
     "@playwright/test": "^1.62.1",
     "@tailwindcss/vite": "4.3.3",
