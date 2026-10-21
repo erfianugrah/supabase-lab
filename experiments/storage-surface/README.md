@@ -32,6 +32,7 @@ https://supabase.com/docs/guides/storage/s3/authentication).
 | SS05a-d | A client-side AES-256-GCM object: chunk-aligned range reads decrypt, what `storage.objects` records, image render and content-type sniffing, an RLS policy on REST and on S3 with a user JWT |
 | SS06 | SS03-SS05 rows diffed across targets: managed, self-hosted `file` and `s3` (MinIO) backends, and self-hosted with the storage image at the managed version |
 | SS07a-b | Read only: the region catalogue for a Pro org; key-management operations in the published Management API OpenAPI document |
+| SS08a-e | CDN cache state per read path on a public and a private bucket: supabase-js `download()`, public URL, `/object/authenticated`, signed URLs reused and fresh, a second user, a long `cacheControl`; a plain and a client-gzipped JSON object's bytes on the wire with and without `Accept-Encoding` |
 
 ## Run
 
@@ -50,6 +51,7 @@ make -C ../self-hosted-defaults clean stack up LAYERS="s3 minio-hostdir storage-
 # minio-hostdir keeps MinIO off the small Docker VM volume (RUNLOG, "Self-hosted rig findings")
 make ss06 RUNS=out/<date>/run-a.json,out/<date>/run-b.json,...            # SS06 diff
 sx SUPABASE_ACCESS_TOKEN -- make probe MODS=SS07  # read only
+sx SUPABASE_ACCESS_TOKEN -- make probe MODS=SS08  # read paths and compression (about 2 min, a few MB of egress)
 make clean-fixtures                                # the 2 GiB, 256 MiB and 64 MiB fixtures
 make sweep                                         # needs SUPABASE_ACCESS_TOKEN: lists leftovers
 make publish-evidence RUN=evidence/<ts>/run-<stamp>.json
