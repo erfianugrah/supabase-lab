@@ -34,6 +34,7 @@ https://supabase.com/docs/guides/storage/s3/authentication).
 | SS07a-b | Read only: the region catalogue for a Pro org; key-management operations in the published Management API OpenAPI document |
 | SS08a-e | CDN cache state per read path on a public and a private bucket: supabase-js `download()`, public URL, `/object/authenticated`, signed URLs reused and fresh, a second user, a long `cacheControl`; a plain and a client-gzipped JSON object's bytes on the wire with and without `Accept-Encoding` |
 | SS09a-d | What the CDN keeps serving: a signed URL read until `HIT` (at most 12 reads) and read again after its token expired, an object deleted behind a cached unexpired signed URL, an upsert in place on the public URL and a reused signed URL (seconds until the new bytes), and the `Cache-Control` each path returns for `cacheControl` 3600 and 31536000 |
+| SS10u, SS10c | A known download load for reading the usage meter: two kept projects, the client sending `Accept-Encoding: gzip` to one and none to the other, each with N uncached reads (a new signed URL per read) and N reads of one public URL of the SS08 JSON object; wire bytes, `cf-cache-status` and `Content-Encoding` per arm. The metered values are read outside the lab |
 
 ## Run
 
@@ -54,6 +55,8 @@ make ss06 RUNS=out/<date>/run-a.json,out/<date>/run-b.json,...            # SS06
 sx SUPABASE_ACCESS_TOKEN -- make probe MODS=SS07  # read only
 sx SUPABASE_ACCESS_TOKEN -- make probe MODS=SS08  # read paths and compression (about 2 min, a few MB of egress)
 sx SUPABASE_ACCESS_TOKEN -- make probe MODS=SS09  # expiry, delete, upsert staleness, Cache-Control (about 7 min; estimated under 1 MB of egress from the read count)
+sx SUPABASE_ACCESS_TOKEN -- make probe MODS=SS10  # egress-meter load, N=600: about 1 min, about 1.1 GB on the wire; KEEPS two projects
+sx SUPABASE_ACCESS_TOKEN -- make ss10-teardown REFS=<gz_ref>,<plain_ref>  # delete them after the usage read
 make clean-fixtures                                # the 2 GiB, 256 MiB and 64 MiB fixtures
 make sweep                                         # needs SUPABASE_ACCESS_TOKEN: lists leftovers
 make publish-evidence RUN=evidence/<ts>/run-<stamp>.json
