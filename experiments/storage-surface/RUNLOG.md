@@ -3,7 +3,7 @@
 Chronological record of what was run. Org slugs and project refs are not
 recorded; the org class is (a Pro-plan organization). Published artifacts
 (refs, hostnames and the vantage address redacted) are in `out/2026-10-10/`
-(SS01, SS02), `out/2026-10-12/` (SS03 to SS07) and `out/2026-10-21/` (SS08);
+(SS01, SS02), `out/2026-10-12/` (SS03 to SS07), `out/2026-10-21/` (SS08) and `out/2026-10-22/` (SS09);
 the file names below are those artifacts' names, and each cell cites a module
 id. Pin the citations to the lab commit that adds this directory.
 
@@ -896,3 +896,141 @@ eviction over hours; a denied user after a warm read; repeat runs beyond two.
 Both projects were deleted in `finally` (`SS08_teardown`, DELETE 200 in both
 runs), as were the two unpublished runs' projects. `make sweep` after the last
 run: `sweep: 0 ss- projects` (operator note, not an artifact).
+
+## 2026-10-22 - SS09 (managed Pro project in ap-southeast-1)
+
+Four questions SS03 and SS08 left open, all on what the CDN keeps serving:
+whether a signed URL whose response is cached is still served after its token
+expires (the Smart CDN page says the cached response "can continue to be
+served for the same signed URL until the CDN cache duration expires, even if
+the token in that URL has already expired", and advises deleting the object
+to cut access,
+https://supabase.com/docs/guides/storage/cdn/smart-cdn#signed-urls-and-cdn-caching);
+how long a deleted object stays readable behind a cached, unexpired signed
+URL; how long an upsert in place stays stale on `/object/public` and on a
+reused signed URL (SS03e saw stale bytes on `/object/authenticated` after an
+S3 overwrite; I06 in image-transformations saw stale render variants); and
+the `Cache-Control` a public URL and a signed URL return for `cacheControl`
+3600 and 31536000 (one year).
+
+Shape: n = 3 runs, each on its own new project, created and deleted by the
+module: run 1 `run-2026-10-22T05-23-24-115Z`, run 2
+`run-2026-10-22T05-30-34-291Z`, run 3 `run-2026-10-22T05-37-20-539Z`
+(published in `out/2026-10-22/`). Storage server 1.80.2 in all three
+(`SS09_setup`). Gateway host only, one client in Singapore. Buckets `pub`
+(public) and `priv` (private), one select policy for any authenticated user
+on both; uploads and signing use the service key. Objects are 1,000 B (v1)
+and 2,000 B (v2), so the byte count says which version a read returned. All
+three artifacts record `labCommit` 6964c07, the commit before this module was
+added. Run 1 used an earlier SS09a (one signed URL, expiresIn 25, read six
+times with no wait for a `HIT`, then the object deleted after expiry) and had
+no SS09d; its six warm reads were `MISS` then `REVALIDATED` five times, which
+is an origin round trip and so cannot show what a cached copy does. Runs 2
+and 3 ran the committed module. SS09b and SS09c are the same code in all
+three runs.
+
+### SS09a - a signed URL read after its token expired
+
+Runs 2 and 3: three private objects, each with its own signed URL (expiresIn
+30, 31, 32 s) read up to 12 times 1.5 s apart, stopping at the first `HIT`;
+a control URL for the first object (expiresIn 33) signed at the same time and
+never read; every URL read once 45 s after signing: url1 to url3 13 to 15 s
+past expiry, the control (expiresIn 33) 12 s past.
+
+| URL | run 2 warm reads | run 3 warm reads | after expiry, both runs |
+|---|---|---|---|
+| url1 | `MISS, HIT` | `MISS`, then `REVALIDATED` x11 | `400 cf=BYPASS bytes=110` |
+| url2 | `MISS, HIT` | `MISS, MISS, HIT` | `400 cf=BYPASS bytes=110` |
+| url3 | `MISS`, then `REVALIDATED` x11 | `MISS`, then `REVALIDATED` x11 | `400 cf=BYPASS bytes=110` |
+| control, never read | - | - | `400 cf=BYPASS bytes=110` |
+
+Run 1 (earlier design, expiresIn 25, read 40 s after signing): the read URL
+(warm reads `MISS` then `REVALIDATED` x5), read twice after expiry, and the
+never-read control, all `400 cf=BYPASS bytes=110`.
+
+What this shows, for these runs: 3 URLs that reached `HIT` before expiry, 4
+that ended `REVALIDATED` (run 1's included) and 3 controls were all refused
+with 400 and `cf=BYPASS` once the token had expired; none was served from
+cache. That is stricter than the Smart CDN wording quoted above ("can
+continue to be served"), from this vantage, 12 to 15 s past expiry. Not separated: whether the edge checks the
+token's expiry before its cache lookup or the origin refuses on a bypass;
+`BYPASS` fits the first, and the module cannot see which layer answered.
+Not measured: other PoPs, and a URL cached for longer than about 30 s before
+its token expired (the `HIT` entries were about 27 to 29 s old at expiry and
+about 43 s old at the read).
+
+### SS09d - delete behind a cached, unexpired signed URL
+
+Runs 2 and 3: one private object, a signed URL with expiresIn 3600 read until
+`HIT` (at most 12 reads), the object deleted with the service key
+(`delete_status` 200 in both), then the URL read every 5 s for 120 s.
+
+| run | warm reads | after delete |
+|---|---|---|
+| 2 | `MISS`, then `REVALIDATED` x11 | `400 cf=BYPASS bytes=88` on all 24 reads, from 0 s |
+| 3 | `MISS, HIT` | `200 cf=HIT bytes=1000` on 11 reads through 51 s, then `400 cf=BYPASS bytes=88` on 13 reads from 56 s |
+
+What this shows: a URL whose warm reads ended `REVALIDATED` stopped serving
+the object at once; one whose warm reads ended `HIT` served the deleted object
+(`200 HIT`) up to the read at 51 s and was refused (`400`) from the read at
+56 s, inside the documented "up to 60 seconds" for
+invalidation
+(https://supabase.com/docs/guides/storage/cdn/smart-cdn#cache-duration).
+One run per state.
+
+### SS09b - upsert in place
+
+Per run: three `pub` keys read through the public URL and two `priv` keys
+through one signed URL each (expiresIn 3600, reused); every key read four
+times 1.5 s apart, overwritten with v2 through a REST POST with
+`x-upsert: true` (200 in all 15 trials), then read every 5 s for 180 s, all
+five keys in parallel. Seconds from the upsert to the first read returning v2
+(`*_first_v2_s`), and the last read that still returned v1 (from the trace):
+
+| trial | run 1 | run 2 | run 3 |
+|---|---|---|---|
+| public_1 | 51 (last v1 45) | 5 (last v1 0) | 51 (last v1 46) |
+| public_2 | 51 (last v1 46) | 51 (last v1 46) | 51 (last v1 46) |
+| public_3 | 51 (last v1 45) | 51 (last v1 46) | 5 (last v1 41) |
+| signed_reused_1 | 51 (last v1 46) | 51 (last v1 46) | 0 (no v1 read) |
+| signed_reused_2 | 0 (no v1 read) | 5 (last v1 41) | 5 (last v1 41) |
+
+The two trials at 0 s were the ones whose warm reads ended `REVALIDATED`;
+their first read after the upsert was `EXPIRED` with v2. In the 13 trials
+whose warm reads ended `HIT`, v1 was served for up to 46 s; in 3 of the 4
+that saw v2 at 5 s, later reads returned v1 again (up to 41 s), so old and
+new bytes alternated. From 51 s on, every read in all 15 trials returned v2.
+In the 9 trials whose first v2 read came at 51 s, that read was a `MISS`
+with v2, then `HIT`s; in the 4 that first saw v2 at 5 s, the 5 s read was the
+`MISS`.
+
+### SS09c - Cache-Control per path
+
+One key per cell, read twice 1.5 s apart.
+
+| cell | all three runs |
+|---|---|
+| public URL, `cacheControl` 3600 | `cc=public, max-age=3600`, `MISS` then `HIT` |
+| public URL, `cacheControl` 31536000 | `cc=public, max-age=31536000`, `MISS` then `HIT` |
+| signed URL, `cacheControl` 3600 | no `Cache-Control`; `MISS` then `REVALIDATED` (runs 1, 3) or `MISS` then `MISS` (run 2) |
+| signed URL, `cacheControl` 31536000 | no `Cache-Control`; `MISS` then `REVALIDATED` (run 1) or `MISS` then `MISS` (runs 2, 3) |
+
+What this shows: the public URL hands the uploaded `cacheControl` to the
+client as `public, max-age=N`, so a browser may keep the object for that long;
+a signed-URL response carries no `Cache-Control` header, as SS08 also
+recorded, so the uploaded value does not reach the client on that path.
+What a browser does with a response that has no `Cache-Control` was not
+measured.
+
+Not measured in SS09: other regions and vantages (one client; the PoP was not
+recorded);
+eviction over hours; objects larger than 2,000 B; how the usage meter counts
+`REVALIDATED` reads; a signed URL cached for longer than about 30 s before
+its token expired.
+
+### Cleanup
+
+All three projects were deleted in `finally` (`SS09_teardown`, DELETE 200 in
+each run). `make sweep` after the last run listed two `ss-` projects with tags
+not produced by this module and created before these runs (operator note);
+they were left as found.

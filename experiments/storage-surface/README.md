@@ -33,6 +33,7 @@ https://supabase.com/docs/guides/storage/s3/authentication).
 | SS06 | SS03-SS05 rows diffed across targets: managed, self-hosted `file` and `s3` (MinIO) backends, and self-hosted with the storage image at the managed version |
 | SS07a-b | Read only: the region catalogue for a Pro org; key-management operations in the published Management API OpenAPI document |
 | SS08a-e | CDN cache state per read path on a public and a private bucket: supabase-js `download()`, public URL, `/object/authenticated`, signed URLs reused and fresh, a second user, a long `cacheControl`; a plain and a client-gzipped JSON object's bytes on the wire with and without `Accept-Encoding` |
+| SS09a-d | What the CDN keeps serving: a signed URL read until `HIT` (at most 12 reads) and read again after its token expired, an object deleted behind a cached unexpired signed URL, an upsert in place on the public URL and a reused signed URL (seconds until the new bytes), and the `Cache-Control` each path returns for `cacheControl` 3600 and 31536000 |
 
 ## Run
 
@@ -52,6 +53,7 @@ make -C ../self-hosted-defaults clean stack up LAYERS="s3 minio-hostdir storage-
 make ss06 RUNS=out/<date>/run-a.json,out/<date>/run-b.json,...            # SS06 diff
 sx SUPABASE_ACCESS_TOKEN -- make probe MODS=SS07  # read only
 sx SUPABASE_ACCESS_TOKEN -- make probe MODS=SS08  # read paths and compression (about 2 min, a few MB of egress)
+sx SUPABASE_ACCESS_TOKEN -- make probe MODS=SS09  # expiry, delete, upsert staleness, Cache-Control (about 7 min; estimated under 1 MB of egress from the read count)
 make clean-fixtures                                # the 2 GiB, 256 MiB and 64 MiB fixtures
 make sweep                                         # needs SUPABASE_ACCESS_TOKEN: lists leftovers
 make publish-evidence RUN=evidence/<ts>/run-<stamp>.json

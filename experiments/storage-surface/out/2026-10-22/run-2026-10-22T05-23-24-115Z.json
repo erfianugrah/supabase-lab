@@ -1,0 +1,105 @@
+{
+  "startedAt": "2026-10-22T05:23:24.115Z",
+  "finishedAt": "2026-10-22T05:29:42.926Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "storage-surface",
+  "labCommit": "6964c07",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "SS09_setup",
+      "title": "project, buckets, policies",
+      "status": "info",
+      "detail": "storage 1.80.2",
+      "measurements": {
+        "storage_version": "1.80.2",
+        "bucket_pub": 200,
+        "bucket_priv": 200,
+        "policies": 201
+      },
+      "durationMs": 378810
+    },
+    {
+      "id": "SS09a",
+      "title": "private bucket: signed URL read after token expiry, then after delete",
+      "status": "info",
+      "detail": "after expiry: warmed 400 cf=BYPASS cc=- bytes=110; never-read control 400 cf=BYPASS cc=- bytes=110; after delete first not served at 10s",
+      "measurements": {
+        "expires_in_s": 25,
+        "warm_1": "200 cf=MISS cc=- bytes=1000",
+        "warm_2": "200 cf=REVALIDATED cc=- bytes=1000",
+        "warm_3": "200 cf=REVALIDATED cc=- bytes=1000",
+        "warm_4": "200 cf=REVALIDATED cc=- bytes=1000",
+        "warm_5": "200 cf=REVALIDATED cc=- bytes=1000",
+        "warm_6": "200 cf=REVALIDATED cc=- bytes=1000",
+        "after_expiry_s": 40,
+        "warm_after_expiry_1": "400 cf=BYPASS cc=- bytes=110",
+        "warm_after_expiry_2": "400 cf=BYPASS cc=- bytes=110",
+        "control_never_read_after_expiry": "400 cf=BYPASS cc=- bytes=110",
+        "delete_status": 200,
+        "after_delete_trace": "10s:400/BYPASS/110 20s:400/BYPASS/110 31s:400/BYPASS/110 41s:400/BYPASS/110 51s:400/BYPASS/110 61s:400/BYPASS/110 71s:400/BYPASS/110 81s:400/BYPASS/110 91s:400/BYPASS/110 101s:400/BYPASS/110 112s:400/BYPASS/110 122s:400/BYPASS/110",
+        "after_delete_first_not_served_s": 10
+      },
+      "durationMs": 378810
+    },
+    {
+      "id": "SS09b",
+      "title": "upsert in place: seconds until the read returns the new bytes (-1 = not within 180 s)",
+      "status": "info",
+      "detail": "public_1=51, public_2=51, public_3=51, signed_reused_1=51, signed_reused_2=0",
+      "measurements": {
+        "signed_reused_1_warm": "200/MISS/1000 200/HIT/1000 200/HIT/1000 200/HIT/1000",
+        "public_1_warm": "200/MISS/1000 200/HIT/1000 200/HIT/1000 200/HIT/1000",
+        "public_3_warm": "200/MISS/1000 200/HIT/1000 200/HIT/1000 200/HIT/1000",
+        "public_2_warm": "200/MISS/1000 200/HIT/1000 200/HIT/1000 200/HIT/1000",
+        "signed_reused_2_warm": "200/MISS/1000 200/REVALIDATED/1000 200/REVALIDATED/1000 200/REVALIDATED/1000",
+        "signed_reused_1_upsert_status": 200,
+        "public_1_upsert_status": 200,
+        "public_2_upsert_status": 200,
+        "public_3_upsert_status": 200,
+        "signed_reused_2_upsert_status": 200,
+        "signed_reused_1_first_v2_s": 51,
+        "signed_reused_1_trace": "0s:HIT/1000 5s:HIT/1000 10s:HIT/1000 15s:HIT/1000 21s:HIT/1000 26s:HIT/1000 31s:HIT/1000 36s:HIT/1000 41s:HIT/1000 46s:HIT/1000 51s:MISS/2000 56s:HIT/2000 61s:HIT/2000 66s:HIT/2000 71s:HIT/2000 76s:HIT/2000 81s:HIT/2000 86s:HIT/2000 91s:HIT/2000 96s:HIT/2000 101s:HIT/2000 106s:HIT/2000 111s:HIT/2000 117s:HIT/2000 122s:HIT/2000 127s:HIT/2000 132s:HIT/2000 137s:HIT/2000 142s:HIT/2000 147s:HIT/2000 152s:HIT/2000 157s:HIT/2000 162s:HIT/2000 167s:HIT/2000 172s:HIT/2000 177s:HIT/2000",
+        "public_3_first_v2_s": 51,
+        "public_3_trace": "0s:HIT/1000 5s:HIT/1000 10s:HIT/1000 15s:HIT/1000 20s:HIT/1000 25s:HIT/1000 30s:HIT/1000 35s:HIT/1000 40s:HIT/1000 45s:HIT/1000 51s:MISS/2000 56s:HIT/2000 61s:HIT/2000 66s:HIT/2000 71s:HIT/2000 76s:HIT/2000 81s:HIT/2000 86s:HIT/2000 91s:HIT/2000 96s:HIT/2000 101s:HIT/2000 106s:HIT/2000 111s:HIT/2000 117s:HIT/2000 122s:HIT/2000 127s:HIT/2000 132s:HIT/2000 137s:HIT/2000 142s:HIT/2000 147s:HIT/2000 152s:HIT/2000 157s:HIT/2000 162s:HIT/2000 167s:HIT/2000 172s:HIT/2000 177s:HIT/2000",
+        "public_1_first_v2_s": 51,
+        "public_1_trace": "0s:HIT/1000 5s:HIT/1000 10s:HIT/1000 15s:HIT/1000 20s:HIT/1000 25s:HIT/1000 30s:HIT/1000 35s:HIT/1000 40s:HIT/1000 45s:HIT/1000 51s:MISS/2000 56s:HIT/2000 61s:HIT/2000 66s:HIT/2000 71s:HIT/2000 76s:HIT/2000 81s:HIT/2000 86s:HIT/2000 91s:HIT/2000 96s:HIT/2000 101s:HIT/2000 106s:HIT/2000 111s:HIT/2000 117s:HIT/2000 122s:HIT/2000 127s:HIT/2000 132s:HIT/2000 137s:HIT/2000 142s:HIT/2000 147s:HIT/2000 152s:HIT/2000 157s:HIT/2000 162s:HIT/2000 167s:HIT/2000 172s:HIT/2000 177s:HIT/2000",
+        "public_2_first_v2_s": 51,
+        "public_2_trace": "0s:HIT/1000 5s:HIT/1000 10s:HIT/1000 15s:HIT/1000 20s:HIT/1000 25s:HIT/1000 30s:HIT/1000 35s:HIT/1000 40s:HIT/1000 46s:HIT/1000 51s:MISS/2000 56s:HIT/2000 61s:HIT/2000 66s:HIT/2000 71s:HIT/2000 76s:HIT/2000 81s:HIT/2000 86s:HIT/2000 91s:HIT/2000 96s:HIT/2000 101s:HIT/2000 107s:HIT/2000 112s:HIT/2000 117s:HIT/2000 122s:HIT/2000 127s:HIT/2000 132s:HIT/2000 137s:HIT/2000 142s:HIT/2000 147s:HIT/2000 152s:HIT/2000 157s:HIT/2000 162s:HIT/2000 167s:HIT/2000 172s:HIT/2000 177s:HIT/2000",
+        "signed_reused_2_first_v2_s": 0,
+        "signed_reused_2_trace": "0s:EXPIRED/2000 5s:REVALIDATED/2000 10s:REVALIDATED/2000 15s:REVALIDATED/2000 20s:REVALIDATED/2000 25s:REVALIDATED/2000 31s:REVALIDATED/2000 36s:REVALIDATED/2000 41s:REVALIDATED/2000 46s:REVALIDATED/2000 51s:MISS/2000 56s:HIT/2000 61s:HIT/2000 66s:HIT/2000 71s:HIT/2000 76s:HIT/2000 81s:HIT/2000 86s:HIT/2000 91s:HIT/2000 97s:HIT/2000 102s:HIT/2000 107s:HIT/2000 112s:HIT/2000 117s:HIT/2000 122s:HIT/2000 127s:HIT/2000 132s:HIT/2000 137s:HIT/2000 142s:HIT/2000 147s:HIT/2000 152s:HIT/2000 157s:HIT/2000 162s:HIT/2000 167s:HIT/2000 172s:HIT/2000 177s:HIT/2000"
+      },
+      "durationMs": 378810
+    },
+    {
+      "id": "SS09c",
+      "title": "Cache-Control returned per path for cacheControl 3600 and 31536000",
+      "status": "info",
+      "measurements": {
+        "public_cc3600_1": "200 cf=MISS cc=public, max-age=3600 bytes=1000",
+        "public_cc3600_2": "200 cf=HIT cc=public, max-age=3600 bytes=1000",
+        "signed_cc3600_1": "200 cf=MISS cc=- bytes=1000",
+        "signed_cc3600_2": "200 cf=REVALIDATED cc=- bytes=1000",
+        "public_cc31536000_1": "200 cf=MISS cc=public, max-age=31536000 bytes=1000",
+        "public_cc31536000_2": "200 cf=HIT cc=public, max-age=31536000 bytes=1000",
+        "signed_cc31536000_1": "200 cf=MISS cc=- bytes=1000",
+        "signed_cc31536000_2": "200 cf=REVALIDATED cc=- bytes=1000"
+      },
+      "durationMs": 378810
+    },
+    {
+      "id": "SS09_teardown",
+      "title": "project deleted",
+      "status": "info",
+      "detail": "DELETE HTTP 200",
+      "durationMs": 378810
+    }
+  ]
+}
