@@ -45,7 +45,7 @@ const mod: TestModule = {
         id: "S08a",
         title: "the database reached an external host over HTTP",
         status: status >= 200 && status < 400 ? "pass" : "info",
-        detail: `net.http_get('https://example.com') -> status ${status}. The DB has outbound HTTP; a SQL-capable attacker can exfiltrate or SSRF from inside Postgres. Restrict who holds EXECUTE on the net schema, or leave pg_net disabled if unused.`,
+        detail: `net.http_get('https://example.com') -> status ${status}. The DB has outbound HTTP; a SQL-capable attacker can exfiltrate or SSRF from inside Postgres. REVOKE on net.* as postgres is a no-op (supabase_admin owns it, PUBLIC holds EXECUTE), so keep LOGIN roles that should not make outbound HTTP off the project, or leave pg_net disabled if unused.`,
         measurements: { egress_status: status },
       });
     } catch (e) {

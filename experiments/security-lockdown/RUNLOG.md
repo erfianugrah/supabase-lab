@@ -79,6 +79,13 @@ Follow-ups on the review gaps. One Micro, run live, destroyed.
   the database can make outbound HTTP. A SQL-capable attacker can exfiltrate or
   SSRF from inside Postgres; restrict EXECUTE on the net schema, or leave
   pg_net disabled if unused. An egress surface most lockdown plans omit.
+  Correction 2026-10-22: "restrict EXECUTE on the net schema" is not
+  available to the project owner. governed-starter-kit (RUNLOG, 2026-10-07)
+  found the net.* grants to PUBLIC owned by supabase_admin, and a REVOKE run
+  as postgres was a no-op with a warning. The pg_net docs (Permissions) put
+  the boundary at login: anon and authenticated are NOLOGIN and net is not
+  exposed through the Data API. The advice is now: keep LOGIN roles that
+  should not make outbound HTTP off the project, or leave pg_net disabled.
 - **S09 audit + backups**: pgaudit is available (statement auditing to the
   Postgres log, read via the Management API logs, not a table). GET
   /database/backups on a fresh project: pitr_enabled=false, walg_enabled=true,
