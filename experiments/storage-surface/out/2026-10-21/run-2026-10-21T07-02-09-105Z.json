@@ -1,0 +1,95 @@
+{
+  "startedAt": "2026-10-21T07:02:09.105Z",
+  "finishedAt": "2026-10-21T07:03:17.822Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "storage-surface",
+  "labCommit": "6964c07",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "SS09_setup",
+      "title": "two projects, one public bucket each, the SS08 JSON payload under two keys",
+      "status": "info",
+      "detail": "gz <ref>, plain <ref>",
+      "measurements": {
+        "json_bytes": 800118,
+        "reads_per_arm": 600,
+        "start_utc": "2026-10-21T07:02:21.180Z",
+        "gz_ref": "<ref>",
+        "gz_accept_encoding": "gzip",
+        "gz_storage_version": "1.80.2",
+        "gz_bucket": 200,
+        "plain_ref": "<ref>",
+        "plain_accept_encoding": "none",
+        "plain_storage_version": "1.80.2",
+        "plain_bucket": 200
+      },
+      "durationMs": 68716
+    },
+    {
+      "id": "SS09u",
+      "title": "uncached reads (new signed URL per read)",
+      "status": "info",
+      "detail": "wire bytes gz 79171772, plain 480070800",
+      "measurements": {
+        "gz_reads": 600,
+        "gz_http": "200:600",
+        "gz_cf": "MISS:600",
+        "gz_ce": "gzip:600",
+        "gz_wire_bytes_total": 79171772,
+        "gz_wire_bytes_mean": 131953,
+        "plain_reads": 600,
+        "plain_http": "200:600",
+        "plain_cf": "MISS:600",
+        "plain_ce": "-:600",
+        "plain_wire_bytes_total": 480070800,
+        "plain_wire_bytes_mean": 800118,
+        "gz_distinct_signed_urls": 600,
+        "plain_distinct_signed_urls": 600
+      },
+      "durationMs": 68716
+    },
+    {
+      "id": "SS09c",
+      "title": "repeat reads of one public URL",
+      "status": "info",
+      "detail": "wire bytes gz 79177469, plain 480070800",
+      "measurements": {
+        "gz_reads": 600,
+        "gz_http": "200:600",
+        "gz_cf": "HIT:599 MISS:1",
+        "gz_ce": "gzip:600",
+        "gz_wire_bytes_total": 79177469,
+        "gz_wire_bytes_mean": 131962,
+        "plain_reads": 600,
+        "plain_http": "200:600",
+        "plain_cf": "HIT:599 MISS:1",
+        "plain_ce": "-:600",
+        "plain_wire_bytes_total": 480070800,
+        "plain_wire_bytes_mean": 800118
+      },
+      "durationMs": 68716
+    },
+    {
+      "id": "SS09_summary",
+      "title": "load window and kept projects (read their metered egress for this UTC day)",
+      "status": "info",
+      "detail": "kept: gz <ref>, plain <ref>",
+      "measurements": {
+        "start_utc": "2026-10-21T07:02:21.180Z",
+        "end_utc": "2026-10-21T07:03:17.818Z",
+        "gz_ref": "<ref>",
+        "plain_ref": "<ref>",
+        "kept": "yes"
+      },
+      "durationMs": 68716
+    }
+  ]
+}

@@ -1033,4 +1033,89 @@ its token expired.
 All three projects were deleted in `finally` (`SS09_teardown`, DELETE 200 in
 each run). `make sweep` after the last run listed two `ss-` projects with tags
 not produced by this module and created before these runs (operator note);
-they were left as found.
+they were left as found. They were the kept SS10 load-run projects (next
+section).
+
+## 2026-10-21 - SS10 (two managed Pro projects in ap-southeast-1)
+
+SS08d measured the same 800,118 B JSON object going over the wire as about
+132 KB to a client that sent `Accept-Encoding: gzip` and as all 800,118 B to
+one that sent none, but the lab cannot see which byte count the usage meter
+records (the organisation usage route answered 401 to a PAT and v1 has no
+organisation usage path; OB03c in observability-surface). SS10 does not
+measure the meter either. It generates a known, separable download load on
+two projects whose only difference is the `Accept-Encoding` the client sends
+to each, records the wire bytes, and keeps the projects so their daily usage
+can be compared with these totals once it lands. That comparison is read
+outside the lab and is not recorded here.
+
+These runs ran the module under the id SS09 on 2026-10-21, the day before
+the CDN-expiry SS09 above was committed (2026-10-22); this module was renamed
+SS10 when the two ids collided, so the artifacts carry `SS09_setup`, `SS09u`,
+`SS09c` and `SS09_summary`. All three record `labCommit` 6964c07, HEAD at run
+time; neither the CDN-expiry SS09 nor this module was committed yet.
+
+Shape: two throwaway projects per run, provisioned in parallel; the client
+sends `Accept-Encoding: gzip` on every read to `gz` and no `Accept-Encoding`
+to `plain`. Each gets a public bucket `pub` and the SS08 JSON payload
+(800,118 B, uploaded with `cache-control: max-age=3600`) under two keys. Per
+project, N reads of one key through a new signed URL each (the uncached arm,
+`SS09u`), a 2 s pause, then N reads of the other key through one public URL
+(the cached arm, `SS09c`); at most six reads in flight per project
+(`CONCURRENCY = 6`), both projects at once. Reads are made with curl without
+decoding, so `wire` is the bytes received. Storage server 1.80.2 on all six
+projects (`SS09_setup`). Gateway host only, one client in Singapore
+(operator note). Published in `out/2026-10-21/`:
+
+| run | artifact | N | projects |
+|---|---|---|---|
+| smoke 1 | `run-2026-10-21T07-00-59-289Z` | 5 | deleted at the end |
+| smoke 2 | `run-2026-10-21T07-01-41-627Z` | 12 | deleted at the end |
+| load | `run-2026-10-21T07-02-09-105Z` | 600 | kept for the usage read |
+
+Smoke 1 signed every uncached URL with expiresIn 3600. Its uncached arm was
+`HIT:3 MISS:2` on `gz` and `MISS:2 REVALIDATED:3` on `plain`. Smoke 1 did not
+count distinct signed URLs; its `HIT:3` and `REVALIDATED:3` imply that URLs
+signed in the same second for the same object with the same expiresIn came
+out identical, so the arm was not uncached. Smoke 2 and the load run sign
+read `i` with expiresIn 3600 + `i`; both recorded as many distinct signed
+URLs as reads (12 and 600 per project), and every uncached read was a `MISS`.
+
+### SS10u, SS10c - the load run
+
+Window `2026-10-21T07:02:21.180Z` (before bucket creation and the uploads) to
+`2026-10-21T07:03:17.818Z` (`SS09_summary`), all 2,400 reads HTTP 200.
+
+| arm | project | `cf-cache-status` | `Content-Encoding` | wire bytes, total | mean wire bytes per read |
+|---|---|---|---|---|---|
+| uncached, 600 signed URLs | `gz` | `MISS:600` | `gzip:600` | 79,171,772 | 131,953 |
+| uncached, 600 signed URLs | `plain` | `MISS:600` | none on 600 | 480,070,800 | 800,118 |
+| cached, one public URL x600 | `gz` | `HIT:599 MISS:1` | `gzip:600` | 79,177,469 | 131,962 |
+| cached, one public URL x600 | `plain` | `HIT:599 MISS:1` | none on 600 | 480,070,800 | 800,118 |
+
+Per project, both arms: `gz` 158,349,241 B on the wire, `plain` 960,141,600 B,
+a ratio of about 6.06 (derived from the two totals). The mean compressed read
+(131,953 B uncached, 131,962 B cached) falls inside SS08d's `gzip` range on
+the `download()` path (131,859 to 131,970 B); per-read sizes were not
+recorded.
+
+What this shows: a download load whose wire bytes differ by about 6x between
+two projects with the same objects, reads and cache states, with 601 `MISS`
+(600 uncached, 1 cached) and 599 `HIT` of the 1,200 reads per project. The
+usage figure each project records for that UTC day is what tells which byte
+count the meter takes; this record holds only the wire side.
+
+Not measured in SS10: the metered values themselves; `br` (the load sent
+`gzip` only); the `download()` path (SS08 shows it serves the same
+encodings); objects other than one JSON payload; the direct storage host;
+other regions; repeat load runs.
+
+### Cleanup
+
+Smoke 1 and smoke 2 deleted both their projects at the end (`SS09_teardown_gz`
+and `SS09_teardown_plain`, DELETE 200 in each). The load run's two projects
+were kept, and were the two `ss-` projects the SS09 cleanup note above
+records as left as found; they were deleted on 2026-10-22 with
+`make ss09-teardown` (the target now named `ss10-teardown`), DELETE 200 for
+both, and `make sweep` afterwards listed `0 ss- projects` (operator note, not
+an artifact).

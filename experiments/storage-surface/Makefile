@@ -11,6 +11,7 @@
 #   make probe MODS=SS07       # read-only: region catalogue, key-management API surface
 #   make ss06 RUNS=a.json,b.json,c.json   # diff table from published run artifacts
 #   make clean-fixtures        # delete the 2 GiB / 64 MiB / 256 MiB fixtures
+#   make probe MODS=SS10       # egress-meter load on two KEPT projects; then make ss10-teardown REFS=a,b
 #   make aws-control           # optional: dot-segment and double-slash keys against Amazon S3 (needs AWS credentials)
 #
 # Runs from source (bun harness/src/run.ts): the AWS SDK v3 lives in canary/
@@ -22,7 +23,7 @@ MODS ?= SS01,SS02
 
 SH_RIG := $(ROOT)/experiments/self-hosted-defaults
 FIXTURES := evidence/fixtures
-.PHONY: probe probe-sh ss06 clean-fixtures sweep publish-evidence aws-control
+.PHONY: probe probe-sh ss06 clean-fixtures sweep publish-evidence aws-control ss10-teardown
 
 probe:
 	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "SUPABASE_ACCESS_TOKEN not set"; exit 1)
@@ -80,3 +81,13 @@ publish-evidence:
 
 aws-control:
 	@cd canary && bun install >/dev/null && bun aws-control.ts ap-southeast-1
+
+# SS10 keeps its two projects so their metered egress can be read later.
+# Delete them by ref once the read is done:
+#   make ss10-teardown REFS=<gz_ref>,<plain_ref>
+ss10-teardown:
+	@test -n "$(REFS)" || (echo "REFS=<gz_ref>,<plain_ref>"; exit 1)
+	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "SUPABASE_ACCESS_TOKEN not set"; exit 1)
+	@for r in $(subst $(comma), ,$(REFS)); do \
+		code=$$(printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -s -o /dev/null -w '%{http_code}' -X DELETE -H @- https://api.supabase.com/v1/projects/$$r); \
+		echo "DELETE $$r: HTTP $$code"; done
