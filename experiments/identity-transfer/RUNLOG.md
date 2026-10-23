@@ -189,15 +189,17 @@ themselves (`hook_before_user_created_enabled`, `_uri`, `_secrets` on
 security-lockdown S19d (2026-09-03): a Postgres-function hook refused a blocked
 domain, active 5 s after the PATCH. Still unprobed on managed: an HTTP hook URI,
 and whether the hook arms on CreateAccount only - IT02 and IT03 are the
-managed-vantage modules for that and have not been run. Nothing Apple-specific is settled either: the audience rule across a
+managed-vantage modules for that and, as of 2026-09-11, had not been run (they
+ran on 2026-10-23, last section). Nothing Apple-specific is settled either: the audience rule across a
 Services ID and a bundle ID, and Apple's own `/auth/usermigrationinfo`
 exchange, still need a real Apple team and app.
 
-## Code changed on 2026-09-11 that has NOT been run
+## Code changed on 2026-09-11, first run 2026-10-23
 
-Three things in this experiment are written and typecheck but have no run
-behind them. They are not "not re-run"; for IT02 and IT03 there was never a
-first run.
+As written on 2026-09-11: three things in this experiment are written and
+typecheck but have no run behind them. They are not "not re-run"; for IT02
+and IT03 there was never a first run. All three ran on 2026-10-23 (next
+section).
 
 - **IT01 was edited after its 2026-09-07 run.** The sign-in flow and the
   config-settle poll moved verbatim into `lib/flow.ts` so IT02, IT03 and the
@@ -216,3 +218,131 @@ first run.
   for with fresh personas because `/auth/v1/settings` does not report hooks.
 - Running all three needs a managed project and a PAT. `make up` then
   `make probe ONLY=IT01,IT02,IT03`.
+
+## IT01 re-run, IT02, IT03 - managed micro, three runs (2026-10-23, green on runs 2 and 3)
+
+Three fresh micro projects in ap-southeast-1 on the Pro org, one per run,
+tofu-managed and destroyed after each run; they are numbered 1 to 3 in the
+order they ran. Each run is one battery, `make probe ONLY=IT01,IT02,IT03`,
+against the same issuer worker.
+
+| run | artifact | result |
+| --- | --- | --- |
+| 1 | `out/2026-10-23/run-2026-10-23T08-17-21-218Z.{json,facts.md}` | 16 pass, 2 fail (IT03d, IT03z: module bugs, below) |
+| 2 | `out/2026-10-23/run-2026-10-23T08-19-09-467Z.{json,facts.md}` | 18 pass, 0 fail |
+| 3 | `out/2026-10-23/run-2026-10-23T08-19-57-569Z.{json,facts.md}` | 18 pass, 0 fail |
+
+All three artifacts carry lab commit 661afdf, the checkout's HEAD. Runs 2 and
+3 ran with an uncommitted fix to `tests/it03-before-user-created.ts` that
+lands in the commit publishing these artifacts; IT01, IT02 and `lib/flow.ts`
+were the same code in all three runs. Outside the artifacts (manual, driver
+log only): `tofu apply` returned about 5 s after it started and the
+per-service health endpoint reported auth, rest and db `ACTIVE_HEALTHY` on
+its first poll, for all three projects.
+
+The two IT03 fixes between run 1 and run 2:
+
+- Turning the hook off sent `hook_before_user_created_enabled: false`
+  together with `hook_before_user_created_uri: ""`. `PATCH /config/auth`
+  answered 400 to that body both times run 1 sent it (IT03d and the IT03z
+  cleanup); the response body was not recorded. The module now sends the
+  enabled flag alone, which answered 200 in all 4 calls of runs 2 and 3, and
+  IT03z reads `hook_before_user_created_enabled` back (false in runs 2 and 3).
+  After run 3 the read-back check was tightened, not re-run: IT03z now passes
+  only on a 200 GET that reports false, where runs 2 and 3 passed unless it
+  reported true; both read false, so they pass either way.
+  The two bodies differ only in the empty `uri` key, so the 400 is tied to
+  that key; which validation rejected it is not known. Run 1's project was
+  destroyed without the hook flag being read back after the 400.
+- The fresh strangers were numbered from 1 in each poll, so run 1's IT03d
+  poll opened by signing in IT03-setup's first stranger again: an existing
+  user, the AccountExists path, a session after 1 s whatever the hook state.
+  Run 1's IT03d therefore measured nothing about the hook being off. If the
+  400 left the hook on (not checked), that session was one more AccountExists
+  sign-in passing an armed hook, as in IT03c. Strangers are now numbered
+  across the run. Run 1's IT03-setup and IT03a-c ran before the second poll
+  and are unaffected.
+
+IT01, refactored module, 3 of 3 runs. Every measurement the 2026-09-07 run
+recorded has the same value in all three runs (`pvlab --diff` of the
+2026-09-07 artifact against run 2: 34 measurements unchanged, 4 added, all
+in IT01d), including the config settle: `external.keycloak` true on the
+second `/auth/v1/settings` read, `settle_s` 4, at a 3 s poll interval. The
+refactor into `lib/flow.ts` did not change what IT01 measures. The four new
+IT01d keys, same in all three runs:
+
+| key | value |
+| --- | --- |
+| user_metadata_sub_before_signin | c1 |
+| user_metadata_sub_after_signin | c2 |
+| user_metadata_provider_id_after_signin | c2 |
+| user_metadata_email_after_signin | new |
+
+So on the managed project, `raw_user_meta_data` keeps the old subject after
+the SQL rewrite and takes the new subject, provider id and email at the next
+sign-in, while `auth.users.email` and the token's email claim stay old
+(`users_email_after` old, `token_email_after` old). That is what ITL1c
+measured on self-hosted v2.197.0.
+
+IT02, 3 of 3 runs, identical values in all three:
+
+| case | what arrives | result |
+| --- | --- | --- |
+| IT02a | subject e1 carrying `transfer_sub` | a session; the claim is on both rows: `identity_data.custom_claims.transfer_sub` and `raw_user_meta_data.custom_claims.transfer_sub` present |
+| IT02b | subject e2 whose `transfer_sub` is e1's exact subject, email matching nothing | a session on a different user (`new_user` true) |
+| IT02c | e1 again with no `transfer_sub` | the same user as e1; both stored copies absent; `raw_user_meta_data` still has a `custom_claims` key |
+
+The managed project agrees with ITL2a-c: the claim is stored twice, nothing
+reads it to find an account, and one sign-in without it removes both copies.
+IT02-setup reported `settle_s` 0 on 1 read in all three runs. That is not a
+settle time: IT01z had restored `external_keycloak_enabled` to its original
+false (HTTP 200) moments before, and a first read of true is either IT02's
+PATCH reflected at once or IT01's restore not yet reflected. The run cannot
+tell which.
+
+IT03, HTTP hook at the issuer worker's `/hook/reject` and `/hook/allow`
+routes over https. Setup and IT03a-c in 3 of 3 runs; IT03d and IT03z in runs
+2 and 3.
+
+| case | what happens | result |
+| --- | --- | --- |
+| IT03-setup | f1 signs in with the hook off; `PATCH /config/auth` enables the hook (HTTP 200, prior value false); fresh strangers sign in, one 3 s pause between attempts, until one is refused | f1 a session; the first refusal on attempt 2 in every run, 5 s after the PATCH in run 1 and 4 s in runs 2 and 3. Attempt 1, straight after the PATCH returned, was created |
+| IT03a | that refused stranger, carrying `transfer_sub` | no session: `error=access_denied` and an empty `error_code`; the hook's digest of its payload: top-level keys `metadata\|user`, `user_metadata` keys `custom_claims\|email\|email_verified\|full_name\|iss\|name\|phone_verified\|provider_id\|sub`, `custom_claims` keys `preferred_username\|transfer_sub`, `transfer_sub` equal to what the issuer sent |
+| IT03b | a new subject f2 on f1's verified email (LinkAccount), hook refusing | a session on f1's user |
+| IT03c | f1 again (AccountExists), hook refusing | a session on f1's user |
+| IT03d | `PATCH /config/auth` with the enabled flag alone set false (HTTP 200); fresh strangers until one is created | attempt 1 got no session, attempt 2 was created, 4 s after the PATCH (runs 2 and 3) |
+| IT03z | cleanup | hook off HTTP 200, 3 users deleted via the admin API, 0 by the sweep, auth config restored HTTP 200, `hook_before_user_created_enabled` read back false (runs 2 and 3) |
+
+- **The managed platform arms the hook on CreateAccount alone, as
+  self-hosted v2.197.0 does (ITL3).** IT03b and IT03c signed in on the
+  LinkAccount and AccountExists paths while the same hook refused every
+  stranger, in 3 of 3 runs.
+- **The payload carries the provider's custom claims.** The `user_metadata`
+  and `custom_claims` key lists in IT03a are the same lists ITL3d recorded
+  locally, and `transfer_sub` arrived with the value the issuer sent.
+- **An https hook URI on an external host is accepted and called.** The
+  config API took a workers.dev URI with a `v1,whsec_` secret (HTTP 200) and
+  the Auth server called it. The worker does not verify the webhook
+  signature, so whether the platform signs as standard-webhooks describes is
+  not measured.
+- **A hook change took effect within 4 to 5 s, in both directions.** On:
+  the first sign-in after the PATCH was still created and the second, 4 or 5
+  s after the PATCH, was refused (3 runs). Off: the first sign-in was still
+  refused and the second, 4 s after, was created (runs 2 and 3). The
+  resolution is one sign-in plus the 3 s pause; the pass band is 120 s.
+  security-lockdown S19d saw a Postgres-function hook active 5 s after its
+  PATCH on 2026-09-03.
+- **To turn the hook off, send `hook_before_user_created_enabled: false`
+  alone.** With `hook_before_user_created_uri: ""` beside it the config API
+  answered 400 (run 1, 2 of 2 calls), and run 1 did not read the flag back.
+  If a rejected PATCH leaves the hook on, which is the expected reading of a
+  400 but was not checked, a cleanup that restores only the other auth keys
+  leaves every new-account signup refused. Read the flag back after turning
+  it off.
+
+Not settled here: the Apple-specific half (the audience rule across a
+Services ID and a bundle ID, Apple's `/auth/usermigrationinfo` exchange)
+still needs a real Apple team and app. The hook's response body on refusal
+is a digest the worker chose, so the full payload shape beyond those key
+lists is not recorded. A Postgres-function hook was not run in this
+experiment.
