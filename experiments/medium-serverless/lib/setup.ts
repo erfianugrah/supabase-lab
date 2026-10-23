@@ -291,6 +291,9 @@ export function flatten(windows: import("../../../harness/src/sampler").PathWind
     m[`${w.name}_first_fail_s`] = w.firstFailMs === null ? "n/a" : Math.round(w.firstFailMs / 1000);
     m[`${w.name}_window_s`] = w.windowMs === null ? "n/a" : Math.round(w.windowMs / 1000);
     m[`${w.name}_mode`] = w.modes[0] ?? "none";
+    // Since #208, as in platform-downtime: a brief failure that recovers inside
+    // the settle rule shows here and not in the window.
+    m[`${w.name}_failed_samples`] = `${w.failures} of ${w.samples}`;
   }
   return m;
 }

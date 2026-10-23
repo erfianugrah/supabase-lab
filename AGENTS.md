@@ -693,7 +693,7 @@ each user's auth rows". Findings and artifacts in RUNLOG.md; out/2026-09-25/.
   the second 5 s poll, 5190 ms after polling began, which itself began after
   S01b, S01x and S01c (S01d). Neither figure is a promotion-to-effect latency.
 
-## experiments/platform-downtime - key facts (validated 2026-08-04; REST/Realtime re-measured 2026-10-23, #204)
+## experiments/platform-downtime - key facts (validated 2026-08-04; REST/Realtime re-measured 2026-10-23, #204; D05 re-run the same day, #208)
 
 - What a platform OPERATION costs a client, per connection path. The
   2026-08-04 windows were sampled at 500 ms, n=1, one Micro project in
@@ -788,7 +788,19 @@ each user's auth rows". Findings and artifacts in RUNLOG.md; out/2026-09-25/.
   and REST, Auth, Storage and Realtime stayed up (the pooler is not probed:
   its probe uses the password being changed). Integration-provisioned
   projects were not tested (a Vercel-Marketplace install needs a human
-  `vercel integration accept-terms` first).
+  `vercel integration accept-terms` first). **Re-run 2026-10-23 with the
+  data-path probes (#208, one self-provisioned Micro, two passes):** again no
+  restart (`postmaster_start` and `stats_reset` unchanged) and 0 failed
+  `rest_read` (0 of 767, 0 of 154) and `realtime_join` (0 of 662, 0 of 132)
+  samples; pass 2 sampled only about 83 s because one `realtime_ws` blip
+  recovered and ended the sampler. Artifacts `out/2026-10-23/`.
+- **A create call can hand out an instance that already ran (inferred,
+  2026-10-23, #208).** Three self-provisioned projects were `ACTIVE_HEALTHY`
+  about 10 s after the create call, with `postmaster_start` about 10
+  minutes, about 6 hours and about 39 hours before it
+  (`run-<stamp>.project.json` in platform-downtime and medium-serverless
+  `out/2026-10-23/`). "Age since create" is not instance age;
+  `lib/selfprov.ts` records both.
 - **D01 2026-10-13 (work-supabase-lab#20, #67): a managed `POST /restart`
   keeps `pg_stat_checkpointer.stats_reset`** (3 of 3 runs), and
   `postgres_logs` records the stop as a fast shutdown (the request line on 1
@@ -2219,7 +2231,7 @@ hand copy got the Vault secret name wrong. Details: RUNLOG.md.
 - **A cascade delete leaves the servers' Vault secrets**: Studio only deletes
   `<fdw>_<option>`, so SQL-created secrets survive.
 
-## experiments/medium-serverless - key facts (validated 2026-09-30, Medium, ap-southeast-2, Team org, Postgres 17.6 image 17.6.1.166)
+## experiments/medium-serverless - key facts (validated 2026-09-30, Medium, ap-southeast-2, Team org, Postgres 17.6 image 17.6.1.166; MS02/MS07 re-run 2026-10-23 on Pro-org Medium projects, #208)
 
 One Medium project probed from an IPv4-only vantage in Singapore, as a
 serverless client on a shared multi-tenant project would see it. Every
@@ -2256,11 +2268,23 @@ Redacted artifacts: `out/2026-09-30/`. Details: RUNLOG.md.
   TTL 30. Shared pooler and REST: 0 failed samples through it (MS02; the REST
   probe there is MS02's anon `GET /rest/v1/`, answered with 401 by the API
   gateway before PostgREST or the database is reached, so it says the HTTP
-  tier answered; correction 2026-10-23, #204, not re-run). One
+  tier answered; correction 2026-10-23, #204). One
   observation (600 s window, A seen about 11 min after the PATCH); pooler-checkout
   on 2026-10-10 saw the A record 80 s after the PATCH in both runs, so quote
   both and do not promise either.
   Negative caching at the vantage not ruled out.
+  **Re-run 2026-10-23 (#208, two Pro-org Medium projects, ap-southeast-2 and
+  ap-southeast-1, macOS vantage):** AAAA gone at 34.7 s (E) and 30.6 s (F)
+  after sampling started (PATCH at 1 s), first connect on direct 5432 and
+  dedicated 6543 (system resolver) at 79 s (E) and 75.2 s (F), so from
+  `resolve6` losing the AAAA to the first `getaddrinfo` connect was about 44
+  to 45 s on both (E sampled about every 3 s); `rest_read` 0 of 119 (E) and
+  0 of 158 (F) failed, `realtime_join` 0 of 111 (E) and 0 of 135 (F),
+  shared pooler 0 failed. The add-on
+  switch leaves the data paths alone. MS02b's `fail` on both runs is a module
+  artefact (its `resolve4` lagged the system resolver and the loop ends at
+  first sustained connect), fixed to report the sampled span. Artifacts
+  `out/2026-10-23/`.
 - **A network restriction presents differently per path** (MS03): Supavisor
   refuses at 2.7-3.3 s with `(EADDRNOTALLOWED) address not in tenant
   allow_list`; direct 5432 and dedicated 6543 drop, so the client sees its own
@@ -2312,8 +2336,22 @@ Redacted artifacts: `out/2026-09-30/`. Details: RUNLOG.md.
   `READ_REPLICA` entry appeared in the pooler config after 216 s and answered
   `pg_is_in_recovery() = true` after 219 s; removal 204, gone on the first
   poll. The docs only say "across multiple regions".
-- **A Medium <-> Large resize cost 30-55 s per Postgres, Auth and Storage
-  path on 2026-09-30 (MS07, n=1 each way); its "nothing on REST or Realtime"
+- **A Medium to Large resize and the resize back took every data path down
+  for 118 to 310 s on 2026-10-23, REST reads and Realtime joins included
+  (MS07, #208)**: two
+  Pro-org Medium projects (E ap-southeast-2, F ap-southeast-1), a pair at
+  about 4 minutes and a pair at one hour after the create call, n=1 per leg.
+  Auth up / down: E 221 / 183 and 141 / 195 s, F 180 / 190 and 128 / 211 s;
+  `rest_read` within 1 s of Auth and `realtime_join` within 10 s in every
+  leg, while `rest_http` and `realtime_ws` had 0 failed samples. F's shared
+  pooler ran 238 and 310 s on the way down behind Supavisor's
+  `(ECIRCUITBREAKER)`. Region (E is the 2026-09-30 region) and age since
+  the create call up to one hour do not explain the 2026-09-30 figures below; untested
+  differences are org plan, Postgres image (17.6.1.166 then, 17.11.0.003
+  now), the project's history (MS06 removed `pitr_7` just before) and the
+  date. Artifacts `out/2026-10-23/`, RUNLOG section of that date.
+- **On 2026-09-30 a Medium <-> Large resize cost 30-55 s per Postgres, Auth
+  and Storage path (MS07, n=1 each way); its "nothing on REST or Realtime"
   is withdrawn (correction below):** up Auth 35 s
   `HTTP 521`, Storage 34 s, shared 6543 30 s, shared 5432 36 s, dedicated 6543
   34 s, direct 35 s; down 42 / 44 / 39 / 39 / 55 / 41 s. Same shape as
@@ -2327,14 +2365,13 @@ Redacted artifacts: `out/2026-09-30/`. Details: RUNLOG.md.
   gateway answers with 401 before PostgREST or the database is reached, any
   status below 500 counted as up; a WebSocket handshake), now named
   `rest_http` and `realtime_ws` in `lib/setup.ts` with `rest_read` and
-  `realtime_join` added beside them. MS07 itself was not re-run (Team org,
-  IPv4 add-on and dedicated-pooler setup). platform-downtime re-measured a
+  `realtime_join` added beside them. platform-downtime re-measured a
   Medium to Large pair on two Pro-org projects in ap-southeast-1 with the
   data-path probes: REST reads down 113 and 299 s up, 217 and 101 s down,
   Realtime joins 107 and 298 s up, 217 and 98 s down. Its Auth windows (115
   and 299 s up, 216 and 101 s down) and pooler windows (113 and 298 s up,
-  217 and 200 s down) are also well above MS07's 30-55 s, on a different org,
-  region and day; the difference is not explained.
+  217 and 200 s down) are also well above MS07's 30-55 s; MS07's own re-run
+  on 2026-10-23 (bullet above) agrees with them, not with 2026-09-30.
 - **A custom hostname's `_acme-challenge` TXT is not in the initialize
   response**; it arrives on a later GET/reverify poll (3-23 s across four
   runs), after the `_cf-custom-hostname` ownership TXT. Re-read the record
