@@ -319,7 +319,7 @@ client can poll. See RUNLOG.md; artifacts in `out/2026-09-24/` and
   extension. privatelink-aws T22 carries the same change, not run (needs the
   AWS PrivateLink rig).
 
-## experiments/data-api-capacity - key facts (validated 2026-10-22/23, Pro org; DC01-03 ap-southeast-1 Small then Large, DC04 ap-northeast-2 Small then 4XL, DC05-07 ap-northeast-2 Small)
+## experiments/data-api-capacity - key facts (validated 2026-10-22/23, Pro org; DC01-03 ap-southeast-1 Small then Large, DC04 ap-northeast-2 Small then 4XL, DC05-07 ap-northeast-2 Small, DC08 ap-northeast-2 Small then 4XL, in-region clients)
 
 The Data API's connection pool, what a full pool looks like to a client, the
 pool settings' PATCH, statement timeouts per role, throughput under request
@@ -329,8 +329,10 @@ rate, the pool metrics and pool size under load. DC01-DC03: four runs; run 4
 named (RUNLOG.md says why runs 1-3 differ). DC04 and DC05-DC07: one run each
 (`run-2026-10-23T07-13-34-754Z`, `run-2026-10-23T07-49-11-858Z`), from a
 Mac in Singapore, so every latency includes the Singapore-Seoul round trip.
-PostgREST 14.18 and Postgres 17.11: console for DC01-DC03, DC04a's artifact;
-not recorded for DC05-DC07 (DC04a, same day and region, read 14.18). The
+DC08: one run (`run-2026-10-23T09-37-44-863Z`) with clients in
+ap-northeast-2 (Edge Functions). PostgREST 14.18 and Postgres 17.11:
+console for DC01-DC03, the DC04a and DC08a artifacts; not recorded for
+DC05-DC07 (DC04a, same day and region, read 14.18). The
 artifacts' top-level `region` is the harness default; the project region
 came from `PVLAB_DC_REGION` (recorded as `project_region_requested` in DC04a
 and DC05a from the next run on).
@@ -456,6 +458,50 @@ and DC05a from the next run on).
   mostly os error 51). `authenticator` backends mostly idle at every size;
   node CPU not computed. Consistent with issue #5336's small-core rows
   (https://github.com/PostgREST/postgrest/issues/5336).
+- **4XL with in-region clients and a mixed workload stopped gaining near
+  6,000 req/s with Postgres mostly idle** (DC08, one run,
+  `run-2026-10-23T09-37-44-863Z`). Clients: Edge Function invocations
+  pinned with `x-region` to ap-northeast-2 (ICN colo on every sampled
+  response), because flyctl had no login and the only Fly token was
+  scoped to another app, and both AWS key pairs were rejected. Mix by
+  weight: point read 50, 50-row range 15, RPC lookup 15, insert 10,
+  `Prefer: count=exact` over 10,000 rows 10, legacy anon key. Ramp at
+  `db_pool` unset (pool 70), by requested concurrency: 3,110 req/s at p50
+  19.9 ms (c=256), 3,962 at 41.9 ms, 4,806 at 125 ms, 5,844 at 230 ms,
+  6,148 at 273 ms (c=3072, +5 %, the stop-rule step; nothing above it
+  run); requests in flight (req/s x p50, derived) about 62, 166, 600,
+  1,340, 1,680. Every answer 200/201/206; every op had the same latency
+  within a step. At most 14 `authenticator` backends active in any
+  in-load sample (of 71 from c=512 on); executor time at most 1,491 ms
+  per second of a window longer than the load (see RUNLOG on why that
+  column is a floor). Node CPU 49.6 % at c=2048 across one payload
+  refresh, process not measured.
+- **One pool snapshot on 4XL showed the waiting-with-free-slots pattern**
+  (DC08b, c=3072, a step averaging 6,148 req/s). The tuple first scraped
+  33 s into the step read 1,078 waiting with 58 of 70 available, so at
+  least 1,066 requests were queued inside PostgREST at some moment between
+  load start and 33 s while 58 open connections were idle.
+  `authenticator` samples during that step read 0 to 7 active of 71. One
+  snapshot, n = 1; it stayed at 1,078 for 25 s after the load ended. Two
+  other refreshes, at c=2048 and in the pool-70 arm, read 0/70/70, at
+  moments not recorded (see RUNLOG). Earlier steps' latency growth fits
+  the same queue, but the edge and gateway were not instrumented.
+- **`db_pool` 150 and 250 did not raise throughput or lower p50 on 4XL at
+  that load** (DC08c, one step each at c=3072): p50 281 and 278 ms
+  against 273 and 274 ms at pool 70; p95/p99 were higher (362/490 and
+  353/462 against 320/384 and 328/379), one step per arm. req/s 4,830
+  (that arm lost about one round of clients) and 5,901, against 6,148 and
+  6,210. Most connections sat idle (133 to 149 idle at 150, 173 to 240 at
+  250). 250 is below the requests in flight, so issue #5336's workaround
+  (pool at least the concurrent requests) was not tested. `db_pool` 250
+  PATCHed 200 this time (DC04d's 500 not reproduced, not investigated).
+- **Edge Functions as a load generator** (DC08, harness note): in this run
+  invocations failed under bursts with 546 `WORKER_RESOURCE_LIMIT`, 503
+  `BOOT_ERROR` and 429 `RATE_LIMIT_EXCEEDED`, so delivered concurrency is
+  below clients x workers; read throughput with req/s x p50 as the
+  in-flight load, and the `gen_*` columns for what was delivered. Since
+  the run the generator targets only its own project (`SUPABASE_URL`),
+  not a host from the request; that version has not been run.
 
 ## Provisioning: ACTIVE_HEALTHY is not readiness (validated 2026-08-03)
 
