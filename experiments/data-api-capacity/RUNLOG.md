@@ -9,6 +9,255 @@ the runs' console output, not from the published artifacts; DC01a records
 both from the next run on. Vantage: this lab's Mac in Singapore over the
 public internet, so every client time below includes the round trip. "Docs"
 means the source named in the module header; "measured" means the artifact.
+DC08 is the exception to that vantage: its clients run in the project's
+region (section below).
+
+## 2026-10-23 - DC08, in-region clients and an application-like mix on 4XL (one run)
+
+Harness: `make run ONLY=DC08,DC99` with `PVLAB_DC_REGION=ap-northeast-2`
+and `PVLAB_DC_SIZE=small`, lab commit 235cac8 plus the uncommitted DC08
+module and generator. One Pro-org project, created Small, resized to 4XL
+(`ci_4xlarge`) in DC08a, deleted by DC99. Published:
+`out/2026-10-23/run-2026-10-23T09-37-44-863Z.json` (13 results) and its
+`.facts.md`.
+
+Load generator. The plan named Fly Machines in the region nearest Seoul
+(Fly's region list, https://fly.io/docs/reference/regions/, has Tokyo `nrt`
+and no Seoul region) or EC2 in ap-northeast-2. Neither
+was usable from this lab on the day: flyctl had no login session and the
+only Fly token available was scoped to one unrelated app (`apps create`
+and `apps list` answered `unauthorized`), and both AWS key pairs answered
+`InvalidClientTokenId` to `sts get-caller-identity`. The clients are
+therefore Supabase Edge Function invocations of `gen/dc08-gen/index.ts`,
+deployed to the project under test and invoked with `x-region:
+ap-northeast-2`: every invocation that returned `x-sb-edge-region`
+reported ap-northeast-2 (none another region; 1,910 of 2,304 in the
+pool-150 arm carried it), the smoke invocation reported `SB_REGION`
+ap-northeast-2, and every sampled (1 in 50) Data API response carried a
+`cf-ray` from the ICN colo. One invocation is one closed-loop client of 8
+workers for one round of 8 s; a step is 6 rounds (48 s), and each round's
+invocations are given the same start time (observed starts were up to
+16.2 s late), fired from this lab's Mac after a warm-up call per client.
+Requested concurrency is clients x 8; the delivered concurrency is lower
+(next paragraph).
+
+The generator in this run took the target host from the request body (the
+module sent the project's own host). After the run the generator was
+changed to target only the project it is deployed in (`SUPABASE_URL`) and
+to ignore any host in the request, so a copied deployment cannot be used
+as a load relay against a third party; that version has not been run.
+
+Mix, by weight per request, legacy anon key on every request, 100,000-row
+`dc_items` (int primary key, md5 text):
+
+| op | weight | request |
+|---|---|---|
+| point | 50 | `GET /rest/v1/dc_items?id=eq.<random>&select=id,payload` |
+| range50 | 15 | `GET /rest/v1/dc_items?id=gte.X&id=lt.X+50&select=id,payload&order=id` (50 rows) |
+| rpc | 15 | `POST /rest/v1/rpc/dc08_lookup {"p_id": <random>}` (`language sql stable`, one indexed row as json) |
+| insert | 10 | `POST /rest/v1/dc08_events {"item_id", "note"}`, `Prefer: return=minimal` (identity primary key, no secondary index) |
+| countExact | 10 | `GET /rest/v1/dc_items?id=gte.X&id=lt.X+10000&select=id,payload&order=id&limit=20`, `Prefer: count=exact` (counts 10,000 rows, returns 20) |
+
+What the generator did not deliver. Invocations failed with 546
+`WORKER_RESOURCE_LIMIT` ("Function failed due to not having enough compute
+resources"), 503 `BOOT_ERROR` ("Function failed to start"), 429
+`RATE_LIMIT_EXCEEDED` ("Too many requests. Re-try the request in 1
+seconds.") and, from the Mac, a closed socket (status 0). A failed
+invocation was retried while 2 s of its round remained, so a retried
+client ran only part of its round. The "clients answered per round" column
+is the invocations that returned a result, divided by 6; the requested
+figure is the clients column.
+
+### DC08b - ramp on 4XL, `db_pool` unset (pool max 70, `max_connections` 480)
+
+Client side (from the generator):
+
+| concurrency (clients x 8) | clients answered per round | req/s | p50 / p95 / p99 ms | statuses | success | per-client req/s median (min-max) | event-loop lag p99 median / max ms | invocation statuses; retried attempts |
+|---|---|---|---|---|---|---|---|---|
+| 64 (8) | 3.8 | 989 | 18.6 / 30.7 / 47.2 | 200:38064 201:4775 206:4633 | 1 | 236 (0-411) | 9 / 103 | 200:23 503:14 546:11; 546:23 |
+| 128 (16) | 9.5 | 1857 | 19.2 / 31.8 / 47.7 | 200:71386 201:8856 206:8896 | 1 | 184 (0-410) | 4 / 113 | 200:57 503:10 546:29; 503:4 546:62 |
+| 256 (32) | 17.2 | 3110 | 19.9 / 34 / 59 | 200:119223 201:15075 206:14984 | 1 | 164 (0-405) | 6 / 168 | 200:103 503:45 546:44; 503:2 546:97 |
+| 512 (64) | 34.5 | 3962 | 41.9 / 63.8 / 85.3 | 200:152099 201:18918 206:19162 | 1 | 107 (0-236) | 6 / 100 | 200:207 503:72 546:105; 503:11 546:158 |
+| 1024 (128) | 88.8 | 4806 | 125 / 163 / 265 | 200:184737 201:23193 206:22766 | 1 | 58 (0-196) | 9 / 1375 | 200:533 429:2 503:140 546:93; 429:9 503:21 546:158 |
+| 2048 (256) | 237 | 5844 | 230 / 312 / 512 | 200:224411 201:28225 206:27896 | 1 | 30 (0-43) | 5 / 627 | 0:11 200:1422 503:52 546:51; none |
+| 3072 (384) | 365.7 | 6148 | 273 / 320 / 384 | 200:236259 201:29312 206:29554 | 1 | 25 (0-34) | 2 / 504 | 0:1 200:2194 429:54 503:41 546:14; 429:1372 |
+
+Every op had the same latency within a step; at c=3072 the per-op p50 was
+273 to 275 ms (point 273, countExact 275) and p99 381 to 391 ms. 206 is
+PostgREST's answer to `count=exact` with a `limit` below the total; 201 is
+the insert.
+
+Server side. `authenticator` states are the samples taken during the 48 s
+of load (13 per step to c=1024; 5 at c=2048 and above, where the sampling
+gaps grew to about 8 s, cause not measured), read through the Management
+API. Postgres figures are deltas of `pg_stat_statements`
+(`total_exec_time`, `calls`) and `pg_stat_database` (commits plus
+rollbacks) divided by that window. The window started about 3 s before the
+load and ended after the last invocation returned: the sampling loops,
+which stop then, ran to 73-75 s after load start at c=2048 and c=3072 and
+to 65 s in the pool-70 arm, so those windows were about 1.5 times the 48 s
+of load. Calls and transactions per client request also fall from about 4
+and 2 at c=64 to 1.3 and 0.66 at c=3072 (0.48 and 0.24 in the pool-150
+arm), which the window alone does not explain (not investigated). Read
+these columns as a floor within a step, not as a comparison between steps.
+Node CPU is the busy share of `node_cpu_seconds_total` between the step's
+first and last metrics scrape; -1 when the counters did not move between
+them (the payload did not refresh).
+
+| concurrency | pool snapshots waiting/available/max | `authenticator` active / idle / idle in transaction (range in load) | Postgres exec ms/s | calls/s | xact/s | node CPU % |
+|---|---|---|---|---|---|---|
+| 64 | 0/2/70 | 0-1 / 9-13 / 0-4 | 258 | 3990 | 1961 | -1 |
+| 128 | 0/13/70 | 0-7 / 20-33 / 0-4 | 622 | 8546 | 4253 | -1 |
+| 256 | 0/32/70 | 0-6 / 37-71 / 0-16 | 1057 | 12230 | 6025 | -1 |
+| 512 | 0/70/70 | 0-14 / 50-71 / 0-14 | 1491 | 14969 | 7377 | -1 |
+| 1024 | 0/70/70 | 0-9 / 56-68 / 3-15 | 1256 | 12678 | 6304 | -1 |
+| 2048 | 0/70/70 | 0-6 / 49-66 / 2-22 | 777 | 7840 | 3974 | 49.6 |
+| 3072 | 0/70/70, then 1078/58/70 from 33 s | 0-7 / 58-64 / 6-13 | 801 | 7995 | 4066 | 29.9 |
+
+From c=512 on, 71 `authenticator` backends were open in every sample (the
+pool of 70 plus one; DC05 counted the same extra idle backend).
+
+Readings:
+
+- Throughput rose 27 %, 21 %, 22 % and 5 % per step from c=256 (3,110
+  req/s) to c=3072 (6,148 req/s) while p50 went 19.9, 41.9, 125, 230, 273
+  ms. Requests in flight, derived as req/s x p50 (a median, so an
+  approximation): about 62, 166, 600, 1,340 and 1,680. Above c=512 latency
+  grew roughly with the requests in flight, and the last step (c=3072, also
+  the stop-rule step) added 5 % for 25 % more requests in flight: it reads
+  as a queue in front of a fixed service rate (one step; nothing above
+  c=3072 was run).
+- That queue showed no sign of being in Postgres. In the samples taken
+  during load, at most 14 `authenticator` backends were active; from
+  c=256 at least 37 were idle (49 or more from c=512, when all 71 were
+  open). Every op, including a `count=exact` over 10,000 rows, had a p50
+  within 3 ms of a point read at every step. Executor time was at most
+  1,491 ms per second of a window longer than the load (about 0.1 ms per
+  call, derived: 1,491 / 14,969 at c=512, 801 / 7,995 at c=3072), on 16
+  vCPU.
+- The one pool tuple that changed inside a step's load window, first
+  scraped 33 s into c=3072 (the 25 s scrape read 0/70/70), read 1,078
+  waiting with 58 of 70 available. DC05 measured lags of 1.5 to 41.5 s
+  between a change and the payload showing it, so the tuple describes some
+  moment between load start and 33 s. Waiting counts queued plus holding
+  (DC05), holding is at most 70 - 58 = 12, so at least 1,066 requests were
+  queued for a pool connection inside PostgREST while 58 open connections
+  were idle. The `authenticator` samples during that step read 0 to 7
+  active and 58 to 64 idle (33 s: 0 active, 64 idle; not the same instant
+  as the snapshot). That is one snapshot of the waiting-with-free-slots
+  pattern on 4XL, during the c=3072 step (6,148 req/s averaged over 48 s).
+  It still read 1,078 waiting at 73 s, 25 s after the load ended, when the
+  `authenticator` samples read 0 active, 71 idle; the 14
+  `queued_with_free_snapshots` in the artifact are 14 scrapes of that one
+  tuple (n = 1).
+- Whether it was there earlier is not settled. The pool tuple changed
+  between steps but within a step's window only once (c=3072). At c=2048
+  the node CPU counters moved between the 16 s and 73 s scrapes (49.6 %),
+  so the payload refreshed at least once, and the pool tuple after it still
+  read 0/70/70; the refresh may have landed after the 48 s of load (DC05:
+  one change in 100 s of 1 s scrapes; a fixed period, if any, of at least
+  about 40 s). The latency growth with idle backends from c=512 (3,962
+  req/s) fits the same queue, and another layer between client and
+  PostgREST (the edge, the API gateway) was not instrumented and would
+  look the same from here.
+- Generator CPU did not look like the limit: event-loop lag p99 had a
+  median of 2 to 9 ms per step (max 100 to 1,375 ms), and the per-client
+  rate fell as latency rose (25 req/s at c=3072 against 8 workers / 0.273
+  s, about 29), so workers mostly waited on answers. Lag does not cover the
+  runtime's outbound connections or the Mac's dispatch, which were not
+  measured. The generator under-delivered concurrency: failed and late
+  invocations; at c=3072, 2,926 answered workers (365.7 x 8, derived)
+  against about 1,680 requests in flight. Each step's concurrency label
+  therefore overstates the load, and the in-flight estimate (client-side,
+  including edge and gateway time) is the closest this run has to the
+  delivered load.
+- Node CPU read 49.6 % (c=2048) and 29.9 % (c=3072) of 16 vCPU, each across
+  one payload refresh at a moment not recorded; which process used it was
+  not measured.
+- Every answer in the ramp was 200, 201 or 206; no 403 and no 5xx.
+
+### DC08c - `db_pool` arms at c=3072
+
+Each arm: PATCH, wait for the restart line, readback, 20 s, then the
+c=3072 step. Order 150, 250, 70; the ramp's c=3072 step (pool 70 with
+`db_pool` unset) ran before them.
+
+| `db_pool` (PATCH, readback, restart after) | clients answered per round | req/s | p50 / p95 / p99 ms | statuses | `authenticator` active / idle / idle in transaction (range in load) | pool snapshots (scrapes) | Postgres exec ms/s | invocation statuses; retried attempts |
+|---|---|---|---|---|---|---|---|---|
+| unset, 70 (ramp) | 365.7 | 6148 | 273 / 320 / 384 | 200:236259 201:29312 206:29554 | 0-7 / 58-64 / 6-13 | 0/70/70, 1078/58/70 (16) | 801 | 0:1 200:2194 429:54 503:41 546:14; 429:1372 |
+| 150 (200, 150, 1.8 s) | 299 | 4830 | 281 / 362 / 490 | 200:185881 201:22964 206:22977 | 0-4 / 133-149 / 2-18 | 0/51/150 (4) | 240 | 0:394 200:1794 429:56 503:13 546:47; 429:1749 |
+| 250 (200, 250, 1 s) | 360 | 5901 | 278 / 353 / 462 | 200:226689 201:28304 206:28249 | 0-5 / 173-240 / 7-78 | 0/0/250 (5) | 1204 | 200:2160 429:78 503:66; 429:2124 |
+| 70 (200, 70, 1.4 s) | 368.8 | 6210 | 274 / 328 / 379 | 200:238435 201:29769 206:29875 502:3 | 0-6 / 51-61 / 5-14 | 0/70/70 (12) | 891 | 0:13 200:2213 429:78; 0:3 429:2716 |
+
+The three 502s in the last arm (1 countExact, 2 rpc): the one body
+recorded (countExact) was Cloudflare's page, `502 Bad Gateway` with
+`cloudflare` in the footer; the rpc bodies were not kept.
+
+Readings:
+
+- A bigger pool did not raise throughput or lower p50. p50 was 273, 281,
+  278 and 274 ms at pool 70 (unset), 150, 250 and 70; req/s 6,148, 4,830,
+  5,901 and 6,210. p95 and p99 were higher at 150 and 250 (362 / 490 and
+  353 / 462 against 320 / 384 and 328 / 379; one step each). One step per
+  arm, no repeats; the two pool-70 steps differ by 62 req/s.
+- The pool 150 arm's lower rate came with fewer clients answering (299
+  per round against 360 to 369). 394 invocations ended with status 0 on
+  the Mac; their error text was not recorded in that arm (the pool-70
+  arm's status-0 sample was a closed socket). 394 is about one round of
+  384 clients, and the arm's samples stop at 41 s, which fits one lost
+  round (derived; the artifact has no per-round split): 4,830 x 6/5 is
+  about 5,800 req/s. Its rate measures the generator; its p50 matched the
+  other arms.
+- With more connections, more sat idle: 133 to 149 at pool 150, 173 to
+  240 at 250, active 0 to 4 at 150 and 0 to 5 at 250. Idle in transaction
+  reached 78 in one pool-250 sample, against at most 22 in any other step.
+- None of the arms' pool tuples changed during the step (`0/0/250` is not
+  a reading of 250 connections in use: the `authenticator` samples beside
+  it read 173 to 240 idle), so whether requests queued for a connection at
+  pool 150 or 250 is not shown by the metric. In the pool-70 arm the node
+  CPU counters moved (48.1 %), so the payload refreshed at least once
+  between the 17 s and 65 s scrapes and still read 0/70/70; when that
+  refresh happened relative to the load is not recorded.
+- Flat throughput with most connections idle at pools of 70, 150 and 250
+  fits a limit in PostgREST that a pool below the requests in flight does
+  not lift. Upstream issue #5336
+  (https://github.com/PostgREST/postgrest/issues/5336) reports collapse
+  growing with cores and a workaround of a pool at least as large as the
+  concurrent requests. 250 is below the 1,360 to 1,700 requests in flight
+  in these arms (derived, req/s x p50), so that workaround was not
+  tested. This run also does not separate a limit in front of PostgREST.
+- `db_pool` 250 answered 200 here; DC04d's PATCH to 250 on 4XL answered
+  500 (not investigated there or here).
+
+### Not run
+
+- Fly Machines or EC2 clients (unavailable, see above); a generator whose
+  delivered concurrency matches the requested one; a client outside the
+  Edge Functions runtime to compare against.
+- The pool series at a known refresh during c=512 to c=2048; a pool
+  reading during the 150 and 250 arms.
+- A per-process CPU split between PostgREST, the gateway and Postgres; the
+  latency added by each layer between the client and PostgREST.
+- Postgres rates over exactly the 48 s of load (the window ran to the last
+  returned invocation, up to about 75 s); why calls and transactions per
+  request fell at the top steps.
+- Authenticated-user JWTs (every request used the anon key), larger
+  payloads, writes with indexes or triggers, a mix without `count=exact`.
+- Repeats of any step or arm; XL, 2XL, 8XL.
+
+### Cost
+
+Project time about 22 minutes (09:37:44 to 09:59:21 UTC, the artifact's
+start and finish stamps): Small for about a minute (console), 4XL after the resize
+(settled 81 s after the PATCH, `max_connections` 90 to 480, 0 of 60 pings
+failed in the 60 s watch), deleted by DC99 (DELETE 200, gone from the
+listing at the first check). Before it, a Small development project in the
+same region ran two short DC08 trials for about 9 minutes (console only,
+not published) and was deleted with `lib/cleanup.ts --delete`. Edge
+Function calls, summed from the artifact's `gen_invocations`,
+`gen_failed_attempts` and `clients` columns: 12,240 measured invocations,
+8,509 retried attempts and 2,040 warm-up calls. `make clean` afterwards listed 0
+`pvlab-dc-` projects (console, not in the artifact).
 
 ## 2026-10-23 - DC05-DC07, the pool metrics, aborted connections, pool size under load (one run)
 
