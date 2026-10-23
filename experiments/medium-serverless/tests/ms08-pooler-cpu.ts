@@ -87,12 +87,13 @@ async function withScrapes<T>(ctx: Ctx, fn: () => Promise<T>): Promise<{ result:
   return { result, first: samples[0] ?? null, last: samples[samples.length - 1] ?? null, n: samples.length };
 }
 
-function url(t: PgTarget, pw: string): string {
-  return `postgres://${encodeURIComponent(t.user)}:${encodeURIComponent(pw)}@${t.host}:${t.port}/postgres`;
+/** No password in the URL (pgbench's argv is visible in ps); it goes in PGPASSWORD. */
+function url(t: PgTarget): string {
+  return `postgres://${encodeURIComponent(t.user)}@${t.host}:${t.port}/postgres`;
 }
 
 async function bench(t: PgTarget, pw: string): Promise<{ tps: number | null; lat: number | null; stderr: string }> {
-  const p = await $`pgbench -n -S -c ${CLIENTS} -j ${JOBS} -T ${TIME_S} ${url(t, pw)}`.env({ ...process.env, PGSSLMODE: "require", PGCONNECT_TIMEOUT: "15" }).quiet().nothrow();
+  const p = await $`pgbench -n -S -c ${CLIENTS} -j ${JOBS} -T ${TIME_S} ${url(t)}`.env({ ...process.env, PGPASSWORD: pw, PGSSLMODE: "require", PGCONNECT_TIMEOUT: "15" }).quiet().nothrow();
   const out = p.stdout.toString() + p.stderr.toString();
   const tps = /tps = ([0-9.]+)/.exec(out);
   const lat = /latency average = ([0-9.]+) ms/.exec(out);
@@ -122,7 +123,7 @@ const mod: TestModule = {
         const r = await c.query<{ t: string | null }>("select to_regclass('public.pgbench_accounts')::text as t");
         if (!r.rows[0]?.t) {
           ctx.log("pgbench -i -s 10 on direct 5432");
-          const init = await $`pgbench -i -s 10 ${url(direct, pw)}`.env({ ...process.env, PGSSLMODE: "require" }).quiet().nothrow();
+          const init = await $`pgbench -i -s 10 ${url(direct)}`.env({ ...process.env, PGPASSWORD: pw, PGSSLMODE: "require" }).quiet().nothrow();
           if (init.exitCode !== 0) return [{ id: "MS08", title: mod.title, status: "fail", detail: `pgbench -i failed: ${init.stderr.toString().slice(-200)}` }];
         }
       } catch (e) {

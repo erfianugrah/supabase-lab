@@ -348,9 +348,11 @@ async function applyMigrations(t: HarnessTarget): Promise<string> {
   const rows = (Array.isArray(pool.json) ? pool.json : []) as { db_host?: string; database_type?: string }[];
   const host = (rows.find((x) => x.database_type === "PRIMARY") ?? rows[0])?.db_host;
   if (!host) die("no pooler host");
-  const url = `postgresql://postgres.${t.managed!.ref}:${encodeURIComponent(t.managed!.dbPass)}@${host}:5432/postgres`;
+  // No password in --db-url (argv, visible in ps): the CLI resolves a missing
+  // password from PGPASSWORD (libpq order: URL, PGPASSWORD, .pgpass).
+  const url = `postgresql://postgres.${t.managed!.ref}@${host}:5432/postgres`;
   for (let i = 0; i < 5; i++) {
-    const r = await sh(["supabase", "db", "push", "--db-url", url, "--workdir", EXP_DIR, "--yes", "--include-all"], { timeoutMs: 300_000 });
+    const r = await sh(["supabase", "db", "push", "--db-url", url, "--workdir", EXP_DIR, "--yes", "--include-all"], { timeoutMs: 300_000, env: { PGPASSWORD: t.managed!.dbPass } });
     if (r.code === 0) return "supabase db push";
     log(`db push attempt ${i + 1} failed: ${(r.err + r.out).replaceAll(t.managed!.dbPass, "<pw>").slice(-300)}`);
     await sleep(15_000);

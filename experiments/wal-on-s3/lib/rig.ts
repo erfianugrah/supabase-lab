@@ -68,6 +68,7 @@ export async function ensureNet(): Promise<void> {
 export async function aws(...args: string[]): Promise<Out> {
   return docker(
     "run", "--rm", "--network", NET,
+    // argv-secret-ok: S3_KEY/S3_SECRET are the local rustfs container's fixed constants, not a credential
     "-e", `AWS_ACCESS_KEY_ID=${S3_KEY}`, "-e", `AWS_SECRET_ACCESS_KEY=${S3_SECRET}`, "-e", `AWS_DEFAULT_REGION=${REGION}`,
     AWS_IMAGE, "--endpoint-url", `http://${S3_NAME}:9000`, ...args,
   );
@@ -77,6 +78,7 @@ export async function aws(...args: string[]): Promise<Out> {
 export async function freshS3(bucket: string): Promise<void> {
   await ensureNet();
   await rmContainer(S3_NAME);
+  // argv-secret-ok: S3_KEY/S3_SECRET are the local rustfs container's fixed constants, not a credential
   const r = await docker("run", "-d", "--name", S3_NAME, "--network", NET, "-e", `RUSTFS_ACCESS_KEY=${S3_KEY}`, "-e", `RUSTFS_SECRET_KEY=${S3_SECRET}`, S3_IMAGE, "/data");
   if (r.code !== 0) throw new Error(`s3 start: ${r.err}`);
   for (let i = 0; i < 30; i++) {
@@ -233,6 +235,7 @@ export async function restoreInto(volume: string, bucket: string, loader: string
   ].join(" && ");
   return docker(
     "run", "--rm", "--network", NET, "-u", "0",
+    // argv-secret-ok: S3_KEY/S3_SECRET are the local rustfs container's fixed constants, not a credential
     "-e", `AWS_ACCESS_KEY_ID=${S3_KEY}`, "-e", `AWS_SECRET_ACCESS_KEY=${S3_SECRET}`, "-e", `AWS_DEFAULT_REGION=${REGION}`,
     "-e", "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
     "-v", `${volume}:/var/lib/postgresql/data`, "-v", `${loader}:/loader.py:ro`,

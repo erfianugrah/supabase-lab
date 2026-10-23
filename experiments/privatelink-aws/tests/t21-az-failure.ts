@@ -20,6 +20,9 @@
  * DESTRUCTIVE: mutates a network ACL for the duration.
  */
 import { $ } from "bun";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { Ctx, TestModule } from "../../../harness/src/types";
 import { invokeProbe } from "../lib/lambda-probe";
 
@@ -35,13 +38,25 @@ async function aws(args: string[]): Promise<{ ok: boolean; out: string }> {
 
 /** psql from the runner: libpq, which tries every resolved address. */
 async function psqlViaRunner(ctx: Ctx, runnerId: string): Promise<boolean | null> {
+  // argv-secret-ok: the runner's script body; it reaches aws via a 0600 file.
   const cmd = `PGPASSWORD='${ctx.dbPassword}' PGCONNECT_TIMEOUT=20 psql "host=${ctx.phzHost} port=5432 user=postgres dbname=postgres sslmode=require" -tAc 'select 1'`;
-  const send = await aws([
-    "ssm", "send-command", "--region", ctx.region, "--instance-ids", runnerId,
-    "--document-name", "AWS-RunShellScript", "--timeout-seconds", "120",
-    "--parameters", JSON.stringify({ commands: [cmd] }),
-    "--query", "Command.CommandId", "--output", "text",
-  ]);
+  // The payload carries the password, so it goes through a 0600 file
+  // (`--parameters file://`, as suite.sh does), never the aws CLI's argv.
+  // SSM still keeps the parameters in command history - see AGENTS.md.
+  const dir = mkdtempSync(join(tmpdir(), "pvlab-t21-"));
+  const params = join(dir, "params.json");
+  let send: { ok: boolean; out: string };
+  try {
+    writeFileSync(params, JSON.stringify({ commands: [cmd] }), { mode: 0o600 });
+    send = await aws([
+      "ssm", "send-command", "--region", ctx.region, "--instance-ids", runnerId,
+      "--document-name", "AWS-RunShellScript", "--timeout-seconds", "120",
+      "--parameters", `file://${params}`,
+      "--query", "Command.CommandId", "--output", "text",
+    ]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
   if (!send.ok) return null;
   const cid = send.out.trim();
   for (let i = 0; i < 12; i++) {
