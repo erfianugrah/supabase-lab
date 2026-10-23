@@ -1,0 +1,925 @@
+{
+  "startedAt": "2026-10-23T07:58:18.094Z",
+  "finishedAt": "2026-10-23T08:00:37.196Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "advisor-coverage",
+  "labCommit": "661afdf",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "AV01c",
+      "title": "AV01c: Postgres version, exposed-schema settings, function default privileges in public",
+      "status": "info",
+      "detail": "pg 17.11; pgrst.db_schemas as postgres: (unset)",
+      "measurements": {
+        "server_version": "17.11",
+        "pgrst_db_schemas_as_postgres": "(unset)",
+        "authenticator_pgrst_db_schemas": "(not set on the role)",
+        "public_function_default_acl": "postgres:postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres | supabase_admin:postgres=X/supabase_admin,anon=X/supabase_admin,authenticated=X/supabase_admin,service_role=X/supabase_admin"
+      },
+      "durationMs": 6592
+    },
+    {
+      "id": "AV01a",
+      "title": "AV01a: audit.sql on the fresh project (read-only transaction)",
+      "status": "info",
+      "detail": "0 rows; read-only txn true; 63 ms",
+      "measurements": {
+        "audit_commit": "f8d15fa",
+        "read_only_txn": "yes",
+        "rows": 0
+      },
+      "evidence": "(no rows)",
+      "durationMs": 6592
+    },
+    {
+      "id": "AV01b",
+      "title": "AV01b: advisors (security + performance) on the fresh project",
+      "status": "info",
+      "detail": "security 200, performance 200; 1 lints",
+      "measurements": {
+        "security_status": 200,
+        "performance_status": 200,
+        "lints": 1,
+        "lint: INFO auth_db_connections_absolute": 1
+      },
+      "evidence": "INFO auth_db_connections_absolute: Your project's Auth server is configured to use at most 10 connections. Increasing the instance size without manually adjusting this number will not improve the performance of the Auth server. Switch to a percentage base",
+      "durationMs": 6592
+    },
+    {
+      "id": "AV02s",
+      "title": "AV02s: seeding, exposed schemas, F09 privileges",
+      "status": "info",
+      "detail": "36/36 fixtures seeded; PATCH /postgrest 200",
+      "measurements": {
+        "fixtures": 36,
+        "seed_errors": 0,
+        "db_schema_before": "public,graphql_public",
+        "db_schema_patched": "public,graphql_public,av_api",
+        "patch_status": 200,
+        "pgrst_db_schemas_as_postgres_after": "(unset)",
+        "authenticator_pgrst_db_schemas_after": "(not set on the role)",
+        "setting_poll_s": 63,
+        "f09_anon_execute": "true",
+        "f09_authenticated_execute": "true",
+        "f09_proacl": "postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres"
+      },
+      "evidence": "(no seed errors)",
+      "durationMs": 109979
+    },
+    {
+      "id": "AV02a",
+      "title": "AV02a: audit.sql after seeding (read-only transaction)",
+      "status": "info",
+      "detail": "30 rows; read-only txn true; 67 ms",
+      "measurements": {
+        "read_only_txn": "yes",
+        "rows": 30,
+        "check: Policy open to anon": 3,
+        "check: RLS disabled": 5,
+        "check: SECURITY DEFINER open to PUBLIC": 2,
+        "check: INSERT policy with no SELECT policy": 1,
+        "check: Possible policy recursion": 1,
+        "check: RLS on, zero policies": 9,
+        "check: Secret-shaped column exposed": 3,
+        "check: SECURITY DEFINER without search_path": 1,
+        "check: auth.uid() re-evaluated per row": 1,
+        "check: Extension installed in public": 1,
+        "check: Foreign key without index": 1,
+        "check: View runs as owner": 2
+      },
+      "evidence": "CRITICAL Policy open to anon: public.av_f05_anon_select_true · av_f05_p\nCRITICAL Policy open to anon: public.av_f07_anon_delete_true · av_f07_p\nCRITICAL Policy open to anon: public.av_f27_insert_only · av_f27_p\nCRITICAL RLS disabled: public.av_f01_rls_off\nCRITICAL RLS disabled: public.av_f15_secret_exact\nCRITICAL RLS disabled: public.av_f16_secret_substring\nCRITICAL RLS disabled: public.av_f18_pii_ssn\nCRITICAL RLS disabled: public.av_f32_policy_rls_off\nCRITICAL SECURITY DEFINER open to PUBLIC: av_private.av_f10_definer_private()\nCRITICAL SECURITY DEFINER open to PUBLIC: public.av_f08_definer_default()\nHIGH INSERT policy with no SELECT policy: public.av_f27_insert_only\nHIGH Possible policy recursion: public.av_f23_members · av_f23_p\nHIGH RLS on, zero policies: public.av_f04_rls_no_policy\nHIGH RLS on, zero policies: public.av_f24_child\nHIGH RLS on, zero policies: public.av_f24_parent\nHIGH RLS on, zero policies: public.av_f25_child\nHIGH RLS on, zero policies: public.av_f25_parent\nHIGH RLS on, zero policies: public.av_f28_no_pk\nHIGH RLS on, zero policies: public.av_f29_dup_index\nHIGH RLS on, zero policies: public.av_f30_unused_index\nHIGH RLS on, zero policies: public.av_f35_no_autovacuum\nHIGH Secret-shaped column exposed: public.av_f15_secret_exact.password\nHIGH Secret-shaped column exposed: public.av_f16_secret_substring.stripe_api_key\nHIGH Secret-shaped column exposed: public.av_f17_secret_rls_on.api_key\nHIGH SECURITY DEFINER without search_path: public.av_f11_definer_no_path()\nPERFORMANCE auth.uid() re-evaluated per row: public.av_f19_initplan_uid · av_f19_p\nREVIEW Extension installed in public: pg_trgm\nPERFORMANCE Foreign key without index: av_f24_child · av_f24_child_parent_id_fkey\nREVIEW View runs as owner: public.av_f13_view_owner\nREVIEW View runs as owner: public.av_f14_auth_users_view",
+      "durationMs": 109979
+    },
+    {
+      "id": "AV02b",
+      "title": "AV02b: advisors after seeding, polled until two answers match",
+      "status": "info",
+      "detail": "41 lints after 2 polls (31 s); first seeded object at 0 s; settled true",
+      "measurements": {
+        "security_status": 200,
+        "performance_status": 200,
+        "lints": 41,
+        "polls": 2,
+        "settled": "yes",
+        "first_seeded_lint_s": 0,
+        "settled_s": 31,
+        "lint: ERROR auth_users_exposed": 1,
+        "lint: ERROR policy_exists_rls_disabled": 1,
+        "lint: INFO rls_enabled_no_policy": 9,
+        "lint: ERROR security_definer_view": 2,
+        "lint: WARN function_search_path_mutable": 2,
+        "lint: ERROR rls_disabled_in_public": 7,
+        "lint: WARN extension_in_public": 1,
+        "lint: ERROR rls_references_user_metadata": 1,
+        "lint: WARN materialized_view_in_api": 1,
+        "lint: WARN anon_security_definer_function_executable": 2,
+        "lint: WARN authenticated_security_definer_function_executable": 2,
+        "lint: INFO unindexed_foreign_keys": 2,
+        "lint: WARN auth_rls_initplan": 2,
+        "lint: INFO no_primary_key": 1,
+        "lint: INFO unused_index": 4,
+        "lint: WARN multiple_permissive_policies": 1,
+        "lint: WARN duplicate_index": 1,
+        "lint: INFO auth_db_connections_absolute": 1
+      },
+      "evidence": "ERROR auth_users_exposed: View/Materialized View \"av_f14_auth_users_view\" in the public schema may expose \\`auth.users\\` data to anon or authenticated roles.\nERROR policy_exists_rls_disabled: Table \\`public.av_f32_policy_rls_off\\` has RLS policies but RLS is not enabled on the table. Policies include {av_f32_p}.\nERROR rls_disabled_in_public: Table \\`av_api.av_f03_rls_off_api\\` is public, but RLS has not been enabled.\nERROR rls_disabled_in_public: Table \\`public.av_f01_rls_off\\` is public, but RLS has not been enabled.\nERROR rls_disabled_in_public: Table \\`public.av_f02_rls_off_public_grant\\` is public, but RLS has not been enabled.\nERROR rls_disabled_in_public: Table \\`public.av_f15_secret_exact\\` is public, but RLS has not been enabled.\nERROR rls_disabled_in_public: Table \\`public.av_f16_secret_substring\\` is public, but RLS has not been enabled.\nERROR rls_disabled_in_public: Table \\`public.av_f18_pii_ssn\\` is public, but RLS has not been enabled.\nERROR rls_disabled_in_public: Table \\`public.av_f32_policy_rls_off\\` is public, but RLS has not been enabled.\nERROR rls_references_user_metadata: Table \\`public.av_f33_user_metadata\\` has a row level security policy \\`av_f33_p\\` that references Supabase Auth \\`user_metadata\\`. \\`user_metadata\\` is editable by end users and should never be used in a security contex\nERROR security_definer_view: View \\`public.av_f13_view_owner\\` is defined with the SECURITY DEFINER property\nERROR security_definer_view: View \\`public.av_f14_auth_users_view\\` is defined with the SECURITY DEFINER property\nINFO auth_db_connections_absolute: Your project's Auth server is configured to use at most 10 connections. Increasing the instance size without manually adjusting this number will not improve the performance of the Auth server. Switch to a percentage base\nINFO no_primary_key: Table \\`public.av_f28_no_pk\\` does not have a primary key\nINFO rls_enabled_no_policy: Table \\`public.av_f04_rls_no_policy\\` has RLS enabled, but no policies exist\nINFO rls_enabled_no_policy: Table \\`public.av_f24_child\\` has RLS enabled, but no policies exist\nINFO rls_enabled_no_policy: Table \\`public.av_f24_parent\\` has RLS enabled, but no policies exist\nINFO rls_enabled_no_policy: Table \\`public.av_f25_child\\` has RLS enabled, but no policies exist\nINFO rls_enabled_no_policy: Table \\`public.av_f25_parent\\` has RLS enabled, but no policies exist\nINFO rls_enabled_no_policy: Table \\`public.av_f28_no_pk\\` has RLS enabled, but no policies exist\nINFO rls_enabled_no_policy: Table \\`public.av_f29_dup_index\\` has RLS enabled, but no policies exist\nINFO rls_enabled_no_policy: Table \\`public.av_f30_unused_index\\` has RLS enabled, but no policies exist\nINFO rls_enabled_no_policy: Table \\`public.av_f35_no_autovacuum\\` has RLS enabled, but no policies exist\nINFO unindexed_foreign_keys: Table \\`public.av_f24_child\\` has a foreign key \\`av_f24_child_parent_id_fkey\\` without a covering index. This can lead to suboptimal query performance.\nINFO unindexed_foreign_keys: Table \\`public.av_f25_child\\` has a foreign key \\`av_f25_child_a_b_fkey\\` without a covering index. This can lead to suboptimal query performance.\nINFO unused_index: Index \\`av_f25_child_a\\` on table \\`public.av_f25_child\\` has not been used\nINFO unused_index: Index \\`av_f29_dup_index_v1\\` on table \\`public.av_f29_dup_index\\` has not been used\nINFO unused_index: Index \\`av_f29_dup_index_v2\\` on table \\`public.av_f29_dup_index\\` has not been used\nINFO unused_index: Index \\`av_f30_unused_index_v\\` on table \\`public.av_f30_unused_index\\` has not been used\nWARN anon_security_definer_function_executable: Function `public.av_f08_definer_default()` can be executed by the `anon` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/av_f08_definer_default`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if that is not\nWARN anon_security_definer_function_executable: Function `public.av_f09_definer_revoked_public()` can be executed by the `anon` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/av_f09_definer_revoked_public`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` \nWARN auth_rls_initplan: Table \\`public.av_f19_initplan_uid\\` has a row level security policy \\`av_f19_p\\` that re-evaluates current_setting() or auth.<function>() for each row. This produces suboptimal query performance at scale. Resolve the is\nWARN auth_rls_initplan: Table \\`public.av_f20_initplan_setting\\` has a row level security policy \\`av_f20_p\\` that re-evaluates current_setting() or auth.<function>() for each row. This produces suboptimal query performance at scale. Resolve th\nWARN authenticated_security_definer_function_executable: Function `public.av_f08_definer_default()` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/av_f08_definer_default`. Revoke `EXECUTE` or switch it to `SECURITY INVOKER` if th\nWARN authenticated_security_definer_function_executable: Function `public.av_f09_definer_revoked_public()` can be executed by the `authenticated` role as a `SECURITY DEFINER` function via `/rest/v1/rpc/av_f09_definer_revoked_public`. Revoke `EXECUTE` or switch it to `SECURITY \nWARN duplicate_index: Table \\`public.av_f29_dup_index\\` has identical indexes {av_f29_dup_index_v1,av_f29_dup_index_v2}. Drop all except one of them\nWARN extension_in_public: Extension \\`pg_trgm\\` is installed in the public schema. Move it to another schema.\nWARN function_search_path_mutable: Function \\`public.av_f11_definer_no_path\\` has a role mutable search_path\nWARN function_search_path_mutable: Function \\`public.av_f12_invoker_no_path\\` has a role mutable search_path\nWARN materialized_view_in_api: Materialized view \\`public.av_f34_matview\\` is selectable by anon or authenticated roles\nWARN multiple_permissive_policies: Table \\`public.av_f31_multi_permissive\\` has multiple permissive policies for role \\`authenticated\\` for action \\`SELECT\\`. Policies include \\`{av_f31_own,av_f31_shared}\\`",
+      "durationMs": 109979
+    },
+    {
+      "id": "AV02-F01",
+      "title": "AV02-F01: table in public, RLS off, granted to anon",
+      "status": "info",
+      "detail": "both",
+      "measurements": {
+        "object": "av_f01_rls_off",
+        "audit_check_no": "1",
+        "observed": "both",
+        "predicted": "both",
+        "prediction_hit": "yes",
+        "audit": "CRITICAL RLS disabled",
+        "advisors": "ERROR rls_disabled_in_public",
+        "other_audit": "-",
+        "other_advisors": "-"
+      },
+      "evidence": "why predicted: the textbook case",
+      "durationMs": 109979
+    },
+    {
+      "id": "AV02-F02",
+      "title": "AV02-F02: table in public, RLS off, readable by anon only through a grant to PUBLIC",
+      "status": "info",
+      "detail": "advisors only",
+      "measurements": {
+        "object": "av_f02_rls_off_public_grant",
+        "audit_check_no": "1",
+        "observed": "advisors only",
+        "predicted": "advisors only",
+        "prediction_hit": "yes",
+        "audit": "-",
+        "advisors": "ERROR rls_disabled_in_public",
+        "other_audit": "-",
+        "other_advisors": "-"
+      },
+      "evidence": "why predicted: audit #1 reads information_schema.role_table_grants for grantee anon/authenticated; the lint uses has_table_privilege, which counts PUBLIC",
+      "durationMs": 109979
+    },
+    {
+      "id": "AV02-F03",
+      "title": "AV02-F03: table in a second exposed schema (av_api), RLS off",
+      "status": "info",
+      "detail": "advisors only",
+      "measurements": {
+        "object": "av_f03_rls_off_api",
+        "audit_check_no": "1",
+        "observed": "advisors only",
+        "predicted": "advisors only",
+        "prediction_hit": "yes",
+        "audit": "-",
+        "advisors": "ERROR rls_disabled_in_public",
+        "other_audit": "-",
+        "other_advisors": "-"
+      },
+      "evidence": "why predicted: audit #1 looks at schema public only; the lint reads pgrst.db_schemas",
+      "durationMs": 109979
+    },
+    {
+      "id": "AV02-F04",
+      "title": "AV02-F04: RLS on, zero policies",
+      "status": "info",
+      "detail": "both",
+      "measurements": {
+        "object": "av_f04_rls_no_policy",
+        "audit_check_no": "2",
+        "observed": "both",
+        "predicted": "both",
+        "prediction_hit": "yes",
+        "audit": "HIGH RLS on, zero policies",
+        "advisors": "INFO rls_enabled_no_policy",
+        "other_audit": "-",
+        "other_advisors": "-"
+      },
+      "evidence": "why predicted: same predicate on both sides",
+      "durationMs": 109979
+    },
+    {
+      "id": "AV02-F05",
+      "title": "AV02-F05: SELECT policy USING (true) for anon",
+      "status": "info",
+      "detail": "tool only",
+      "measurements": {
+        "object": "av_f05_anon_select_true",
+        "audit_check_no": "3",
+        "observed": "tool only",
+        "predicted": "tool only",
+        "prediction_hit": "yes",
+        "audit": "CRITICAL Policy open to anon",
+        "advisors": "-",
+        "other_audit": "-",
+        "other_advisors": "-"
+      },
+      "evidence": "why predicted: lint 0024 excludes SELECT on purpose (deliberate public read); audit #3 flags any command",
+      "durationMs": 109979
+    },
+    {
+      "id": "AV02-F06",
+      "title": "AV02-F06: UPDATE policy USING (true) WITH CHECK (true) for authenticated",
+      "status": "info",
+      "detail": "neither (predicted advisors only)",
+      "measurements": {
+        "object": "av_f06_auth_update_true",
+        "audit_check_no": "3",
+        "observed": "neither",
+        "predicted": "advisors only",
+        "prediction_hit": "no",
+        "audit": "-",
+        "advisors": "-",
+        "other_audit": "-",
+        "other_advisors": "-"
+      },
+      "evidence": "why predicted: audit #3 matches roles anon/public only; any signed-up user can rewrite every row",
+      "durationMs": 109979
+    },
+    {
+      "id": "AV02-F07",
+      "title": "AV02-F07: DELETE policy USING (true) for anon",
+      "status": "info",
+      "detail": "tool only (predicted both)",
+      "measurements": {
+        "object": "av_f07_anon_delete_true",
+        "audit_check_no": "3",
+        "observed": "tool only",
+        "predicted": "both",
+        "prediction_hit": "no",
+        "audit": "CRITICAL Policy open to anon",
+        "advisors": "-",
+        "other_audit": "-",
+        "other_advisors": "-"
+      },
+      "evidence": "why predicted: inside both predicates",
+      "durationMs": 109979
+    },
+    {
+      "id": "AV02-F08",
+      "title": "AV02-F08: SECURITY DEFINER function in public, default privileges, search_path pinned",
+      "status": "info",
+      "detail": "both",
+      "measurements": {
+        "object": "av_f08_definer_default",
+        "audit_check_no": "4",
+        "observed": "both",
+        "predicted": "both",
+        "prediction_hit": "yes",
+        "audit": "CRITICAL SECURITY DEFINER open to PUBLIC",
+        "advisors": "WARN anon_security_definer_function_executable; WARN authenticated_security_definer_function_executable",
+        "other_audit": "-",
+        "other_advisors": "-"
+      },
+      "evidence": "why predicted: PUBLIC holds EXECUTE by default, so anon can call it",
+      "durationMs": 109979
+    },
+    {
+      "id": "AV02-F09",
+      "title": "AV02-F09: SECURITY DEFINER in public after the audit's own fix (REVOKE EXECUTE ... FROM PUBLIC) and nothing else",
+      "status": "info",
+      "detail": "advisors only",
+      "measurements": {
+        "object": "av_f09_definer_revoked_public",
+        "audit_check_no": "4",
+        "observed": "advisors only",
+        "predicted": "advisors only",
+        "prediction_hit": "yes",
+        "audit": "-",
+        "advisors": "WARN anon_security_definer_function_executable; WARN authenticated_security_definer_function_executable",
+        "other_audit": "-",
+        "other_advisors": "-"
+      },
+      "evidence": "why predicted: if the schema's default privileges grant EXECUTE to anon by name, revoking PUBLIC leaves anon able to call it; audit #4 checks PUBLIC only",
+      "durationMs": 109979
+    },
+    {
+      "id": "AV02-F10",
+      "title": "AV02-F10: SECURITY DEFINER open to PUBLIC in a schema the API does not expose (av_private)",
+      "status": "info",
+      "detail": "tool only",
+      "measurements": {
+        "object": "av_f10_definer_private",
+        "audit_check_no": "4",
+        "observed": "tool only",
+        "predicted": "tool only",
+        "prediction_hit": "yes",
+        "audit": "CRITICAL SECURITY DEFINER open to PUBLIC",
+        "advisors": "-",
+        "other_audit": "-",
+        "other_advisors": "-"
+      },
+      "evidence": "why predicted: audit #4 has no exposed-schema filter; the lints only look at pgrst.db_schemas",
+      "durationMs": 109979
+    },
+    {
+      "id": "AV02-F11",
+      "title": "AV02-F11: SECURITY DEFINER without a pinned search_path (EXECUTE revoked from everyone)",
+      "status": "info",
+      "detail": "both",
+      "measurements": {
+        "object": "av_f11_definer_no_path",
+        "audit_check_no": "5",
+        "observed": "both",
+        "predicted": "both",
+        "prediction_hit": "yes",
+        "audit": "HIGH SECURITY DEFINER without search_path",
+        "advisors": "WARN function_search_path_mutable",
+        "other_audit": "-",
+        "other_advisors": "-"
+      },
+      "evidence": "why predicted: same proconfig test on both sides",
+      "durationMs": 109979
+    },
+    {
+      "id": "AV02-F12",
+      "title": "AV02-F12: SECURITY INVOKER function without a pinned search_path",
+      "status": "info",
+      "detail": "advisors only",
+      "measurements": {
+        "object": "av_f12_invoker_no_path",
+        "audit_check_no": "5",
+        "observed": "advisors only",
+        "predicted": "advisors only",
+        "prediction_hit": "yes",
+        "audit": "-",
+        "advisors": "WARN function_search_path_mutable",
+        "other_audit": "-",
+        "other_advisors": "-"
+      },
+      "evidence": "why predicted: audit #5 is definer-only; lint 0011 covers every function",
+      "durationMs": 109979
+    },
+    {
+      "id": "AV02-F13",
+      "title": "AV02-F13: view without security_invoker, granted to anon",
+      "status": "info",
+      "detail": "both",
+      "measurements": {
+        "object": "av_f13_view_owner",
+        "audit_check_no": "6",
+        "observed": "both",
+        "predicted": "both",
+        "prediction_hit": "yes",
+        "audit": "REVIEW View runs as owner",
+        "advisors": "ERROR security_definer_view",
+        "other_audit": "-",
+        "other_advisors": "-"
+      },
+      "evidence": "why predicted: same reloptions test",
+      "durationMs": 109979
+    },
+    {
+      "id": "AV02-F14",
+      "title": "AV02-F14: view over auth.users granted to anon",
+      "status": "info",
+      "detail": "advisors only",
+      "measurements": {
+        "object": "av_f14_auth_users_view",
+        "audit_check_no": "6",
+        "observed": "advisors only",
+        "predicted": "advisors only",
+        "prediction_hit": "yes",
+        "audit": "-",
+        "advisors": "ERROR auth_users_exposed",
+        "other_audit": "REVIEW View runs as owner",
+        "other_advisors": "ERROR security_definer_view"
+      },
+      "evidence": "why predicted: audit #6 flags it as a generic owner-rights view (REVIEW), with no check for auth.users",
+      "durationMs": 109979
+    },
+    {
+      "id": "AV02-F15",
+      "title": "AV02-F15: column named password on a table with RLS off",
+      "status": "info",
+      "detail": "tool only (predicted both)",
+      "measurements": {
+        "object": "av_f15_secret_exact",
+        "audit_check_no": "7",
+        "observed": "tool only",
+        "predicted": "both",
+        "prediction_hit": "no",
+        "audit": "HIGH Secret-shaped column exposed",
+        "advisors": "-",
+        "other_audit": "CRITICAL RLS disabled",
+        "other_advisors": "ERROR rls_disabled_in_public"
+      },
+      "evidence": "why predicted: exact name on both lists",
+      "durationMs": 109979
+    },
+    {
+      "id": "AV02-F16",
+      "title": "AV02-F16: column named stripe_api_key on a table with RLS off",
+      "status": "info",
+      "detail": "tool only",
+      "measurements": {
+        "object": "av_f16_secret_substring",
+        "audit_check_no": "7",
+        "observed": "tool only",
+        "predicted": "tool only",
+        "prediction_hit": "yes",
+        "audit": "HIGH Secret-shaped column exposed",
+        "advisors": "-",
+        "other_audit": "CRITICAL RLS disabled",
+        "other_advisors": "ERROR rls_disabled_in_public"
+      },
+      "evidence": "why predicted: audit #7 is a substring regex; lint 0023 compares the whole column name",
+      "durationMs": 109979
+    },
+    {
+      "id": "AV02-F17",
+      "title": "AV02-F17: column named api_key on a table with RLS on and an owner policy",
+      "status": "info",
+      "detail": "tool only",
+      "measurements": {
+        "object": "av_f17_secret_rls_on",
+        "audit_check_no": "7",
+        "observed": "tool only",
+        "predicted": "tool only",
+        "prediction_hit": "yes",
+        "audit": "HIGH Secret-shaped column exposed",
+        "advisors": "-",
+        "other_audit": "-",
+        "other_advisors": "-"
+      },
+      "evidence": "why predicted: lint 0023 only looks at tables with RLS off",
+      "durationMs": 109979
+    },
+    {
+      "id": "AV02-F18",
+      "title": "AV02-F18: column named ssn on a table with RLS off",
+      "status": "info",
+      "detail": "neither (predicted advisors only)",
+      "measurements": {
+        "object": "av_f18_pii_ssn",
+        "audit_check_no": "7",
+        "observed": "neither",
+        "predicted": "advisors only",
+        "prediction_hit": "no",
+        "audit": "-",
+        "advisors": "-",
+        "other_audit": "CRITICAL RLS disabled",
+        "other_advisors": "ERROR rls_disabled_in_public"
+      },
+      "evidence": "why predicted: audit #7 matches credentials only; lint 0023 also lists PII and financial names",
+      "durationMs": 109979
+    },
+    {
+      "id": "AV02-F19",
+      "title": "AV02-F19: policy calls auth.uid() unwrapped",
+      "status": "info",
+      "detail": "both",
+      "measurements": {
+        "object": "av_f19_initplan_uid",
+        "audit_check_no": "8",
+        "observed": "both",
+        "predicted": "both",
+        "prediction_hit": "yes",
+        "audit": "PERFORMANCE auth.uid() re-evaluated per row",
+        "advisors": "WARN auth_rls_initplan",
+        "other_audit": "-",
+        "other_advisors": "-"
+      },
+      "evidence": "why predicted: textbook case",
+      "durationMs": 109979
+    },
+    {
+      "id": "AV02-F20",
+      "title": "AV02-F20: policy calls current_setting() unwrapped",
+      "status": "info",
+      "detail": "advisors only",
+      "measurements": {
+        "object": "av_f20_initplan_setting",
+        "audit_check_no": "8",
+        "observed": "advisors only",
+        "predicted": "advisors only",
+        "prediction_hit": "yes",
+        "audit": "-",
+        "advisors": "WARN auth_rls_initplan",
+        "other_audit": "-",
+        "other_advisors": "-"
+      },
+      "evidence": "why predicted: audit #8 matches auth.uid/jwt/role; lint 0003 also matches auth.email() and current_setting()",
+      "durationMs": 109979
+    },
+    {
+      "id": "AV02-F21",
+      "title": "AV02-F21: policy with one wrapped and one unwrapped auth.uid()",
+      "status": "info",
+      "detail": "neither",
+      "measurements": {
+        "object": "av_f21_initplan_mixed",
+        "audit_check_no": "8",
+        "observed": "neither",
+        "predicted": "neither",
+        "prediction_hit": "yes",
+        "audit": "-",
+        "advisors": "-",
+        "other_audit": "-",
+        "other_advisors": "-"
+      },
+      "evidence": "why predicted: both sides skip a policy whose text contains any 'select auth.uid()'",
+      "durationMs": 109979
+    },
+    {
+      "id": "AV02-F22",
+      "title": "AV02-F22: control: policy with auth.uid() wrapped",
+      "status": "info",
+      "detail": "neither",
+      "measurements": {
+        "object": "av_f22_initplan_wrapped",
+        "audit_check_no": "8",
+        "observed": "neither",
+        "predicted": "neither",
+        "prediction_hit": "yes",
+        "audit": "-",
+        "advisors": "-",
+        "other_audit": "-",
+        "other_advisors": "-"
+      },
+      "evidence": "why predicted: negative control, nothing to find",
+      "durationMs": 109979
+    },
+    {
+      "id": "AV02-F23",
+      "title": "AV02-F23: policy that queries its own table (recursion)",
+      "status": "info",
+      "detail": "tool only",
+      "measurements": {
+        "object": "av_f23_members",
+        "audit_check_no": "9",
+        "observed": "tool only",
+        "predicted": "tool only",
+        "prediction_hit": "yes",
+        "audit": "HIGH Possible policy recursion",
+        "advisors": "-",
+        "other_audit": "-",
+        "other_advisors": "-"
+      },
+      "evidence": "why predicted: no splinter lint for policy recursion",
+      "durationMs": 109979
+    },
+    {
+      "id": "AV02-F24",
+      "title": "AV02-F24: single-column foreign key with no index",
+      "status": "info",
+      "detail": "both",
+      "measurements": {
+        "object": "av_f24_child",
+        "audit_check_no": "10",
+        "observed": "both",
+        "predicted": "both",
+        "prediction_hit": "yes",
+        "audit": "PERFORMANCE Foreign key without index",
+        "advisors": "INFO unindexed_foreign_keys",
+        "other_audit": "HIGH RLS on, zero policies",
+        "other_advisors": "INFO rls_enabled_no_policy"
+      },
+      "evidence": "why predicted: textbook case",
+      "durationMs": 109979
+    },
+    {
+      "id": "AV02-F25",
+      "title": "AV02-F25: two-column foreign key (a, b) with an index on (a) only",
+      "status": "info",
+      "detail": "advisors only",
+      "measurements": {
+        "object": "av_f25_child",
+        "audit_check_no": "10",
+        "observed": "advisors only",
+        "predicted": "advisors only",
+        "prediction_hit": "yes",
+        "audit": "-",
+        "advisors": "INFO unindexed_foreign_keys",
+        "other_audit": "HIGH RLS on, zero policies",
+        "other_advisors": "INFO rls_enabled_no_policy; INFO unused_index"
+      },
+      "evidence": "why predicted: audit #10 compares the leading column only; lint 0001 wants an index whose leading columns are the whole key",
+      "durationMs": 109979
+    },
+    {
+      "id": "AV02-F26",
+      "title": "AV02-F26: extension installed in public",
+      "status": "info",
+      "detail": "both",
+      "measurements": {
+        "object": "pg_trgm",
+        "audit_check_no": "11",
+        "observed": "both",
+        "predicted": "both",
+        "prediction_hit": "yes",
+        "audit": "REVIEW Extension installed in public",
+        "advisors": "WARN extension_in_public",
+        "other_audit": "-",
+        "other_advisors": "-"
+      },
+      "evidence": "why predicted: same predicate",
+      "durationMs": 109979
+    },
+    {
+      "id": "AV02-F27",
+      "title": "AV02-F27: INSERT policy with no SELECT policy",
+      "status": "info",
+      "detail": "tool only",
+      "measurements": {
+        "object": "av_f27_insert_only",
+        "audit_check_no": "12",
+        "observed": "tool only",
+        "predicted": "tool only",
+        "prediction_hit": "yes",
+        "audit": "HIGH INSERT policy with no SELECT policy",
+        "advisors": "-",
+        "other_audit": "CRITICAL Policy open to anon",
+        "other_advisors": "-"
+      },
+      "evidence": "why predicted: no splinter lint for it",
+      "durationMs": 109979
+    },
+    {
+      "id": "AV02-F28",
+      "title": "AV02-F28: table without a primary key",
+      "status": "info",
+      "detail": "advisors only",
+      "measurements": {
+        "object": "av_f28_no_pk",
+        "audit_check_no": "-",
+        "observed": "advisors only",
+        "predicted": "advisors only",
+        "prediction_hit": "yes",
+        "audit": "-",
+        "advisors": "INFO no_primary_key",
+        "other_audit": "HIGH RLS on, zero policies",
+        "other_advisors": "INFO rls_enabled_no_policy"
+      },
+      "evidence": "why predicted: no audit check",
+      "durationMs": 109979
+    },
+    {
+      "id": "AV02-F29",
+      "title": "AV02-F29: duplicate index",
+      "status": "info",
+      "detail": "advisors only",
+      "measurements": {
+        "object": "av_f29_dup_index",
+        "audit_check_no": "-",
+        "observed": "advisors only",
+        "predicted": "advisors only",
+        "prediction_hit": "yes",
+        "audit": "-",
+        "advisors": "WARN duplicate_index",
+        "other_audit": "HIGH RLS on, zero policies",
+        "other_advisors": "INFO rls_enabled_no_policy; INFO unused_index"
+      },
+      "evidence": "why predicted: no audit check",
+      "durationMs": 109979
+    },
+    {
+      "id": "AV02-F30",
+      "title": "AV02-F30: unused index",
+      "status": "info",
+      "detail": "advisors only",
+      "measurements": {
+        "object": "av_f30_unused_index",
+        "audit_check_no": "-",
+        "observed": "advisors only",
+        "predicted": "advisors only",
+        "prediction_hit": "yes",
+        "audit": "-",
+        "advisors": "INFO unused_index",
+        "other_audit": "HIGH RLS on, zero policies",
+        "other_advisors": "INFO rls_enabled_no_policy"
+      },
+      "evidence": "why predicted: no audit check (and a fresh index is unused by definition)",
+      "durationMs": 109979
+    },
+    {
+      "id": "AV02-F31",
+      "title": "AV02-F31: two permissive SELECT policies for the same role",
+      "status": "info",
+      "detail": "advisors only",
+      "measurements": {
+        "object": "av_f31_multi_permissive",
+        "audit_check_no": "-",
+        "observed": "advisors only",
+        "predicted": "advisors only",
+        "prediction_hit": "yes",
+        "audit": "-",
+        "advisors": "WARN multiple_permissive_policies",
+        "other_audit": "-",
+        "other_advisors": "-"
+      },
+      "evidence": "why predicted: no audit check",
+      "durationMs": 109979
+    },
+    {
+      "id": "AV02-F32",
+      "title": "AV02-F32: policy exists but RLS is disabled",
+      "status": "info",
+      "detail": "advisors only",
+      "measurements": {
+        "object": "av_f32_policy_rls_off",
+        "audit_check_no": "-",
+        "observed": "advisors only",
+        "predicted": "advisors only",
+        "prediction_hit": "yes",
+        "audit": "-",
+        "advisors": "ERROR policy_exists_rls_disabled",
+        "other_audit": "CRITICAL RLS disabled",
+        "other_advisors": "ERROR rls_disabled_in_public"
+      },
+      "evidence": "why predicted: audit #1 flags the table as RLS disabled (incidental) but says nothing about the dormant policy",
+      "durationMs": 109979
+    },
+    {
+      "id": "AV02-F33",
+      "title": "AV02-F33: policy trusts user_metadata from the JWT",
+      "status": "info",
+      "detail": "advisors only",
+      "measurements": {
+        "object": "av_f33_user_metadata",
+        "audit_check_no": "-",
+        "observed": "advisors only",
+        "predicted": "advisors only",
+        "prediction_hit": "yes",
+        "audit": "-",
+        "advisors": "ERROR rls_references_user_metadata",
+        "other_audit": "-",
+        "other_advisors": "-"
+      },
+      "evidence": "why predicted: no audit check; user_metadata is editable by the user",
+      "durationMs": 109979
+    },
+    {
+      "id": "AV02-F34",
+      "title": "AV02-F34: materialized view in public granted to anon",
+      "status": "info",
+      "detail": "advisors only",
+      "measurements": {
+        "object": "av_f34_matview",
+        "audit_check_no": "-",
+        "observed": "advisors only",
+        "predicted": "advisors only",
+        "prediction_hit": "yes",
+        "audit": "-",
+        "advisors": "WARN materialized_view_in_api",
+        "other_audit": "-",
+        "other_advisors": "-"
+      },
+      "evidence": "why predicted: audit only looks at relkind r and v; RLS does not apply to materialized views",
+      "durationMs": 109979
+    },
+    {
+      "id": "AV02-F35",
+      "title": "AV02-F35: table with autovacuum disabled",
+      "status": "info",
+      "detail": "neither (predicted advisors only)",
+      "measurements": {
+        "object": "av_f35_no_autovacuum",
+        "audit_check_no": "-",
+        "observed": "neither",
+        "predicted": "advisors only",
+        "prediction_hit": "no",
+        "audit": "-",
+        "advisors": "-",
+        "other_audit": "HIGH RLS on, zero policies",
+        "other_advisors": "INFO rls_enabled_no_policy"
+      },
+      "evidence": "why predicted: no audit check",
+      "durationMs": 109979
+    },
+    {
+      "id": "AV02-F36",
+      "title": "AV02-F36: public Storage bucket with a listing policy for anon",
+      "status": "info",
+      "detail": "neither (predicted advisors only)",
+      "measurements": {
+        "object": "av_f36_bucket",
+        "audit_check_no": "-",
+        "observed": "neither",
+        "predicted": "advisors only",
+        "prediction_hit": "no",
+        "audit": "-",
+        "advisors": "-",
+        "other_audit": "-",
+        "other_advisors": "-"
+      },
+      "evidence": "why predicted: audit reads schema public only; Storage policies live on storage.objects",
+      "durationMs": 109980
+    },
+    {
+      "id": "AV02",
+      "title": "AV02: totals per observed cell",
+      "status": "info",
+      "detail": "both 8, tool only 8, advisors only 14, neither 6; predictions hit 30/36",
+      "measurements": {
+        "fixtures": 36,
+        "both": 8,
+        "tool_only": 8,
+        "advisors_only": 14,
+        "neither": 6,
+        "prediction_hits": 30
+      },
+      "durationMs": 109980
+    },
+    {
+      "id": "AV03a",
+      "title": "AV03a: F02 anon GET, RLS off, granted to PUBLIC only",
+      "status": "info",
+      "detail": "200 [{\"id\":1,\"note\":\"seeded\"}]",
+      "measurements": {
+        "status": 200,
+        "body": "[{\"id\":1,\"note\":\"seeded\"}]",
+        "warmup_s": 1
+      },
+      "durationMs": 979
+    },
+    {
+      "id": "AV03b-F08",
+      "title": "AV03b: F08 anon RPC, definer with default privileges (control)",
+      "status": "info",
+      "detail": "200 1",
+      "measurements": {
+        "status": 200,
+        "body": "1"
+      },
+      "durationMs": 979
+    },
+    {
+      "id": "AV03b-F09",
+      "title": "AV03b: F09 anon RPC after REVOKE EXECUTE ... FROM PUBLIC",
+      "status": "info",
+      "detail": "200 9",
+      "measurements": {
+        "status": 200,
+        "body": "9"
+      },
+      "durationMs": 979
+    },
+    {
+      "id": "AV03c",
+      "title": "AV03c: F10 anon RPC into the unexposed schema av_private",
+      "status": "info",
+      "detail": "406 {\"code\":\"PGRST106\",\"details\":null,\"hint\":\"Only the following schemas are exposed: public, graphql_public, av_api\",\"message\":\"Invalid schema: av_private\"}",
+      "measurements": {
+        "status": 406,
+        "body": "{\"code\":\"PGRST106\",\"details\":null,\"hint\":\"Only the following schemas are exposed: public, graphql_public, av_api\",\"message\":\"Invalid schema: av_private\"}"
+      },
+      "durationMs": 979
+    },
+    {
+      "id": "AV03d-rep",
+      "title": "AV03d: F27 anon INSERT, Prefer return=representation",
+      "status": "info",
+      "detail": "401 {\"code\":\"42501\",\"details\":null,\"hint\":null,\"message\":\"new row violates row-level security policy for table \\\"av_f27_insert_only\\\"\"}",
+      "measurements": {
+        "status": 401,
+        "body": "{\"code\":\"42501\",\"details\":null,\"hint\":null,\"message\":\"new row violates row-level security policy for table \\\"av_f27_insert_only\\\"\"}"
+      },
+      "durationMs": 979
+    },
+    {
+      "id": "AV03d-min",
+      "title": "AV03d: F27 anon INSERT, Prefer return=minimal",
+      "status": "info",
+      "detail": "201 ",
+      "measurements": {
+        "status": 201,
+        "body": ""
+      },
+      "durationMs": 979
+    },
+    {
+      "id": "AV03e",
+      "title": "AV03e: F03 anon GET in the second exposed schema av_api",
+      "status": "info",
+      "detail": "200 [{\"id\":1,\"note\":\"seeded\"}]",
+      "measurements": {
+        "status": 200,
+        "body": "[{\"id\":1,\"note\":\"seeded\"}]"
+      },
+      "durationMs": 979
+    },
+    {
+      "id": "AV99",
+      "title": "AV99: project deleted and gone from the listing",
+      "status": "pass",
+      "detail": "DELETE 200; absent from GET /projects after 20s",
+      "measurements": {
+        "delete_status": 200,
+        "gone_from_listing_s": 20
+      },
+      "durationMs": 21550
+    }
+  ]
+}
