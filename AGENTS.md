@@ -3153,6 +3153,25 @@ when present, so a new module is invisible until it is regenerated).
   134 answers carried a served count above 1; the instance id is not relied on.
 - **Superseded:** the first ER02 run reported a 3-6 s mixed-version window; it
   was a time-origin defect in the module, withdrawn (RUNLOG).
+- **ER03, Bun server and named keys (2026-10-23, 2 projects, 2 passes each,
+  `out/2026-10-23/`).** `server/bun.ts` on `Bun.serve` (Bun 1.3.14, loopback)
+  in three env configurations (singular variables, plural JSON variables with
+  named keys, `env` override with inline JWKS): 0 docs-stated cells of the
+  14 x 5 matrix differed from the docs, and each differs from the Edge Function
+  cells of the same run in the same 5 `unknown_secret` cells as the Workers
+  runtime (the gateway's `401 Invalid API key`). Named keys (`web_app`,
+  `automations`) x 10 `auth` options (bare, `:<name>`, `:*`, an unconfigured
+  name, two arrays) on the Edge Function and the two Bun configurations given
+  named keys: 0 of 77 docs-stated cells differed. Not in the docs: an
+  unconfigured name gives `500 NO_KEYS_CONFIGURED` only when an `apikey` is
+  sent, and in `['publishable:nokey','secret']` it also wins over the
+  `INVALID_API_KEY` a non-matching secret key would get. Singular
+  `SUPABASE_SECRET_KEY` holds only `default`, so `secret:<name>` answers 500
+  there. The Management API refuses the docs' example name `web` (HTTP 400,
+  names need 4 or more characters). An Edge Function deployed before a key was
+  created saw the new names by 16 s in one run (the poll at 3 s showed
+  neither); in the other the publishable name appeared by 15 s and the secret
+  name not within 180 s, until a redeploy (by 5 s, first poll); not settled. Vercel not run (no credential).
 
 ## experiments/lifecycle-ops - key facts (validated 2026-10-10, Pro org)
 
