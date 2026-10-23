@@ -1,0 +1,12 @@
+{
+  // S23 external receiver: a workers.dev echo that proves receipt by returning
+  // the nonce it read from the request body. Deployed for one run and deleted
+  // after (`make echo-worker-up` / `make echo-worker-down`). No bindings, no
+  // storage: the proof of receipt is the response body pg_net stores in
+  // net._http_response.content, plus `wrangler tail` if wanted.
+  "name": "pvlab-s23-echo",
+  "main": "index.ts",
+  "compatibility_date": "2025-06-01",
+  "workers_dev": true,
+  "upload_source_maps": false
+}

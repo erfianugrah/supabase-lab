@@ -1,0 +1,113 @@
+{
+  "startedAt": "2026-10-23T08:17:05.467Z",
+  "finishedAt": "2026-10-23T08:21:07.049Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "security-lockdown",
+  "labCommit": "661afdf",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "S23a",
+      "title": "setup: fresh Micro, pg_cron + pg_net + webhooks enabled, receivers answering",
+      "status": "pass",
+      "detail": "PostgreSQL 17.11; pg_cron 1.6.4, pg_net 0.20.4; cron.use_background_workers=off, cron.host=localhost; webhooks/enable HTTP 201; EF deploy HTTP 201; DB clock offset 37 ms vs orchestrator",
+      "measurements": {
+        "create_s": 5,
+        "webhooks_enable_status": 201,
+        "db_clock_offset_ms": 37
+      },
+      "durationMs": 241581
+    },
+    {
+      "id": "S23b",
+      "title": "control: restrict-all applied and the pooler refuses this machine",
+      "status": "pass",
+      "detail": "baseline pooler connect ok; apply HTTP 201; refused after 0 s ((EADDRNOTALLOWED) address not in tenant allow_list: {<addr>}); GET network-restrictions status=applied config={\"dbAllowedCidrs\":[\"192.0.2.0/24\"],\"dbAllowedCidrsV6\":[\"2001:db8::/32\"]}; enforced window held 120 s; restore HTTP 201; pooler accepted again after 0 s",
+      "measurements": {
+        "apply_status": 201,
+        "refused_after_s": 0,
+        "enforced_window_s": 120,
+        "reopened_after_s": 0
+      },
+      "evidence": "(EADDRNOTALLOWED) address not in tenant allow_list: {<addr>}",
+      "durationMs": 241581
+    },
+    {
+      "id": "S23g",
+      "title": "Management API query endpoint under restrict-all",
+      "status": "info",
+      "detail": "POST /database/query answered 201 while the pooler refused this machine (s23_tick count 23)",
+      "measurements": {
+        "mgmt_query_status_enforced": 201
+      },
+      "durationMs": 241581
+    },
+    {
+      "id": "S23c",
+      "title": "pg_cron keeps running under restrict-all",
+      "status": "pass",
+      "detail": "s23-tick (every 2 s) rows: pre 22 in 45 s, enforced 60 in 120 s, post 22 in 45 s; longest gap between consecutive rows over the whole run 2.1 s. cron.job_run_details: ",
+      "measurements": {
+        "ticks_pre": 22,
+        "ticks_enforced": 60,
+        "ticks_post": 22,
+        "max_tick_gap_s": 2.1,
+        "cron_runs_not_succeeded": 0
+      },
+      "evidence": "{\"ticks\":[{\"phase\":\"pre\",\"n\":22,\"span_s\":42},{\"phase\":\"enforced\",\"n\":60,\"span_s\":119},{\"phase\":\"restore_to_open\",\"n\":1,\"span_s\":0},{\"phase\":\"post\",\"n\":22,\"span_s\":42}],\"runs\":[]}",
+      "durationMs": 241581
+    },
+    {
+      "id": "S23d",
+      "title": "database webhooks (supabase_functions.http_request) deliver under restrict-all",
+      "status": "pass",
+      "detail": "to own Edge Function: pre 5/5 200, echoed 5, statuses [200]; enforced 13/13 200, echoed 13, statuses [200]; post 6/6 200, echoed 6, statuses [200]. To external CF Worker: pre 5/5 200, echoed 5, statuses [200]; enforced 13/13 200, echoed 13, statuses [200]; post 6/6 200, echoed 6, statuses [200]. Data API inserts (app path): rest-pre webhook responses echoing its nonce 2 of 2 [200,200], rest-enforced webhook responses echoing its nonce 2 of 2 [200,200], rest-post webhook responses echoing its nonce 2 of 2 [200,200] (REST insert HTTP pre 201, enforced 201, post 201).",
+      "measurements": {
+        "hook_ef_enforced_n": 13,
+        "hook_ef_enforced_200": 13,
+        "hook_ef_enforced_echoed": 13,
+        "hook_worker_enforced_n": 13,
+        "hook_worker_enforced_200": 13,
+        "hook_worker_enforced_echoed": 13,
+        "rest_insert_enforced_status": 201
+      },
+      "evidence": "{\"hooks\":[{\"path\":\"s23_hook_ef\",\"phase\":\"pre\",\"n\":5,\"s200\":5,\"no_response\":0,\"timed_out\":0,\"echoed\":5,\"statuses\":\"200\",\"err\":null},{\"path\":\"s23_hook_ef\",\"phase\":\"enforced\",\"n\":13,\"s200\":13,\"no_response\":0,\"timed_out\":0,\"echoed\":13,\"statuses\":\"200\",\"err\":null},{\"path\":\"s23_hook_ef\",\"phase\":\"post\",\"n\":6,\"s200\":6,\"no_response\":0,\"timed_out\":0,\"echoed\":6,\"statuses\":\"200\",\"err\":null},{\"path\":\"s23_hook_worker\",\"phase\":\"pre\",\"n\":5,\"s200\":5,\"no_response\":0,\"timed_out\":0,\"echoed\":5,\"statuses\":\"200\",\"err\":null},{\"path\":\"s23_hook_worker\",\"phase\":\"enforced\",\"n\":13,\"s200\":13,\"no_response\":0,\"timed_out\":0,\"echoed\":13,\"statuses\":\"200\",\"err\":null},{\"path\":\"s23_hook_worker\",\"phase\":\"post\",\"n\":6,\"s200\":6,\"no_response\":0,\"timed_out\":0,\"echoed\":6,\"statuses\":\"200\",\"err\":null}],\"restRows\":[{\"note\":\"rest-pre-1792743458947\",\"echoed\":2,\"statuses\":\"200,200\"},{\"note\":\"rest-enforced-1792743543059\",\"echoed\":2,\"statuses\":\"200,200\"},{\"note\":\"rest-post-1792743626727\",\"echoed\":2,\"statuses\":\"200,200\"}],\"sample\":[{\"hook_name\":\"s23_hook_ef\",\"status_code\":200,\"content\":\"{\\\"received\\\":true,\\\"receiver\\\":\\\"edge-function\\\",\\\"nonce\\\":\\\"cron-081806.665\\\",\\\"method\\\":\\\"POST\\\",\\\"ua\\\":\\\"pg_net/0.20.4\\\",\\\"webhook_type\\\":\\\"INSERT\\\",\\\"at\\\":\\\"2026-10-23T08:18:06.767Z\\\",\\\"stored\\\":201}\"},{\"hook_name\":\"s23_hook_worker\",\"status_code\":200,\"content\":\"{\\\"received\\\":true,\\\"receiver\\\":\\\"cf-worker\\\",\\\"nonce\\\":\\\"cron-081806.665\\\",\\\"method\\\":\\\"POST\\\",\\\"ua\\\":\\\"pg_net/0.20.4\\\",\\\"webhook_type\\\":\\\"INSERT\\\",\\\"bytes\\\":171,\\\"at\\\":\\\"2026-10-23T08:18:06.752Z\\\"}\"}]}",
+      "durationMs": 241581
+    },
+    {
+      "id": "S23e",
+      "title": "pg_net direct calls leave the database under restrict-all",
+      "status": "pass",
+      "detail": "net.http_post to own Edge Function: pre 4/4 200, echoed 4, statuses [200]; enforced 12/12 200, echoed 12, statuses [200]; post 5/5 200, echoed 5, statuses [200]. To external CF Worker: pre 4/4 200, echoed 4, statuses [200]; enforced 12/12 200, echoed 12, statuses [200]; post 5/5 200, echoed 5, statuses [200]. Edge Function receipt rows written via /rest/v1 during enforced: 25 (user-agent pg_net/0.20.4).",
+      "measurements": {
+        "direct_ef_enforced_n": 12,
+        "direct_ef_enforced_200": 12,
+        "direct_ef_enforced_echoed": 12,
+        "direct_worker_enforced_n": 12,
+        "direct_worker_enforced_200": 12,
+        "direct_worker_enforced_echoed": 12,
+        "ef_receipts_enforced": 25
+      },
+      "evidence": "{\"direct\":[{\"path\":\"direct-ef\",\"phase\":\"pre\",\"n\":4,\"s200\":4,\"no_response\":0,\"timed_out\":0,\"echoed\":4,\"statuses\":\"200\",\"err\":null},{\"path\":\"direct-ef\",\"phase\":\"enforced\",\"n\":12,\"s200\":12,\"no_response\":0,\"timed_out\":0,\"echoed\":12,\"statuses\":\"200\",\"err\":null},{\"path\":\"direct-ef\",\"phase\":\"post\",\"n\":5,\"s200\":5,\"no_response\":0,\"timed_out\":0,\"echoed\":5,\"statuses\":\"200\",\"err\":null},{\"path\":\"direct-worker\",\"phase\":\"pre\",\"n\":4,\"s200\":4,\"no_response\":0,\"timed_out\":0,\"echoed\":4,\"statuses\":\"200\",\"err\":null},{\"path\":\"direct-worker\",\"phase\":\"enforced\",\"n\":12,\"s200\":12,\"no_response\":0,\"timed_out\":0,\"echoed\":12,\"statuses\":\"200\",\"err\":null},{\"path\":\"direct-worker\",\"phase\":\"post\",\"n\":5,\"s200\":5,\"no_response\":0,\"timed_out\":0,\"echoed\":5,\"statuses\":\"200\",\"err\":null}],\"receipts\":[{\"phase\":\"pre\",\"n\":9,\"ua\":\"pg_net/0.20.4\"},{\"phase\":\"enforced\",\"n\":25,\"ua\":\"pg_net/0.20.4\"},{\"phase\":\"post\",\"n\":11,\"ua\":\"pg_net/0.20.4\"}]}",
+      "durationMs": 241581
+    },
+    {
+      "id": "S23z",
+      "title": "teardown: project deleted and gone from the listing",
+      "status": "pass",
+      "detail": "DELETE 200; absent from GET /projects after 0 s",
+      "measurements": {
+        "delete_status": 200,
+        "gone_from_listing_s": 0
+      },
+      "durationMs": 241581
+    }
+  ]
+}

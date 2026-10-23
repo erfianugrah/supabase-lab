@@ -11,7 +11,7 @@ RL_PORT ?= 8080
 RLW_PORT ?= 8788
 EDGE_PORT ?= 8081
 
-.PHONY: init fmt validate apply probe publish-evidence destroy postgrest-up postgrest-down ratelimit-up ratelimit-down ratelimit-worker-up ratelimit-worker-down edge-up edge-down
+.PHONY: init fmt validate apply probe probe-s23 echo-worker-up echo-worker-down publish-evidence destroy postgrest-up postgrest-down ratelimit-up ratelimit-down ratelimit-worker-up ratelimit-worker-down edge-up edge-down
 
 init:
 	tofu init
@@ -106,6 +106,29 @@ probe:
 		$(HARNESS_RUN) --where local --experiment security-lockdown \
 		--only "$(IDS)" --destructive --out evidence/$(TS)
 	@echo "== evidence/$(TS)/run-<stamp>.md =="
+
+# S23: pg_cron, database webhooks and pg_net under restrict-all. Self-provisions
+# its own Pro-org Micro (POST /v1/projects) and deletes it in the same run, so
+# it needs no tofu state:
+#   SUPABASE_ACCESS_TOKEN  Management API token (env only)
+#   PVLAB_ORG_PRO          Pro org slug (env only)
+#   ECHO_WORKER            URL printed by `make echo-worker-up`
+# The Worker is the external receiver; deploy it first, delete it after.
+probe-s23:
+	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "export SUPABASE_ACCESS_TOKEN"; exit 1)
+	@test -n "$$PVLAB_ORG_PRO" || (echo "export PVLAB_ORG_PRO"; exit 1)
+	@test -n "$(ECHO_WORKER)" || (echo "ECHO_WORKER=<workers.dev url> required (make echo-worker-up)"; exit 1)
+	@$(HARNESS_BUILD)
+	@mkdir -p evidence/$(TS)
+	PVLAB_ENDPOINT_ECHO_WORKER="$(ECHO_WORKER)" $(HARNESS_RUN) --where local --experiment security-lockdown \
+		--only S23 --destructive --out evidence/$(TS)
+
+# Needs CLOUDFLARE_API_TOKEN (Workers edit) and CLOUDFLARE_ACCOUNT_ID in the env.
+echo-worker-up:
+	cd echo-worker && wrangler deploy
+
+echo-worker-down:
+	cd echo-worker && wrangler delete --force
 
 # Redact a run artifact and publish it (plus facts.md) to the committed out/<date>/.
 publish-evidence:
