@@ -12,7 +12,20 @@
 ROOT := $(abspath ../..)
 TS := $(shell date +%Y%m%d-%H%M%S)
 
-.PHONY: run facts publish list
+.PHONY: run run-rr02 facts publish list
+
+# RR02: re-routing on a lagging or unhealthy replica, non-REST traffic through
+# the load balancer. Same billing shape as RR01; 24 and 33 minutes in the
+# 2026-10-23 runs. Knobs:
+#   PVLAB_RR_PHASES=services,burst,stall,restart,remove,logs
+#   PVLAB_RR_STANDBY_DELAY (600s) / PVLAB_RR_STALL_S (180) / PVLAB_RR_BURST_ROWS (1500000; filled a Small disk on 2026-10-23, RR02g)
+#   PVLAB_RR_REMOVE_WATCH_S (360)  how long RR02j reads after the remove call
+#   PVLAB_RR_REFS_FILE=<path outside git>  appends the created ref
+run-rr02:
+	@test -n "$(PVLAB_ORG_PRO)" || (echo "PVLAB_ORG_PRO not set" && exit 1)
+	cd $(ROOT) && bun harness/src/run.ts --where local --tests experiments/replica-routing/tests \
+	  --experiment replica-routing --only RR02 --destructive \
+	  --out experiments/replica-routing/evidence/$(TS)
 
 run:
 	@test -n "$(PVLAB_ORG_PRO)" || (echo "PVLAB_ORG_PRO not set" && exit 1)
@@ -22,7 +35,7 @@ run:
 
 # RUN=evidence/<ts>/run-<stamp>.json
 facts:
-	cd $(ROOT) && bun harness/src/run.ts --facts experiments/replica-routing/$(RUN) --only RR01
+	cd $(ROOT) && bun harness/src/run.ts --facts experiments/replica-routing/$(RUN) --only $(or $(ONLY),RR01)
 
 publish:
 	cd $(ROOT) && bun harness/scripts/publish-evidence.ts experiments/replica-routing/$(RUN) experiments/replica-routing

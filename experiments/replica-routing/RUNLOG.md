@@ -255,17 +255,234 @@ Used to find what the module needed; each is superseded by the final run.
   `Backend error! Retry your query.`; the same query with the raw user agent
   worked. The cause was not isolated to `split`.
 
+## 2026-10-23 - RR02, re-routing on a lagging or unhealthy replica, and non-REST traffic
+
+Shape: the RR01 shape again, two throwaway Pro-org projects, one per run, the
+same day. Each: primary in ap-northeast-1 (Tokyo) on Small compute, `pitr_7`,
+one Small read replica in ap-southeast-1 (Singapore), vantage one Singapore
+workstation, so the load balancer's choice for this vantage is the replica
+(RR01f). Small is the smallest size a replica accepts (`"minimum size of
+small"`, sfp-platforms S07). Run 1 ran every phase; run 2 repeated the
+stopped-replay, restart and remove phases, with a 20-minute watch after the
+remove instead of 6 minutes. Artifacts (module rows quoted from the facts
+files beside them):
+
+- run 1: `out/2026-10-23/run-2026-10-23T07-57-32-539Z.json`, 07:57 to 08:21
+  UTC (24 min), 17 rows, 4 pass, 13 info, 0 fail
+- run 2: `out/2026-10-23/run-2026-10-23T08-22-50-864Z.json`, from 08:22 UTC
+  (33 min), 10 rows, 4 pass, 6 info, 0 fail
+
+Replica setup (RR02c) answered 204 on the first attempt in both runs; the
+first session-pooler connection to the replica came 182 s (run 1) and 197 s
+(run 2) after the setup call. The load balancer host was `<ref>-all` again.
+
+### How a read is classified
+
+Every timed read is `GET /rest/v1/rpc/rr_node` with the anon key: a stable
+function that reads the newest row of `rr_marker` and returns
+`pg_is_in_recovery()` (which node ran it), the postmaster start time, and
+`stale_ms`, the node's `clock_timestamp()` minus that row's `written_at`.
+While a phase runs, a session-pooler connection to the primary inserts a
+heartbeat row every 250 ms, so a node that is keeping up reads a few hundred
+ms, and a node whose replay has stopped reads the length of the stop. The two
+clocks are on different hosts; skew is inside every `stale_ms`. When the
+primary itself is down no heartbeat is written, so `stale_ms` then grows on
+every node and measures time since the last write, not replica lag.
+
+Three sources are read in parallel, one request at a time each with a 5 s
+client timeout and 250 ms between requests: the load balancer host, the
+replica's own host and the primary's own host. The harness `rest_read` probe
+(`harness/src/real-probes.ts`: `pvlab_probe` row 1 with the anon key, up only
+on HTTP 200 with that row) runs on the load balancer host beside them; its
+failure counts match the `rr_node` reads on the same host in RR02g and RR02h
+(0 and 0), are within 5 failures in RR02i, and within 14 and 25 in RR02j
+(1.3 % and 0.6 % of `rest_read` samples). A "lagging" read is a replica read with
+`stale_ms` above 2,000 ms, a threshold chosen for this module (eight
+heartbeat periods), not measured. Per-5-second counts are in each row's
+evidence; spans read from those buckets carry 5 s of resolution and are
+marked "about".
+
+Baseline (RR02e, 30 rounds): the load balancer served 30 of 30 reads from the
+replica in both runs; largest `stale_ms` through the load balancer 353 (run
+1) and 379 (run 2).
+
+### Lagging replica: the load balancer keeps sending reads to it
+
+- RR02g (run 1), write burst: a 1,500,000-row insert (about 530 bytes a row)
+  on the primary through a session-pooler connection. It started at 15.8 s
+  and failed at 35.5 s (19.7 s later) with `could not extend file
+  "base/5/17717": No space left on device`: the Small project's disk filled
+  before the insert finished, so the burst's WAL volume and duration were not
+  recorded. Up to then the replica did not fall behind measurably: the
+  largest `stale_ms` was 1,563 on the replica host and 1,426 on the primary
+  host in the +25 s to +35 s buckets (the heartbeat insert itself slowed on the
+  primary), and the sampled replay lag was 16,627,032 bytes at 16 s and 224
+  bytes at 21 s. Nothing crossed the 2,000 ms threshold, so this method did
+  not produce a lagging replica. Later phases on the same project ran
+  normally (RR02h heartbeat: 924 rows, 0 errors). Whether the disk grew
+  afterwards was not checked.
+- RR02h, stopped replay (the method that worked): on the replica, a
+  repeatable-read transaction counted `rr_conflict` and then ran
+  `select pg_sleep(180)` with `statement_timeout = 0`; 3 s later the primary
+  ran `update rr_conflict set v = v + 1` and `vacuum rr_conflict`. With
+  `hot_standby_feedback` off, replay on the replica stops until the replica
+  query ends or `max_standby_streaming_delay` cancels it (RR01m).
+
+  Before that, RR02d set `max_standby_streaming_delay` to `600s` with
+  `PUT /config/database/postgres` (HTTP 200 in both runs, config read back
+  `600s`) and read `pg_settings` on both nodes once the project was healthy
+  again. Run 1: replica `600000ms (configuration file)`. Run 2: replica
+  `30000ms (default)`, primary `600000ms (configuration file)`. The same call
+  had reached the replica in one of two runs at the time of the read; how
+  long it takes to arrive was not measured.
+
+  | run | replica query | replica host lagging (> 2,000 ms) | largest `stale_ms`, replica host | load balancer reads in that span | served by the replica, all lagging | served by the primary | errors |
+  |---|---|---|---|---|---|---|---|
+  | 1 | ran its 180 s, not cancelled | 174.6 s | 176,680 ms | 586 | 586 | 0 | 0 |
+  | 2 | cancelled at 50 s, 31.4 s after the conflict at 18.6 s, SQLSTATE 40001 | 28.8 s | 30,842 ms | 98 | 98 | 0 | 0 |
+
+  The largest `stale_ms` served through the load balancer was 176,772 ms
+  (run 1) and 30,842 ms (run 2). In both runs the load balancer sent every
+  read to the replica for the whole stop, and `rest_read` through it failed 0
+  times (1,010 and 1,039 samples): a stale replica answers 200 with old data,
+  and the load balancer did not move a read to the primary at any staleness
+  reached here. When the replica query ended, the next 5 s bucket was back
+  under 400 ms through the load balancer.
+
+### Unhealthy replica: project restart
+
+`POST /projects/{ref}/restart` (RR02i, HTTP 200 both runs) restarted both
+nodes: the postmaster start time changed on the primary and on the replica in
+both runs. The nodes went down one after the other, primary first:
+
+| run | primary host failing (first fail to recovery) | replica host failing | load balancer failing | load balancer reads served by the primary |
+|---|---|---|---|---|
+| 1 | 17.1 s to 78.1 s (27 failed reads) | 50.7 s to 114.9 s (21) | 50.8 s to 115 s (21) | 0 of 334 |
+| 2 | 17.6 s to 97.1 s (86) | 70.3 s to 133.2 s (31) | 70.4 s to 133.1 s (29) | 0 of 415 |
+
+Times are seconds after sampling started; the restart call went out at 15 s.
+"Recovery" is the sampler's: the first success followed by 30 s without a
+failure (`settleMs`), so a later blip moves it.
+
+- While the primary was down and the replica up (run 1 about 17 to 50 s, run
+  2 about 17 to 70 s), reads through the load balancer kept succeeding from
+  the replica; their `stale_ms` grew to 33,517 ms (run 1) and 52,578 ms (run
+  2) because no heartbeat could be written, not because the replica was
+  behind.
+- While the replica was down and the primary up (run 1 about 65 to 100 s,
+  run 2 about 85 to 120 s), the load balancer failed every read and sent none
+  to the primary. Most of those reads ended in the 5 s client timeout, so
+  there is about one sample per 5 s bucket in that span; the other failure
+  texts were `HTTP 521` (a Cloudflare HTML page), `HTTP 503 upstream connect
+  error or disconnect/reset before headers` and `HTTP 503 PGRST002`.
+- The load balancer recovered when the replica did, in the same 5 s bucket,
+  in both runs.
+
+### Unhealthy replica: replica removed
+
+`POST read-replicas/remove` (RR02j, HTTP 204 both runs) at 15 s; the
+`READ_REPLICA` entry was gone from the pooler config at 15.2 s in both runs.
+
+- The load balancer's last good read was at 15.8 s (run 1) and 15.9 s (run
+  2) and its first failure at 16.1 s and 16.2 s. It never served a read from
+  the primary afterwards: 0 of 1,034 reads from its first failure on (run 1,
+  watched to 360 s; 1,089 in all, the other 55 served by the replica before
+  that) and 0 of 4,103 (run 2, watched to 1,200 s; 4,158 in all, 55 before),
+  while the primary host answered every
+  read in the same windows (958 and 3,236 samples, 0 failures).
+- Failure texts in order: `HTTP 521` (Cloudflare page) and client timeouts
+  first, then `HTTP 400 Load balancer does not seem to be configured
+  properly.` Run 2 answered that 400 continuously from 70.7 s to its last
+  error at 1,199.8 s; run 1 alternated it with `HTTP 530` (Cloudflare page)
+  from 92.9 s to the end of its 360 s watch.
+- The load balancer's name kept resolving: run 2 checked it once a minute
+  from 75 s to 1,215 s and it resolved every time.
+- So for at least 1,185 s after the remove call (run 2: call at 15 s, watch
+  ended at 1,200 s), a client using the load balancer endpoint got errors
+  while the primary's own endpoint worked. Whether it ever starts serving the
+  primary was not watched past 1,200 s.
+
+### Auth, Storage, Realtime, GraphQL and Edge Functions through the load balancer (run 1)
+
+RR02f1 to f6 sent each request to the primary host, the replica host and the
+load balancer host. HTTP status, and for REST and GraphQL the node named by
+`rr_node`:
+
+| request | primary host | replica host | load balancer host |
+|---|---|---|---|
+| `GET rpc/rr_node` | 200 primary | 200 replica | 200 replica |
+| `POST rpc/rr_node` | 200 primary | 400 | 200 primary |
+| GraphQL `POST { __typename }` | 200 | 400 `Read replica does not handle POST requests for the path /gra` | 400 `Load balancer does not handle POST requests for the path /gr` |
+| GraphQL `POST { rr_node }` | 200 primary | 400 | 400 |
+| GraphQL `GET ?query={ rr_node }` | 404 `PGRST202` | 400 | 400 `Load balancer does not handle GET reques` |
+| Auth `GET /health`, `GET /settings` | 200, 200 | 400, 400 | 200, 200 |
+| Auth admin create user, password grant, `GET /user` | 200, 200, 200 | 400, 400, not sent | 200, 200, 200 |
+| Storage list buckets, create bucket, upload, authenticated download | 200 each, body matched | 400 each | 200 each, body matched |
+| Realtime join with Postgres Changes and broadcast self-echo, 3 tries | ok x3 | `ws error at handshake` x3 | ok x3 |
+| Edge Functions `POST /functions/v1/<probe>` | 200, `x-sb-edge-region` ap-southeast-1 | 400 | 200, `x-sb-edge-region` ap-southeast-1 |
+
+The error texts are cut where the module's 70-character limit cut them.
+pg_graphql was enabled by the module (`create extension pg_graphql`);
+GraphQL through the primary host works, so the load balancer's 400 is its own
+refusal of the `/graphql/v1` path for both methods. The replica host served
+only REST GETs.
+
+Which node the load balancer sent them to, from `edge_logs` on the load
+balancer host (RR02k, run 1, `load_balancer_redirect_identifier` per path
+family; "none" means the row carries no identifier):
+
+| family | rows | redirect identifier |
+|---|---|---|
+| Auth (GET 3, POST 2) | 5 | primary |
+| Storage (GET 2, POST 2) | 4 | none |
+| Realtime (GET, status 101) | 3 | none |
+| GraphQL (POST 2, GET 1, all 400) | 3 | none |
+| `rpc/rr_node` POST | 1 | primary |
+| Edge Functions | 0 | no row on the load balancer host matched |
+
+Storage and Realtime answered through the load balancer with no redirect
+identifier logged, so the log does not name the node that served them; the
+replica's host refuses both. Inference, not separated by this run: they go to
+the project's primary services. The Auth rows name the primary. The Edge
+Function call answered 200 through the load balancer but left no `edge_logs`
+row on that host; where it was logged was not found.
+
+The REST rows in RR02k agree with the timed reads: in run 1 the load
+balancer redirected 2,502 `rr_node` GETs to the replica and 952 got the 400
+with no identifier (the RR02j tail); in run 2, 1,549 and 4,077.
+
+### Not settled by RR02
+
+- Lag from write volume: the one burst filled the disk at 19.7 s without
+  lagging the replica past 2,000 ms. A burst that fits the disk, or a larger
+  disk, was not run, so whether write volume alone can lag a Small replica
+  enough to matter is open. The stopped replay is the method that produced
+  lag.
+- A replica that is down while the primary and the load balancer config are
+  untouched: the Management API has no per-replica restart (its OpenAPI
+  document lists `/restart` per project only, as of 2026-10-23); `restart` takes down both
+  nodes, and `remove` changes the load balancer's config. The replica-down,
+  primary-up span inside RR02i, about 35 s per run, is the closest these runs
+  got.
+- Recovery of the load balancer endpoint after the last replica is removed:
+  not seen within 1,200 s.
+- Two runs, one region pair, one vantage. The load balancer's rule is still
+  not visible; these runs show what it did not do (move reads off a stale or
+  unreachable replica), not how it chooses.
+
 ## Not measured
 
 - Any second primary region, a second replica, or a replica larger than
   Small.
 - Load: every probe is one client at a few requests per second.
 - Replication delay for a large write (the largest transaction here is a
-  50,000-row update).
-- Auth, Storage, Realtime and Edge Function traffic through the load
-  balancer; custom domains; the replica's behaviour on restart.
-- The load balancer's rule, and whether it re-routes when a replica is
-  unhealthy or lagging.
+  50,000-row update; the RR02g bulk insert filled the disk before it
+  committed).
+- Custom domains. Auth, Storage, Realtime, GraphQL and Edge Function traffic
+  through the load balancer is RR02f/RR02k; the replica's behaviour on a
+  project restart is RR02i.
+- The load balancer's rule. Whether it re-routes off a lagging or unhealthy
+  replica is RR02h-RR02j (it did not, in two runs).
 - Cost: not metered. The final run kept a Small primary, a Small replica and
   `pitr_7` for about 27 minutes; the exploratory runs kept one project and
   one replica for roughly an hour and a half.
