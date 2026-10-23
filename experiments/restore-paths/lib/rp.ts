@@ -14,7 +14,7 @@
  */
 import { Client } from "pg";
 import { mgmt } from "../../../harness/src/mgmt";
-import { fetchKeys, sql } from "../../../harness/src/platform";
+import { fetchKeys, logsQuery, sql } from "../../../harness/src/platform";
 import { sampleDuring, type PathWindow, type Probe, type ProbeOutcome } from "../../../harness/src/sampler";
 import type { Ctx } from "../../../harness/src/types";
 import { authProbe, realtimeProbe, restProbe, storageProbe } from "../../platform-downtime/lib/probes";
@@ -195,6 +195,57 @@ export function serviceProbes(s: Subject): Probe[] {
     storageProbe(s.apiHost, s.anon),
     realtimeProbe(s.apiHost, s.anon),
   ];
+}
+
+/**
+ * A Data API read that reaches Postgres: `GET /rest/v1/<table>?select=*&limit=1`
+ * (`table` defaults to rp_marker)
+ * with the service_role key, up only on HTTP 200. The `rest` probe above hits
+ * `/rest/v1/` with the anon key, which answers 401 without a database read
+ * (platform-downtime probes.ts header), so it shows the HTTP tier answering,
+ * not a read succeeding. Added 2026-10-22 UTC for RP07 (first complete run
+ * R18) and RP06 (valid from R24; RUNLOG run ids).
+ */
+export function restReadProbe(s: Subject, table = "rp_marker"): Probe {
+  return {
+    name: "rest_read",
+    async run() {
+      try {
+        const res = await fetch(`https://${s.apiHost}/rest/v1/${table}?select=*&limit=1`, {
+          headers: { apikey: s.service, Authorization: `Bearer ${s.service}` },
+          signal: AbortSignal.timeout(5000),
+        });
+        if (res.status !== 200) return { ok: false, error: `HTTP ${res.status} ${(await res.text()).slice(0, 80)}` };
+        return { ok: true };
+      } catch (e) {
+        return { ok: false, error: errText(e) };
+      }
+    },
+  };
+}
+
+/** WAL position as Postgres reports it: current segment and the archiver's last archived segment. */
+export async function walPosition(s: Subject): Promise<{ current: string; lastArchived: string; archivedCount: number; line: string }> {
+  const r = await sql(
+    s.ctx,
+    "select pg_walfile_name(pg_current_wal_lsn()) as cur, a.last_archived_wal as la, a.archived_count as n, extract(epoch from a.last_archived_time)::bigint as lat from pg_stat_archiver a",
+  );
+  const x = r.rows[0];
+  if (r.status !== 201 || !x) return { current: "", lastArchived: "", archivedCount: -1, line: `unreadable HTTP ${r.status} ${r.error}`.slice(0, 120) };
+  const segs = segmentGap(String(x.cur ?? ""), String(x.la ?? ""));
+  return {
+    current: String(x.cur ?? ""),
+    lastArchived: String(x.la ?? ""),
+    archivedCount: Number(x.n),
+    line: `current=${x.cur} last_archived=${x.la} segments_behind=${segs} archived_count=${x.n} last_archived_age_s=${x.lat ? Math.round(Date.now() / 1000 - Number(x.lat)) : "n/a"}`,
+  };
+}
+
+/** Segments between two WAL file names on the same timeline (16 MB segments), or "n/a". */
+export function segmentGap(cur: string, last: string): number | string {
+  if (cur.length !== 24 || last.length !== 24) return "n/a";
+  const n = (w: string) => parseInt(w.slice(8, 16), 16) * 256 + parseInt(w.slice(16, 24), 16);
+  return n(cur) - n(last);
 }
 
 export interface CredentialWatch {
@@ -599,6 +650,8 @@ export async function measureRestore(
     retryEveryMs?: number;
     maxMs?: number;
     tailMs?: number;
+    /** Extra sampler probes, e.g. `restReadProbe` (RP06, RP07). */
+    extraProbes?: Probe[];
   },
 ): Promise<RestoreRun> {
   const maxMs = o.maxMs ?? 25 * 60_000;
@@ -606,7 +659,7 @@ export async function measureRestore(
   const retryMs = o.retryMs ?? 0;
   const retryEvery = o.retryEveryMs ?? 60_000;
   const watch = watchCredentials(s, o.newPw, o.oldPw);
-  const probes = [...serviceProbes(s), watch.probe];
+  const probes = [...serviceProbes(s), ...(o.extraProbes ?? []), watch.probe];
   const attempts: string[] = [];
   let http = 0;
   let body = "";
@@ -649,4 +702,134 @@ export async function measureRestore(
     throw e;
   });
   return { windows, postOffsetMs, http, body, attempts, acceptedAfterS, tl, cred: cred as CredentialTimeline };
+}
+
+/* ---------- PITR recoverable range (RP06, RP07) ---------- */
+
+export interface PitrBound {
+  /** Upper bound quoted by the platform, unix seconds, or null when none was quoted. */
+  latest: number | null;
+  earliest: number | null;
+  http: number;
+  /** Refusal text, truncated; the range is parsed out of it. */
+  text: string;
+}
+
+/**
+ * The platform's current recoverable range, read the way RP02c read it: ask
+ * `restore-pitr` for a target a week in the future and parse the refusal
+ * ("Recovery time target must be within range: <earliest> <= t <= <latest>").
+ * A future target cannot be inside the range, so the call is refused and
+ * nothing is restored; if it were ever accepted, `http` says so and the caller
+ * must treat the project as restored.
+ */
+export async function pitrBound(s: Subject): Promise<PitrBound> {
+  const target = Math.floor(Date.now() / 1000) + 7 * 86_400;
+  let r = await mgmt(s.ctx, "POST", `/projects/${s.ref}/database/backups/restore-pitr`, { recovery_time_target_unix: target });
+  for (let i = 0; i < 3 && (r.throttled || r.status === 429); i++) {
+    await sleep(20_000);
+    r = await mgmt(s.ctx, "POST", `/projects/${s.ref}/database/backups/restore-pitr`, { recovery_time_target_unix: target });
+  }
+  const m = /(\d{9,})\s*<=\s*t\s*<=\s*(\d{9,})/.exec(r.text);
+  return { latest: m ? Number(m[2]) : null, earliest: m ? Number(m[1]) : null, http: r.status, text: r.text.slice(0, 160) };
+}
+
+/** A session-pooler connection with no statement timeout, for writers and bulk fills. */
+export async function poolerClient(s: Subject, password: string): Promise<Client> {
+  const c = new Client({
+    host: s.pooler.host,
+    port: s.pooler.port,
+    user: s.pooler.user,
+    database: "postgres",
+    password,
+    ssl: { rejectUnauthorized: false },
+    connectionTimeoutMillis: 15_000,
+  });
+  c.on("error", () => {});
+  await c.connect();
+  await c.query("set statement_timeout = 0");
+  return c;
+}
+
+/** Enable `pitr_7`, retrying the addon PATCH through its 429 cooldown. */
+export async function applyPitr7(ctx: Ctx, ref: string): Promise<{ status: number; text: string }> {
+  let r = await mgmt(ctx, "PATCH", `/projects/${ref}/billing/addons`, { addon_type: "pitr", addon_variant: "pitr_7" });
+  for (let i = 0; i < 4 && r.status === 429; i++) {
+    const m = /try again in (\d+)/.exec(r.text);
+    await sleep(((m ? Number(m[1]) : 1) * 60 + 5) * 1000);
+    r = await mgmt(ctx, "PATCH", `/projects/${ref}/billing/addons`, { addon_type: "pitr", addon_variant: "pitr_7" });
+  }
+  return { status: r.status, text: r.text.slice(0, 200) };
+}
+
+/** pg_stat_archiver plus archive settings, one line, from the database's own view. */
+export async function archiverLine(s: Subject): Promise<{ line: string; lastArchivedUnix: number | null }> {
+  const r = await sql(
+    s.ctx,
+    "select archived_count, failed_count, extract(epoch from last_archived_time)::bigint as la, current_setting('archive_timeout') as at, current_setting('archive_mode') as am from pg_stat_archiver",
+  );
+  const x = r.rows[0];
+  if (r.status !== 201 || !x) return { line: `unreadable HTTP ${r.status} ${r.error}`.slice(0, 120), lastArchivedUnix: null };
+  return {
+    line: `archived=${x.archived_count} failed=${x.failed_count} archive_timeout=${x.at} archive_mode=${x.am}`,
+    lastArchivedUnix: x.la === null || x.la === undefined ? null : Number(x.la),
+  };
+}
+
+/**
+ * Retry a call that THREW (a dropped socket to api.supabase.com, seen 2026-10-22
+ * UTC in RP07 R16, R17 and RP06 R14: "The socket connection was closed
+ * unexpectedly"; RUNLOG run ids), up to
+ * `tries` times 10 s apart. An HTTP answer is returned as-is, never retried here.
+ */
+export async function again<T>(fn: () => Promise<T>, tries = 4): Promise<T> {
+  for (let i = 1; ; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      if (i >= tries) throw e;
+      await sleep(10_000);
+    }
+  }
+}
+
+/**
+ * Postgres's own account of the last recovery, from `postgres_logs`: the lines
+ * that say where replay stopped and why ("recovery stopping before ...",
+ * "last completed transaction was at log time ...", "redo done at ...",
+ * "archive recovery complete", "selected new timeline ID"). Joined, oldest
+ * first; empty when the logs endpoint holds none (it may lag a few minutes).
+ */
+export async function recoveryLogLines(s: Subject, windowHours = 1): Promise<string> {
+  const q =
+    "select timestamp, event_message from logs where source = 'postgres_logs' and (" +
+    ["recovery stopping", "last completed transaction", "redo done", "archive recovery complete", "selected new timeline", "recovery target", "starting point-in-time recovery", "could not restore file"]
+      .map((p) => `event_message like '%${p}%'`)
+      .join(" or ") +
+    ") order by timestamp asc limit 40";
+  const r = await logsQuery(s.ctx, q, windowHours).catch((e) => ({ status: 0, rows: [], error: errText(e) }));
+  if (r.status !== 200) return `logs HTTP ${r.status} ${r.error}`.slice(0, 200);
+  return (r.rows as { event_message?: string }[]).map((x) => String(x.event_message ?? "").slice(0, 140)).join(" | ").slice(0, 1500) || "(none)";
+}
+
+export function stats(xs: number[]): { n: number; min: number | string; p50: number | string; max: number | string } {
+  if (!xs.length) return { n: 0, min: "n/a", p50: "n/a", max: "n/a" };
+  const v = [...xs].sort((a, b) => a - b);
+  return { n: v.length, min: v[0] as number, p50: v[Math.floor((v.length - 1) / 2)] as number, max: v[v.length - 1] as number };
+}
+
+/** Wait for PITR to read enabled and the window to be populated; seconds, or "never". */
+export async function waitPitrReady(s: Subject, maxMs = 30 * 60_000): Promise<{ enabledS: number | string; windowS: number | string }> {
+  const t0 = Date.now();
+  let bk = await backups(s);
+  let enabledS: number | string = bk.pitr ? 0 : "never";
+  let windowS: number | string = bk.windowLatest ? 0 : "never";
+  while ((windowS === "never" || enabledS === "never") && Date.now() - t0 < maxMs) {
+    await sleep(15_000);
+    bk = await backups(s);
+    const at = Math.round((Date.now() - t0) / 1000);
+    if (bk.pitr && enabledS === "never") enabledS = at;
+    if (bk.windowLatest && windowS === "never") windowS = at;
+  }
+  return { enabledS, windowS };
 }
