@@ -62,6 +62,7 @@ import {
   type PtProject,
 } from "../lib/project.js";
 
+// No GRANTs on purpose: the exposure measured here is what the default privileges give a partition (legacy grant before 2026-10-30).
 const SETUP = `
 create schema if not exists archive;
 create table public.ar_events (

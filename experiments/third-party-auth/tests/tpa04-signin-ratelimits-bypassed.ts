@@ -45,6 +45,7 @@ const mod: TestModule = {
     try {
       await cleanupPrefix(ctx, P);
       await sql(ctx, `create table if not exists ${TABLE} (id int primary key)`);
+      await sql(ctx, `grant select, insert, update, delete on table ${TABLE} to anon, authenticated, service_role`);
       await sql(ctx, `insert into ${TABLE} values (1) on conflict do nothing`);
       await sql(ctx, `alter table ${TABLE} enable row level security`);
       await sql(ctx, `drop policy if exists tpa_rl_read on ${TABLE}`);

@@ -201,7 +201,7 @@ const mod: TestModule = {
       const s = await subjectOf(ctx, ref);
       const mk = await sql(
         s.ctx,
-        "create table public.rp_writes (seq bigint primary key, written_at timestamptz not null default clock_timestamp())",
+        "create table public.rp_writes (seq bigint primary key, written_at timestamptz not null default clock_timestamp()); grant select, insert, update, delete on table public.rp_writes to anon, authenticated, service_role",
       );
 
       // ---- RP06a ----

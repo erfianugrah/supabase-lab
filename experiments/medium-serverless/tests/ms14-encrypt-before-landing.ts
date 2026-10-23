@@ -91,6 +91,8 @@ const mod: TestModule = {
       ctx,
       `create table if not exists public.ms_secret (id serial primary key, tenant_id text not null, blob text not null, version int not null, created_at timestamptz default now());
        create table if not exists public.ms_plain (id serial primary key, tenant_id text not null, body text not null, created_at timestamptz default now());
+       grant select, insert, update, delete on table public.ms_secret, public.ms_plain to anon, authenticated, service_role;
+       grant usage, select on sequence public.ms_secret_id_seq, public.ms_plain_id_seq to anon, authenticated, service_role;
        alter table public.ms_secret enable row level security; alter table public.ms_plain enable row level security;`,
     );
     if (setup.status >= 300) return [{ id: "MS14", title: mod.title, status: "fail", detail: `setup failed: ${setup.error}` }];

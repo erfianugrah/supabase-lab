@@ -86,7 +86,7 @@ const mod: TestModule = {
         }
       };
 
-      const ddl = await sql(pc, "create table public.ob_canary(id int primary key, tag text); insert into public.ob_canary values (1); alter table public.ob_canary enable row level security; create policy ob_anon_read on public.ob_canary for select to anon using (true);");
+      const ddl = await sql(pc, "create table public.ob_canary(id int primary key, tag text); grant select, insert, update, delete on table public.ob_canary to anon, authenticated, service_role; insert into public.ob_canary values (1); alter table public.ob_canary enable row level security; create policy ob_anon_read on public.ob_canary for select to anon using (true);");
       if (ddl.status >= 300) throw new Error(`ddl: ${ddl.error}`);
       const dep = await deployViaApi(pc, "ob-canary", [{ name: "index.ts", content: FN }], { entrypoint_path: "index.ts", name: "ob-canary", verify_jwt: false });
       if (dep.status >= 300) throw new Error(`deploy HTTP ${dep.status} ${dep.error}`);

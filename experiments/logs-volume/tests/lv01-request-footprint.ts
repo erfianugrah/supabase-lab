@@ -82,7 +82,7 @@ const mod: TestModule = {
       // ---- setup (outside every window)
       const ddl = await sql(
         pc,
-        "create table public.lv(id bigserial primary key, v text); alter table public.lv enable row level security; create policy lv_read on public.lv for select to anon using (true); insert into public.lv(v) values ('seed');",
+        "create table public.lv(id bigserial primary key, v text); grant select, insert, update, delete on table public.lv to anon, authenticated, service_role; grant usage, select on sequence public.lv_id_seq to anon, authenticated, service_role; alter table public.lv enable row level security; create policy lv_read on public.lv for select to anon using (true); insert into public.lv(v) values ('seed');",
       );
       if (ddl.status >= 300) throw new Error(`ddl: ${ddl.error}`);
       const fnIds: Record<string, string> = {};
