@@ -1,0 +1,61 @@
+{
+  "startedAt": "2026-10-23T08:32:56.569Z",
+  "finishedAt": "2026-10-23T08:33:36.606Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "mgmt-api-faults",
+  "labCommit": "661afdf",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "MF08a",
+      "title": "MF08a: create reset after upstream answered; created_at against the send time",
+      "status": "info",
+      "detail": "fetch threw (Error ECONNRESET); upstream 201; projects with the name: 1; send time minus created_at: answer 219 s, listing 219 s",
+      "measurements": {
+        "upstream_status": 201,
+        "projects_with_name": 1,
+        "send_minus_created_at_answer_s": 219,
+        "send_minus_created_at_listing_s": 219,
+        "answer_and_listing_created_at_equal": "yes"
+      },
+      "evidence": "1x POST /v1/projects reset-after (upstream 201)",
+      "durationMs": 40035
+    },
+    {
+      "id": "MF08b",
+      "title": "MF08b: reconciler script, 30 s grace from first sighting, two passes 35 s apart",
+      "status": "pass",
+      "detail": "pass 1: exit 0, young 1, orphan 0; pass 2: exit 3, orphan 1 (the induced name: yes); old created_at >= start filter keeps 0 of 1",
+      "measurements": {
+        "pass1_exit": 0,
+        "pass1_young": 1,
+        "pass1_orphan": 0,
+        "pass2_exit": 3,
+        "pass2_orphan": 1,
+        "pass2_is_induced": 1,
+        "old_filter_kept": 0
+      },
+      "durationMs": 40035
+    },
+    {
+      "id": "MF08c",
+      "title": "MF08c: reconciler after the delete",
+      "status": "pass",
+      "detail": "DELETEs accepted 1; listing empty for the tag: true; reconciler exit 0, orphan 0",
+      "measurements": {
+        "deletes_accepted": 1,
+        "gone": 1,
+        "exit": 0,
+        "orphan": 0
+      },
+      "durationMs": 40035
+    }
+  ]
+}
