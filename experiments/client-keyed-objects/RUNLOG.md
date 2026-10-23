@@ -177,3 +177,91 @@ These are the operator's account; no artifact backs them.
 - Key service containers removed and the per-run KEKs deleted; no Playwright
   containers left; self-hosted stacks taken down with their volumes;
   `work/fixtures` deleted.
+
+## 2026-10-23 - region-b re-run of CK04 and CK06
+
+Why: on 2026-10-12 CK04 failed on region-b (the resume process ended with
+`data api unreachable: The operation timed out.` after `resume_process_ms`
+300412, while the laptop was entering maintenance sleep) and CK06 was skipped
+because it reads CK04's asset.
+
+Shape: one new Pro-org micro project, eu-central-1, created and deleted by
+`make managed MANAGED=region-b IDS=CK04,CK06` (the `MANAGED` variable is new
+in this commit; before it, `make managed` always made both regions). Same
+migrations, same client, same 2 GiB fixture (256 chunks, 32 parts of 64 MiB).
+The whole make target ran under `caffeinate -i`. Vantage: the same laptop in
+Singapore. n = 1. Artifact: `out/2026-10-23/run-2026-10-23T10-34-14-905Z`
+(run 10:34:14Z to 11:05:26Z, lab commit 77cdea0 with this commit's
+changes in the working tree). Regenerated parity table with this run added:
+`out/2026-10-23/parity.md`. In its region-b column the CK04 and CK06 cells are
+the 2026-10-23 run and the rest are 2026-10-12; CK06 byte totals cover
+successful reads only (region-b `authenticated` 369099456 bytes over 24 reads,
+against 385876704 over 25 on onprem and region-a).
+
+| cell | 2026-10-12 | 2026-10-23 |
+|---|---|---|
+| CK04 region-b | fail (resume timed out, see above) | pass: killed at 0.4063, 13 of 32 parts kept, 13 ETags match, 0 mismatches, `chunk_rows` 256, full read SHA-256 equals the fixture, `read_all_ciphertext_marker_hits` 0 |
+| CK06 region-b | skip (no CK04 asset) | fail: 99 of 100 reads equal the fixture slice and were exactly the covering chunks; 1 of 25 `authenticated` reads failed with client error code `Thrown` (`errors` `authenticated:Thrown x1`) |
+
+CK04 region-b, from the facts (one vantage, n = 1, not throughput claims):
+
+| key | value |
+|---|---|
+| first_process_ms | 101981 |
+| resume_process_ms | 145149 |
+| read_all_ms | 108322 |
+| info_upload_mib_per_s | 8.3 |
+| info_read_mib_per_s | 18.9 |
+| iat_future_retries | 0 |
+
+CK06 region-b per read path (25 reads each, 100 ranges, `plaintext_bytes_asked`
+499413339):
+
+| path | ok | equal | body = covering chunks | info_ms_p50 | info_ms_p95 | cf_cache_status |
+|---|---|---|---|---|---|---|
+| s3 | 25 | 25 | 25 | 2311 | 4040 | - |
+| s3-presigned | 25 | 25 | 25 | 1132 | 3665 | DYNAMIC:25 |
+| signed-url | 25 | 25 | 25 | 50507 | 78804 | MISS:25 |
+| authenticated | 24 | 24 | 24 | 983 | 2510 | HIT:24 |
+
+What this settles and what it does not:
+
+- CK04 on region-b passes when the host stays awake: the same S3 multipart
+  resume (13 of 32 parts kept from server state) that passed on onprem and
+  region-a on 2026-10-12. One trial. It does not explain the 2026-10-12
+  timeout. It fits the sleep explanation, but a platform cause on that day is
+  still not excluded.
+- CK06 on region-b: every read that returned had the right bytes and a body
+  of exactly the covering chunks, on all four paths. The module fails on the
+  one `authenticated` read that threw. The artifact keeps the error code only,
+  not its message. Reading the client source (not shown by the run): the code
+  `Thrown` means an exception that was not a `CkError`. In `httpRange`
+  (`client/src/read.ts`) the `fetch` call is wrapped, but the body read
+  (`r.arrayBuffer()`) is not. So a connection that failed while the body was
+  arriving would surface this way. That is one reading. The others are the
+  same path's other unwrapped steps: the body read of the Data API calls for
+  chunk hashes and the access-log row (`r.text()` in `rest1`,
+  `client/src/catalogue.ts`) and the WebCrypto DEK import; the session
+  refresh, the key-service call and the decrypt step do throw `CkError`s. The
+  run cannot separate these. CK06 now records the first message per error key
+  (`error_messages`) so a repeat run can tell.
+- Signed-URL reads were slow again, as on region-a on 2026-10-12: `MISS:25`,
+  p50 50507 ms on region-b (region-a 2026-10-12: `MISS:25`, p50 30479 ms).
+  `/object/authenticated` answered `HIT:24` with p50 983 ms (region-a
+  2026-10-12: `MISS:1 HIT:24`). Not shown: the cache status of the read that
+  threw (region-b's 24 successful authenticated reads were all HIT; region-a's
+  one MISS was on 2026-10-12).
+
+Not run, with the reason:
+
+| item | reason |
+|---|---|
+| A second 2 GiB run (n = 2) | the harness run took 31 minutes (10:34:14Z to 11:05:26Z; CK06 alone about 20 minutes by the make log, mostly the signed-url reads), past the time box for this re-run |
+| An object past 2 GiB | the code now supports it (`CK_BIG_MIB=2250`: 2250 MiB, 282 chunks with a 2 MiB last chunk, offsets past 2^31; layout unit test added). Not run: same time box |
+| CK04-CK06 on onprem-file | the Docker VM disk had 6.9 GB free with other experiments' data on it (operator check with `docker run --rm alpine df -h /` just before this run; no artifact). A completed 2 GiB multipart upload on the file backend may need the parts and the assembled object at once; that is reasoned, not measured |
+
+Cleanup: `delete region-b: HTTP 200` at the end of the make target, then
+`no ck- projects (HTTP 200)` from its sweep, and again from `make sweep` and a
+direct `GET /v1/projects` at 11:06Z (the run's ref absent). Key service
+container removed and the per-run KEKs deleted (`keysvc removed, KEKs
+deleted`); no `ck-` containers left.

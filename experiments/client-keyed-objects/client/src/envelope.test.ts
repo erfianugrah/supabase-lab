@@ -17,6 +17,15 @@ describe("layout", () => {
     expect([tail.first, tail.last, tail.cStart, tail.cEnd]).toEqual([3, 3, 3 * (CHUNK + TAG), 3 * (CHUNK + TAG) + 100 + TAG - 1]);
     expect(() => span(5, 5, size)).toThrow();
   });
+  test("past 2 GiB (the CK_BIG_MIB=2250 fixture): partial last chunk, offsets beyond 2^31", () => {
+    const size = 2250 * 1024 ** 2;
+    expect(chunkCount(size)).toBe(282);
+    expect(cipherSize(size)).toBe(size + 282 * TAG);
+    const tail = span(size - 10, size, size);
+    expect([tail.first, tail.last, tail.cStart, tail.cEnd]).toEqual([281, 281, 281 * (CHUNK + TAG), 281 * (CHUNK + TAG) + 2 * 1024 ** 2 + TAG - 1]);
+    const across = span(2 ** 31 - 5, 2 ** 31 + 5, size);
+    expect([across.first, across.last, across.cStart]).toEqual([255, 256, 255 * (CHUNK + TAG)]);
+  });
 });
 
 describe("AEAD binding", async () => {

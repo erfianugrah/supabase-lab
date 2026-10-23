@@ -3,7 +3,7 @@
  * manifest matches. Seeded AES-256-CTR keystream with an ASCII marker at the
  * start of every MiB, so CK08 can scan stored bytes for plaintext:
  *
- *   big  2 GiB    CK04 (S3 multipart), CK05 (TUS), CK06 (ranged reads)
+ *   big  2 GiB    CK04 (S3 multipart), CK05 (TUS), CK06 (ranged reads); CK_BIG_MIB resizes it
  *   mid  64 MiB   CK07 (tamper), CK09 (key service down), CK11 (browser)
  */
 import { createCipheriv, createHash } from "node:crypto";
@@ -40,14 +40,14 @@ function write(path: string, name: string, size: number): Fix {
   return { path, size, sha256: h.digest("hex") };
 }
 
-export function ensureFixtures(dir: string): Manifest {
+export function ensureFixtures(dir: string, bigMiB = 2048): Manifest {
   mkdirSync(dir, { recursive: true });
   const mf = join(dir, "manifest.json");
   if (existsSync(mf)) {
     const m = JSON.parse(readFileSync(mf, "utf8")) as Manifest;
-    if (m.version === VERSION && existsSync(m.big.path) && existsSync(m.mid.path)) return m;
+    if (m.version === VERSION && m.big.size === bigMiB * MiB && existsSync(m.big.path) && existsSync(m.mid.path)) return m;
   }
-  const m: Manifest = { version: VERSION, big: write(join(dir, "big.bin"), "big", 2048 * MiB), mid: write(join(dir, "mid.bin"), "mid", 64 * MiB) };
+  const m: Manifest = { version: VERSION, big: write(join(dir, "big.bin"), "big", bigMiB * MiB), mid: write(join(dir, "mid.bin"), "mid", 64 * MiB) };
   writeFileSync(mf, JSON.stringify(m));
   return m;
 }

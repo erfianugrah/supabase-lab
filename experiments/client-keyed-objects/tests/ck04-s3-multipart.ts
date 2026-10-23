@@ -24,7 +24,7 @@ import { interruptResume } from "../lib/flows";
 
 const mod: TestModule = {
   id: "CK04",
-  title: "2 GiB upload via s3-multipart, interrupted and resumed",
+  title: "2 GiB (or CK_BIG_MIB) upload via s3-multipart, interrupted and resumed",
   where: "local",
   destructive: true,
   async run(ctx: Ctx): Promise<TestResult[]> {
