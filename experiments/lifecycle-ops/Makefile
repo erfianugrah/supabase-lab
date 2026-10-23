@@ -14,7 +14,7 @@ ONLY ?= LO03,LO04,LO05
 
 .PHONY: test status run-destructive
 
-# Gate unit tests (fixtures, no network).
+# Gate and runbook unit tests (fixtures and a fake clock, no network).
 test:
 	@cd $(ROOT) && bun test experiments/lifecycle-ops
 
@@ -25,7 +25,8 @@ status:
 
 # LO03: 3 creates, sequential. LO04: 1-2 creates. LO05: 1 create, ~20 min
 # (waits ~11.5 min after the create before restarting). One full pass = 5-6
-# creates. Set LO_HANDOFF=1 to let LO05 restart the project LO04 leaves running
+# creates. LO06 (cluster B drill, 1 create, ~30 min on 2026-10-23) runs only when named:
+# ONLY=LO06. Set LO_HANDOFF=1 to let LO05 restart the project LO04 leaves running
 # (saves a create; LO05 then waits from LO04's first POST, see RUNLOG). The
 # runner is invoked from source because harness/dist/pvlab is linux-x64.
 run-destructive:
