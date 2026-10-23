@@ -10,6 +10,102 @@ both from the next run on. Vantage: this lab's Mac in Singapore over the
 public internet, so every client time below includes the round trip. "Docs"
 means the source named in the module header; "measured" means the artifact.
 
+## 2026-10-23 - DC04, request rate instead of request duration (one run)
+
+Harness: `make run ONLY=DC04,DC99` with `PVLAB_DC_REGION=ap-northeast-2`
+and `PVLAB_DC_SIZE=small`, lab commit 4141477 plus the uncommitted DC04
+module. One Pro-org project, Small, resized to 4XL (`ci_4xlarge`) in DC04c,
+deleted by DC99. Load generator: `oha` 1.16.0, closed loop, 40 s per step,
+one GET `/rest/v1/dc_items?id=eq.4242&select=id,payload` (indexed point read
+on a 100,000-row table) with the legacy anon key, from this lab's Mac in
+Singapore, so every latency includes the Singapore-Seoul round trip (p50 141
+to 150 ms at low load). Pool series are `pgrst_db_pool_*` read from
+`/customer/v1/privileged/metrics` every 3 s; node CPU from
+`node_cpu_seconds_total`; `authenticator` states read once mid-step through
+the Management API query endpoint. Published:
+`out/2026-10-23/run-2026-10-23T07-13-34-754Z.json` (19 results) and its
+`.facts.md`.
+
+### DC04a - what the metrics endpoint exposes
+
+9 `pgrst_*` series: `pgrst_db_pool_available`, `pgrst_db_pool_max`,
+`pgrst_db_pool_timeouts_total`, `pgrst_db_pool_waiting`, three JWT cache
+series and two schema cache series. Small: pool max 30, `db_pool` null,
+`max_connections` 90, `application_name` "PostgREST 14.18". 4XL (DC04c
+resize, settled 68 s after the PATCH): `max_connections` 480, `db_pool`
+null, pool max 70.
+
+### DC04b - Small (2 vCPU)
+
+| concurrency | req/s | p50 / p99 ms | success | waiting max (available then, of max) | timeouts | node CPU % | `authenticator` mid-step | client errors |
+|---|---|---|---|---|---|---|---|---|
+| 16 | 108 | 143 / 374 | 1 | 0 (1 of 30) | +0 | -1 (not computed) | idle:7 | none |
+| 32 | 214 | 144 / 345 | 1 | 1 (5 of 30) | +0 | 9.5 | idle:7 | none |
+| 64 | 428 | 145 / 334 | 1 | 1 (5 of 30) | +0 | 21.7 | active:1 idle:18 | none |
+| 128 | 825 | 149 / 370 | 1 | 7 (11 of 30) | +0 | 49.1 | idle:16, idle in transaction:3 | none |
+| 256 | 925 | 269 / 526 | 1 | 139 (11 of 30) | +0 | 73.9 | idle:16, idle in transaction:3 | 2 |
+| 512 | 918 | 547 / 1039 | 0.993 | 139 (11 of 30) | +0 | -1 | idle:27, idle in transaction:4 | 277 |
+| 1024 | 1020 | 1110 / 1748 | 0.872 | 0 (30 of 30) | +0 | -1 | idle:22, idle in transaction:9 | 5,323 |
+
+Reading: from 256 on, throughput stopped at about 920 to 1,020 req/s while
+latency doubled per step, and at 256 the pool reported 139 requests
+waiting while 11 connections were available, timeouts flat, and the
+`authenticator` backends idle. That is the waiting-with-free-slots pattern,
+on 2 vCPU, with node CPU at 73.9 %. Postgres and PostgREST share that node,
+so node CPU does not say which process used it; no per-process figure was
+read. The 512 row repeats the 256 row's pool figures exactly and the 1024
+row reads 0 waiting with every slot available while 12.8 % of requests
+failed on the client; the pool series appear to update less often than the
+3 s scrape (a reading, not separated). Treat the pool columns as coarse.
+
+### DC04c - 4XL (16 vCPU)
+
+| concurrency | req/s | p50 / p99 ms | success | waiting max (available then, of max) | node CPU % | `authenticator` mid-step | statuses | client errors |
+|---|---|---|---|---|---|---|---|---|
+| 64 | 436 | 141 / 365 | 1 | 0 (1 of 70) | -1 | idle:10 | 200:17521 | none |
+| 128 | 860 | 143 / 339 | 1 | 0 (1 of 70) | 2.2 | idle:10 | 200:34810 | none |
+| 256 | 1699 | 144 / 355 | 1 | 1 (10 of 70) | 5 | active:1 idle:11 | 200:68773 | 1 |
+| 512 | 3158 | 150 / 457 | 0.996 | 1 (10 of 70) | 11.5 | active:1 idle:31 | 200:127297 | 456 |
+| 1024 | 2243 | 164 / 2162 | 0.837 | 0 (66 of 70) | 11.5 | idle:67 | 200:75566 403:6804 | 16,018 |
+| 1536 | 539 | 801 / 4460 | 0.375 | 0 (66 of 70) | 0.1 | idle:67 | 403:8856 | 14,729 |
+
+Reading: on 16 vCPU the same request scaled linearly to 3,158 req/s at 512
+with nothing waiting and node CPU at 11.5 %. The pattern DC04b met on 2 vCPU
+did not appear up to that rate. Above 512 the run stopped measuring
+PostgREST: the client logged "Network is unreachable (os error 51)" on
+thousands of requests, and from 1024 the answers that came back included
+HTTP 403 (6,804 at 1024, every answer at 1536), with node CPU falling to
+0.1 %. The 403 body was not recorded, so which layer sent it is not
+established. These two rows describe this client and the edge in front of
+the project, not PostgREST.
+
+### DC04d - db_pool arms on 4XL (not usable)
+
+`db_pool` 20 (PATCH 200), 150 (PATCH 200) and 250 (PATCH 500), each
+followed by the 1024 step. The first two returned 531 and 548 req/s, 403
+only, with one `authenticator` backend; the 250 arm returned 2,749 req/s
+(98,340 x 200, 4,347 x 403). The pool max read in each arm was the value
+from the arm before (70, then 20, then 150), so the reading lagged a PATCH.
+The arms ran behind the same client and edge limit as DC04c's top rows and
+compare nothing about pool size; the 500 on `db_pool` 250 was not
+investigated.
+
+### Not run
+
+- Load above about 3,000 req/s from a vantage that is not one Mac (several
+  clients, or clients in-region).
+- Any request other than one indexed point read: RPCs, inserts, wide
+  responses, `Prefer: count=exact`, a high `max_rows`.
+- A per-process CPU split between PostgREST and Postgres.
+- The `db_pool` comparison, which needs the above before it means anything.
+- XL and 2XL/8XL, between the two sizes measured.
+
+### Cost
+
+Project time about 18 minutes (07:13:34 to 07:31:20 UTC, the artifact's
+start and finish stamps), Small until DC04c and 4XL after, deleted by DC99
+(DELETE 200).
+
 ## 2026-10-22/23 - four runs (run 4 is the reference)
 
 Harness: `make run` (DC01, DC02, DC03, DC99, `--destructive`), lab commit
