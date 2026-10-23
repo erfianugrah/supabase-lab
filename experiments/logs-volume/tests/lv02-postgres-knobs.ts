@@ -86,6 +86,7 @@ const mod: TestModule = {
       const ddl = await sql(
         pc,
         `create table public.lv2(id int primary key, v text); insert into public.lv2 values (1, 'seed');
+         grant select, insert, update, delete on table public.lv2 to anon, authenticated, service_role;
          alter table public.lv2 enable row level security; create policy lv2_read on public.lv2 for select to anon using (true);
          create or replace function public.lv_notice(m text) returns int language plpgsql as $$ begin raise notice 'lv notice %', m; return 1; end $$;
          create or replace function public.lv_log(m text) returns int language plpgsql as $$ begin raise log 'lv log %', m; return 1; end $$;

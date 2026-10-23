@@ -375,7 +375,7 @@ export const OBJECT_BODY = "restore-paths seed object";
 export async function seedData(s: Subject): Promise<string> {
   const r = await sql(
     s.ctx,
-    "create table if not exists public.rp_marker (id serial primary key, label text not null, at timestamptz default now()); insert into public.rp_marker(label) values ('seed-before-backup')",
+    "create table if not exists public.rp_marker (id serial primary key, label text not null, at timestamptz default now()); grant select, insert, update, delete on table public.rp_marker to anon, authenticated, service_role; insert into public.rp_marker(label) values ('seed-before-backup')",
   );
   return r.status === 201 ? "ok" : `HTTP ${r.status} ${r.error}`;
 }

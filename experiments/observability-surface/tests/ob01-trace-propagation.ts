@@ -187,7 +187,7 @@ const mod: TestModule = {
       ctx.log(`OB01 project ready (healthy after ${proj.healthyMs} ms)`);
       const ddl = await sql(
         pc,
-        "create table if not exists public.ob_probe(id int primary key); insert into public.ob_probe values (1) on conflict do nothing; alter table public.ob_probe enable row level security; drop policy if exists ob_anon_read on public.ob_probe; create policy ob_anon_read on public.ob_probe for select to anon using (true);",
+        "create table if not exists public.ob_probe(id int primary key); grant select, insert, update, delete on table public.ob_probe to anon, authenticated, service_role; insert into public.ob_probe values (1) on conflict do nothing; alter table public.ob_probe enable row level security; drop policy if exists ob_anon_read on public.ob_probe; create policy ob_anon_read on public.ob_probe for select to anon using (true);",
       );
       if (ddl.status >= 300) throw new Error(`ddl: ${ddl.error}`);
       const dep = await deployViaApi(pc, "ob-echo", [{ name: "index.ts", content: ECHO_FN }], { entrypoint_path: "index.ts", name: "ob-echo", verify_jwt: false });

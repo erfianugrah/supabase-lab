@@ -184,6 +184,8 @@ const mod: TestModule = {
       s = await pgSession(p);
       await must("set statement_timeout = 0");
       await must(`create table public.dt_events (id bigint generated always as identity, tenant_id int not null, created_at timestamptz not null, payload jsonb, primary key (created_at, id)) partition by range (created_at)`);
+      // Parent only: the load loops go through it. The partitions keep whatever the default privileges give them, which PT04e measures.
+      await must(`grant select, insert, update, delete on table public.dt_events to anon, authenticated, service_role`);
       for (const m of ["2026_05", "2026_06", "2026_07", "2026_08", "2026_09", "2026_10", "2026_11"]) {
         const [y = 0, mo = 0] = m.split("_").map(Number);
         const from = new Date(Date.UTC(y, mo - 1, 1)).toISOString().slice(0, 10);

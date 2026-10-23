@@ -138,6 +138,7 @@ async function setup(ctx: Ctx, arm: Arm): Promise<void> {
     const r = await sql(
       ctx,
       `create table public.ob_probe(id int primary key); insert into public.ob_probe values (1);
+       grant select, insert, update, delete on table public.ob_probe to anon, authenticated, service_role;
        alter table public.ob_probe enable row level security;
        create policy ob_anon_read on public.ob_probe for select to anon using (true);
        create function public.ob_boom() returns void language plpgsql as $$ begin raise sqlstate 'PT500' using message = 'ob induced'; end $$;
