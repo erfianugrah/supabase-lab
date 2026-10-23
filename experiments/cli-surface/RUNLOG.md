@@ -370,3 +370,134 @@ the container:
 | Apply a config change to a running stack with `stop` then `start`; `start` and `stack restart` keep the saved configuration. `stack destroy` also applies it and deletes the data. | CL22d |
 | Enable `[storage.image_transformation]` explicitly before testing image rendering on the stack, and enable `[db.pooler]` before the first `start` (or destroy and recreate). | CL22c |
 | Budget about 2.1 GB of memory (summed PSS) for one stack with every service awake and about 0.25 GB asleep, as measured once (n=1) in a linux/arm64 container with 10 CPUs; `studio` is the slowest service to wake (first request 4937 ms) and has the largest artifact on disk, 456 MB; per-service memory was not measured. | CL20c |
+
+## 2026-10-23 - CL23 (native stack artifacts: libc, glibc floor, idle-stop constants; static read)
+
+Scope: the four gaps the 2026-10-10 run left for the native stack (linux/amd64,
+the glibc floor, a hosted CI runner, idle stops). Only a static read ran. The
+runtime matrix (the stack started in containers of several distributions,
+amd64 under emulation) and an idle-stop watch did not run: the Docker Desktop
+VM had 6.9 GB free of 58.4 GB on 2026-10-23 (operator check, no artifact), under the 10 GB this lab keeps
+free before container work on a VM shared with other runs. The hosted CI
+runner was not run either: a workflow on a public repository publishes its
+logs.
+
+Method. CL23 runs on the macOS host with no container. It downloads the CLI
+2.120.0 Linux tarballs and Alpine packages for amd64 and arm64 (sha256 checked
+against the release checksums file), reads the arm64 tarball's bundled
+JavaScript for the artifact pins, the host-to-target map and the idle-stop
+constants, then downloads the 13 pinned service artifacts for linux-amd64 and
+linux-arm64 from the supabase/slim-services releases, checks each against the
+CLI's sha256 pin, unpacks it and reads every ELF file in it: `PT_INTERP`,
+`PT_DYNAMIC`, and, for an artifact with no bundled loader, the highest
+`GLIBC_` version under "Version References" in `objdump -p`. "Bundled" below
+means the archive ships `lib/ld-linux-*` and `lib/libc.so.6`; the module does
+not check that every launcher goes through them, and every bundled artifact
+also holds ELF files whose `PT_INTERP` is the host path
+(`/lib64/ld-linux-x86-64.so.2` or `/lib/ld-linux-aarch64.so.1`) or a
+`/nix/store/...-glibc-2.40-66/lib/` path (`amd64_elf_interps`,
+`arm64_elf_interps`), so a launcher that skipped the bundled loader would
+fall back to the host's. Read by hand outside the
+harness (no artifact): the postgres launcher (`bin/postgres`) and the storage
+Node launcher (`node/bin/node`) exec the real binary through the bundled
+loader; the edge-runtime launcher sets `LD_LIBRARY_PATH` to its `lib/` (which
+holds only `libgcc_s.so.1`) and execs the binary, so the host's loader and
+libc serve it. Every figure below was pasted from
+`out/2026-10-23/run-2026-10-23T11-18-38-851Z.facts.md`. No stack ran; n = 1
+read of one release's files. An earlier run the same day (not published)
+read only the first 64 KB of each file and missed `PT_INTERP` where patchelf
+had put it further in (edge-runtime's sits at offset 0x7bfc128 by `objdump -p`, outside the harness); the module
+now reads it by offset (`elf_interp_unread` 0). The classification and the
+floor did not change between the two runs.
+
+### CL23a - the CLI's own Linux binaries
+
+- Release tarball `supabase`, both architectures: dynamically linked against
+  glibc, interpreter `/lib64/ld-linux-x86-64.so.2` (amd64) and
+  `/lib/ld-linux-aarch64.so.1` (arm64), highest required symbol version
+  `GLIBC_2.17` on both. `supabase-go` is static on both.
+- Alpine `.apk`: interpreter `/lib/ld-musl-x86_64.so.1` and
+  `/lib/ld-musl-aarch64.so.1`, declared depends `libstdc++,libgcc`. The
+  release ships a musl build for Alpine; the tarball binary needs a glibc
+  loader.
+
+### CL23b - what the bundle says
+
+- Native targets `darwin-arm64,linux-amd64,linux-arm64`. The function that
+  maps the host to a target reads only os and arch
+  (`target_selector_reads_only_os_arch` 1). No libc check was found in it, so
+  unless a caller checks elsewhere (not read), a musl host on x64 or arm64 is
+  handed the same artifacts as a glibc host.
+- 13 pinned services: `database=postgres@17.11.0.004-r1 rest=postgrest@v16.4-r0
+  auth=auth@v2.197.0-r0 realtime=realtime@v2.140.10-r0
+  storage=storage@v1.79.36-r0 imgproxy=imgproxy@v3.26.0-r0
+  functions=edge-runtime@v1.77.4-r0 studio=studio@2026.10.05-sha-94b8b06-r0
+  pgmeta=pgmeta@v0.100.0-r0 mail=mailpit@v1.31.3-r0
+  analytics=analytics@v1.52.0-r0 vector=vector@0.58.0-r0
+  pooler=pooler@v2.9.13-r1`.
+- Idle-stop constants: `idle_ms_lazy` 60000 for lazy services,
+  `idle_ms_studio` 300000 for studio. The call site gives an idle timeout to
+  lazy members only (not the database, not under `--eager`), and in 2.120.0
+  exempts one lazy service, `functions` (`lazy_without_idle_stop`). These are
+  constants read from the code; no stop was observed. A 2.121.0 Homebrew
+  install on the host, read the same way outside the harness (no artifact),
+  carries the same two constants and no `functions` exemption.
+
+### CL23c - the pinned artifacts
+
+26 of 26 archives matched their pins (899505122 bytes). The classification is
+the same on amd64 and arm64:
+
+| service (artifact) | libc |
+|---|---|
+| database (postgres), realtime, storage, imgproxy, studio, pgmeta, analytics, pooler | bundled glibc 2.40, ELF ABI tag kernel >= 3.10.0 |
+| rest (postgrest), auth, mail (mailpit), vector | static |
+| functions (edge-runtime) | host glibc >= 2.35, set by `bin/.edge-runtime-wrapped` |
+
+Host glibc floor: 2.35 on both architectures (`amd64_host_glibc_floor`,
+`arm64_host_glibc_floor`), and edge-runtime is the only artifact that sets
+one.
+
+### What it predicts (inference, not run)
+
+glibc in the distributions the card named, read on 2026-10-23: Debian 11
+2.31 (https://packages.debian.org/bullseye/libc6), Debian 12 2.36
+(https://packages.debian.org/bookworm/libc6), and from the Launchpad API's
+release-pocket glibc source for each series
+(https://api.launchpad.net/1.0/ubuntu/+archive/primary?ws.op=getPublishedSources&source_name=glibc&exact_match=true&pocket=Release&distro_series=https://api.launchpad.net/1.0/ubuntu/focal,
+`jammy` and `noble` in place of `focal`): Ubuntu 20.04 2.31, Ubuntu 22.04
+2.35, Ubuntu 24.04 2.39.
+
+- Ubuntu 22.04 and 24.04, Debian 12: every artifact's libc need is met, and
+  the CLI's (2.17).
+- Debian 11 and Ubuntu 20.04 (glibc 2.31): the CLI and the 4 static services
+  should load, and the 8 bundled-glibc services if their launchers go through
+  the bundled loader (read for postgres and storage only); edge-runtime asks for versions up to `GLIBC_2.35`, which 2.31
+  does not have, so the dynamic loader should refuse it when functions
+  starts. Whether that fails `supabase start` or only the first functions
+  request was not run.
+- Alpine (musl): the `.apk` CLI loads; the static services do not use the
+  host libc, and the bundled ones do not if their launcher goes through the
+  bundled loader (read for postgres and storage only); edge-runtime asks for a glibc loader, which a musl host
+  has only if a compatibility package provides one (not checked).
+- amd64: the artifacts classify the same as arm64; process start, ports and
+  wake on amd64 were not run.
+
+### Not measured
+
+- The runtime matrix (distributions, amd64 under emulation), the idle-stop
+  watch, a hosted CI runner: not run, for the reasons at the top of this
+  section.
+- Whether the launchers of the six bundled artifacts other than postgres and
+  storage (realtime, imgproxy, studio, pgmeta, analytics, pooler) go through
+  the bundled loader.
+- What resets a lazy service's idle timer.
+- `--eager` and `--preparation on-demand` behaviour.
+
+### What to do about it
+
+| practice | rests on |
+|---|---|
+| Run the native stack on a glibc 2.35 or newer host or CI image (Ubuntu 22.04 or later, Debian 12 or later) when Edge Functions are part of it; edge-runtime is the only artifact that uses the host's glibc and it asks for `GLIBC_2.35`. | CL23c; distribution versions from the package indexes; no runtime run |
+| On Alpine, install the CLI from the release `.apk` (a musl build), not the tarball (glibc-linked), and treat functions as the service likely to fail. | CL23a, CL23c; not run |
+| Expect lazy services to carry an idle timeout of 60000 ms and studio 300000 ms (what resets the timer was not read), with the database always running and, on 2.120.0, functions given none; pass `--eager` (which the call site exempts from idle timeouts) when first-request latency matters more than memory. | CL23b (constants and call site from the code; no stop observed); CL20c (wake latency) |

@@ -4339,7 +4339,23 @@ does not use the code under test. Details: RUNLOG.md.
   second, empty stack. A config with fixed legacy ports makes the second worktree fail to bind.
   Config changes apply on `stop` then `start` (not `start` or `stack restart`). The stack backend
   refuses `--use-migra`. Image transformation, pooler and drift behaviour: RUNLOG CL22c, CL22d.
-  Unmeasured: amd64, CI runners, idle stops, pooler SQL path.
+  Unmeasured: amd64 at runtime, CI runners, observed idle stops, pooler SQL path.
+- **Native artifacts' libc (CL23, static read, 2026-10-23).** No stack started: the module
+  downloads the 13 pinned slim-services artifacts for linux-amd64 and linux-arm64 (26 of 26
+  matched the CLI's sha256 pins) and reads their ELF files. Same on both architectures: 8
+  ship their own glibc 2.40 and loader (database, realtime, storage, imgproxy, studio, pgmeta,
+  analytics, pooler), 4 are static (rest, auth, mail, vector), and edge-runtime (functions)
+  uses the host's glibc and asks for `GLIBC_2.35`, the host floor. The release tarball CLI
+  needs `GLIBC_2.17`; the `.apk` is a musl build. The host-to-target map reads only os and
+  arch (no libc check). Idle-stop constants in the 2.120.0 code: 60000 ms for lazy services,
+  300000 ms for studio, none for the database or (2.120.0 only) functions; no stop observed.
+  Predictions, not run: on glibc 2.31 hosts (Debian 11, Ubuntu 20.04) and on Alpine,
+  functions fails (it asks for `GLIBC_2.35`; on Alpine, unless a glibc compatibility layer
+  provides it); the 8 bundled-glibc services load only if
+  their launchers go through the bundled loader, which was read by hand for postgres and
+  storage and not checked for the others. The runtime matrix did not run (Docker VM disk
+  under the lab's 10 GB floor).
+  RUNLOG 2026-10-23.
 
 ## experiments/compute-surface - key facts (CS00 validated 2026-10-23, one Micro project, ap-southeast-1, Pro org)
 
