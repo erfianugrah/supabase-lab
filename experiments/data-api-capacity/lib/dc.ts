@@ -20,7 +20,9 @@ import { mgmt } from "../../../harness/src/mgmt.js";
 import { logsQuery, type LogsResult } from "../../../harness/src/platform.js";
 import type { Ctx, TestResult } from "../../../harness/src/types.js";
 
-export const REGION = "ap-southeast-1";
+/** PVLAB_DC_REGION / PVLAB_DC_SIZE override the region and starting size (DC04 runs in ap-northeast-2). */
+export const REGION = process.env.PVLAB_DC_REGION || "ap-southeast-1";
+export const START_SIZE = process.env.PVLAB_DC_SIZE || "small";
 export const prefix = (): string => process.env.PVLAB_DC_PREFIX || "pvlab-dc-";
 export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export const errText = (e: unknown) => (e instanceof Error ? e.message : String(e)).replace(/\s+/g, " ").slice(0, 200);
@@ -103,7 +105,7 @@ async function create(ctx: Ctx): Promise<DcProject> {
       name: `${prefix()}${t0}`,
       db_pass: `${crypto.randomUUID().replaceAll("-", "")}Aa1!`,
       region: REGION,
-      desired_instance_size: "small",
+      desired_instance_size: START_SIZE,
     });
     ref = String((res.json as { ref?: string; id?: string } | undefined)?.ref ?? (res.json as { id?: string } | undefined)?.id ?? "");
     if (res.status !== 201 || !ref) throw new Error(`create project: HTTP ${res.status} ${res.text.slice(0, 200)}`);
@@ -576,7 +578,7 @@ export async function postgrestStarts(ctx: Ctx, ref: string, sinceMs: number): P
  * target's max_connections, the project is ACTIVE_HEALTHY, and the Data API
  * answered 5 consecutive pings.
  */
-export async function resize(ctx: Ctx, p: DcProject, variant: string, wantMaxConn: number, maxMs = 20 * 60_000, watchS = 300): Promise<{ status: number; text: string; settledS: number; maxConn: number; watch?: Outage }> {
+export async function resize(ctx: Ctx, p: DcProject, variant: string, wantMaxConn: number, maxMs = 20 * 60_000, watchS = 300, fromMaxConn = -1): Promise<{ status: number; text: string; settledS: number; maxConn: number; watch?: Outage }> {
   const t0 = Date.now();
   let r = await mgmt(ctx, "PATCH", `/projects/${p.ref}/billing/addons`, { addon_type: "compute_instance", addon_variant: variant });
   for (let i = 0; i < 4 && r.status === 429; i++) {
@@ -589,7 +591,8 @@ export async function resize(ctx: Ctx, p: DcProject, variant: string, wantMaxCon
     await sleep(10_000);
     const q = await sql(ctx, p.ref, "select current_setting('max_connections')::int as m", 20_000);
     maxConn = Number(q.rows?.[0]?.m ?? -1);
-    if (maxConn !== wantMaxConn) continue;
+    // wantMaxConn <= 0: target figure unknown, accept any change from fromMaxConn.
+    if (wantMaxConn > 0 ? maxConn !== wantMaxConn : maxConn <= 0 || maxConn === fromMaxConn) continue;
     if ((await statusOf(ctx, p.ref)) !== "ACTIVE_HEALTHY") continue;
     let okRun = 0;
     for (let i = 0; i < 20 && okRun < 5; i++) {
