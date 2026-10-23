@@ -24,6 +24,7 @@ is built for linux-x64.
 | RP05 | What `DELETE database/migrations?gte=` and the stored `rollback` SQL do to schema, data and history, on the production project and on a git-less preview branch; plus a failing apply |
 | RP06 | PITR recovery point on Small: lag of the platform's latest recoverable instant under a light writer and idle (`RP06_PHASE_MIN`, default 20; 0 skips to the restore), then a restore to that instant with the writer running and a count of acknowledged rows kept and lost |
 | RP07 | PITR restore time against database size past 1 GB (`RP07_SIZES_GB`, default 3,10; `RP07_COMPUTE`, default small; disk grown once to `RP07_DISK_GB`, default 40): fill, archive catch-up, restore to the latest instant, per-path outage including a Data API read, rows kept, Postgres recovery log lines. `RP07_WAIT_ARCHIVER=1` also waits for `pg_stat_archiver` to pass the fill-end segment |
+| RP08 | PITR restore to the quoted latest instant while the WAL archiver is behind: N writers (`RP08_WRITERS`, default 3; `RP08_LOAD=bulk` rows or `wal` logical messages), a per-statement ledger and a 250 ms ticker, `pg_stat_archiver` and the `.ready` count every 10 s; per cycle (`RP08_ARMS`, default `latest,explicit`; also `live`) the target, archiver state and LSN before the call, then acked statements and ticks missing, the marker, and the recovery stop LSN |
 | RP09 | Logical slots (`pgoutput` and `wal2json` via the SQL interface over the session pooler, `wal2json` streamed by `pg_recvlogical` over direct IPv6) across compute resize Small to Medium and back, read-replica create and remove, and restart: slot present, `active`, `confirmed_flush_lsn` before vs after, retained WAL, duplicates and gaps against a steady writer; then `restore-point` and `undo` |
 
 ## Run
@@ -37,6 +38,7 @@ make daily     # RP04, ~4 minutes while backups/restore refuses, up to ~30 if a 
 make rollback  # RP05, ~1-2 minutes including the preview branch; PVLAB_ORG_PRO
 make rpo       # RP06, ~50 minutes (RP06_PHASE_MIN=0: ~10 minutes, restore only); PVLAB_ORG_PRO
 make size      # RP07, 36.6 to 46.5 minutes per run on Small (2026-10-22/23); PVLAB_ORG_PRO
+make lag       # RP08, project lifetime 0.47 to 0.75 h on Small (2026-10-23: 2 bulk or 3 WAL-load cycles; R27 held 2.13 h by a since-fixed sampler wait); PVLAB_ORG_PRO
 make slots     # RP09, about 18 minutes on Small (2026-10-23); needs pg_recvlogical and an IPv6 route; PVLAB_ORG_PRO
 ```
 
@@ -45,7 +47,7 @@ refs and hostnames).
 
 ## Measured
 
-See RUNLOG.md (2026-10-10, 2026-10-20, 2026-10-22/23, and RP09 on 2026-10-23). Short form, from one vantage (an IPv4-only
+See RUNLOG.md (2026-10-10, 2026-10-20, 2026-10-22/23, and RP08 and RP09 on 2026-10-23). Short form, from one vantage (an IPv4-only
 workstation; it had an IPv6 route for RP09), ap-southeast-1 projects:
 
 | finding | value | module |
@@ -58,6 +60,7 @@ workstation; it had an IPv6 route for RP09), ap-southeast-1 projects:
 | PITR range upper bound | equals `pg_stat_archiver.last_archived_time`; lag 1 to 107 s under one INSERT per ~200 ms (120 s `archive_timeout` sawtooth), up to 752 s idle over 20 min | RP06 |
 | Restore to the quoted latest instant under a writer | restores to an LSN; 2 to 4 acked rows written before the target missing in each of 4 runs (R20, R21, R24, R25), 0.02 to 0.79 s before it where ages were recorded (R24, R25); nothing after the target kept; back to healthy in 30 to 41 s with a Data API read `503 PGRST002` for 15 and 14 s (R24, R25) | RP06 |
 | PITR restore, Small, 3111 to 3210 MB / 10441 to 10482 MB | healthy in 221 to 322 s (n=4) / 475 to 787 s (n=5); Data API read `503 PGRST002` for 192 to 544 s in the 7 restores that carried the probe (R15 had none); one 10 GB restore of five kept 31,000,000 of 37,000,000 rows with no error | RP07 |
+| Restore to the quoted latest instant with 7 to 33 WAL segments unarchived at the call (Small, `live` arm) | 0 of 10 restores short (none lost more than 1 acked statement, all within 0.4 s of the target; 6 with a backlog); stop LSN 5 to 33 segments past the last segment archived at the call, interpolated -0.5 to +0.4 s from the target; RP07 R15's short restore not reproduced | RP08 |
 | PITR target just past "now" | refused with the allowed range until the platform's upper bound moves; accepted on a 60 s or 121 s retry | RP02 |
 | Password after a PITR restore | the current password works, the replaced one is refused; the verifier is set again (a value matching neither earlier one); the current password was refused for about one 5 s poll in 6 of 7 restores observed with the new poller | RP02 |
 | Storage after a restore | list, download (bytes equal) and upload `200`; no `500`; an object written after the target reads `404` after a restore to before it | RP02, RP03 |

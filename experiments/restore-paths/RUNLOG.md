@@ -570,8 +570,180 @@ Not measured: which base backup each restore started from (the backups
 endpoint listed no physical backup before any of the 9 RP07 restores, as
 RP02 saw once PITR is on); other compute sizes; a heavy writer's effect on the bound lag;
 restore-to-latest with the archiver measurably behind (the case R15
-suggests); the Dashboard's restore button, which may pick its target
+suggests; run as RP08 on 2026-10-23, below); the Dashboard's restore button, which may pick its target
 differently.
+
+## 2026-10-23 - RP08 (restore to the quoted latest instant while the archiver is behind)
+
+Question: RP07 R15's 10 GB restore to the quoted upper bound answered `201`,
+returned to `ACTIVE_HEALTHY` and kept 31,000,000 of 37,000,000 rows without
+the post-fill marker. Can a short restore be reproduced, and does it follow
+archiver lag? Three readings, each with the evidence only it predicts:
+
+- H1, archiver lag: under heavy writes `last_archived_time` (the bound,
+  RP06) keeps moving while segments wait to be archived, and a restore to the
+  bound stops at the archive frontier. Predicts acked statements and the
+  marker missing only when segments were waiting at the call, and a recovery
+  stop LSN at or near the end of the last archived segment.
+- H2, an earlier base backup or target: a stop LSN well below the frontier,
+  loss with no backlog, or a recovery log naming an earlier target.
+- H3, the fill had not committed: only unacknowledged statements missing.
+  Every RP08 statement is acknowledged with its commit.
+
+Same vantage, Pro org, ap-southeast-1, every project created on Small by the
+module with `pitr_7` and the disk grown once to 40 GB (`POST /config/disk`
+`201`, applied after 302 s in each published run). Postgres 17.11,
+`archive_timeout=120 wal_compression=zstd max_wal_size=4096`. All runs ran
+from the working tree on top of lab commit `661afdf`; R26 and R27 ran the
+first revision (bulk load only, the log-timestamp defect and the frozen
+pooler probe below, a 90 min restore wait), R29 and R30 the committed one. Each cycle writes with
+N session-pooler connections; every statement commits its own `rp_ledger`
+row in the same statement (ledger row present iff its writes are), a ticker
+commits one `rp_tick` row per 250 ms, and a sampler reads
+`pg_current_wal_lsn()`, `pg_stat_archiver` and the count of `.ready` files
+every 10 s. Loads: `bulk` is RP07's rows (3 writers, 100,000-row INSERTs);
+`wal` is the same bytes as one `pg_logical_emit_message` per statement (WAL
+with no heap or index writes, a lever for a WAL rate above the archiver's).
+Arms: `latest` stops the writers, inserts the marker, waits (30 s polls) for
+the bound to pass the fill end plus 10 s and restores to the bound L (R15's
+procedure); `explicit` does the same with the target `floor(now) - 2` read
+just before the call; `live` inserts the marker and restores to L at once
+with the writers running, halting them when the call is accepted.
+
+| run | start (UTC) | load, writers | arms | artifact |
+|---|---|---|---|---|
+| R26 | 07:56 | bulk, 3 | latest, explicit | `out/2026-10-23/run-2026-10-23T07-56-08-998Z.json` |
+| R27 | 07:56 | bulk, 3 | latest, live | `out/2026-10-23/run-2026-10-23T07-56-29-050Z.json` |
+| R28 | 08:43 | wal, 4 | killed by the author during the first write phase (below) | (none; log local only) |
+| R29 | 08:50 | wal, 4, 90 s writes | live x3 | `out/2026-10-23/run-2026-10-23T08-50-41-278Z.json` |
+| R30 | 09:21 | wal, 8, 90 s writes | live x3 | `out/2026-10-23/run-2026-10-23T09-21-24-819Z.json` |
+
+R28 used the default 480 s write cap; the archiver read 8 and 7 segments
+behind at its 62 s and 93 s samples, and 480 s at that WAL rate would have
+left roughly 30 GB of WAL to replay per cycle (reasoned, not measured), and the author killed it and restarted as
+R29 with a 90 s cap. Its project's `pitr_7` and the project were deleted by
+hand (`DELETE` `200` each). R26, R27, R29 and R30 deleted theirs in
+`finally` (`DELETE` `200` in each artifact); a `GET /v1/projects/{ref}` of
+all five refs answered `404` at 10:04 UTC (author's check, no snapshot).
+
+WAL rate, derived from the first and last LSN of each cycle's sampled series
+(evidence field, not a measurement column; MiB/s): 32.4 and 34.0 MiB/s for
+R26's two bulk cycles, 68.8 to 71.6 MiB/s for R29 (4 writers) and 63.5 to
+71.6 MiB/s for R30 (8 writers).
+
+| run, cycle | arm | `ready` / segments behind at the call | stop segment minus last archived at the call | stop LSN written at minus target (s) | acked statements before the target missing | ticks before the target missing | marker (target minus marker, s) | back `ACTIVE_HEALTHY` (s) |
+|---|---|---|---|---|---|---|---|---|
+| R26 1 | latest | 0 / 1 | not logged | not logged | 0 of 219 | 4 of 1451 (oldest 1 s) | kept (119.9) | 414 |
+| R26 2 | explicit | 0 / 1 | not logged | not logged | 0 of 222 | 0 of 1068 | kept (28.6) | 545 |
+| R27 1 | latest | 0 / 1 | 1 (log read by hand) | not computed | 0 of 220 | 0 of 1314 | kept (23.3) | 465 |
+| R27 2 | live | 1 / 2 | 1 (log read by hand) | not computed | 0 of 219 | 0 of 945 | kept (0.4) | 10 (below) |
+| R29 1 | live | 3 / 8 | 9 | 0.1 | 0 of 306 | 1 of 314 (0.1 s) | kept (1.2) | 323 |
+| R29 2 | live | 2 / 7 | 5 | -0.5 | 0 of 312 | 0 of 366 | kept (0.6) | 313 |
+| R29 3 | live | 4 / 8 | 7 | 0.1 | 0 of 303 | 0 of 343 | kept (0.8) | 354 |
+| R30 1 | live | 9 / 12 | 8 | 0.2 | 1 of 278 (0.4 s) | 0 of 302 | absent (-0.3) | 283 |
+| R30 2 | live | 14 / 33 | 33 | 0.4 | 0 of 312 | 0 of 321 | absent (-0.2) | 313 |
+| R30 3 | live | 14 / 31 | 26 | 0.3 | 1 of 305 (0.2 s) | 1 of 331 (0 s) | kept (0.4) | 313 |
+
+"Segments behind" is the gap between `pg_walfile_name(pg_current_wal_lsn())`
+and `last_archived_wal`; `ready` counts completed segments not yet handed to
+the archiver, so the difference is segments in flight. "Stop LSN written at"
+interpolates the stop LSN from the recovery log over the cycle's (database
+time, LSN) samples. R26 and R27 recorded no recovery log: the module parsed
+the logs endpoint's zone-less timestamps as local time and filtered out every
+line (fixed before R29; R29 and R30 carry the lines). R27's lines were read by
+hand from the logs endpoint at 08:46 UTC while its project was up (local
+only): cycle 1 `recovery stopping after WAL location (LSN) "2/91C7870"` and
+`last completed transaction was at log time 2026-10-23 08:07:08.579569+00`
+against a target of 08:07:09; cycle 2 `"4/2482A9B8"` and `08:25:32.598465`
+against 08:25:33. The published R26 and R27 artifacts read `outside sampled
+range` in `stop_lsn_written_at_minus_target_s`: that is the value the first
+revision wrote when no stop LSN was found (the module now writes `no stop
+LSN`). This branch's RP08 artifacts are the four in the run table; two other
+2026-10-23 artifacts carrying RP08-prefixed result ids (07:58 and 08:17 UTC)
+come from a parallel branch's slots module (RP09) and are not part of this
+run.
+
+- **R15 did not reproduce: 0 of 10 restores came back short**, where short
+  means losing more than RP06's sub-second window: none lost more than 1
+  acked statement, all within 0.4 s of the target (4 bulk with no backlog, 6
+  WAL-load `live` restores with 7 to 33 segments unarchived at the call).
+- The bound does run ahead of the archived WAL under load: in R29 and
+  R30 the bound at the call sat 0 to 2 s behind the local clock and 0 to 1 s
+  from `last_archived_time`, while 7 to 33 segments were unarchived. H1's
+  premise holds on Small at 63.5 to 71.6 MiB/s of WAL (derived, above).
+- **The restore did not stop at the archive frontier (H1 falsified for these
+  backlogs: Small, `live` arm, 90 s writes).** In the 6 restores with a
+  backlog, all `live`, the stop LSN lay 5 to 33 segments past the last segment
+  archived at the call, and the same count past the last archived when the
+  `201` came back; it sat -5 to +1 segments from the segment being written at
+  the call, and its write time, interpolated over 10 s samples, was -0.5 to
+  +0.4 s from the target. The recovery log's `last completed transaction`
+  (its log time against the target, derived) was 0.26, 0.50 and 0.13 s before the target in R29 and 0.02, 0.32 and 0.27
+  s in R30, and in R29 2 and R30 2 the newest kept tick (0.2 s before the
+  target) is later than that logged commit, so sub-second placement is not
+  established by either. The `latest` arm (R15's procedure) never had more
+  than 1 segment behind at the call, so it was not tested under a backlog. Reading (not separated by a probe): the platform gets the WAL
+  past the frontier before recovery, for instance from the old instance
+  archiving its remaining segments as it shuts down.
+- Acked statements lost sit inside RP06's window; one tick sits just
+  outside it. Acked statements written before the target and missing: 0 in 8
+  of 10 restores, 1 at 0.4 s (R30 1) and 1 at 0.2 s (R30 3); ticks: 4 in R26
+  1 (oldest 1 s before the target, past RP06's 0.79 s), 1 in R29 1 (0.1 s),
+  1 in R30 3 (0 s). RP06 measured
+  0.02 to 0.79 s. The marker absences in R30 cycles 1 and 2 are markers
+  committed 0.3 and 0.2 s after the target (the target is a whole unix
+  second). No acked statement written after the target plus 1 s was kept
+  (ticks after the target were not counted).
+- H3 does not fit any of these restores: no acked statement older than
+  0.4 s before the target was missing, and in the four bulk cycles `rp_bulk`
+  held exactly the ledger's rows times 100,000 (21,900,000, 22,200,000,
+  22,000,000, 21,900,000).
+- In R29 and R30 each restore after the first started from a base backup
+  whose redo LSN sat 2 segments past the previous restore's stop LSN (R26 and
+  R27 logged no such line): `starting backup recovery with redo LSN
+  1/A0000028 ... on timeline ID 2` after a stop at `1/9EC400C0` (R29 2),
+  `3/44000028` after `3/42CE41A8` (R29 3), `1/7D000028` after `1/7B9BFE68`
+  (R30 2), `3/21000028` after `3/1FCE2F00` (R30 3); R30's first restore
+  started from `0/2000028` on timeline 1. Nothing here picked an earlier
+  backup or target; H2 was not tested in R15's shape (a 10 GB fill on top of
+  a restored 3 GB database).
+- The archiver kept up with the bulk load: in the sampled series (10 s)
+  `ready` never above 2 and segments behind at most 4 in R26 and R27 (32.4
+  and 34.0 MiB/s of WAL in R26, derived). The WAL load peaked at 9 to 11 segments
+  behind (`ready` 4 to 5) with 4 writers (R29) and 23 to 49 (`ready` 12 to
+  26) with 8 (R30), and moved up and down rather than growing through the
+  90 s writes (R30 2: 40 and 49 segments at the 62 s and 83 s samples, 33
+  at the call).
+- **R27 2: the project status read healthy before the database went down.**
+  Statuses `RESTORING -> ACTIVE_HEALTHY` with `ACTIVE_HEALTHY` 10 s after the
+  `201` (10 s polling, which stops at the first `ACTIVE_HEALTHY`);
+  `rest_read` first failed at 58 s and stayed failed for 385 s, the pooler
+  answered `the database system is shutting down` from 60 s (the credential
+  watch saw it at 62 s), and `pg_postmaster_start_time()` read 08:32:52 UTC
+  by hand, not in the artifact (the target L was 08:25:33 and the call went
+  in 2 s later). The status was not read during the outage. In the other 9
+  restores the status went back to healthy after 283 to 545 s. 1 of 10.
+- Password after the restore (R18 recurrence): no restore ended with the
+  current password refused (0 of 10). 8 of 10 ended `ok` inside the
+  credential watch; R27 2 and R29 3 ended `down` when the watch stopped and
+  the next login after it succeeded. The single 5 s poll that refuses the
+  current password before it works showed in 7 of 10 (`cred_refused_until_ok_s`
+  5 in R26 1-2, R27 1, R29 2, R30 1-3).
+- Harness defect found in R27 2: once the credential watch stopped, the
+  pooler probe returned its last login result forever, so a restore that ended
+  with the pooler down held the sampler's watchdog to its 93-minute cap (R27
+  ran to 10:00 UTC; its pooler column after about 70 s is that frozen value).
+  `lib/rp.ts` now logs in again on each probe after the watch stops, and RP08
+  caps the restore wait at 30 min. There is no unit test for the fix (the
+  probe opens a real pooler connection); the check is R29 3, which ended with
+  the watch `down` (`pooler_window_s` 330) and still finished, its project
+  living 0.50 h against R27's 2.13 h.
+
+Not measured: a backlog that grows without bound (none of these loads built
+one on Small); a heavier write than 8 WAL writers or a larger compute;
+R15's exact shape (10 GB on top of a restored 3 GB database, one writer);
+which base backup R15 used; the Dashboard's restore button. R15 stays
+unexplained.
 
 ## 2026-10-23 - RP09 (logical slots across resize, read replica and restart; restore-point and undo)
 
