@@ -1,7 +1,7 @@
 ROOT := $(abspath ../..)
 TS := $(shell date +%Y%m%d-%H%M%S)
 
-# Self-provisioning: PT01-PT04 share ONE Pro-org Micro project created
+# Self-provisioning: PT01-PT06 share ONE Pro-org Micro project created
 # through POST /v1/projects, PT99 deletes it. No OpenTofu state.
 #   SUPABASE_ACCESS_TOKEN   Management API token (never written to a file here)
 #   PVLAB_ORG_PRO           slug of a Pro-plan organization
@@ -9,7 +9,7 @@ TS := $(shell date +%Y%m%d-%H%M%S)
 # Include PT99 in ONLY or the project is left running; `make clean` lists
 # leftovers by prefix, `make clean DELETE=1` deletes them.
 # Runs from source with bun: harness/dist/pvlab is a linux-x64 build.
-ONLY ?= PT01,PT02,PT03,PT04,PT99
+ONLY ?= PT01,PT02,PT03,PT04,PT05,PT06,PT99
 
 .PHONY: run clean publish-evidence
 
