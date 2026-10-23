@@ -21,17 +21,27 @@ setup gate hunt) and `medium-serverless` (MS06: same-region replica).
 | RR01l-n | `max_standby_streaming_delay`, `hot_standby_feedback`; a long replica query against primary UPDATE+VACUUM and against an ACCESS EXCLUSIVE lock (3 each) |
 | RR01o | what `edge_logs` records per load balancer GET (Cloudflare colo, chosen region, redirect identifier) |
 | RR01p | teardown: replica removed, project deleted |
+| RR02a-d | same shape as RR01; `max_standby_streaming_delay` raised through the Management API and read back on both nodes |
+| RR02e | baseline: `rpc/rr_node` through the load balancer, the replica host and the primary host, with a 250 ms heartbeat writer |
+| RR02f1-f6 | REST, GraphQL, Auth, Storage, Realtime and Edge Function requests on the primary, replica and load balancer hosts |
+| RR02g | lag by write burst (bulk insert) while reading through the load balancer |
+| RR02h | lag by stopped replay (replica query vs primary UPDATE+VACUUM) while reading through the load balancer |
+| RR02i | `POST /restart` while reading: error windows per host, which nodes restarted |
+| RR02j | `read-replicas/remove` while reading: errors, whether the load balancer moves to the primary |
+| RR02k | `edge_logs` redirect identifier per path family on the load balancer host |
 
 The node that served a request is read from `public.rr_whoami()`
 (`pg_is_in_recovery()`, postmaster start time) called as a GET, not inferred
-from latency.
+from latency. RR02 reads `public.rr_node()` instead, which also returns
+`stale_ms`, the age of the newest heartbeat row the node can see.
 
 ## Run
 
 ```bash
 SUPABASE_ACCESS_TOKEN=... PVLAB_ORG_PRO=<pro-org-slug> make run
+PVLAB_ORG_PRO=<pro-org-slug> make run-rr02   # RR02, about 25 to 35 minutes
 make leftovers        # nothing named rr-* should print
-make facts RUN=evidence/<ts>/run-<stamp>.json
+make facts RUN=evidence/<ts>/run-<stamp>.json        # ONLY=RR02 for an RR02 run
 make publish RUN=evidence/<ts>/run-<stamp>.json
 ```
 
@@ -56,5 +66,22 @@ Full record and caveats: `RUNLOG.md`; artifact `out/2026-10-10/`.
 | Long replica query vs primary UPDATE+VACUUM or ACCESS EXCLUSIVE lock | cancelled in 6 of 6, SQLSTATE 40001, about 30 to 32 s after the primary command | RR01m, RR01n |
 | Row written on the primary after the conflicting command | visible on the replica about 30 to 32 s later (replay stopped) | RR01m, RR01n |
 
-Not measured: other region pairs, load, Auth/Storage/Realtime through the load
-balancer, behaviour with `hot_standby_feedback` on, the load balancer's rule.
+## Measured (2026-10-23, RR02, two projects, two runs, Singapore vantage)
+
+Full record: `RUNLOG.md`; artifacts `out/2026-10-23/`.
+
+| finding | value | module |
+|---|---|---|
+| Replica whose replay stopped (replica query vs primary UPDATE+VACUUM) | load balancer sent every read to it: 586 of 586 over 174.6 s (run 1), 98 of 98 over 28.8 s (run 2); largest age served 176,772 ms and 30,842 ms; 0 errors | RR02h |
+| Write burst as a lag method | 1,500,000-row insert filled the Small disk after 19.7 s; replica age stayed under 2,000 ms | RR02g |
+| `PUT config/database/postgres` `max_standby_streaming_delay: 600s` | HTTP 200 both runs; replica read `600000ms` in run 1, `30000ms (default)` in run 2 | RR02d |
+| `POST /restart` | restarted both nodes, primary first; reads through the load balancer stayed on the replica while the primary was down, and failed (0 sent to the primary) while the replica was down, about 35 s per run | RR02i |
+| `read-replicas/remove` of the only replica | load balancer errors from about 1 s after the call (16.1 s and 16.2 s, call at 15 s), 0 reads served by the primary; `HTTP 400 Load balancer does not seem to be configured properly.` until the 1,200 s watch ended (run 2) | RR02j |
+| GraphQL through the load balancer | 400 for POST and GET (`Load balancer does not handle ... requests for the path /gr...`) | RR02f2 |
+| Auth, Storage, Realtime, Edge Functions through the load balancer | 200 / joined; `edge_logs` names the primary for Auth, no identifier for Storage and Realtime | RR02f3-f6, RR02k |
+| Replica's own host | serves REST GETs only; Auth, Storage, Functions, GraphQL 400, Realtime handshake fails | RR02f |
+
+Not measured: other region pairs, load, behaviour with `hot_standby_feedback`
+on, the load balancer's rule, a replica that is down while the primary is
+untouched (the Management API has no per-replica restart as of 2026-10-23), recovery of the load
+balancer endpoint after the last replica is removed beyond 1,200 s.
