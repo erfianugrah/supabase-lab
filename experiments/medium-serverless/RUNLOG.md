@@ -382,8 +382,9 @@ for about 14 s, its cached login failure. n=1 per direction.
 > not re-run here. platform-downtime re-measured a Medium to Large pair with
 > a row read and a joined channel on 2026-10-23 (its RUNLOG section of that
 > date), on two Pro-org projects in ap-southeast-1: REST reads down 113 and
-> 299 s resizing up, 217 and 101 s down. Its Auth and Storage windows (101
-> to 299 s) also disagree with this run's 30-55 s; different org, region and
+> 299 s resizing up, 217 and 101 s down (#211: the 299 s is void, the
+> orchestrator slept 263 s inside it; the 101 s is a lower bound). Its Auth
+> and Storage windows (101 to 299 s) also disagree with this run's 30-55 s; different org, region and
 > day, not explained. `lib/setup.ts` now names the old probes `rest_http` and
 > `realtime_ws` and adds `rest_read` and `realtime_join` to `allProbes`.
 

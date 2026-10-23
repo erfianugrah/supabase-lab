@@ -1,0 +1,20 @@
+pid <pid> sampler=1e4cb33:harness/src/sampler.ts query_timeout=unset
+--- after 20 s (sampler maxWaitMs 6000):
+STAT  %CPU ELAPSED
+SN     0.0   00:20
+    873 Thread_67011930   DispatchQueue_1: com.apple.main-thread  (serial)
+    + 873 start  (in dyld) + 6688  
+    +   873 ???  (in bun)  0x9bdd0c  
+    +     873 ???  (in bun)  0x9be670  
+    +       873 ???  (in bun)  0x9ccf6c  
+    +         873 ???  (in bun)  0xa0dabc  
+    +           873 ???  (in bun)  0xa4ff8c  
+    +             873 ???  (in bun)  0xa359cc  
+    +               873 ???  (in bun)  0x3c14e0  
+    +                 873 ???  (in bun)  0x117f3d0  
+    +                   873 ???  (in bun)  0xe735ec  
+    +                     873 ???  (in bun)  0xe78b2c  
+    +                       872 ???  (in bun)  0x599a98  
+    +                       ! 872 kevent64  (in libsystem_kernel.dylib) + 8  
+    +                       1 ???  (in bun)  0x599a74  
+--- killed

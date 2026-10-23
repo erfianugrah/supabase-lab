@@ -1,0 +1,5 @@
+pid <pid> sampler=harness/src/sampler.ts query_timeout=2000
+  pooler down at +610ms: Query read timeout
+  pooler down at +2813ms: Query read timeout
+  pooler down at +5016ms: Query read timeout
+returned after 7219 ms: rest_http samples=30 failures=0 modes=[] | pooler samples=6 failures=3 modes=["Query read timeout"]

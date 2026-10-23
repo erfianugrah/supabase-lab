@@ -439,9 +439,9 @@ Artifacts, all in `out/2026-10-23/`:
 | operation | rest_http | rest_read | realtime_ws | realtime_join | auth | storage | pooler |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | D03 Medium to Large, B | 0 of 237 failed | 113 | 0 of 220 failed | 107 | 115 | 113 | 113 |
-| D03 Medium to Large, C | 1 of 88 failed | 299 | 0 of 82 failed | 298 | 299 | 299 | 298 |
+| D03 Medium to Large, C (VOID: host asleep 263 s inside it, #211) | 1 of 88 failed | 299 | 0 of 82 failed | 298 | 299 | 299 | 298 |
 | D04 Large to Medium, B | 0 of 670 failed | 217 | 0 of 623 failed | 217 | 216 | 217 | 217 |
-| D04 Large to Medium, C | 0 of 383 failed | 101 | 0 of 336 failed | 98 | 101 | 104 | 200 |
+| D04 Large to Medium, C (outage start unobserved: host asleep 43 s, #211) | 0 of 383 failed | 101 | 0 of 336 failed | 98 | 101 | 104 | 200 |
 
 Modes: `rest_read` failed with `HTTP 521` (and `HTTP 525` in B's D04);
 `realtime_join` with `pg_changes: {:error, "Too many database timeouts"}` or a
@@ -459,16 +459,20 @@ Reading:
 - **A network restriction still leaves the data paths alone** (D02, 0 failed
   `rest_read` and `realtime_join` samples in both runs): REST and Realtime
   reach Postgres from inside the platform, as the 2026-08-04 reading said.
-- The pooler window was the longest by 15 to 96 s in six of the ten
+- The pooler window was the longest by 15 to 96 s in six of the nine valid
   operations above that had an outage (A pass 1 D01, D03, D04; A pass 2 D01,
-  D04; C D04) and within 2 s of the longest other path in the other four (A
-  pass 2 D03, B D03, B D04, C D03). In C's D04 the run's console output (not
+  D04; C D04, whose windows are lower bounds) and within 2 s of the longest
+  other path in the other three (A pass 2 D03, B D03, B D04); C D03 is void
+  (#211). In C's D04 the run's console output (not
   the published artifact) shows Supavisor's circuit breaker (`(ECIRCUITBREAKER)
   too many authentication failures`) answering the correct password until
   about +240 s; the restore-paths key facts describe the same hazard.
 - The two `rest_http` failures were single samples that ended in `The
   operation timed out.`; their windows in the artifacts (41 s and 262 s) are
   how long that one request took to come back, not a sustained outage.
+  Corrected 2026-10-23 (#211): both are the orchestrator Mac asleep
+  (43 s and 263 s in `pmset -g log`) with the request in flight; see the
+  #211 section below.
 
 Gaps and anomalies:
 
@@ -476,7 +480,11 @@ Gaps and anomalies:
   three consecutive passes in 180 s (the run's console note, not in the
   published artifact, shows both probes passing on the last check), probably
   the project still settling from D03; the module ran with the HTTP-tier
-  probes only. So Small to Micro on the data path is n=1 (54 s and 67 s).
+  probes only. Corrected 2026-10-23 (#211): the seed loop's 180 s budget is
+  wall time, and a 263 s sleep of the orchestrator fell at the D03/D04
+  boundary (+202 s into D03 by the reconstruction, within about 6 s), so the
+  budget most likely ran out while the process was frozen; "settling" was
+  not shown. So Small to Micro on the data path is n=1 (54 s and 67 s).
 - **B pass 1 D04 threw** on `429 We are still processing addon changes`
   because it followed D03 at once. `setComputeSize` now retries a 429 every
   60 s and the module reports `addon_429_retries`; B pass 2's D04 needed 2
@@ -491,12 +499,25 @@ Gaps and anomalies:
   13 minutes. Killed, project deleted. An LO05 run (lifecycle-ops) stalled the
   same way. Both stalls happened before the sampler capped each `probe.run()`
   at 30 s (`sampleDeadlineMs`); a deadline may not fix an idle event loop,
-  and the cause is not established.
+  and the cause is not established. Corrected 2026-10-23 (#211): the event
+  loop was not stuck. Most likely (the log shows where each path stopped, not
+  what it awaited) the pooler loop had been awaiting a `select 1` with no
+  query timeout since about +109 s, the Mac slept 66 s at about +122 s, and
+  at +264.7 s the last two failing paths came back, which the sampler did not
+  log (it logged only a path's first recovery). After `maxWaitMs` the sampler
+  awaited the pinned pooler loop forever; idle in `kevent64` at 0 % CPU is
+  what that looks like, and it reproduces locally (#211 section). The LO05
+  stall has no per-sample log; it ran the same pg probes on the pre-cap
+  sampler, and between its start (01:31:40 UTC, its evidence directory name)
+  and its console log's last write (02:46 UTC, file time, local only) the
+  sleep log has seven sleeps; which, if any, fell in the stalled restart is
+  not traceable. Not explained further.
 - One region, one vantage, n=2 per cell at most, consecutive operations on
   the same project. Between the two runs of one operation the Auth window
   varied by 1.3x (restart: 247 and 192 s; Micro to Small: 171 and 218 s) to
   3.5x (Small to Micro: 191 and 54 s); on Medium, 113 and 299 s (Medium to
-  Large) and 216 and 101 s (Large to Medium).
+  Large) and 216 and 101 s (Large to Medium). The 299 s is void and the
+  101 s a lower bound (#211 section).
 - The D01 restart windows here (191 to 250 s for Auth, Storage and the data
   paths) are well above the 2026-08-04 D01 (75 to 78 s) and the 2026-10-10
   LO05 p50s (54 to 58 s). Not explained: different day, different project.
@@ -552,3 +573,116 @@ Reading:
   (`stats_reset` two days before `postmaster_start`) and with the create
   call handing out an already-provisioned instance; inferred from these
   timestamps, not from a platform statement.
+
+## 2026-10-23 - the "event-loop stall" was the orchestrator asleep and a pinned pooler loop (#211)
+
+**Question.** Two runs on 2026-10-23 went silent with the process at 0 % CPU
+and the main thread in `kevent64`, and one `fetch` with
+`AbortSignal.timeout(5000)` took 262 s. Bun bug, or ours? Runtime: Bun
+1.3.14 (`0d9b296af`) on the macOS orchestrator, whose `pmset -g` has system
+sleep set to 1 minute. All clock times below are UTC.
+
+**Finding 1: the long requests and the shared silences are the Mac
+asleep.** The sleep log has a system sleep (idle, or the maintenance sleep
+after a dark wake) at each of them (`out/2026-10-23/host-sleep/pm-events.tsv`:
+the Sleep, Wake and DarkWake lines of `pmset -g log`, converted to UTC, with
+the sleep reason, trimmed to the run windows: only events within 5 min of a
+scanned artifact's start to finish, plus both ends of any sleep overlapping
+one, 41 of the 155 events from 2026-10-22T05:00Z to 2026-10-23T09:30Z. The
+trim is `harness/scripts/sleep-overlap.ts --trim`; every figure below is the
+same from the full and the trimmed log):
+
+- Medium C D03: every path failing until the gap (last samples started at
+  +34.1 s on `pooler`, +38.8 to +39.2 s on the others), then every path
+  except `rest_http` (+301307) `recovered at +300805ms` (`realtime_join`
+  +300804); sleep 01:56:21 to 02:00:44 (263 s). The `rest_http` sample that
+  "took 262 s" started at +39.153 s.
+- Medium C D04: first failure on `storage`, `rest_read` and `auth` all at
+  +40447 ms; sleep 02:00:54 to 02:01:37 (43 s), starting about when the
+  resize PATCH went out.
+- The extra Micro pass: every path quiet from about +122 s, next samples at
+  +187248 to +187250 ms; sleep 02:32:17 to 02:33:23 (66 s). No artifact:
+  placed by its console clock (the pass began at 02:30:08) and by the 65 s
+  gap matching the only 66 s sleep after pass 2 ended at 02:29:42.
+
+Console lines: `out/2026-10-23/host-sleep/console-excerpts.md` (refs
+removed). `durationMs` comes from `performance.now()`, which did not advance
+during these sleeps while `Date.now()` did. Walking each artifact's tests
+forward from `startedAt` and skipping the logged sleeps lands within 5 to 6 s
+of `finishedAt` for the three runs that spanned sleeps; for the two that did
+not, wall span and summed `durationMs` are equal (134.7 and 134.7 s, 434.2
+and 434.2 s). Both in `out/2026-10-23/host-sleep/overlap.txt`, from
+`harness/scripts/sleep-overlap.ts`. By that placement:
+
+| artifact | test | sleep inside it |
+| --- | --- | --- |
+| `run-2026-10-23T01-43-22-996Z` (Micro A, pass 1) | D03 | 263 s at about +202 s, at the D03/D04 boundary after D03's last recovery (pooler at 192 s: first failure 3 s plus window 189 s in the artifact) |
+| same | D04 | 43 s at +9 s, inside the outage; paths failing on both sides of the gap |
+| `run-2026-10-23T01-55-35-451Z` (Medium C) | D03 | 263 s at +46 s, inside the outage; every path up on the first sample after it |
+| same | D04 | 43 s at +1 s, before the first failure |
+| `run-2026-10-23T02-07-03-305Z` (Micro A, pass 2) | D01 | 193, 243 and 103 s at +304, +528, +781 s, after its windows closed |
+
+So: **C D03 is void**: the recovery happened somewhere inside a 263 s blind
+spot, the 298 to 299 s windows include the 263 s sleep, and the 262 s
+`rest_http` sample is the sleep. **C D04's windows (98 to 104 s, pooler
+200 s) are lower bounds**: the outage may have begun unobserved during the
+43 s sleep (first failures at +40447 ms, right after the wake). A pass 1
+D04's windows span a 40 s gap with failures on both sides and stand, but its
+one `rest_http` failure (41 s) is the sleep, and its missing data-path
+columns are most likely the seed loop's 180 s wall budget running out across
+the 263 s sleep: D04's `durationMs` is 219 s in all, too short to hold 180 s
+of awake seeding plus its 191 to 249 s windows. The rest of the table is
+unaffected by placement (two more passes had no sleep at all).
+
+**Finding 2: the 13-minute silence was a pooler loop pinned by a query with
+no timeout.** In the extra Micro pass the `pooler` path logged a failure on
+every sample until `+108781ms` and never logged again. Inference, as the
+log cannot show where a sample waits: its next sample's `select 1` got
+through startup and was never answered, the one unbounded await in that
+probe (`connectionTimeoutMillis` ends at ReadyForQuery; no `query_timeout`
+was set). `rest_read` and `auth` went quiet at +264.7 s most likely because
+they came back up a second time: each had already logged its first recovery
+(+250712 and +249424 ms), and the sampler logged only that one; the other
+reading, two fetches hanging past their abort timeout at once, did not
+reproduce (below). After `maxWaitMs`, `sampleDuring` awaited every loop,
+including the pinned one, forever. With nothing due, Bun waits in
+`kevent64`: the observed state. Reproduced locally with no project
+(`harness/scripts/repro-pinned-loop.ts`, a fake pooler that holds the 4th
+connection's query): the sampler from before the cap (`1e4cb33`) was still
+running 20 s after start, 14 s past its 6 s `maxWaitMs`, `STAT SN`, 0.0 %
+CPU, 872 of 873 main-thread samples in `kevent64`
+(`out/2026-10-23/host-sleep/repro-precap.txt`). The current sampler returns
+after 7013 ms with `probe did not answer within 3000 ms` twice
+(`repro-current.txt`); with `query_timeout` the probe itself fails with
+`Query read timeout` (`repro-current-query-timeout.txt`). No Bun fault
+found: in local scratch probes (one trial each, not kept),
+`AbortSignal.timeout` (1000 ms; 500 ms for DNS) aborted a fetch stuck in DNS
+(a `.local` name that takes 10 s to fail), in TCP connect to an unroutable
+address, in a TLS handshake, on a response body, and on a reused keep-alive
+socket that went silent, each within 2 ms of its timeout.
+
+**Changes.** `harness/src/host-pause.ts`: the runner holds a macOS
+idle-sleep assertion for its own lifetime (`caffeinate -i -w <pid>`, skip
+with `PVLAB_ALLOW_SLEEP=1`), and stamps any test whose wall time exceeds its
+monotonic time by more than 2 s with `host_suspended_s` and a detail note,
+also when the test threw. `sampler.ts` logs `host paused N s at +X ms (...
+the host was suspended)` when its watchdog wakes late, carries `pausedMs`
+per path (pause time inside [0, recovery]), and logs `<path> up again` for
+every later recovery. The pooler (`lib/probes.ts`) and lifecycle-ops
+`direct` probes set `query_timeout` (5 s). `caffeinate -i` blocks idle sleep
+only, not a lid-close sleep; the stamp and the sampler line are what catch
+that.
+
+**Other artifacts spanning a sleep, not audited here (work-supabase-lab#234)**
+(`out/2026-10-23/host-sleep/artifacts-spanning-sleep.txt`: each committed
+pvlab artifact under `out/2026-10-22/` and `out/2026-10-23/`, start and
+finish against the published sleep log): data-api-capacity (three runs,
+2026-10-22/23), realtime-surface RT05 (2026-10-22), restore-paths RP06 and
+RP07 (seven artifacts). Whether a given number in them is affected depends
+on where the sleep fell. The lifecycle-ops LO05 artifact
+(`run-2026-10-23T02-47-19-611Z`, started 02:47:19) holds two sleeps,
+02:52:17 to 02:55:27 and 02:55:37 to 02:56:04; by its own
+`first_restart_accepted_after_healthy_s=698` both fell in the post-create
+wait before the first measured restart, so its restart windows are not
+affected. LO05f, timed for +300 s, went out at +489 s because the sleep
+froze its timer; the 489 s acceptance is real wall time.

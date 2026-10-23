@@ -11,6 +11,7 @@
  * Everything returned is scalar: `measurements` in the report contract is
  * Record<string, number | string>, so a series has nowhere to go.
  */
+import { PAUSE_SLACK_MS, systemClock, type Clock } from "./host-pause";
 
 export interface ProbeOutcome {
   ok: boolean;
@@ -37,6 +38,12 @@ export interface PathWindow {
   windowMs: number | null;
   /** Distinct failure texts, in first-seen order. */
   modes: string[];
+  /**
+   * Host pause (machine asleep, or the event loop blocked) inside
+   * [0, recoveredMs or end of sampling], in ms: a span in which no sample ran.
+   * Non-zero means the window, or a "never failed", has a blind spot that long.
+   */
+  pausedMs: number;
 }
 
 export interface SampleOptions {
@@ -50,13 +57,15 @@ export interface SampleOptions {
    * Hard cap on one probe.run(), default 30 s. A probe's own timeouts are not
    * enough: on 2026-10-23 a fetch with AbortSignal.timeout(5000) took 262 s
    * to return during a resize. A sample past the cap counts as failed with a
-   * fixed mode; the abandoned promise is left to settle on its own. Two runs
-   * that day also stalled with the event loop idle (an LO05 run silent for
-   * over 50 minutes); both stalls happened before this cap existed, a
-   * deadline may not fix that state, and the cause is not established.
+   * fixed mode; the abandoned promise is left to settle on its own. That
+   * 262 s was the Mac asleep (see host-pause.ts), which no deadline
+   * fixes; the cap is for a probe that really hangs, e.g. a pg query with no
+   * timeout, which before it pinned its path's loop for good.
    */
   sampleDeadlineMs?: number;
   log?: (msg: string) => void;
+  /** Injected in tests; defaults to Date.now() / performance.now(). */
+  clock?: Clock;
 }
 
 const DEFAULT_SAMPLE_DEADLINE_MS = 30_000;
@@ -79,9 +88,20 @@ interface PathState {
   pendingRecoveryMs: number | null;
   recoveredMs: number | null;
   modes: string[];
+  /** Last sample failed: the next OK one is a recovery, logged even after the first. */
+  down: boolean;
 }
 
-function finalise(state: PathState): PathWindow {
+interface Pause {
+  fromMs: number;
+  toMs: number;
+}
+
+function overlap(p: Pause, from: number, to: number): number {
+  return Math.max(0, Math.min(p.toMs, to) - Math.max(p.fromMs, from));
+}
+
+function finalise(state: PathState, pauses: Pause[], endMs: number): PathWindow {
   const windowMs =
     state.firstFailMs !== null && state.recoveredMs !== null
       ? state.recoveredMs - state.firstFailMs
@@ -95,6 +115,7 @@ function finalise(state: PathState): PathWindow {
     recoveredMs: state.recoveredMs,
     windowMs,
     modes: state.modes,
+    pausedMs: pauses.reduce((n, p) => n + overlap(p, 0, state.recoveredMs ?? endMs), 0),
   };
 }
 
@@ -108,7 +129,9 @@ export async function sampleDuring(
   opts: SampleOptions,
   operation: () => Promise<void>,
 ): Promise<PathWindow[]> {
-  const t0 = Date.now();
+  const clock = opts.clock ?? systemClock;
+  const t0 = clock.wall();
+  const pauses: Pause[] = [];
   const states: PathState[] = probes.map((probe) => ({
     probe,
     healthyAtStart: null,
@@ -118,13 +141,14 @@ export async function sampleDuring(
     pendingRecoveryMs: null,
     recoveredMs: null,
     modes: [],
+    down: false,
   }));
 
   let stop = false;
 
   async function loop(state: PathState): Promise<void> {
-    while (!stop && Date.now() - t0 < opts.maxWaitMs) {
-      const at = Date.now() - t0;
+    while (!stop && clock.wall() - t0 < opts.maxWaitMs) {
+      const at = clock.wall() - t0;
       let outcome: ProbeOutcome;
       try {
         outcome = await withDeadline(state.probe.run(), opts.sampleDeadlineMs ?? DEFAULT_SAMPLE_DEADLINE_MS);
@@ -136,12 +160,19 @@ export async function sampleDuring(
 
       if (!outcome.ok) {
         state.failures += 1;
+        state.down = true;
         state.pendingRecoveryMs = null;
         if (state.firstFailMs === null) state.firstFailMs = at;
         const mode = (outcome.error ?? "unknown").slice(0, 80);
         if (!state.modes.includes(mode)) state.modes.push(mode);
         opts.log?.(`${state.probe.name} down at +${at}ms: ${mode}`);
+      } else if (state.firstFailMs !== null && state.recoveredMs !== null) {
+        // Later outages are counted in `failures` but do not move the window;
+        // log their end anyway, or a path that went quiet reads as a hang.
+        if (state.down) opts.log?.(`${state.probe.name} up again at +${at}ms`);
+        state.down = false;
       } else if (state.firstFailMs !== null && state.recoveredMs === null) {
+        state.down = false;
         if (state.pendingRecoveryMs === null) {
           state.pendingRecoveryMs = at;
         } else if (at - state.pendingRecoveryMs >= opts.settleMs) {
@@ -156,12 +187,30 @@ export async function sampleDuring(
 
   const loops = states.map((s) => loop(s));
   const watchdog = (async () => {
-    while (!stop && Date.now() - t0 < opts.maxWaitMs) {
+    let lastWall = clock.wall();
+    let lastMono = clock.mono();
+    while (!stop && clock.wall() - t0 < opts.maxWaitMs) {
       // Stop early ONLY once something actually went down and came back.
       // A no-op operation must run to maxWaitMs: a null result has to be
       // earned by waiting, not assumed by an early exit.
       if (states.some((s) => s.firstFailMs !== null) && allSettled(states)) break;
       await Bun.sleep(opts.intervalMs);
+      // This loop does nothing but sleep, so a late wake-up is the host's
+      // doing: wall advanced and monotonic did not = the machine slept;
+      // both advanced = the event loop was blocked. Either way no probe ran.
+      const wall = clock.wall();
+      const mono = clock.mono();
+      const late = wall - lastWall - opts.intervalMs;
+      if (late > PAUSE_SLACK_MS) {
+        pauses.push({ fromMs: lastWall - t0, toMs: wall - t0 });
+        const monoS = ((mono - lastMono) / 1000).toFixed(1);
+        const why = wall - lastWall - (mono - lastMono) > PAUSE_SLACK_MS ? "the host was suspended" : "the event loop was blocked";
+        opts.log?.(
+          `host paused ${Math.round((wall - lastWall) / 1000)} s at +${lastWall - t0}ms (monotonic clock advanced ${monoS} s: ${why}); no sample ran in it`,
+        );
+      }
+      lastWall = wall;
+      lastMono = mono;
     }
   })();
 
@@ -177,5 +226,6 @@ export async function sampleDuring(
   stop = true;
   await Promise.all(loops);
 
-  return states.map(finalise);
+  const endMs = clock.wall() - t0;
+  return states.map((s) => finalise(s, pauses, endMs));
 }
