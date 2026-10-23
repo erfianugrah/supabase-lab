@@ -15,7 +15,7 @@ PVLAB = cd $(ROOT) && PVLAB_EVIDENCE=$(EVD) bun harness/src/run.ts --where local
 
 STACK_IDS ?= CL20,CL21,CL22
 
-.PHONY: gen image local nodocker remote all facts publish-evidence
+.PHONY: gen image local nodocker static remote all facts publish-evidence unit
 
 gen:
 	cd $(ROOT)/harness && bun run gen >/dev/null
@@ -33,12 +33,21 @@ nodocker: gen image
 	mkdir -p $(EVD)
 	$(PVLAB) --only $(STACK_IDS) --destructive
 
+# CL23: static read of the native artifacts (no container, no stack; about 1.1 GB
+# downloaded, kept in PVLAB_CL23_CACHE when set). Needs zstd, objdump, file.
+static: gen
+	mkdir -p $(EVD)
+	$(PVLAB) --only CL23
+
+unit:
+	cd $(ROOT) && bun test experiments/cli-surface/lib
+
 # CL04: one Free-org project, created and deleted by the module.
 remote: gen
 	mkdir -p $(EVD)
 	$(PVLAB) --only CL04 --destructive
 
-all: local nodocker remote
+all: local nodocker static remote
 
 # usage: make facts RUN=evidence/<ts>/run-<stamp>.json [IDS=CL01,CL02]
 facts:

@@ -27,12 +27,15 @@ but recorded no version).
 | CL20 | stack in a box with no Docker: legacy control, cold start, ports, lazy services, first-request latency, memory, restart, app flow through the gateway |
 | CL21 | main plus two linked worktrees: ports, start times, isolation, memory, stop one, branch switch, fixed-port config collision |
 | CL22 | switches and precedence, command surface (db diff, declarative, reset, migration, dump, lint, gen types, test db, functions serve), services vs the legacy list, config drift |
+| CL23 | static read, no stack: the CLI's Linux binaries (tarball and `.apk`), the bundle's native targets, artifact pins and idle-stop constants, and every pinned linux-amd64/arm64 artifact classified as bundled glibc, static or host glibc (with the version it needs) |
 
 ## Run
 
 ```bash
 make -C experiments/cli-surface local        # CL01-CL03, needs Docker
 make -C experiments/cli-surface nodocker     # CL20-CL22, builds pvlab-cli-nodocker:2.120.0
+make -C experiments/cli-surface static       # CL23, no Docker; about 1.1 GB downloaded (PVLAB_CL23_CACHE keeps it)
+make -C experiments/cli-surface unit         # parser unit tests for CL23
 sx SUPABASE_ACCESS_TOKEN -- env PVLAB_ORG_FREE=<free-org-slug> \
   make -C experiments/cli-surface remote     # CL04, creates and deletes one project
 ```
