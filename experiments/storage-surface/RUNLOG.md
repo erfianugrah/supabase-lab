@@ -3,7 +3,7 @@
 Chronological record of what was run. Org slugs and project refs are not
 recorded; the org class is (a Pro-plan organization). Published artifacts
 (refs, hostnames and the vantage address redacted) are in `out/2026-10-10/`
-(SS01, SS02), `out/2026-10-12/` (SS03 to SS07), `out/2026-10-21/` (SS08) and `out/2026-10-22/` (SS09);
+(SS01, SS02), `out/2026-10-12/` (SS03 to SS07), `out/2026-10-21/` (SS08, SS10), `out/2026-10-22/` (SS09) and `out/2026-10-23/` (SS11, SS12);
 the file names below are those artifacts' names, and each cell cites a module
 id. Pin the citations to the lab commit that adds this directory.
 
@@ -763,6 +763,10 @@ encryption keys. That is "no published API surface", not "no such option".
   several GB after the module's deletes; operator note, not measured).
 - Contract and certification questions (encryption at rest, BAA, SLA).
 
+SS11 and SS12 (2026-10-23, below) took up the stale-copy timing, purge and
+fresh signed URLs, objects past 2 GiB, parallel parts, two TUS clients on
+one URL, MinIO space after deletes, and the default bind mount.
+
 ### Cleanup
 
 Four managed projects were created (runs 1 to 4). Runs 1, 2 and 4 deleted
@@ -1119,3 +1123,261 @@ records as left as found; they were deleted on 2026-10-22 with
 `make ss09-teardown` (the target now named `ss10-teardown`), DELETE 200 for
 both, and `make sweep` afterwards listed `0 ss- projects` (operator note, not
 an artifact).
+
+## 2026-10-23 - SS11 (managed Pro project in ap-southeast-1) and SS12 (local self-hosted rig)
+
+The items left in "Not measured (SS03 to SS07)" above: how long a stale
+cached copy is served after an overwrite and whether a purge or a fresh
+signed URL changes it, objects past 2 GiB, parallel part uploads, TUS with
+two clients on one URL (SS11, managed); whether deleted objects free MinIO
+space, and the file backend on the default bind mount past the failed
+preflight (SS12, self-hosted). SS09b already timed a REST upsert on the
+public URL and a reused signed URL (v1 for up to 46 s, every read v2 from
+51 s, n = 3); SS11a polls the other paths, with a public-URL control in the
+same window. Claims under test: "It can take up to 60 seconds for the CDN
+cache to be invalidated"
+(https://supabase.com/docs/guides/storage/cdn/smart-cdn#cache-duration), and
+the purge page's "it can take up to 60 seconds for the invalidation to
+propagate across all CDN edge nodes"
+(https://supabase.com/docs/guides/storage/cdn/purge-cdn-cache, "Pro Plan and
+above"), both fetched 2026-10-23.
+
+SS11 shape: n = 1 run, `run-2026-10-23T08-58-46-286Z` (published in
+`out/2026-10-23/`), one project `ss-ss11-<epoch>` created and deleted by the
+module. Storage server `1.80.2` (`SS11_setup storage_version`). Buckets `pub`
+(public) and `priv` (private), a select policy for any authenticated user on
+both; one signed-in user (U) for the authenticated and `download()` reads;
+uploads, overwrites, signing and purge with the service_role key. Upload limit
+raised from `52428800` to `10737418240` (`PATCH 200`, effective after `4s`).
+One laptop client in Singapore (operator note). The artifact records
+`labCommit` 661afdf, the commit before this module was added.
+
+### SS11a - staleness after an overwrite, per path
+
+14 trials in parallel, two per arm, each on its own key: v1 is 1,000 B of
+`a`, v2 2,000 B of `b`, and the first byte says which version a read
+returned. Each key was read until the edge answered `HIT` (every one of the
+14 reached `HIT`, 13 on the second read), overwritten (every overwrite
+`200`), then read every 5 s for 150 s. `first v2` is the seconds from the
+overwrite to the first read returning v2, `last v1` the last read still
+returning v1 (`-1`: none).
+
+| arm | path and overwrite | trial 1: first v2 / last v1 | trial 2: first v2 / last v1 |
+|---|---|---|---|
+| public_control | public URL, REST upsert (SS09b's case) | `56` / `50` | `56` / `50` |
+| auth_range | `/object/authenticated` as U, `Range: bytes=0-99`, S3 PutObject overwrite (SS03e's case) | `55` / `50` | `5` / `45` |
+| auth_other_range | as auth_range, warmed with `bytes=0-99`, polled with `bytes=100-199` | `56` / `51` | `56` / `51` |
+| download_priv | `GET /object/priv/<key>` as U (the request supabase-js `download()` sends, SS08c), REST upsert | `5` / `30` | `56` / `51` |
+| public_purge | public URL, REST upsert, then `DELETE /storage/v1/cdn/pub/<key>` | `6` / `1` | `5` / `0` |
+| auth_range_purge | auth_range, then the purge | `7` / `1` | `6` / `0` |
+| fresh_signed | priv, one signed URL warmed, REST upsert, then a new signed URL for every read | `0` / `-1` | `0` / `-1` |
+
+The four purge calls answered `200 {"message":"success"}` in 0.3 to 0.8 s
+(`*_purge_done_s`). From the traces:
+
+- No purge, 8 trials on four paths (public URL, authenticated with the
+  warmed range, authenticated with another range, `download()` on the
+  private bucket): 6 served v1 on every read through 50 or 51 s, then a
+  `MISS` with v2 at 55 or 56 s and `HIT` v2 after. The other 2
+  (download_priv_1, auth_range_2) read a `MISS` with v2 at 5 s and then
+  alternated, `HIT` v1 and `HIT` v2, until their last v1 at 30 s and 45 s.
+  SS09b recorded the same two patterns on the public URL and a reused
+  signed URL.
+- A range that was never requested before the overwrite (`bytes=100-199`)
+  was served v1 from the cache for as long as the warmed range: one cache
+  entry answers both ranges of the object. Inferred from the timing; the
+  edge's cache key is not visible.
+- Purge, 4 trials: the read right after the purge call returned (0 or 1 s)
+  was still `HIT` v1; the next, at 5 to 7 s, a `MISS` with v2, and every read
+  after it v2 (no alternation). Docs allow up to 60 s.
+- A new signed URL per read: v2 from the first read after the overwrite, a
+  `MISS` on every read (30 per trial). The warmed signed URL itself was not
+  read again, so its own staleness is SS09b's figure.
+
+### SS11e - two clients on one TUS upload URL
+
+Raw `node:https` clients (one agent each) on the direct storage host, a
+12 MiB upload (`Upload-Length` 12582912). Client A sends 6 MiB at offset 0
+in 512 KiB writes 0.5 s apart; client B starts 1.5 s later. `at` is ms from
+A's start.
+
+| scenario | A's PATCH | B | after |
+|---|---|---|---|
+| overlap: B also PATCHes 6 MiB at offset 0 | `204 at=5545ms offset=5242880` | `409 at=5267ms ... body=Upload-Offset conflict` | HEAD offset `5242880`; the rest filled with `C`; object `200 bytes=12582912`, first 6 MiB `A:5242880 C:1048576`, second `C:6291456` |
+| head-during: B sends HEAD, then PATCHes at the offset it returns | `204 at=5552ms offset=5242880` | HEAD `200 at=4850ms offset=5242880`; PATCH at 5242880 `204 at=5439ms offset=11534336` | object `200 bytes=12582912`, `A:5242880 B:1048576` then `B:5242880 C:1048576` |
+| pair: two tus-js-client processes given the same upload URL and the same 64 MiB file, started together | - | client 1 `HEAD:200 PATCH:409`, `failed after 0 chunks: 409`; client 2 `completed, 11 chunks` | GET `200 bytes=67108864 sha256_equals_fixture=true` |
+
+What this shows, for this run: A's PATCH ended with 5,242,880 B stored (10
+of its 12 writes) while it was still sending, about the time B's request
+was answered; the server did not take two writers at one offset. In
+`overlap` B got `409 Upload-Offset conflict` and the object holds A's 5 MiB
+and nothing of B's. In `head-during` B's HEAD, sent at about 1,500 ms, returned at 4,850 ms
+with A's final offset, and B continued from there, so the object is A's first 5 MiB
+followed by B's bytes: valid by offset, mixed by writer. With two
+tus-js-client processes and identical bytes, one failed on its first PATCH
+with 409 and the other completed a correct object. How the server cut A
+short (a lock handed to the newer request, or a timeout) is not visible
+from the client; it is not separated here.
+
+### SS11b - UploadPart concurrency
+
+256 MiB (16 parts of 16 MiB, the first 16 parts of the 2304 MiB fixture) to
+the direct host, one upload per concurrency, in the order 1, 8, 4, 16. MB is
+10^6 bytes, timed from CreateMultipartUpload to CompleteMultipartUpload.
+Every upload completed `200` and its ETag equals the AWS multipart value for
+those part MD5s (so every part arrived intact).
+
+| concurrency | wall time | MB/s | part p50 / p95 / max |
+|---|---|---|---|
+| 1 | `11359 ms` | `23.6` | `655` / `930` / `930` ms |
+| 4 | `8722 ms` | `30.8` | `1157` / `4224` / `4224` ms |
+| 8 | `8288 ms` | `32.4` | `3270` / `6775` / `6775` ms |
+| 16 | `7374 ms` | `36.4` | `6241` / `6817` / `6817` ms |
+
+One upload per concurrency, one vantage, so differences of a few MB/s are
+within what a second run could move. From 1 to 16 parts in flight the rate
+rose about 1.5x (derived) while the per-part time rose about tenfold
+(p50 655 to 6241 ms), which fits a shared limit such as this client's uplink
+filling up; the uplink was not measured, so the limiter is not named here.
+
+### SS11c, SS11d - 2304 MiB through S3 multipart and through TUS
+
+The fixture `huge` is 2,415,919,104 B (2304 MiB, 144 parts of 16 MiB) of
+seeded bytes. Both uploads went to the direct host; both reads were one S3
+GetObject from the gateway, hashed as it streamed.
+
+| row | S3 multipart, concurrency 8 (SS11c) | TUS, tus-js-client, 6 MiB chunks (SS11d) |
+|---|---|---|
+| upload | `61587 ms, 39.2 MB/s, part p50 2789 p95 7713 max 8252 ms, complete 200` | `completed, 384 chunks`, `196361` ms, `12.3` MB/s |
+| final ETag | AWS multipart form for 144 parts (`final_etag_aws_form` `true`) | `md5-dash-384` |
+| full GET | `200 bytes=2415919104 content-length=2415919104 ms=42459` | `200 bytes=2415919104 content-length=2415919104 ms=49774` |
+| SHA-256 equals the fixture | `true` | `true` |
+| `storage.objects` `metadata.size` and `contentLength` | `2415919104`, `2415919104` | same |
+| REST list `metadata.size`; REST HEAD `content-length` | `2415919104`; `2415919104` | same |
+| TUS creation response | - | `201`, no `Tus-Max-Size` header |
+
+What this shows: an object past 2 GiB (2^31 = 2,147,483,648 B) completes
+through both protocols with the upload limit raised, reads back
+byte-identical, and every size field the run read (metadata, list, HEAD,
+GET `Content-Length`) carries the full 2,415,919,104 B, with no 32-bit
+truncation. Both uploads ran once; the 39.2 against 12.3 MB/s compares 8
+parallel parts with TUS's one chunk at a time from this client and is not a
+protocol ceiling.
+
+### Cleanup (SS11)
+
+The project was deleted in `finally` (`SS11_teardown`, `DELETE HTTP 200`).
+`make sweep` at 09:09 UTC: `sweep: 0 ss- projects`, and a GET of the
+project returned 404 (operator notes, not artifacts). Every object was
+deleted before teardown (`delete` `200` in SS11c and SS11d).
+
+
+### SS12 - does a delete free backend space (self-hosted)
+
+The 2026-10-12 cleanup left several GB in the MinIO data directory after the
+module's deletes (operator note in "Not measured (SS03 to SS07)"). SS12 lists
+the backend's files after every delete path. Local rig only: the managed
+backend is not visible to a project.
+
+Shape: the self-hosted-defaults rig at its pinned supabase/supabase commit,
+one fresh stack per run (`make clean stack up`), `make probe-sh SHMODS=SS12`.
+Five runs on 2026-10-23, published in `out/2026-10-23/`:
+
+| artifact | target | backend files read from |
+|---|---|---|
+| `run-2026-10-23T08-36-10-723Z` | `sh-s3@v1.74.0` | host bind mount `volumes/minio` (`minio-hostdir` layer) |
+| `run-2026-10-23T08-41-52-008Z` | `sh-s3@v1.80.2` | same |
+| `run-2026-10-23T08-47-08-957Z` | `sh-file@v1.74.0` on the default `./volumes/storage` bind mount | preflight only |
+| `run-2026-10-23T08-47-59-431Z` | `sh-file@v1.74.0` on a named volume (`storage-volume` layer) | `find` inside the storage container at `/var/lib/storage` |
+| `run-2026-10-23T08-53-28-034Z` | `sh-file@v1.80.2` on a named volume | same |
+
+MinIO in both s3 runs: `RELEASE.2026-09-22T19-25-18Z` (`SS12_setup
+minio_version`; the pinned compose file names the image without a tag, so
+this is whatever `latest` was when pulled). Objects of 64 MiB (seeded
+fixtures `r1` and, for the overwrites, `r2`). Steps in order, one key each:
+five S3 PutObjects (k1 to k5); k1 REST DELETE; k2 S3 DeleteObject; k3 REST
+upsert with other bytes; k5 S3 PutObject over the existing key; k4 SQL delete
+with `storage.allow_delete_query = 'true'`; k6 a multipart upload of three
+16 MiB parts left open, then aborted; k7 a TUS upload SIGKILLed after three
+6 MiB chunks, then a TUS DELETE on its URL; the bucket emptied (`POST
+/bucket/reclaim/empty`) and deleted. A listing after each step at +0 s and
++15 s (+60 s after the upsert and the bucket delete), then one every 10 s for
+up to 10 minutes until MinIO's `.minio.sys/tmp` held under 1 MiB (s3) or the
+total stopped changing for a minute (file). `t=` is seconds since the
+baseline listing.
+
+| step | `sh-s3@v1.74.0` | `sh-s3@v1.80.2` | `sh-file@v1.74.0` | `sh-file@v1.80.2` |
+|---|---|---|---|---|
+| after five puts | `total=320MiB` | `total=320MiB` | `total=320MiB` | `total=320MiB` |
+| k1 REST DELETE (+0 s) | `total=320MiB`, `tmp+trash=64MiB` | same | `total=256MiB` | `total=256MiB` |
+| k2 S3 DeleteObject (+0 s) | `total=320MiB`, `tmp+trash=128MiB` | same | `total=192MiB` | `total=192MiB` |
+| k3 REST upsert (+60 s) | `total=384MiB`, `tmp+trash=192MiB`, `k3=64MiB/5f` | same | `total=192MiB`, `k3=64MiB/1f` | same |
+| k5 S3 overwrite (+15 s) | `total=448MiB`, `tmp+trash=256MiB` | same | `total=192MiB` | `total=192MiB` |
+| k4 SQL delete (+15 s) | `k4=64MiB/5f` | same | `k4=64MiB/1f` | same |
+| k6 multipart open, three parts | `minio.sys/multipart=48MiB` | same | `k6=48MiB/4f` | same |
+| k6 aborted (+0 s) | `minio.sys/multipart=0MiB`, `tmp+trash=304MiB` | same | `total=192MiB` | `total=192MiB` |
+| k7 TUS killed after 3 chunks | `minio.sys/multipart=18MiB`, `k7=0MiB/1f` | same | `k7=18MiB/2f` | same |
+| k7 TUS DELETE | `204`; `tmp+trash=322MiB` | `204`; `tmp+trash=322MiB`, `k7=0.1MiB/1f` left | `204`; `total=192MiB` | same |
+| bucket emptied and deleted (+0 s) | `total=514.1MiB`, `tmp+trash=450MiB`, only `k4=64MiB/5f` | same, plus `k7=0.1MiB/1f` | `total=64MiB files=1`, only `k4=64MiB/1f` | same |
+| last recorded listing before the tail (tail values not kept) | `t=248s total=514.1MiB` | `t=223s total=514.1MiB` | - | - |
+| settled (`tail_settled_at`) | `t=278s total=64MiB`, `tmp+trash=0MiB` | `t=263s total=64.1MiB`, `tmp+trash=0MiB` | `t=292s total=64MiB` (`64MiB` at every recorded listing from `t=162s`; the tail stops only after equal totals for 60 s) | `t=294s total=64MiB` (same, from `t=163s`) |
+| `final_minus_baseline_mib` | `64` | `64.1` | `64` | `64` |
+
+Bucket empty answered `200 {"message":"Empty bucket has been queued.
+Completion may take up to an hour."}` on every target; the listing taken
+about 5 s later (after the bucket delete, `200 Successfully deleted`) already
+showed the objects gone from the bucket's path.
+
+What this shows, for these runs:
+
+- Every API delete path (REST, S3, an upsert's old version, an S3 overwrite's
+  old version, an aborted multipart upload, a terminated TUS upload, a bucket
+  emptied) removed the data from the object's path at once on both backends.
+  The file backend freed the bytes at once. MinIO moved them into
+  `.minio.sys/tmp` (the `tmp+trash` column), where the total still counted
+  them, and released it between about `t=268s` and `t=278s` (1.74.0) and
+  `t=253s` and `t=263s` (1.80.2), about 240 to 260 s after the first delete
+  (`t=30s` and `t=5s`). The bounds come from the tail's 10 s spacing and its
+  stop rule (it stops at the first listing under 1 MiB, so the one before
+  held more); the tail kept only its last listing, so whether the release was
+  one step or several is not recorded. Whether that is a MinIO timer, idle
+  detection or something else was not separated.
+- A SQL delete leaves the object's bytes on both backends (`k4`, 64 MiB, still
+  there after the bucket was deleted; `objects_rows_left` 0). Same finding as
+  SS01c on managed (the row re-inserted with the original `version` served
+  the bytes again), here seen directly on disk.
+- A killed TUS upload holds its received chunks (18 MiB on both backends)
+  until a TUS DELETE; an open multipart upload holds its parts until
+  AbortMultipartUpload. Neither was left to expire in these runs.
+- `sh-s3@v1.80.2` left one 0.1 MiB file under the TUS key after the TUS
+  DELETE and the bucket delete; 1.74.0 left none.
+- File backend on the default bind mount, Docker Desktop for macOS (Docker
+  Engine 29.9.2, operator note from `docker info`, not in the artifact): the
+  1 KiB preflight failed as on 2026-10-12 (S3 `500
+  InternalError`, REST `500 ... "The file system does not support extended
+  attributes or has the feature disabled."`), so nothing past it runs on that
+  mount. Docker Desktop had VirtioFS file sharing enabled (operator note,
+  read from its settings file).
+
+Operator notes (not artifact-backed): one development run at 08:31 UTC with
+an earlier version of the module (no tail) ended with 454.5 MiB in
+`.minio.sys/tmp`; a `du` on the host about a minute later found that
+directory at 28 KiB and the SQL-deleted key still at 64 MiB.
+
+Not measured in SS12: the managed backend; MinIO with versioning or lifecycle
+rules; a different MinIO release; Linux hosts; how long an abandoned TUS
+upload or open multipart upload is kept before any expiry; n = 1 per variant.
+
+### Not measured (SS11, SS12)
+
+- Repeat runs: SS11 is n = 1 (two trials per SS11a arm), SS12 n = 1 per
+  variant; other regions, PoPs and vantages.
+- The client's uplink, so the limiter in SS11b and SS11c is not named.
+- Purge of a whole bucket, purge with a secret (`sb_secret_`) key, and purge
+  without an overwrite; staleness on the direct storage host.
+- TUS with two clients on the gateway host, or one on each host; how the
+  server ended A's PATCH early.
+- Objects past 2304 MiB; TUS chunk sizes other than 6 MiB at this size.
+- The managed backend's space accounting after deletes; self-hosted file
+  backend on Linux, or on macOS with a file-sharing implementation other than
+  the one Docker Desktop was using.

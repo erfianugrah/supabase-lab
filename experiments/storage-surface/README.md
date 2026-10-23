@@ -35,6 +35,10 @@ https://supabase.com/docs/guides/storage/s3/authentication).
 | SS08a-e | CDN cache state per read path on a public and a private bucket: supabase-js `download()`, public URL, `/object/authenticated`, signed URLs reused and fresh, a second user, a long `cacheControl`; a plain and a client-gzipped JSON object's bytes on the wire with and without `Accept-Encoding` |
 | SS09a-d | What the CDN keeps serving: a signed URL read until `HIT` (at most 12 reads) and read again after its token expired, an object deleted behind a cached unexpired signed URL, an upsert in place on the public URL and a reused signed URL (seconds until the new bytes), and the `Cache-Control` each path returns for `cacheControl` 3600 and 31536000 |
 | SS10u, SS10c | A known download load for reading the usage meter: two kept projects, the client sending `Accept-Encoding: gzip` to one and none to the other, each with N uncached reads (a new signed URL per read) and N reads of one public URL of the SS08 JSON object; wire bytes, `cf-cache-status` and `Content-Encoding` per arm. The metered values are read outside the lab |
+| SS11a | How long an overwritten object stays stale on `/object/authenticated` (ranged, S3 overwrite), on another range of it, on the `download()` path of a private bucket, and through a new signed URL per read; whether `DELETE /storage/v1/cdn/<bucket>/<key>` (purge) shortens it; a public-URL control in the same window |
+| SS11b-d | UploadPart concurrency 1, 4, 8, 16 on 256 MiB; a 2304 MiB object through S3 multipart (concurrency 8) and through TUS: completes, SHA-256 of a full GET, the size recorded |
+| SS11e | Two clients on one TUS upload URL: overlapping PATCHes at offset 0, a HEAD and PATCH during another client's PATCH, two tus-js-client processes resuming one URL |
+| SS12 | Self-hosted only: backend bytes after each delete path (REST, S3, upsert, S3 overwrite, SQL delete, aborted multipart, terminated TUS, bucket empty and delete) on the file and MinIO backends |
 
 ## Run
 
@@ -57,7 +61,9 @@ sx SUPABASE_ACCESS_TOKEN -- make probe MODS=SS08  # read paths and compression (
 sx SUPABASE_ACCESS_TOKEN -- make probe MODS=SS09  # expiry, delete, upsert staleness, Cache-Control (about 7 min; estimated under 1 MB of egress from the read count)
 sx SUPABASE_ACCESS_TOKEN -- make probe MODS=SS10  # egress-meter load, N=600: about 1 min, about 1.1 GB on the wire; KEEPS two projects
 sx SUPABASE_ACCESS_TOKEN -- make ss10-teardown REFS=<gz_ref>,<plain_ref>  # delete them after the usage read
-make clean-fixtures                                # the 2 GiB, 256 MiB and 64 MiB fixtures
+sx SUPABASE_ACCESS_TOKEN -- make probe MODS=SS11  # overwrite staleness, purge, past-2 GiB objects, parallel parts, TUS race (about 30 min; about 5.8 GiB up, 4.5 GiB down)
+make probe-sh SHMODS=SS12                          # on any self-hosted variant above: does a delete free backend space (about 5 min)
+make clean-fixtures                                # the 2 GiB, 256 MiB and 64 MiB fixtures, and SS11's 2304 MiB and two 64 MiB
 make sweep                                         # needs SUPABASE_ACCESS_TOKEN: lists leftovers
 make publish-evidence RUN=evidence/<ts>/run-<stamp>.json
 ```
