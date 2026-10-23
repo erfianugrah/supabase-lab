@@ -18,10 +18,11 @@
  * database-password change is one way a restart gets triggered.
  *
  * This module calls `PATCH /v1/projects/{ref}/database/password` on an
- * ordinary OpenTofu-provisioned project. The one run so far (2026-10-01,
- * RUNLOG.md) found no restart: pg_postmaster_start_time() did not move, so
- * on a plain project the PATCH alone does not restart Postgres and the
- * checkpointer question goes unanswered. Projects provisioned through an
+ * ordinary OpenTofu-provisioned project. The 2026-10-01 run and two passes
+ * on 2026-10-23 (#208, self-provisioned, data-path probes) found no restart:
+ * pg_postmaster_start_time() did not move, so on a plain project the PATCH
+ * alone does not restart Postgres and the checkpointer question goes
+ * unanswered (RUNLOG.md). Projects provisioned through an
  * integration were not tested (a Vercel-Marketplace project cannot be stood
  * up from OpenTofu or the Supabase API - Vercel's CLI needs one
  * human-confirmed `accept-terms` step per team, RUNLOG.md). The cheaper route
@@ -29,8 +30,9 @@
  * restart signal around D01's direct `/restart`.
  *
  * Reuses D01-D04's shared assembly (lib/setup.ts) for the per-path outage
- * measurement, with ONE deliberate deviation: the pooler probe is NOT
- * included. `buildProbes()`'s pooler probe authenticates with
+ * measurement (`buildProbes`, so since 2026-10-23 the data-path probes
+ * `rest_read` and `realtime_join` too), with ONE deliberate deviation: the
+ * pooler probe is NOT included. `buildProbes()`'s pooler probe authenticates with
  * `ctx.dbPassword` for the WHOLE sampling window, but this module changes the
  * real password partway through that same window - so a pooler probe would
  * start failing on a STALE CREDENTIAL partway through, indistinguishable from
@@ -48,9 +50,8 @@
 import type { TestModule, TestResult } from "../../../harness/src/types";
 import type { Probe } from "../../../harness/src/sampler";
 import { sampleDuring } from "../../../harness/src/sampler";
-import { restProbe, authProbe, storageProbe, realtimeProbe } from "../lib/probes";
 import {
-  AUTH_PATH,
+  buildProbes,
   INTERVAL_MS,
   SETTLE_MS,
   flatten,
@@ -70,14 +71,11 @@ const mod: TestModule = {
   requires: ["pat", "anon-key"],
   destructive: true,
   async run(ctx): Promise<TestResult> {
-    const anon = ctx.anonKey as string;
-    const probes: Probe[] = [
-      restProbe(ctx.apiHost, anon),
-      authProbe(ctx.apiHost, anon, AUTH_PATH),
-      storageProbe(ctx.apiHost, anon),
-      realtimeProbe(ctx.apiHost, anon),
-    ];
-    ctx.log("probes: rest, auth, storage, realtime (pooler deliberately excluded - see module doc comment)");
+    // Since 2026-10-23 (#208) the data-path probes rest_read and realtime_join
+    // run beside the HTTP-tier rest_http and realtime_ws (buildProbes); the
+    // 2026-10-01 run had the HTTP-tier pair only.
+    const { probes, note } = await buildProbes(ctx, { pooler: false });
+    ctx.log(`probes: ${probes.map((p: Probe) => p.name).join(", ")} (${note}; pooler deliberately excluded - see module doc comment)`);
 
     const before = await readRestartSignal(ctx);
     ctx.log(

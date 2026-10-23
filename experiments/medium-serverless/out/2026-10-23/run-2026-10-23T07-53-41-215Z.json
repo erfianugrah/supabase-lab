@@ -1,0 +1,80 @@
+{
+  "startedAt": "2026-10-23T07:53:41.215Z",
+  "finishedAt": "2026-10-23T07:55:20.657Z",
+  "where": "local",
+  "region": "ap-southeast-2",
+  "projectRegion": "ap-southeast-2",
+  "ref": "<ref>",
+  "experiment": "medium-serverless",
+  "labCommit": "661afdf",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "MS02a",
+      "title": "PATCH billing/addons ipv4_default",
+      "status": "pass",
+      "detail": "HTTP 200 in 147ms",
+      "measurements": {
+        "http_status": 200,
+        "call_ms": 147
+      },
+      "durationMs": 99438
+    },
+    {
+      "id": "MS02b",
+      "title": "DNS swap for the database host, seen from this resolver",
+      "status": "fail",
+      "detail": "no A record within 600s",
+      "measurements": {
+        "a_record_s": "n/a",
+        "aaaa_gone_s": 34.7,
+        "a_after": 0,
+        "aaaa_after": 0,
+        "patch_at_s": 1
+      },
+      "durationMs": 99438
+    },
+    {
+      "id": "MS02c",
+      "title": "time-to-usable from IPv4: direct 5432 and dedicated 6543",
+      "status": "pass",
+      "detail": "direct first ok 79s, dedicated first ok 79s (sampling started 1s before the PATCH returned); 33 samples at 500ms",
+      "measurements": {
+        "direct_first_ok_s": 79,
+        "dedicated_first_ok_s": 79,
+        "samples": 33,
+        "direct_last_error": "getaddrinfo ENOTFOUND",
+        "dedicated_last_error": "getaddrinfo ENOTFOUND"
+      },
+      "durationMs": 99438
+    },
+    {
+      "id": "MS02d",
+      "title": "control paths across the switch: shared pooler 6543, REST and Realtime",
+      "status": "pass",
+      "detail": "shared pooler failed 0/33 samples, rest_http failed 0/169, realtime_ws failed 0/151, rest_read failed 0/119, realtime_join failed 0/111; data-path probes ready after 7s",
+      "measurements": {
+        "shared_fail_samples": 0,
+        "shared_mode": "none",
+        "rest_http_fail_samples": 0,
+        "rest_http_samples": 169,
+        "rest_http_mode": "none",
+        "realtime_ws_fail_samples": 0,
+        "realtime_ws_samples": 151,
+        "realtime_ws_mode": "none",
+        "rest_read_fail_samples": 0,
+        "rest_read_samples": 119,
+        "rest_read_mode": "none",
+        "realtime_join_fail_samples": 0,
+        "realtime_join_samples": 111,
+        "realtime_join_mode": "none"
+      },
+      "durationMs": 99438
+    }
+  ]
+}

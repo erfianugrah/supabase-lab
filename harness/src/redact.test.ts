@@ -134,6 +134,15 @@ describe("redact removes the addresses it is told to, and only those", () => {
     expect(redact("connect ECONNREFUSED 2001:db8:1:2::abcd:5432", [], ["2001:db8:1:2::abcd"])).toBe("connect ECONNREFUSED <addr>:5432");
     expect(redact("2001:db8:1:2::abcd:5432:1", [], ["2001:db8:1:2::abcd"])).toBe("2001:db8:1:2::abcd:5432:1");
   });
+  test("a listed IPv4 literal followed by :port is replaced (2026-10-23, #208)", () => {
+    expect(redact("connect ECONNREFUSED 192.0.2.44:6543", [], ["192.0.2.44"])).toBe("connect ECONNREFUSED <addr>:6543");
+    expect(redact("192.0.2.4:6543", [], ["192.0.2.44"])).toBe("192.0.2.4:6543");
+    // IPv4 has no longer-address reading, so a colon after the port is text
+    // (`<addr>:5432: connection refused`) and must not shield the address.
+    expect(redact("192.0.2.44:6543:1", [], ["192.0.2.44"])).toBe("<addr>:6543:1");
+    expect(redact("192.0.2.44:5432: Connection refused", [], ["192.0.2.44"])).toBe("<addr>:5432: Connection refused");
+    expect(redact("192.0.2.44:65432", [], ["192.0.2.44"])).toBe("<addr>:65432");
+  });
   test("a listed IPv4 literal becomes <vantage-ip>", () => {
     expect(redact('no pg_hba.conf entry for host "192.0.2.44", user "postgres"', ["192.0.2.44"])).toBe('no pg_hba.conf entry for host "<vantage-ip>", user "postgres"');
   });

@@ -36,7 +36,7 @@ SHARED_TXN ?= $(POOLER):6543
 POOLER_TXN ?= db.$(REF).supabase.co:6543
 POOLER_TXN_USER ?= postgres
 
-.PHONY: init fmt validate apply pooler-config bench-init probe probe-destructive probe-bg publish-evidence destroy
+.PHONY: init fmt validate apply pooler-config bench-init probe probe-destructive probe-bg selfprov publish-evidence destroy
 
 init:
 	tofu init
@@ -106,6 +106,21 @@ probe-bg:
 	@mkdir -p evidence
 	@nohup $(MAKE) probe-destructive ONLY=$(ONLY) > evidence/probe-$(TS).log 2>&1 &
 	@echo "log: evidence/probe-$(TS).log"
+
+# Self-provisioned run, no tofu state (2026-10-23, #208): platform-downtime's
+# wrapper creates a pd-* Medium project on the Pro org in MS_REGION, runs
+# MS_PLAN (one --only per pass, `@<s>` = not before that project age), removes
+# the IPv4 add-on MS02 turns on, and deletes the project. Writes
+# evidence/<ts>/pass<n>/project.json (age, compute, database size) per pass.
+# Needs SUPABASE_ACCESS_TOKEN and PVLAB_ORG_PRO in the environment.
+MS_REGION ?= ap-southeast-2
+MS_PLAN ?= MS02;MS07;MS07@3600
+selfprov:
+	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "export SUPABASE_ACCESS_TOKEN"; exit 1)
+	@test -n "$$PVLAB_ORG_PRO" || (echo "export PVLAB_ORG_PRO=<pro org slug>"; exit 1)
+	@cd $(ROOT) && bun harness/scripts/gen-registry.ts >/dev/null
+	@cd $(ROOT) && PD_EXPERIMENT=medium-serverless PD_SIZE=medium PD_REGION=$(MS_REGION) PD_PLAN='$(MS_PLAN)' \
+		PD_OUT=experiments/medium-serverless/evidence/$(TS)-$(MS_REGION) bun experiments/platform-downtime/lib/selfprov.ts
 
 publish-evidence:
 	@test -n "$(RUN)" || (echo "RUN=evidence/<ts>/run-<stamp>.json required"; exit 1)

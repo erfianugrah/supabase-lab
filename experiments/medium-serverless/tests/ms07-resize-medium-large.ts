@@ -12,6 +12,10 @@
  *          6543 and 5432, dedicated 6543, direct 5432 - with the failure MODE.
  *   MS07b  Large -> Medium: the same.
  *
+ * Since 2026-10-23 (#204, first run with them #208) `allProbes` adds the
+ * data-path probes `rest_read` and `realtime_join`; the REST and Realtime
+ * rows of the 2026-09-30 run were the HTTP-tier `rest_http` and `realtime_ws`.
+ *
  * DESTRUCTIVE and BILLABLE: Large is USD 0.1517/h while it lasts; MS07b puts
  * Medium back. Adjacent addon PATCHes are rate-limited (429 "try again in N
  * minutes", D09), which `applyAddon` waits out. Not settled: an authenticated

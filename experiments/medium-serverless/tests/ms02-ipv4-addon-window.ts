@@ -14,8 +14,14 @@
  *   MS02c  first successful connect on direct 5432 and dedicated 6543 (both
  *          unreachable before, per MS01d) - the time-to-usable a Vercel
  *          function would see.
- *   MS02d  control paths across the same window: shared pooler 6543 and REST
- *          - failures during the switch, if any.
+ *   MS02d  control paths across the same window: shared pooler 6543, REST
+ *          and Realtime - failures during the switch, if any. Since
+ *          2026-10-23 (#208) REST and Realtime are each probed twice: the
+ *          HTTP-tier `rest_http` (anon `GET /rest/v1/`, answered 401 by the
+ *          API gateway before PostgREST or the database is reached; the only
+ *          REST probe of the 2026-09-30 run) and `realtime_ws` (handshake),
+ *          and the data-path `rest_read` and `realtime_join`
+ *          (harness/src/real-probes.ts).
  *
  * DESTRUCTIVE and BILLABLE: leaves the add-on ON (USD 0.0055/h) because every
  * later module needs 6543 and 5432 reachable from here; `make destroy`
@@ -24,8 +30,10 @@
  * would see - this vantage has no IPv6.
  */
 import { mgmt } from "../../../harness/src/mgmt";
+import { realtimeJoinProbe, restReadProbe, seedProbeTable } from "../../../harness/src/real-probes";
+import { withDeadline } from "../../../harness/src/sampler";
 import type { Ctx, TestModule, TestResult } from "../../../harness/src/types";
-import { addons, dedicatedTarget, directTarget, dnsRecords, pgOnce, primaryPooler, restProbe, sharedTargets, sleep } from "../lib/setup";
+import { addons, dedicatedTarget, directTarget, dnsRecords, errText, pgOnce, primaryPooler, realtimeProbe, restProbe, sharedTargets, sleep } from "../lib/setup";
 
 const INTERVAL_MS = 500;
 const MAX_WAIT_MS = 10 * 60_000;
@@ -48,7 +56,19 @@ const mod: TestModule = {
     const shared = sv ? sharedTargets(sv).txn : null;
     const direct = directTarget(ctx);
     const ded = dedicatedTarget(ctx);
-    const rest = restProbe(ctx);
+    // HTTP-tier probes first, data-path probes after them when the seed passes.
+    const http = [restProbe(ctx), realtimeProbe(ctx)];
+    let dataNote = "";
+    try {
+      const secs = await seedProbeTable(ctx, ctx.apiHost, ctx.anonKey ?? "");
+      http.push(restReadProbe(ctx.apiHost, ctx.anonKey ?? ""), realtimeJoinProbe(ctx.apiHost, ctx.anonKey ?? ""));
+      dataNote = `data-path probes ready after ${secs}s`;
+    } catch (e) {
+      dataNote = `data-path probes skipped: ${errText(e)}`;
+    }
+    ctx.log(`MS02 control probes: ${http.map((p) => p.name).join(", ")} (${dataNote})`);
+    const ctlFails = new Map<string, number>(http.map((p) => [p.name, 0]));
+    const ctlSamples = new Map<string, number>(http.map((p) => [p.name, 0]));
 
     const t0 = Date.now();
     const rel = () => Date.now() - t0;
@@ -59,7 +79,6 @@ const mod: TestModule = {
     let directSustainedFrom: number | null = null;
     let dedSustainedFrom: number | null = null;
     let sharedFails = 0;
-    let restFails = 0;
     let samples = 0;
     const modes = new Map<string, string>();
     let stop = false;
@@ -67,12 +86,11 @@ const mod: TestModule = {
     const loop = (async () => {
       while (!stop) {
         samples++;
-        const [dns, d, dd, s, r] = await Promise.all([
+        const [dns, d, dd, s] = await Promise.all([
           dnsRecords(ctx.phzHost),
           pgOnce(direct, ctx.dbPassword),
           pgOnce(ded, ctx.dbPassword),
           shared ? pgOnce(shared, ctx.dbPassword) : Promise.resolve<{ ok: boolean; error?: string; ms: number }>({ ok: true, ms: 0 }),
-          rest.run(),
         ]);
         const now = rel();
         if (tA === null && dns.a.length) tA = now;
@@ -98,10 +116,6 @@ const mod: TestModule = {
           sharedFails++;
           if (s.error) modes.set("shared", s.error);
         }
-        if (!r.ok) {
-          restFails++;
-          if (r.error) modes.set("rest", r.error);
-        }
         if (
           directSustainedFrom !== null &&
           dedSustainedFrom !== null &&
@@ -114,6 +128,21 @@ const mod: TestModule = {
       }
     })();
 
+    // Control paths on their own loops, one per probe, so a slow Realtime join
+    // (up to 10 s when failing) does not pace the DNS and Postgres samples.
+    let mainDone = false;
+    const ctlLoops = http.map(async (p) => {
+      while (!mainDone && !stop) {
+        const o = await withDeadline(p.run());
+        ctlSamples.set(p.name, (ctlSamples.get(p.name) ?? 0) + 1);
+        if (!o.ok) {
+          ctlFails.set(p.name, (ctlFails.get(p.name) ?? 0) + 1);
+          if (o.error) modes.set(p.name, o.error);
+        }
+        await sleep(INTERVAL_MS);
+      }
+    });
+
     // Two baseline samples, then fire.
     await sleep(2 * INTERVAL_MS);
     const tCall = rel();
@@ -122,6 +151,9 @@ const mod: TestModule = {
     ctx.log(`ipv4 add-on PATCH: HTTP ${r.status} in ${callMs}ms`);
     if (r.status >= 300) stop = true;
     await loop;
+    const tEnd = rel();
+    mainDone = true;
+    await Promise.all(ctlLoops);
 
     const after = await dnsRecords(ctx.phzHost);
     const s = (ms: number | null) => (ms === null ? "n/a" : Math.round(ms / 100) / 10);
@@ -140,8 +172,15 @@ const mod: TestModule = {
         id: "MS02b",
         title: "DNS swap for the database host, seen from this resolver",
         status: tA !== null ? "pass" : "fail",
-        detail: tA === null ? `no A record within ${Math.round(MAX_WAIT_MS / 1000)}s` : `A record at ${s(tA)}s after sampling started; AAAA gone at ${s(tNoAAAA)}s; now A=${after.a.length} AAAA=${after.aaaa.length}`,
-        measurements: { a_record_s: s(tA), aaaa_gone_s: s(tNoAAAA), a_after: after.a.length, aaaa_after: after.aaaa.length, patch_at_s: s(tCall) },
+        // The loop also ends once both Postgres paths have connected for SETTLE_MS,
+        // so "no A record" holds for the sampled span, not for MAX_WAIT_MS
+        // (2026-10-23: getaddrinfo reached the host at 79 s while resolve4
+        // still had no A when sampling ended SETTLE_MS, 10 s, later).
+        detail:
+          tA === null
+            ? `resolve4 saw no A record before sampling ended at ${s(tEnd)}s (cap ${Math.round(MAX_WAIT_MS / 1000)}s); AAAA gone at ${s(tNoAAAA)}s`
+            : `A record at ${s(tA)}s after sampling started; AAAA gone at ${s(tNoAAAA)}s; now A=${after.a.length} AAAA=${after.aaaa.length}`,
+        measurements: { a_record_s: s(tA), aaaa_gone_s: s(tNoAAAA), a_after: after.a.length, aaaa_after: after.aaaa.length, patch_at_s: s(tCall), sampling_ended_s: s(tEnd) },
       },
       {
         id: "MS02c",
@@ -152,10 +191,23 @@ const mod: TestModule = {
       },
       {
         id: "MS02d",
-        title: "control paths across the switch: shared pooler 6543 and REST",
-        status: sharedFails === 0 && restFails === 0 ? "pass" : "info",
-        detail: `shared pooler failed ${sharedFails}/${samples} samples, REST failed ${restFails}/${samples}`,
-        measurements: { shared_fail_samples: sharedFails, rest_fail_samples: restFails, shared_mode: modes.get("shared") ?? "none", rest_mode: modes.get("rest") ?? "none" },
+        title: "control paths across the switch: shared pooler 6543, REST and Realtime",
+        status: sharedFails === 0 && [...ctlFails.values()].every((n) => n === 0) ? "pass" : "info",
+        detail:
+          `shared pooler failed ${sharedFails}/${samples} samples, ` +
+          [...ctlFails].map(([n, f]) => `${n} failed ${f}/${ctlSamples.get(n) ?? 0}`).join(", ") +
+          `; ${dataNote}`,
+        measurements: {
+          shared_fail_samples: sharedFails,
+          shared_mode: modes.get("shared") ?? "none",
+          ...Object.fromEntries(
+            [...ctlFails].flatMap(([n, f]) => [
+              [`${n}_fail_samples`, f],
+              [`${n}_samples`, ctlSamples.get(n) ?? 0],
+              [`${n}_mode`, modes.get(n) ?? "none"],
+            ]),
+          ),
+        },
       },
     );
     return out;

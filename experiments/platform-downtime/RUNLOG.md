@@ -500,5 +500,55 @@ Gaps and anomalies:
 - The D01 restart windows here (191 to 250 s for Auth, Storage and the data
   paths) are well above the 2026-08-04 D01 (75 to 78 s) and the 2026-10-10
   LO05 p50s (54 to 58 s). Not explained: different day, different project.
-- D05 (password reset) was not re-run; its "REST and Realtime had no failed
-  sample" line above stays an HTTP-tier observation.
+- D05 (password reset) was not re-run here; its "REST and Realtime had no
+  failed sample" line above was an HTTP-tier observation until the #208
+  re-run (next section), which found the data paths untouched as well.
+
+## 2026-10-23 - D05 re-run with the data-path probes (#208)
+
+**Why.** The 2026-10-01 D05 run's "every probe path stayed up" came from the
+HTTP-tier probes the #204 section above describes. D05 now builds its probes
+with `buildProbes(ctx, { pooler: false })`, so `rest_read` and
+`realtime_join` run beside `rest_http`, `realtime_ws`, Auth and Storage; the
+pooler stays out for the reason in the module header (it authenticates with
+the password being changed).
+
+**How.** `make selfprov PD_ONLY=D05 PD_PASSES=2`: one throwaway Micro project
+on the Pro org in ap-southeast-1, two passes. The wrapper now writes each
+pass's project facts next to the artifact (`run-<stamp>.project.json`:
+project age, compute, database size, Postgres image, `postmaster_start`, the
+platform's `created_at`).
+
+| pass | artifact (`out/2026-10-23/`) | age at start (since the create call) | sampled | failed samples |
+| --- | --- | --- | --- | --- |
+| 1 | `run-2026-10-23T07-54-24-330Z` | 10 s | 420 s (`MAX_WAIT_MS`, nothing failed) | 0 on every path: `rest_read` 0 of 767, `realtime_join` 0 of 662, Auth 0 of 772, Storage 0 of 738, `rest_http` 0 of 788, `realtime_ws` 0 of 697 |
+| 2 | `run-2026-10-23T08-03-36-243Z` | 562 s | about 83 s, see below | `rest_read` 0 of 154, `realtime_join` 0 of 132, Auth 0 of 154, Storage 0 of 147, `rest_http` 0 of 157; `realtime_ws` 1 of 140 (at +77 s, recovered within 1 s) |
+
+Both passes: `pg_postmaster_start_time()` read `2026-10-23T07:44:20.792Z`
+before and after, and `pg_stat_checkpointer.stats_reset` read
+`2026-10-02T17:53:10.203Z` before and after. Postgres image `17.11.0.003`.
+Both artifacts show D05 as `fail`: the module fails when no restart is
+confirmed, which is the expected outcome here.
+
+Reading:
+
+- **A database-password PATCH on a plain project did not restart Postgres
+  and did not touch the data paths** (two passes, one project): no failed
+  `rest_read` or `realtime_join` sample, `postmaster_start` unchanged. This
+  repeats the 2026-10-01 result with the data-path probes, so its "REST and
+  Realtime stayed up" now holds on the data path too. The checkpointer
+  question stays unanswered by this module (no restart to observe).
+- **Pass 2 sampled for about 83 s, not 420 s.** The sampler stops once every
+  path that failed has recovered and settled (`harness/src/sampler.ts`,
+  `allSettled`), and the one `realtime_ws` failure at +77 s met that rule. So
+  pass 2 covers the first 83 s after the PATCH; pass 1 covers 420 s.
+- **The project predates its create call.** The create call (07:54:13 UTC,
+  wrapper log) came back `ACTIVE_HEALTHY` within about 10 s; the platform's
+  `created_at` was `2026-10-23T07:42:12Z`, about 12 minutes earlier,
+  `postmaster_start` `07:44:20Z`, and `stats_reset` `2026-10-02T17:53:10Z`,
+  three weeks earlier. The two Medium projects created for #208 the same
+  morning (medium-serverless RUNLOG) reported `postmaster_start` about 39
+  hours and about 6 hours before their create calls. That is consistent with the 2026-10-01 side observation above
+  (`stats_reset` two days before `postmaster_start`) and with the create
+  call handing out an already-provisioned instance; inferred from these
+  timestamps, not from a platform statement.

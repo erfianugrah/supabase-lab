@@ -520,3 +520,149 @@ MS07.
   the unified `logs` table.
 - `make apply` recipes are silenced with `@` so the PAT passed as `-var` is
   not echoed into a log.
+
+## 2026-10-23 - MS02 and MS07 re-run with the data-path probes (#208)
+
+**Why.** The 2026-09-30 MS02 control row and MS07's "REST and Realtime
+untouched" were measured with HTTP-tier probes only (the correction under
+MS07 above). Both modules now run the data-path probes from
+`harness/src/real-probes.ts` beside the old ones: `rest_read` (anon row read,
+up only on HTTP 200 with the seeded row) and `realtime_join` (Postgres
+Changes join confirmed and the probe's own broadcast delivered), next to
+`rest_http` and `realtime_ws`. MS02's control probes now run on their own
+loops so a slow Realtime join does not pace the DNS and Postgres samples.
+MS07 reports `<path>_failed_samples` beside each window.
+
+**How.** No tofu state: `make selfprov` (new here) reuses platform-downtime's
+wrapper (`lib/selfprov.ts`, now with `PD_EXPERIMENT`, `PD_REGION`,
+`PD_PLAN`) to create a throwaway Medium project on the Pro org, run
+`MS02;MS07;MS07@3600` (the IPv4 add-on, a resize pair about 4 minutes after
+the create call, another pair once the project is an hour old), remove the
+IPv4 add-on and delete the project. Two projects ran side by side from the
+same vantage: project E in ap-southeast-2 (the 2026-09-30 region) and project
+F in ap-southeast-1 (platform-downtime's region). Each pass's project facts
+are in `run-<stamp>.project.json` beside the artifact in `out/2026-10-23/`.
+This differs from 2026-09-30 in org plan (Pro, not Team), Postgres image
+(`17.11.0.003`, not `17.6.1.166`), and history: the 2026-09-30 project had run
+every other module first, with `pitr_7` removed by MS06 just before MS07.
+
+Both create calls came back `ACTIVE_HEALTHY` in about 10 s with
+`postmaster_start` well before the call: E `2026-10-21 17:04:13 UTC` (about
+39 hours earlier), F `2026-10-23 01:33:33 UTC` (about 6 hours earlier), so
+"age since the create call" below is not the instance's age. E's
+`project.json` files have no `platform_created_at`: the wrapper started
+recording it after E's run had begun; F's reads `2026-10-23T01:31:42Z`.
+
+### MS02 - IPv4 add-on switch (E `run-2026-10-23T07-53-41-215Z`, F `run-2026-10-23T07-54-21-985Z`)
+
+| | E (ap-southeast-2) | F (ap-southeast-1) |
+| --- | --- | --- |
+| PATCH `billing/addons {ipv4, ipv4_default}` | HTTP 200 in 147 ms | HTTP 200 in 174 ms |
+| AAAA gone (`resolve6`), from sampling start | 34.7 s | 30.6 s |
+| first connect, direct 5432 and dedicated 6543 | 79 s | 75.2 s |
+| A record seen by `resolve4` | none before sampling ended | none before sampling ended |
+| Postgres-path samples | 33 | 150 |
+| shared 6543 failed | 0 of 33 | 0 of 150 |
+| `rest_read` failed | 0 of 119 | 0 of 158 |
+| `realtime_join` failed | 0 of 111 | 0 of 135 |
+| `rest_http` / `realtime_ws` failed | 0 of 169 / 0 of 151 | 0 of 163 / 0 of 145 |
+
+The PATCH went out 1 s after sampling started (`patch_at_s` 1). Last error on
+direct and dedicated before the first connect: `getaddrinfo ENOTFOUND`.
+
+Reading:
+
+- **The IPv4 add-on switch did not touch REST reads or Realtime
+  subscriptions** on either project (0 failed `rest_read` and
+  `realtime_join` samples), nor the shared pooler. The 2026-09-30 control
+  row now holds on the data path.
+- **From `resolve6` losing the AAAA to the first `getaddrinfo` connect was
+  about 44 to 45 s on both projects** (E sampled about every 3 s). The AAAA
+  disappeared at 34.7 s (E) and 30.6 s (F) and the system resolver
+  (`getaddrinfo`, which the `pg` client uses) returned an A record by 79 s
+  (E) and 75.2 s (F), when both `db.<ref>` ports first connected. The 2026-09-30
+  run saw no usable record for 600 s from a different machine and resolver
+  (systemd-resolved); pooler-checkout on 2026-10-10 saw the A record 80 s
+  after the PATCH. Quote the range and the resolver.
+- **MS02b's `fail` here is a module artefact.** The loop ends 10 s after
+  both Postgres paths connect, and the module's `resolve4` call (Node DNS
+  against the configured servers, not `getaddrinfo`) had not returned the A
+  record by then; its detail text said "within 600s" regardless. The detail
+  now reports the span actually sampled (`sampling_ended_s`). `resolve4`
+  returned E's A record when run by hand a few minutes after its pass (by
+  hand, not recorded).
+- E's Postgres-path loop took about 3 s per sample against F's 0.6 s
+  (33 against 150 samples over a similar span); the first-connect times are
+  to that resolution. Cause not established.
+
+### MS07 - Medium to Large and back, four pairs on two projects
+
+Artifacts in `out/2026-10-23/`: E at about 4 minutes
+`run-2026-10-23T07-57-23-944Z`, E at one hour `run-2026-10-23T08-53-30-971Z`,
+F at about 4 minutes `run-2026-10-23T07-57-57-816Z`, F at one hour
+`run-2026-10-23T08-54-10-992Z`. Age is from the create call (235, 3602, 227
+and 3600 s at pass start); every pass started on `ci_medium` with the IPv4
+add-on on and a database of 11.2 to 11.3 MB (`db_bytes`).
+
+Outage window in seconds, up (Medium to Large) / down (Large to Medium):
+
+| path | E, 4 min | E, 1 h | F, 4 min | F, 1 h | 2026-09-30 |
+| --- | --- | --- | --- | --- | --- |
+| `rest_read` | 222 / 183 | 140 / 195 | 179 / 190 | 127 / 211 | not probed |
+| `realtime_join` | 212 / 184 | 138 / 200 | 180 / 193 | 118 / 213 | not probed |
+| Auth `/auth/v1/health` | 221 / 183 | 141 / 195 | 180 / 190 | 128 / 211 | 35 / 42 |
+| Storage | 222 / 184 | 140 / 195 | 179 / 190 | 124 / 212 | 34 / 44 |
+| shared 6543 | 222 / 180 | 141 / 194 | 173 / 238 | 125 / 310 | 30 / 39 |
+| shared 5432 | 222 / 180 | 142 / 196 | 178 / 238 | 123 / 310 | 36 / 39 |
+| dedicated 6543 | 235 / 197 | 140 / 209 | 193 / 204 | 128 / 210 | 34 / 55 |
+| direct 5432 | 223 / 182 | 139 / 194 | 177 / 189 | 128 / 210 | 35 / 41 |
+| `rest_http` failed samples | 0 of 457 / 0 of 392 | 0 of 294 / 0 of 419 | 0 of 374 / 0 of 461 | 0 of 261 / 0 of 596 | no failure |
+| `realtime_ws` failed samples | 0 of 412 / 0 of 346 | 0 of 269 / 0 of 379 | 0 of 325 / 0 of 415 | 0 of 240 / 0 of 540 | no failure |
+
+First failure modes, the same in all eight legs except one: `rest_read`
+`HTTP 521`, `realtime_join` `pg_changes: {:error, "Too many database
+timeouts"}` (the join itself was acknowledged), Auth `HTTP 521`, Storage
+`HTTP 500`, shared 6543 `terminating connection due to administrator
+command`, shared 5432 and direct `the database system is shutting down`,
+dedicated `connect ECONNREFUSED`. The exception is one leg of a one-hour
+pair, where direct's first mode was `Client network socket disconnected
+before secure TLS connection was established`.
+
+The first failure came 2 to 5 s after sampling started in every leg (no 429
+wait this time). Health read `ACTIVE_HEALTHY` 0 to 3 s after each leg's sampling ended
+(`healthy_after_s`).
+
+Reading:
+
+- **A Medium to Large resize and the resize back took REST reads and
+  Realtime subscriptions down with every other data path**, in all eight
+  legs: `rest_read` and
+  `realtime_join` were within 10 s of Auth's window in each leg, while the
+  HTTP-tier `rest_http` and `realtime_ws` had 0 failed samples throughout.
+  The 2026-09-30 "REST and Realtime untouched" was that HTTP-tier blind spot.
+- **The windows were 118 to 310 s, not 30 to 55 s.** Auth 128 to 221 s across
+  the eight legs against 35 and 42 s on 2026-09-30, in line with
+  platform-downtime's Medium pair on the same day (Auth 101 to 299 s, its
+  RUNLOG 2026-10-23 section).
+- **Region does not explain the 2026-09-30 figures**: E ran in the 2026-09-30
+  region and measured 141 to 221 s. **Age since the create call up to one
+  hour does not either**: at one hour Auth was shorter going up (141 and 128 s against 221
+  and 180 s at 4 minutes) and longer going down (195 and 211 s against 183
+  and 190 s). Still untested, each a difference between the two days: org plan (Team then, Pro
+  now), Postgres image (`17.6.1.166` then, `17.11.0.003` now), the project's
+  history (two hours of modules, `pgbench` data, and `pitr_7` removed by MS06
+  just before MS07, whose first PATCH answered 429), and whatever changed on
+  the platform between the dates. n=1 per leg and condition.
+- **Supavisor's circuit breaker stretched F's shared pooler windows on the
+  way down** (238 s and 310 s against 189 to 213 s on F's other paths): its
+  modes ran on to `(EAUTHQUERY) auth_query secret check timed out` and
+  `(ECIRCUITBREAKER) too many authentication failures, new connections are
+  temporar...` (truncated by the module) after Postgres was back. E's shared
+  pooler did not do this. platform-downtime's project C saw the same on
+  2026-10-23 (console output, not in its artifact).
+- The dedicated PgBouncer was the last path back in 4 of 8 legs (E 4 min up
+  and down, F 4 min up, E 1 h down), by 9 to 13 s (E 4 min up: 235 s against
+  223 s direct), and in each of those 4 its modes include `server login has
+  been failing, cached error: ...`, as on 2026-09-30.
+- Both projects ran at the same time from one machine, alongside other
+  agents' lab projects.
