@@ -190,7 +190,8 @@ notify pgrst, 'reload schema';`,
     const pristine = join(rig.dir, "..", "supabase", "docker", "docker-compose.yml");
     const a = readFileSync(pristine, "utf8").split("\n");
     const b = readFileSync(join(rig.dir, "docker-compose.yml"), "utf8").split("\n");
-    const changed = a.length === b.length ? a.map((l, i) => (l !== b[i] ? b[i]!.trim().split(":")[0]! : "")).filter(Boolean) : ["line count differs"];
+    // A SLOT stack also carries the rig's own line edits, each marked `# sd-slot`; those are not the key script's.
+    const changed = a.length === b.length ? a.map((l, i) => (l !== b[i] && !b[i]!.includes("# sd-slot") ? b[i]!.trim().split(":")[0]! : "")).filter(Boolean) : ["line count differs"];
     out.push({
       id: `${ID}d`,
       title: "utils/add-new-auth-keys.sh edits docker-compose.yml: which lines it uncomments",

@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { jwtParts, parseEnv, scrub, type Rig } from "./rig";
+import { cname, jwtParts, parseEnv, scrub, setProject, type Rig } from "./rig";
 
 test("parseEnv reads KEY=value lines, strips quotes, ignores comments", () => {
   const e = parseEnv('# c\nA=1\nB="two words"\nC=\nlower=ignored\nD=x=y\n');
@@ -16,4 +16,16 @@ test("jwtParts decodes header and payload, rejects non-JWTs", () => {
   const t = `${b({ alg: "ES256", kid: "k" })}.${b({ iss: "i", role: "anon" })}.sig`;
   expect(jwtParts(t)).toEqual({ header: { alg: "ES256", kid: "k" }, payload: { iss: "i", role: "anon" } });
   expect(jwtParts("sb_secret_x")).toBeNull();
+});
+
+test("cname keeps upstream names on the default project and maps them on a SLOT project", () => {
+  setProject("supabase");
+  expect(cname("supabase-db")).toBe("supabase-db");
+  setProject("sd-a");
+  expect(cname("supabase-db")).toBe("sd-a-db-1");
+  expect(cname("realtime-dev.supabase-realtime")).toBe("sd-a-realtime-1");
+  expect(cname("supabase-envoy")).toBe("sd-a-api-gw-1");
+  expect(cname("something-else")).toBe("something-else");
+  setProject("");
+  expect(cname("supabase-db")).toBe("supabase-db");
 });

@@ -22,7 +22,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Ctx, TestModule, TestResult } from "../../../harness/src/types";
-import { compose, http, inspect, rigOf, sh, sql } from "../lib/rig";
+import { cname, compose, http, inspect, rigOf, sh, sql } from "../lib/rig";
 
 const ID = "SD03";
 
@@ -47,7 +47,7 @@ const mod: TestModule = {
     const runImage = String(info?.Config?.Image ?? "absent");
     const serverVersion = (await sql("show server_version"))[0]?.[0];
     const versionLine = (await sql("select version()"))[0]?.[0];
-    const pgVersionFile = (await sh(["docker", "exec", "supabase-db", "cat", "/var/lib/postgresql/data/PG_VERSION"])).out.trim();
+    const pgVersionFile = (await sh(["docker", "exec", cname("supabase-db"), "cat", "/var/lib/postgresql/data/PG_VERSION"])).out.trim();
     const all17 = /:17\./.test(modelImage) && /:17\./.test(runImage) && /^17\./.test(serverVersion ?? "") && pgVersionFile === "17";
     out.push({
       id: `${ID}a`,

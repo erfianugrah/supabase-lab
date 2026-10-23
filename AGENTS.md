@@ -4170,7 +4170,7 @@ projects in the lab org use), deleted in `finally`. See its RUNLOG.
   `pvlab --diff` against `out/2026-10-23/`; the `gate` measurement flips.
   CS01-CS07 (README) wait for enrollment and for a read of the alpha terms.
 
-## experiments/self-hosted-defaults - key facts (SD01-SD08, validated 2026-10-10, local rig)
+## experiments/self-hosted-defaults - key facts (SD01-SD08 validated 2026-10-10, SD09-SD12 2026-10-23, local rig)
 
 Local rig, no project or PAT: `make stack up probe clean` clones
 supabase/supabase at a pinned commit into the gitignored `work/`, copies
@@ -4215,8 +4215,46 @@ bun discovers the clone's own test files.
   URL are `<API_EXTERNAL_URL>/sso/saml/{metadata,acs}`, the ACS route needs no
   apikey, and an invented IdP registered with the secret key yields a SAMLRequest
   redirect (SD06d-f). A real IdP assertion was not exercised.
-- Not measured: `sb_` keys against Realtime and Edge Functions, a Postgres 15 to
-  17 upgrade, Linux amd64, image digests, repeat runs.
+- Realtime with `sb_` keys (SD09, 2026-10-23, n = 1): both keys join and
+  broadcast as the `apikey` query parameter, the publishable key also as a
+  header, supabase-js 2.112.3 included; no key or an unknown `sb_` key gets a
+  401 at the handshake (Envoy's, by the code at the pin).
+  On a private channel the publishable key is refused ("Unauthorized: You do
+  not have permissions to read from this Channel topic"), the secret key is
+  admitted, a user JWT in the join's access_token is admitted; an `sb_` key in
+  access_token changes nothing either way. REST broadcast: 202 for both keys.
+- Edge Functions with `sb_` keys (SD10, n = 1): `apikey` publishable or secret
+  reaches `hello` (200) with FUNCTIONS_VERIFY_JWT false or true; Envoy itself
+  answers 401 "Invalid API key" for an unknown `sb_` key and "Conflicting API
+  keys" for apikey/Bearer disagreement; a key only in `Authorization: Bearer
+  sb_...` is refused by `@supabase/server` (`UNUSABLE_CREDENTIAL`); legacy JWTs
+  in `apikey` get `INVALID_API_KEY` from `@supabase/server` with
+  FUNCTIONS_VERIFY_JWT=false and the main router's 401
+  `UNAUTHORIZED_NO_AUTH_HEADER` with true. Functions get both `sb_` keys in env and
+  no `sb-api-key` header; the env secret key works against
+  `http://api-gw:8000` from inside.
+- PG 15 -> 17 (SD11): `utils/upgrade-pg17.sh --yes` as root (root via a
+  docker:29-dind shell, script copy with 2 lines changed) kept every seeded
+  checksum and all 55 tables' row counts, Vault, a cron job, the auth user and
+  `pg_graphql` (170.9 s, 92.6 s of it building the 1214 MB tarball); the
+  guide's rollback restored PG 15 intact. Neither changes `COMPOSE_FILE`, so a
+  stack pinned with `run.sh config add pg15` restarts db on 15.8 against 17
+  data ("database files are incompatible with server") until `config remove
+  pg15`. One of three host-copy attempts failed in pg_upgrade (operator-read
+  PANIC on `base/1`, not in the artifact); two engine-VM-ext4 attempts failed
+  early with 5873 and 4681 MB free at the script's pre-flight; causes not
+  isolated. The script picks `supabase-db` and the first
+  `*_db-config` volume on the engine (two-stack hazard, code reading).
+- linux/amd64 is emulated only (SD12): nine services from amd64 images, `up
+  --wait` exit 1 after 82620 ms (compose gave up on Realtime) vs 22372 ms
+  native; Realtime restarted 7 times and stayed "starting" (the operator read
+  an Erlang `prim_tty:isatty` NIF error in its log, not in the artifact), the
+  rest healthy; a CPU-bound query 801-845 ms vs 516-531 ms. Native amd64 not
+  measured.
+- Still not measured: image digests for SD01-SD08, repeat runs, Realtime
+  `postgres_changes` with `sb_` keys. SLOT stacks (`make ... SLOT=x GW_PORT=...`)
+  run beside another stack on the same engine: own project and ports, no fixed
+  container names.
 - `make up LAYERS="..."` (added 2026-10-12 for storage-surface SS03) stacks
   upstream overrides by name (`s3`, `logs`, `kong`) and this experiment's
   `compose/` layers: `storage-limit` (FILE_SIZE_LIMIT is hard-coded in the pinned
