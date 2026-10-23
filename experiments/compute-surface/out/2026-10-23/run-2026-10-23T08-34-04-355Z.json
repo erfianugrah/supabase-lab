@@ -1,0 +1,157 @@
+{
+  "startedAt": "2026-10-23T08:34:04.355Z",
+  "finishedAt": "2026-10-23T08:34:19.793Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "compute-surface",
+  "labCommit": "661afdf",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "CS00a",
+      "title": "org entitlements: keys containing compute/worker/service/container/app",
+      "status": "info",
+      "detail": "HTTP 200, 64 entitlements, 1 matching key(s)",
+      "measurements": {
+        "http_status": 200,
+        "entitlements_total": 64,
+        "matching_keys": 1,
+        "matches": "instances.compute_update_available_sizes=true"
+      },
+      "durationMs": 15437
+    },
+    {
+      "id": "CS00p",
+      "title": "throwaway project",
+      "status": "info",
+      "detail": "ACTIVE_HEALTHY after 12 s, size ci_micro",
+      "measurements": {
+        "region": "ap-southeast-1",
+        "instance_size": "ci_micro",
+        "healthy_s": 12
+      },
+      "durationMs": 15438
+    },
+    {
+      "id": "CS00b",
+      "title": "GET /v2/projects/{ref}/compute (list)",
+      "status": "info",
+      "detail": "HTTP 404 compute_not_enabled",
+      "measurements": {
+        "http_status": 404,
+        "error_code": "compute_not_enabled",
+        "gate_reading": "closed"
+      },
+      "evidence": "{\"error\":{\"code\":\"compute_not_enabled\",\"message\":\"Compute is not available for this project\"}}",
+      "durationMs": 15438
+    },
+    {
+      "id": "CS00c",
+      "title": "GET /v2/projects/{ref}/compute/cs00-probe (get)",
+      "status": "info",
+      "detail": "HTTP 404 compute_not_enabled",
+      "measurements": {
+        "http_status": 404,
+        "error_code": "compute_not_enabled",
+        "gate_reading": "closed"
+      },
+      "evidence": "{\"error\":{\"code\":\"compute_not_enabled\",\"message\":\"Compute is not available for this project\"}}",
+      "durationMs": 15438
+    },
+    {
+      "id": "CS00d",
+      "title": "POST /v2/projects/{ref}/compute/cs00-probe/uploads (upload slot)",
+      "status": "info",
+      "detail": "HTTP 404 compute_not_enabled",
+      "measurements": {
+        "http_status": 404,
+        "error_code": "compute_not_enabled",
+        "gate_reading": "closed"
+      },
+      "evidence": "{\"error\":{\"code\":\"compute_not_enabled\",\"message\":\"Compute is not available for this project\"}}",
+      "durationMs": 15438
+    },
+    {
+      "id": "CS00e",
+      "title": "POST /v2/projects/{ref}/compute/cs00-probe/deploy (schema-valid body, no upload)",
+      "status": "info",
+      "detail": "HTTP 404 compute_not_enabled",
+      "measurements": {
+        "http_status": 404,
+        "error_code": "compute_not_enabled",
+        "gate_reading": "closed"
+      },
+      "evidence": "{\"error\":{\"code\":\"compute_not_enabled\",\"message\":\"Compute is not available for this project\"}}",
+      "durationMs": 15438
+    },
+    {
+      "id": "CS00f",
+      "title": "DELETE /v2/projects/{ref}/compute/cs00-probe (never deployed)",
+      "status": "info",
+      "detail": "HTTP 404 compute_not_enabled",
+      "measurements": {
+        "http_status": 404,
+        "error_code": "compute_not_enabled",
+        "gate_reading": "closed"
+      },
+      "evidence": "{\"error\":{\"code\":\"compute_not_enabled\",\"message\":\"Compute is not available for this project\"}}",
+      "durationMs": 15438
+    },
+    {
+      "id": "CS00g",
+      "title": "control: list with no Authorization header",
+      "status": "info",
+      "detail": "HTTP 401 unauthorized",
+      "measurements": {
+        "http_status": 401,
+        "error_code": "unauthorized",
+        "gate_reading": "unclear"
+      },
+      "evidence": "{\"error\":{\"code\":\"unauthorized\",\"description\":\"No access token provided\",\"message\":\"Unauthorized\"}}",
+      "durationMs": 15438
+    },
+    {
+      "id": "CS00h",
+      "title": "CLI: `supabase compute` presence and the read-only list against the project",
+      "status": "info",
+      "detail": "CLI 2.121.0; compute help without env absent, with SUPABASE_EXPERIMENTAL_COMPUTE=1 present, with --experimental absent; compute list exit 1",
+      "measurements": {
+        "cli_version": "2.121.0",
+        "npm_dist_tags": "latest=2.121.0 beta=2.122.0-beta.15",
+        "help_plain_compute": 0,
+        "help_plain_exit": 0,
+        "help_env_compute": 1,
+        "help_env_exit": 0,
+        "help_flag_compute": 0,
+        "help_flag_exit": 0,
+        "compute_list_exit": 1
+      },
+      "evidence": "compute --help (no env): DESCRIPTION |   Supabase CLI. | \nSUPABASE_EXPERIMENTAL_COMPUTE=1 compute --help: DESCRIPTION |   Manage Supabase Compute (experimental): deploy and run any code. Source code and config are read from supabase/compute/<name>/. This command is unstable and may change without notice. | \n--experimental compute --help: DESCRIPTION |   Supabase CLI. | \nSUPABASE_EXPERIMENTAL_COMPUTE=1 compute list --project-ref <ref>: Compute is not available for project <ref>.\nCompute is in private alpha. Stay tuned for the public alpha coming soon.",
+      "durationMs": 15438
+    },
+    {
+      "id": "CS00",
+      "title": "Compute gate for a new Micro project on the Pro organization",
+      "status": "info",
+      "detail": "gate closed: list 404 compute_not_enabled; get 404 compute_not_enabled; uploads 404 compute_not_enabled; deploy 404 compute_not_enabled; delete 404 compute_not_enabled",
+      "measurements": {
+        "gate": "closed",
+        "routes": "list 404 compute_not_enabled; get 404 compute_not_enabled; uploads 404 compute_not_enabled; deploy 404 compute_not_enabled; delete 404 compute_not_enabled"
+      },
+      "durationMs": 15438
+    },
+    {
+      "id": "CS00z",
+      "title": "cleanup",
+      "status": "pass",
+      "detail": "DELETE project HTTP 200",
+      "durationMs": 15438
+    }
+  ]
+}
