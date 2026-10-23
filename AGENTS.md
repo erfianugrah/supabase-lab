@@ -68,12 +68,28 @@ platform behaviour or writing it into docs
   full `maxWaitMs` - a null result has to be earned by waiting, not assumed.
   Since 2026-10-23 each `probe.run()` is capped at `sampleDeadlineMs` (default
   30 s) and a sample past it fails with `probe did not answer within N ms`:
-  a fetch with `AbortSignal.timeout(5000)` came back after 262 s during a
-  resize. Two long runs that day stalled with the event loop idle (0 % CPU,
-  main thread in `kevent64`, every probe silent at once); both stalls
-  happened before the cap existed, a deadline may not fix that state, and
-  the cause is not established. If a run goes silent, `sample <pid>` shows
-  whether it is that state.
+  most likely a pg probe with no `query_timeout` had pinned its path's loop
+  for good, and `sampleDuring` awaits every loop. That was most likely the
+  13-minute "event-loop stall" of 2026-10-23 (idle in `kevent64` = nothing
+  due; no Bun fault found);
+  pooler and lifecycle-ops `direct` probes now set `query_timeout` (#211,
+  platform-downtime RUNLOG). Since #211 the sampler also logs a path's every
+  recovery (`<path> up again`), not just the first: a path that came back a
+  second time used to go silent and, inferred from the 2026-10-23 log, read
+  as a hang.
+- **The orchestrator Mac sleeps mid-run, and every timing across the sleep
+  is wrong** (#211). `pmset -g` system sleep is 1 minute; on 2026-10-23
+  sleeps of 43 to 263 s fell inside platform-downtime runs, freezing the process while the
+  platform carried on: a 5 s-timeout fetch "took" 262 s, a seed loop's 180 s
+  wall budget most likely ran out across a sleep, a 299 s outage window
+  included a 263 s sleep. `performance.now()`
+  does not advance during it and `Date.now()` does (Bun 1.3.14, macOS), so
+  `harness/src/host-pause.ts` stamps a test with `host_suspended_s` when the
+  two differ by over 2 s, the sampler logs `host paused N s ... suspended`
+  and sets `pausedMs` per path, and `run.ts` holds `caffeinate -i -w <pid>`
+  for its lifetime (`PVLAB_ALLOW_SLEEP=1` skips it; `-i` blocks idle sleep
+  only, so a lid-close still sleeps). For an older artifact, `harness/scripts/sleep-overlap.ts`
+  places its tests against `pmset -g log`.
 - Probe the data, not the tier: `harness/src/real-probes.ts` (#204,
   2026-10-23). `rest_read` is up only on HTTP 200 with the seeded row;
   `realtime_join` only when a Postgres Changes join is confirmed and the
@@ -755,7 +771,9 @@ each user's auth rows". Findings and artifacts in RUNLOG.md; out/2026-09-25/.
   `realtime_join`): restart 194 and 247 s / 191 and 242 s; Micro to Small 171
   and 218 s / 168 and 214 s; Small to Micro 54 s / 67 s (n=1). Medium, two
   projects, n=1 per project (`rest_read`): Medium to Large 113 and 299 s,
-  Large to Medium 217 and 101 s. The data paths fail about as long as Auth and
+  Large to Medium 217 and 101 s (#211: the 299 s is void, the orchestrator
+  slept 263 s inside it; the 101 s is a lower bound, outage start slept
+  through). The data paths fail about as long as Auth and
   Storage in each run; the HTTP-tier probes (kept as `rest_http`,
   `realtime_ws`) had at most one failed sample per run. Only the restriction
   flip leaves the data paths alone (0 failed samples, two runs). Artifacts
@@ -764,10 +782,11 @@ each user's auth rows". Findings and artifacts in RUNLOG.md; out/2026-09-25/.
   (2026-08-04).** On restart: Auth 75 s (`HTTP 521`), Storage 78 s
   (`HTTP 500`), pooler 158 s; the "REST and Realtime untouched" half of that
   line is withdrawn (above). On 2026-10-23 the pooler window was the longest
-  by 15 to 96 s in six of ten platform-downtime operations (RUNLOG project
-  labels, A Micro, B and C Medium: A pass 1 D01, D03,
-  D04; A pass 2 D01, D04; C D04) and within 2 s of the longest other path in
-  the other four; in LO05 its p50 (147 s) was below Storage's (151 s). This
+  by 15 to 96 s in six of the nine valid platform-downtime operations (RUNLOG
+  project labels, A Micro, B and C Medium: A pass 1 D01, D03, D04; A pass 2
+  D01, D04; C D04, whose windows are lower bounds) and within 2 s of the
+  longest other path in the other three (A pass 2 D03, B D03, B D04); C D03
+  is void (#211); in LO05 its p50 (147 s) was below Storage's (151 s). This
   refines T14, which measured one path at 5 s resolution and reported a
   single number.
 - `selfprov` (`make selfprov`, `lib/selfprov.ts`) runs the D modules on a
@@ -2413,7 +2432,9 @@ Redacted artifacts: `out/2026-09-30/`. Details: RUNLOG.md.
   `rest_http` and `realtime_ws` in `lib/setup.ts` with `rest_read` and
   `realtime_join` added beside them. platform-downtime re-measured a
   Medium to Large pair on two Pro-org projects in ap-southeast-1 with the
-  data-path probes: REST reads down 113 and 299 s up, 217 and 101 s down,
+  data-path probes (#211: C's Medium to Large figures, 298 and 299 s, are
+  void and its Large to Medium figures, 98 to 200 s, are lower bounds):
+  REST reads down 113 and 299 s up, 217 and 101 s down,
   Realtime joins 107 and 298 s up, 217 and 98 s down. Its Auth windows (115
   and 299 s up, 216 and 101 s down) and pooler windows (113 and 298 s up,
   217 and 200 s down) are also well above MS07's 30-55 s; MS07's own re-run

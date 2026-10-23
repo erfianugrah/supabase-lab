@@ -93,6 +93,54 @@ test("the operation runs while sampling, and its error propagates", async () => 
   ).rejects.toThrow("restart API returned 500");
 });
 
+/**
+ * A clock whose wall time jumps `jumpMs` ahead once `afterMs` of real time has
+ * passed, while the monotonic clock keeps real time: what a process sees across
+ * a macOS idle sleep (2026-10-23: Date.now() gaps of 66 s and 263 s that
+ * performance.now() did not count).
+ */
+function sleepingClock(afterMs: number, jumpMs: number) {
+  const start = Date.now();
+  return {
+    wall: () => Date.now() + (Date.now() - start >= afterMs ? jumpMs : 0),
+    mono: () => performance.now(),
+  };
+}
+
+test("a host suspension inside an outage is logged and counted against that path's window", async () => {
+  const logs: string[] = [];
+  const probe = scriptedProbe("rest_read", (i) => i >= 2 && i < 6);
+  const w = one(
+    await sampleDuring(
+      [probe],
+      { ...OPTS, maxWaitMs: 120_000, clock: sleepingClock(25, 60_000), log: (m) => logs.push(m) },
+      async () => {},
+    ),
+  );
+  expect(logs.some((l) => /host paused \d+ s at \+\d+ms .*suspended/.test(l))).toBe(true);
+  expect(w.pausedMs).toBeGreaterThanOrEqual(59_000);
+});
+
+test("no suspension: pausedMs is 0 and nothing is logged about it", async () => {
+  const logs: string[] = [];
+  const probe = scriptedProbe("rest_read", (i) => i >= 2 && i < 6);
+  const w = one(await sampleDuring([probe], { ...OPTS, log: (m) => logs.push(m) }, async () => {}));
+  expect(w.pausedMs).toBe(0);
+  expect(logs.some((l) => l.includes("host paused"))).toBe(false);
+});
+
+test("a path that recovers, fails again and comes back logs the second recovery too", async () => {
+  // 2026-10-23: rest_read and auth went quiet at +264.7 s, most likely after
+  // a SECOND recovery (inferred from the log), which the sampler never
+  // logged; read as a stall.
+  const logs: string[] = [];
+  const flappy = scriptedProbe("rest_read", (i) => (i >= 2 && i < 4) || (i >= 12 && i < 14));
+  const late = scriptedProbe("pooler", (i) => i >= 2 && i < 30);
+  await sampleDuring([flappy, late], { ...OPTS, log: (m) => logs.push(m) }, async () => {});
+  expect(logs.filter((l) => l.startsWith("rest_read recovered")).length).toBe(1);
+  expect(logs.some((l) => l.startsWith("rest_read up again"))).toBe(true);
+});
+
 test("a probe whose run() never settles is cut off at the sample deadline and recorded as a failure", async () => {
   let i = -1;
   const hangs: Probe = {

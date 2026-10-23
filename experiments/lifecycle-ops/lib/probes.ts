@@ -36,6 +36,8 @@ export function directProbe(host: string, password: string): Probe {
         password,
         ssl: { rejectUnauthorized: false, servername: host },
         connectionTimeoutMillis: TIMEOUT_MS,
+        // See platform-downtime poolerProbe: a held query never settles without it (#211).
+        query_timeout: TIMEOUT_MS,
       });
       client.on("error", () => {});
       try {

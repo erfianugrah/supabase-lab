@@ -346,7 +346,12 @@ run's typical window, runs 1, 2 and 5 (145 to 182 s) do not. Not explained.
 LO05f: a restart sent 489 s after the first `ACTIVE_HEALTHY` read was accepted
 (HTTP 200), inside the ten minutes the earlier refusal message named; the
 boundary stays unresolved. LO05c: a second restart sent while the first read
-`RESTARTING` answered 200 again.
+`RESTARTING` answered 200 again. #211 (2026-10-23): LO05f was timed for
++300 s and went out at +489 s because a sleep of the orchestrator Mac
+(02:52:17 to 02:55:27 UTC) froze its timer; the 489 s acceptance is real
+wall time. This run's two sleeps both fell before the first measured
+restart, so the windows above are not affected (platform-downtime RUNLOG,
+#211 section).
 
 An earlier attempt the same morning (01:31 UTC project) stalled after its
 third restart: no output for over 50 minutes with the project healthy. It was
@@ -354,7 +359,11 @@ killed, its project deleted by name, and it wrote no artifact; its console
 lines are not cited. The sampler now caps each probe call at 30 s and LO05's
 readiness loop uses the same cap. The stall happened before the cap existed,
 a deadline may not fix that state, and the cause is not established; this run
-did not stall.
+did not stall. #211 (2026-10-23): it ran the pg probes with no
+`query_timeout` on the pre-cap sampler, the combination that most likely
+pinned a platform-downtime run for good that morning, and the Mac slept seven times
+during it; with no per-sample log, its stall is not explained further
+(platform-downtime RUNLOG, #211 section).
 
 ## 2026-10-23 - LO06 cluster B drill: detect, self-restart, verify (#150)
 
