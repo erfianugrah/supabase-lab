@@ -283,6 +283,81 @@ client can poll. See RUNLOG.md; artifacts in `out/2026-09-24/`.
   enabled, so `/graphql/v1` returned 200 with an errors envelope and is not a
   health signal.
 
+## experiments/data-api-capacity - key facts (validated 2026-10-22/23, Pro org, ap-southeast-1, Small then Large)
+
+The Data API's connection pool, what a full pool looks like to a client, the
+pool settings' PATCH, and statement timeouts per role. Four runs; run 4
+(`out/2026-10-23/`) is the reference, runs 1-2 published for their repeats.
+All figures are run 4 unless a run is named. See RUNLOG.md for why runs 1-3
+differ. PostgREST 14.18 and Postgres 17.11 were read from the console, not
+from the published artifacts.
+
+- **Pool with `db_pool` unset: Small 30, Large 50** (mid-burst count of
+  `authenticator` backends in `PgSleep`; Small 30/30 in runs 1, 2 and 4,
+  Large 50/50 in runs 1 and 4). `GET /postgrest` reads `db_pool` null and
+  `db_pool_acquisition_timeout` 10. `max_connections` 90 and 160.
+- **A request behind a full pool waits about 6 x the acquisition timeout
+  before PGRST003.** Single requests (service_role key) queued behind a held
+  pool answered 504 PGRST003 after 61364 and 61972 ms at the default 10 s
+  (DC01b; runs 1 and 2 the same within 1 s) and 13767 / 13752 ms at 2 s
+  (DC02b). At 4 s one request answered after 25007 ms and the other got no
+  answer by the client's 105001 ms timeout and left 0 log lines (n = 1,
+  unexplained). Each answered request's User-Agent appears on 6 PostgREST
+  access-log lines: 6 attempts in total, so something between the client and
+  PostgREST sends the request again after a PGRST003. The component and its
+  policy are not identified. Under a 220-request burst at pool 50 the 70
+  PGRST003 answers came after 10923 to 20903 ms (median 20855), shorter than
+  a lone request's wait; attempts were not counted there, so that is
+  inferred from latency only. A 500 (statement timeout after a side effect,
+  anon key plus an authenticated user token) was not sent again: one
+  execution, one log line (DC03d).
+- **Bursts that drain within that window come back as waves of 200s:** 100
+  concurrent 12 s requests on a pool of 30 all answered 200 (DC01a), 140 on
+  50 too (DC01d). 220 concurrent 15 s requests on 50 did not: 150 x 200 and
+  70 x 504 PGRST003 (DC02c).
+- **`PATCH /postgrest` always restarts PostgREST** (9 start lines for 9
+  PATCHes, DC02e), a no-change PATCH included. Across the seven PATCHes in
+  DC02a-c the restart landed 0.5 to 0.9 s after the PATCH; pings were
+  sampled for three of them (the two DC02a PATCHes and `db_pool` 1000) and
+  none failed. With 20 requests sleeping 60 s in flight it landed 55.3 s
+  after, twice; all 20 completed with 200, and 5 of 267 and 5 of 265 pings
+  failed (status 0, no text, 10 s client timeout), first at 1.3 s and 0.8 s,
+  in one run of about 50 s that ended before the logged restart (DC02d).
+  Wait for the restart before measuring: run 1 did not, and three of its
+  rows look like restart overlaps.
+- **The new pool is what Postgres sees**: `db_pool` 70 and 90 read back and
+  measured 70 and 90 (DC02a). Bounds sent and refused with 400: `db_pool`
+  1001 (`db_pool: Too big: expected number to be <=1000`), -1 (`db_pool: Too
+  small: expected number to be >=0`) and acquisition timeout 61
+  (`db_pool_acquisition_timeout: Too big: expected number to be <=60`); a 0
+  for either was not sent (DC02c).
+- **Reading, one burst per arm: `db_pool` above `max_connections` changed
+  the failure.** At 1000 on Large (160) a 220-request burst gave 154 x 200
+  and 66 x 503 PGRST002, whose body is PostgREST's own message ("Could not
+  query the database for the schema cache. Retrying.", unrelated to the
+  resends), against the control's 150 x 200 and 70 x 504 PGRST003 at pool
+  50. The mid-burst Management API query read gave no row (status and error
+  not recorded), so no connection count near 160 was observed. After the
+  burst, 5 consecutive good pings took 6 s against a check floor of about
+  4 s; no outage after the burst was measured.
+- **Statement timeouts through the Data API** (DC03): anon 3 s
+  (3062 / 3057 ms), authenticated 8 s, and service_role 8 s too:
+  service_role's `rolconfig` is null, so it runs with `authenticator`'s login
+  setting (`statement_timeout=8s,lock_timeout=8s`). A function declared
+  `set statement_timeout = '30s'` ran a 12 s sleep to 200 for all three keys,
+  anon included. `alter role authenticated set statement_timeout = '15s'` had
+  no effect until `notify pgrst, 'reload config'`; then 10 s sleeps answered
+  200.
+- Harness: bursts use `dc_sleep_xl` (function timeout 180 s) so the 8 s
+  login default does not end the sleep; requests go out with `keepalive:
+  false` (client-side failures before run 4: "socket closed" text on 218 of
+  220 requests in run 1's DC02c, status 0 without text in run 2, an
+  `ECONNRESET` from `api.supabase.com` in run 3, console only);
+  `linesForUa` counts PostgREST access-log lines by User-Agent, polling until
+  two reads agree. Resize waits for `max_connections` to read the target,
+  then watches 300 s (run 2 "settled" at 41 s, then a Management API read
+  timed out and Data API calls failed on the client).
+
 ## Provisioning: ACTIVE_HEALTHY is not readiness (validated 2026-08-03)
 
 Affects every experiment here, since they all create projects.
