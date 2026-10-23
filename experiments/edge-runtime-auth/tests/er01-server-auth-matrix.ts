@@ -233,6 +233,7 @@ const mod: TestModule = {
       }
       // control: does the data API accept the third-party token at all? (fixture check, as in the third-party-auth experiment)
       await sql(ctx, "create table if not exists public.er_probe (id int primary key)");
+      await sql(ctx, "grant select, insert, update, delete on table public.er_probe to anon, authenticated, service_role");
       await sql(ctx, "insert into public.er_probe values (1) on conflict do nothing");
       await sql(ctx, "alter table public.er_probe enable row level security");
       await sql(ctx, "create policy er_probe_read on public.er_probe for select to authenticated using (true)");

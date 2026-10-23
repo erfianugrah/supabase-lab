@@ -134,7 +134,7 @@ const mod: TestModule = {
       const fn2 = await sql(ctx, `grant execute on function public.er_canary() to anon, authenticated; notify pgrst, 'reload schema'`);
 
       // server-side witness for the retry cases: one row per request the canary receives with ?fail=
-      const hitsTbl = await sql(ctx, "create table if not exists public.er_hits (probe text not null, isolate text, at timestamptz default now())");
+      const hitsTbl = await sql(ctx, "create table if not exists public.er_hits (probe text not null, isolate text, at timestamptz default now()); grant select, insert, update, delete on table public.er_hits to anon, authenticated, service_role");
       const hitsRls = await sql(ctx, "alter table public.er_hits enable row level security");
 
       // ---- initial deploy, wait until it answers ----

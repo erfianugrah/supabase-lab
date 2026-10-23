@@ -46,6 +46,7 @@ const mod: TestModule = {
     try {
       await cleanupPrefix(ctx, P);
       await sql(ctx, `create table if not exists ${TABLE} (id int primary key, owner uuid, note text)`);
+      await sql(ctx, `grant select, insert, update, delete on table ${TABLE} to anon, authenticated, service_role`);
       await sql(ctx, `insert into ${TABLE} values (1, '${sub}', 'mine'), (2, '${other}', 'theirs') on conflict (id) do update set owner = excluded.owner`);
       await sql(ctx, `alter table ${TABLE} enable row level security`);
       await sql(ctx, `drop policy if exists tpa_items_owner on ${TABLE}`);

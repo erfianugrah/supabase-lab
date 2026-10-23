@@ -118,6 +118,8 @@ const mod: TestModule = {
            payload jsonb,
            primary key (created_at, id)
          ) partition by range (created_at);
+         -- Parent only; what the children get (default privileges, inherit_privileges) is what PT02c/e/g measure.
+         grant select, insert, update, delete on table public.pm_events to anon, authenticated, service_role;
          alter table public.pm_events enable row level security;
          create policy tenant_read on public.pm_events for select to authenticated
            using (tenant_id = (select (auth.jwt() -> 'app_metadata' ->> 'tenant_id')::int));`,

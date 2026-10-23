@@ -75,6 +75,8 @@ create table public.pt_audit (
   payload jsonb,
   primary key (created_at, id)
 ) partition by range (created_at);
+-- Parent only (the tenant reads go through it); the partitions keep what the default privileges give them, which PT01a/c/i measure.
+grant select, insert, update, delete on table public.pt_audit to anon, authenticated, service_role;
 create table public.pt_audit_2026_09 partition of public.pt_audit for values from ('2026-09-01') to ('2026-10-01');
 create table public.pt_audit_2026_10 partition of public.pt_audit for values from ('2026-10-01') to ('2026-11-01');
 create table public.pt_audit_2026_11 partition of public.pt_audit for values from ('2026-11-01') to ('2026-12-01');
