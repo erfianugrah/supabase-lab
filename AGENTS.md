@@ -3352,13 +3352,36 @@ because `harness/dist/pvlab` is a linux-x64 build.
   of 37,000,000 rows and no post-fill marker after a `201` and a healthy
   project; the four later 10 GB restores (R18, R19, R22, R23) kept every row
   with the archiver caught up (`segments_behind=1`: only the segment being
-  written unarchived). Untested reading: if the archiver falls behind, the
-  quoted bound runs ahead of the archived WAL and a restore stops short;
-  nothing recorded in R15 shows a backlog (fill rate, bound wait and WAL size
+  written unarchived). Reading: if the archiver falls behind, the quoted
+  bound runs ahead of the archived WAL and a restore stops short; RP08
+  (below) built 7 to 33 segments of backlog on Small and no restore stopped
+  short; nothing recorded in R15 shows a backlog (fill rate, bound wait and WAL size
   match the clean runs). Before relying on a restore to "latest", compare
   `pg_stat_archiver.last_archived_wal` with
   `pg_walfile_name(pg_current_wal_lsn())` (`walPosition` in `lib/rp.ts`); a
   gap of 1 is caught up.
+- **Archiver lag did not shorten a restore (RP08, 2026-10-23, R26, R27, R29,
+  R30; 0 of 10 short: none lost more than 1 acked statement, all within 0.4
+  s of the target).** With 7 to 33 segments unarchived at the call (WAL
+  load, `pg_logical_emit_message`, 63.5 to 71.6 MiB/s derived from the
+  sampled LSNs; R29, R30) the quoted bound still equalled
+  `last_archived_time` within 1 s, yet each of the 6 `live` restores stopped
+  5 to 33 segments past the last segment archived at the call, at an LSN
+  interpolated to -0.5 to +0.4 s from the target (recovery log: last
+  completed transaction 0.02 to 0.50 s before the target, R29, R30); acked
+  statements lost were 0 or 1 per restore, 0.2 and 0.4 s before the target
+  (RP06's window). The `latest` arm (R15's procedure) never ran with more
+  than 1 segment behind. The bulk load (RP07's rows, 3 writers) never left
+  more than 2 segments `.ready` (R26, R27; 32.4 and 34.0 MiB/s derived, R26).
+  In R29 and R30 each restore after the first started from a base backup
+  whose redo LSN sat 2 segments past the previous restore's stop LSN
+  (recovery log `starting backup recovery with redo LSN ...`; R26, R27
+  logged none). R15 stays unexplained; its shape (10 GB on top of a restored
+  3 GB database, one writer) was not re-run. In 1 of 10 (R27 cycle 2) the
+  project status read `ACTIVE_HEALTHY` 10 s after the `201`, before the
+  outage began; the Data API read then failed from 58 s for 385 s (status
+  not polled after the first healthy read): poll the database, not the
+  status, to call a restore done.
 - **The current password works after a PITR restore; the replaced one is
   refused** (9 of 9 clean restores, targets before and after a rotation). The
   stored verifier is a third value each time, so credentials are set again
@@ -3368,7 +3391,9 @@ because `harness/dist/pvlab` is a linux-x64 build.
   resolution: a short stale window, not a measured duration. A restore target
   hours or days old was not run. RP07 R18's 3 GB restore (2026-10-22) ended
   with the current password refused (`cred_final_current` `refused`; pooler
-  down 322 s against 221 s to healthy); not followed up.
+  down 322 s against 221 s to healthy). It did not recur in RP08's 10
+  restores (2026-10-23): 8 ended `ok` in the watch, 2 ended `down` when the
+  watch stopped and the next login worked; the one-poll refusal showed in 7.
 - **Storage did not 500 after any restore or unpause** (list, download with
   bytes equal, upload all `200`). A PITR restore to before an object's upload
   makes the download `404` and the listing omit it, and the same path is
