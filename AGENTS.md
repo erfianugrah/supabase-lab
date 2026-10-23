@@ -4692,7 +4692,7 @@ and PT02g rows are probe artefacts (named in the RUNLOG); other run 1 / run
   partitions. The Postgres version was queried at setup but not written to
   the artifact; the PostgREST version was not read.
 
-## experiments/hyperdrive-direct - key facts (H01 2026-10-05 Micro; H02 2026-10-23 Small, ap-southeast-1, Pro org, two runs)
+## experiments/hyperdrive-direct - key facts (H01 2026-10-05 Micro; H02 and H03 2026-10-23 Small, ap-southeast-1, Pro org; H02 two runs, H03 three)
 
 Self-provisioning (one throwaway project per module, Worker and Hyperdrive
 configs made with wrangler, all deleted in `finally`). Wrangler needs the
@@ -4735,17 +4735,50 @@ in the RUNLOG.
   connections (2 `authenticator` backends reopened before the burst): 19
   of 30 Data API calls answered 200 and 11 plus a ping answered `503
   PGRST002 Could not query the database for the schema cache. Retrying.`
-  (no PGRST000/001/003); whether that is slot exhaustion or a schema-cache
-  reload is not separated (RUNLOG).
-- **In one run, Hyperdrive kept 60 idle origin connections for at least
-  891 s:** 60 idle `hd_a` backends at every sample after load stopped
-  (watch cap 900 s). Cloudflare's limits page lists a 10 minute idle
-  connection timeout for origin connections; this run saw them past it,
-  and the module recorded only state, so it cannot separate a pool floor,
-  keepalive queries or a timeout that does not apply here. Count a config
-  at its origin connection limit when budgeting slots.
-- In run 2 PostgREST's idle pool closed (31 to 1 `authenticator`) between
-  43 and 54 s after its 100 s holds returned; in run 1 its 31 idle
+  (no PGRST000/001/003); H03 separates the two readings (below).
+- **Idle origin connections were closed between 16 and 21 minutes idle
+  (H03, one run; Hyperdrive or something on its path, sender not
+  measured):** after 20 s holds, 54 `hd_a` (default limit) and 13 `hd_c`
+  (`--origin-connection-limit 15`) backends sat idle with `state_change`
+  age equal to the time since load end and the last `pg_sleep` as query
+  text at every sample to 965 s, the same pids from 30 s on; all `hd_a`
+  closed between 965 and 1182 s idle, `hd_c` between 965 and 1265 s
+  (samples at 965, 1182 and 1265 s only). No keepalive queries
+  (`state_change` never reset), no recycling (same pids), no floor with no
+  Worker traffic (`hd_b`, terminated, never reconnected). H02 saw 60 idle at
+  891 s. Cloudflare's limits page lists a 10 minute idle connection timeout
+  for connections between Hyperdrive and the origin database. Budget a
+  config at its origin connection limit for at least 21 minutes after its
+  last burst; one run.
+- **PGRST002 under Hyperdrive slot pressure (H03, 4 arms x 3 runs):** in
+  the 9 arm-runs with Hyperdrive load, `dc_sleep_xl` answered 200 exactly as
+  often as PostgREST's pool connections before the burst plus free slots
+  (20 = 1 + 19 ... 1 = 1 + 0); every other `dc_sleep_xl` call answered 503
+  PGRST002 in 719-2718 ms instead of waiting the 10 s acquisition timeout.
+  postgrest_logs (runs 2 and 3): the first refused connections (503 access
+  lines from 0.1-0.3 s, 234-byte bodies, code not captured; then the
+  version query's `PGRST000 ... FATAL: remaining connection slots ...` at
+  0.2-0.5 s) make PostgREST fail the schema-cache load, answer PGRST002,
+  retry with backoff and initialise a new pool and cache at 7.6-8.4 s
+  (run 3), so `authenticator` reads 1 at 10 s. Warm pool connections were
+  not dropped (12 of 12 served); a reset is not needed, and a reset with
+  free slots gives 30 x 200. Each 503 the client saw left exactly 6
+  PostgREST access lines (runs 2 and 3, 6 arm-runs), the same factor as
+  data-api-capacity DC01b's 504s: a resend in front of PostgREST (reading;
+  not identified). Terminating 31 idle `authenticator` backends gave 503
+  PGRST002 on pings (run 3 logs: 503s from 43.0 to 16.6 s before the burst;
+  11-12 pings to 3 good in all three runs); terminating 2 did not.
+- Config B (`--origin-connection-limit 5`) read up to 9 backends after the
+  warm-up alone and 11 later (H03 run 3), 6 in run 1: the soft limit can be
+  exceeded by more than one (the limits page's footnote 2 says counts "may
+  occasionally exceed the listed limits"). In H03 Q1 (run 1: 70 holds
+  through A and 30 through C, 20 s each, read at 10 s) A and C held 54 and
+  13, below their limits of 60 and 15, with Postgres slots free; the rest
+  got `58000` after 15.2-15.8 s (the limits page lists a 15 s initial
+  connection timeout; docs figure, not probed). In Q2d (40 s holds) A
+  reached 58-60 alongside C. Why A stopped at 54 in Q1 is not separated.
+- In H02 run 2 PostgREST's idle pool closed (31 to 1 `authenticator`) between
+  43 and 54 s after its 100 s holds returned; in H02 run 1 its 31 idle
   connections stayed open for the whole remaining watch (at least 92 s
   idle, t+222 to t+314 s). Cause not separated.
 - Harness: read `pg_stat_activity` through a connection that is already
