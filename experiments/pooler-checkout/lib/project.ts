@@ -42,6 +42,8 @@ let cached: Promise<PcProject> | null = null;
 
 export const REGION = process.env.PVLAB_PC_REGION ?? "ap-southeast-1";
 export const PREFIX = process.env.PVLAB_PC_PREFIX ?? "pc-checkout-";
+/** Compute size for a self-provisioned project (`micro`, `small`, `medium`, ...). */
+export const SIZE = process.env.PVLAB_PC_SIZE ?? "micro";
 
 async function createAndWait(ctx: Ctx): Promise<PcProject> {
   const org = ctx.orgs.pro ?? "";
@@ -54,7 +56,7 @@ async function createAndWait(ctx: Ctx): Promise<PcProject> {
     name,
     db_pass: password,
     region: REGION,
-    desired_instance_size: "micro",
+    desired_instance_size: SIZE,
   });
   const ref = ((create.json as { ref?: string; id?: string } | undefined)?.ref ?? "") as string;
   if (create.status !== 201 || !ref) throw new Error(`create: HTTP ${create.status}: ${create.text.slice(0, 300)}`);

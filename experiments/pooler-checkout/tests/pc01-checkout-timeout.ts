@@ -21,9 +21,9 @@
  *          `select 1` 2 s in. It waits and succeeds; the wait is the holders'
  *          remaining time.
  *
- * Not settled: whether the checkout timeout is per tenant, per region or per
- * Supavisor version (a public status-page mirror quotes 15000 ms; this project
- * answered 60000 ms), and other compute sizes.
+ * The 60000 ms in the error is the pool-slot wait. The `after 15000ms` text
+ * quoted publicly is a different wait (the backend-connection handover); PC06
+ * reproduces it and RUNLOG.md has the source reading. Micro and Small measured.
  */
 import { sql } from "../../../harness/src/platform";
 import type { Ctx, TestModule, TestResult } from "../../../harness/src/types";
