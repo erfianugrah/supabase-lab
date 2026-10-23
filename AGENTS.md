@@ -3936,12 +3936,12 @@ the two targets apart from plan costs and the encoded path length.
   vantage, concurrency, writes without grants, edge_logs retention, the
   wrapper inside an Edge Function (WebAssembly build).
 
-## experiments/partitioned-tenancy - key facts (validated 2026-10-22, default compute (Micro, not read back), ap-southeast-1, Pro org, three runs)
+## experiments/partitioned-tenancy - key facts (validated 2026-10-22, three runs; PT05-PT06 2026-10-23, one run; default compute (Micro, not read back), ap-southeast-1, Pro org)
 
 Self-provisioning (`pvlab-pt-*`, deleted by PT99), run from source with bun.
 An append-only multi-tenant table (`tenant_id`, `created_at`, `payload`)
 partitioned and read through the Data API under a tenant policy on the
-parent. Artifacts `out/2026-10-22/` (runs 1-3). Run 1's PT01e, PT01g, PT01j
+parent. Artifacts `out/2026-10-22/` (runs 1-3) and `out/2026-10-23/` (PT05-PT06). Run 1's PT01e, PT01g, PT01j
 and PT02g rows are probe artefacts (named in the RUNLOG); other run 1 / run
 2 differences are run-to-run variation; run 2's PT04 is void.
 
@@ -3962,17 +3962,29 @@ and PT02g rows are probe artefacts (named in the RUNLOG); other run 1 / run
   its anon grant, has RLS off, and an anon Data API read answered 200 with
   rows from all tenants in the table: 1000 rows (the limit) from all 50
   tenants in PT04e; 2 rows from tenants 1 and 2, the only two, in PT02g.
-  Revoking or enabling RLS on a child before detaching it,
-  or pg_partman's `retention_schema` pointed at an unexposed schema, should
-  close it (reasoned: grants and RLS belong to the table; not run).
+  Measured 2026-10-23 (PT05, n = 1 per step, `out/2026-10-23/`): REVOKE ALL
+  from anon, authenticated before the detach answered anon `401 42501` and a
+  tenant-2 user `403 42501`; SET SCHEMA to `archive` (not exposed) after the
+  detach answered `404 PGRST205`, and `406 PGRST106` with `Accept-Profile:
+  archive`, although the table kept its anon grant (anon has no USAGE on
+  `archive`); RLS enabled on the partition before the detach answered 200
+  with 0 rows (the partition had no policy of its own; policies = 0);
+  pg_partman retention with `retention_schema = 'archive'` moved all 5
+  retired children there (none left in `public`, anon grant kept on 5 of
+  5) and the newest answered anon `404 PGRST205` / `406 PGRST106` (anon
+  only; no tenant-2 read in PT05e). The control (plain detach) still served
+  all 1000 rows of the partition, from tenants 1 and 2, to anon and to the
+  tenant-2 user.
 - **The security advisor flags what the API does not serve.**
   `rls_disabled_in_public` on each of the 3 attached partitions (none on the
   parent) (PT01e, run 2); revoking anon/authenticated on a partition clears
   it, enabling RLS with no policy turns it into `rls_enabled_no_policy`
   (PT01j). Both leave parent reads intact, and a tenant insert through the
-  parent still routes into the revoked partition (201, PT01h). The advisors
-  were not read after a detach, so whether they flag the exposed detached
-  table is not measured.
+  parent still routes into the revoked partition (201, PT01h). After a
+  detach (PT05f, 2026-10-23): the plain-detached table in `public` was
+  flagged `rls_disabled_in_public`, the RLS-on one `rls_enabled_no_policy`,
+  and the revoked table, the table moved to `archive` and the 5 pg_partman
+  children retired to `archive` were not flagged.
 - **pg_partman 5.3.1 per the docs works; no background worker.** The
   documented `create extension pg_partman with schema partman` and
   `create_parent(... p_type := 'range' ...)` answer 201; `pg_partman_bgw` is
@@ -4012,8 +4024,28 @@ and PT02g rows are probe artefacts (named in the RUNLOG); other run 1 / run
   non-2xx 0); why was not read. Run 3 ran PT04 alone on a fresh project
   (PT04z reads `default_transaction_read_only` and size first: off, 369 MB)
   and the DDL succeeded.
-- Not run: archiving a detached table elsewhere (Storage, another database),
-  `retention_schema`, ATTACH cost, sub-partitioning, LIST by tenant, pruning
+- **A detached partition round-trips through a private Storage bucket; the
+  S3 FDW could not read it with the three credential forms this run could
+  create (project ref plus anon or service_role key)** (PT06, 2026-10-23;
+  export, upload, download, import and the restored-table lookups n = 2,
+  the baseline lookup and the FDW attempts n = 1). 1,000,000 rows exported with psql `\copy ... to
+  pstdout` and gzip in 1590 / 1420 ms to a 6611657-byte object, uploaded
+  through Storage REST in 505 / 471 ms, table dropped, downloaded in 505 /
+  601 ms and imported with `\copy ... from pstdin` into
+  `archive.cs_restore_rN` in 1925 / 1913 ms: 1000000 rows, checksum equal to
+  the original both times. A one-tenant one-day lookup took 95.61 / 96.1 ms
+  on the restored table, 0.23 / 0.22 ms after an index on (tenant_id,
+  created_at) built in 935 / 942 ms, against 4.94 ms on the detached table's
+  primary key before the drop. The Wrappers S3 FDW (0.6.3): the Management
+  API v1 document lists no endpoint that creates Storage S3 access keys and
+  the dashboard's credential route answered the PAT `401 Unsupported access
+  token`, so the documented dashboard-key form was not exercised; the
+  project ref with the anon key on the storage host, the anon key on the
+  gateway host, and the service_role key on the storage host each answered
+  `HV000: request failed: service error`.
+- Not run: archiving to another database, the S3 FDW with dashboard-issued
+  keys, Parquet, objects above the 52428800-byte file size limit, exposing
+  `archive` later, ATTACH cost, sub-partitioning, LIST by tenant, pruning
   through PostgREST's own query shape, larger compute, GraphQL exposure of
   partitions. The Postgres version was queried at setup but not written to
   the artifact; the PostgREST version was not read.
