@@ -382,7 +382,11 @@ endif
 # OpenNext adapter (`@opennextjs/cloudflare migrate`), then three changes
 # that measured necessary on 2026-10-07: next pinned to $(LIVE_NEXT) (with
 # next 16.4.0, OpenNext 1.20.9 builds and deploys but every page 500s on
-# "Unexpected loadManifest(/.next/server/preview-props.json)"), the
+# "Unexpected loadManifest(/.next/server/preview-props.json)"; OpenNext
+# 1.20.12's release notes list the fix (not re-checked on a deployed
+# Worker), and from 1.20.13 it needs next >=16.4.1, so the pin
+# moved from 16.3.8 to 16.4.2 on 2026-10-23 for the Next.js RCE advisories;
+# built and served locally under wrangler dev, not yet deployed), the
 # template's `cacheComponents: true` removed (with it, pages hang until the
 # Workers runtime cancels them), and the migrate defaults trimmed to a
 # plain Worker - no R2 incremental-cache bucket, image binding or
@@ -391,7 +395,7 @@ endif
 LIVE_WEB    ?= $(WORKSPACE)/web
 LIVE_WORKER ?= kit-live-app
 LIVE_HOST   ?= kit-live.erfi.dev
-LIVE_NEXT   ?= 16.3.8
+LIVE_NEXT   ?= 16.4.2
 
 .PHONY: live-app-prep live-app-deploy live-app-delete
 
