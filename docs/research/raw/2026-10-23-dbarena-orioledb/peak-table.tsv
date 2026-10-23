@@ -1,0 +1,35 @@
+# Derived from https://github.com/dbarena/dbarena.com/tree/1d7b6309cb0849698709125f9adb478650914c42/results/supabase/{supabase,orioledb}/tpcc/*/result.json (read 2026-10-23).
+# peak = client count with the highest median NEW_ORDER tpm over 3 runs; tpm = NEW_ORDER tpm of the run flagged median at that count; tpm_runs and rtt_us_runs = the 3 runs at that count; rtt = metadata.network_rtt.median_us. product supabase = heap.
+bound	tier	product	clients	wh	tpm	p95ms	rtt_us_sel	tpm_runs	rtt_us_runs	disk	version	measured
+cache-exceeding	2xlarge	orioledb	48	1280	35712	62.91	517	36458/35712/35270	580/517/455	256GB/12000iops/297MBps	OrioleDB beta 17	2026-09-25
+cache-exceeding	2xlarge	supabase	24	1280	21165	61.34	631	21243/21165/20998	514/631/561	256GB/12000iops/297MBps	PostgreSQL 17.6 on aarch	2026-09-27
+cache-exceeding	4xlarge	orioledb	128	2560	59308	97.52	558	59438/59308/58750	577/558/676	512GB/20000iops/594MBps	OrioleDB beta 17	2026-09-26
+cache-exceeding	4xlarge	supabase	128	2560	31496	391.64	517	31496/31591/29834	517/474/483	512GB/20000iops/594MBps	PostgreSQL 17.6 on aarch	2026-09-28
+cache-exceeding	8xlarge	orioledb	128	5120	113850	56.1	613	112831/113850/114193	501/613/509	1024GB/40000iops/1188MBps	OrioleDB beta 17	2026-09-25
+cache-exceeding	8xlarge	supabase	128	5120	60304	160.43	602	60304/51391/64907	602/516/493	1024GB/40000iops/1188MBps	PostgreSQL 17.6 on aarch	2026-09-28
+cache-exceeding	large	orioledb	8	320	7084	59.24	442	7058/7084/7194	698/442/515	64GB/3000iops/125MBps	OrioleDB beta 17	2026-09-26
+cache-exceeding	large	supabase	12	320	5310	86.51	382	5153/5358/5310	533/459/382	64GB/3000iops/125MBps	PostgreSQL 17.6 on aarch	2026-09-28
+cache-exceeding	medium	orioledb	12	160	7156	83.36	292	7066/7156/7221	640/292/308	32GB/3000iops/125MBps	OrioleDB beta 17	2026-09-26
+cache-exceeding	medium	supabase	12	160	4983	95.42	279	4983/4909/5116	279/309/265	32GB/3000iops/125MBps	PostgreSQL 17.6 on aarch	2026-09-28
+cache-exceeding	small	orioledb	4	80	6444	29.88	549	6618/6444/6404	669/549/538	20GB/3000iops/nullMBps	OrioleDB beta 17	2026-09-26
+cache-exceeding	small	supabase	4	80	4392	45.09	881	4344/4669/4392	851/593/881	20GB/3000iops/nullMBps	PostgreSQL 17.6 on aarch	2026-09-28
+cache-exceeding	xlarge	orioledb	16	640	25825	28.84	585	26709/24772/25825	411/560/585	128GB/12000iops/149MBps	OrioleDB beta 17	2026-09-26
+cache-exceeding	xlarge	supabase	16	640	14950	50.86	595	14950/15092/14374	595/714/599	128GB/12000iops/149MBps	PostgreSQL 17.6 on aarch	2026-09-28
+cache-fit	2xlarge	orioledb	48	64	80006	29.36	476	80006/78879/80785	476/525/491	64GB/12000iops/300MBps	OrioleDB beta 17	2026-10-01
+cache-fit	2xlarge	supabase	48	64	68628	34.08	496	68096/69322/68628	502/532/496	64GB/12000iops/300MBps	PostgreSQL 17.11 on aarc	2026-10-01
+cache-fit	4xlarge-cost-optimized	orioledb	128	128	163632	38.27	604	160900/163632/167378	513/604/377	128GB/12000iops/500MBps	OrioleDB beta 17	2026-10-01
+cache-fit	4xlarge-cost-optimized	supabase	128	128	130614	58.2	483	130891/130597/130614	440/476/483	128GB/12000iops/500MBps	PostgreSQL 17.11 on aarc	2026-10-01
+cache-fit	4xlarge-performance-optimized	orioledb	128	128	165371	38.27	533	165371/162006/169329	533/529/614	128GB/20000iops/600MBps	OrioleDB beta 17	2026-10-01
+cache-fit	4xlarge-performance-optimized	supabase	128	128	129596	58.72	421	129596/126677/131766	421/634/451	128GB/20000iops/600MBps	PostgreSQL 17.11 on aarc	2026-10-01
+cache-fit	8xlarge-cost-optimized	orioledb	256	256	303225	45.61	431	303225/315705/297588	431/379/543	256GB/12000iops/500MBps	OrioleDB beta 17	2026-10-01
+cache-fit	8xlarge-cost-optimized	supabase	256	256	235163	64.49	522	236797/235163/226358	379/522/462	256GB/12000iops/500MBps	PostgreSQL 17.11 on aarc	2026-10-01
+cache-fit	8xlarge-performance-optimized	orioledb	256	256	307202	45.09	552	305646/317282/307202	533/389/552	256GB/40000iops/1200MBps	OrioleDB beta 17	2026-10-01
+cache-fit	8xlarge-performance-optimized	supabase	256	256	238510	60.29	493	238510/230658/240694	493/499/349	256GB/40000iops/1200MBps	PostgreSQL 17.11 on aarc	2026-10-01
+cache-fit	large	orioledb	12	16	21182	28.31	416	18193/21782/21182	746/309/416	20GB/3000iops/125MBps	OrioleDB beta 17	2026-10-01
+cache-fit	large	supabase	12	16	18705	31.98	711	18484/21536/18705	591/361/711	20GB/3000iops/125MBps	PostgreSQL 17.11 on aarc	2026-10-01
+cache-fit	medium	orioledb	8	8	10588	38.8	271	10772/10134/10588	203/322/271	20GB/3000iops/125MBps	OrioleDB beta 17	2026-10-01
+cache-fit	medium	supabase	8	8	10441	40.37	506	10441/10220/10560	506/245/450	20GB/3000iops/125MBps	PostgreSQL 17.11 on aarc	2026-10-01
+cache-fit	small	orioledb	12	4	16096	39.85	589	17087/13037/16096	503/1094/589	20GB/3000iops/125MBps	OrioleDB beta 17	2026-10-01
+cache-fit	small	supabase	12	4	17695	36.18	273	13998/18358/17695	865/463/273	20GB/3000iops/125MBps	PostgreSQL 17.11 on aarc	2026-10-01
+cache-fit	xlarge	orioledb	24	32	40755	28.84	470	41268/38596/40755	555/739/470	24GB/3000iops/125MBps	OrioleDB beta 17	2026-10-01
+cache-fit	xlarge	supabase	24	32	37861	31.98	527	33680/38184/37861	753/538/527	24GB/3000iops/125MBps	PostgreSQL 17.11 on aarc	2026-10-01
