@@ -363,6 +363,104 @@ Verified by absence from `GET /v1/projects` plus an empty tofu state rather
 than by the per-ref status code, which was 404 for the first project and 403
 for the second. Nothing left standing.
 
+## Run 7 - 2026-10-23 - background work under restrict-all (S23)
+
+The question: network restrictions gate inbound connections to the DB socket
+(S02, S10), and L22 (iap-lockdown) measured an Edge Function losing its
+direct socket under restrict-all. Does work that Postgres starts itself keep
+running - a pg_cron job, a database webhook (the
+`supabase_functions.http_request` trigger, which queues a pg_net request) and
+a bare pg_net call - and do the outbound requests leave?
+
+Two runs, each on a fresh self-provisioned Pro-org Micro in ap-southeast-1
+(PostgreSQL 17.11, pg_cron 1.6.4, pg_net 0.20.4), created, probed and deleted
+by S23 in one process (`make probe-s23`, no tofu state). Restrict-all is the
+lab's TEST-NET form used by S02, S10 and L22 (`192.0.2.0/24` and
+`2001:db8::/32`). Database webhooks were switched on with
+`POST /v1/projects/{ref}/database/webhooks/enable` (201).
+
+Receivers, both lab-controlled, both answering with the nonce they read from
+the request body, so the response pg_net stores in `net._http_response.content`
+is the receipt:
+
+- external: a Cloudflare Worker on workers.dev (`echo-worker/`, deployed for
+  these runs with `make echo-worker-up`, deleted after; the Workers API
+  answered 404 for the script afterwards);
+- same project: an Edge Function (`verify_jwt=false`) that also writes a
+  receipt row through `/rest/v1` with the service-role key.
+
+What fires: cron `s23-tick` every 2 s inserts a timestamp row; cron `s23-fire`
+every 10 s inserts an `s23_events` row (two webhook triggers on it, one per
+receiver) and makes two direct `net.http_post` calls (one per receiver); the
+orchestrator also inserts one `s23_events` row through the Data API
+(service-role key) in each phase. Phases on the DB clock: pre (45 s, open),
+enforced (120 s, restrict-all applied and the session pooler refusing this
+machine), post (45 s, restored and the pooler accepting again).
+
+Artifacts: run 1 `out/2026-10-23/run-2026-10-23T08-17-05-467Z.json`, run 2
+`out/2026-10-23/run-2026-10-23T08-21-39-730Z.json` (each with its
+`.facts.md`). Run 1's `cron.job_run_details` read joined on `cron.job` after
+the jobs were unscheduled, so it returned no rows (probe bug, fixed before
+run 2); its other figures stand.
+
+- **S23b the restriction was live.** In both runs the first session-pooler
+  connect after the apply was refused (`(EADDRNOTALLOWED) address not in
+  tenant allow_list`; `refused_after_s` 0), `GET network-restrictions` read
+  `status=applied` with the TEST-NET config, and after the restore the first
+  connect was accepted (`reopened_after_s` 0). The enforced window held 120 s.
+- **S23c pg_cron keeps running.** `s23-tick` rows per phase, run 1: pre 22
+  in 45 s, enforced 60 in 120 s, post 22 in 45 s; run 2: 22, 60, 23. Longest
+  gap between consecutive rows over the whole run: 2.1 s (run 1), 2.0 s
+  (run 2). Run 2 `cron.job_run_details`: every run succeeded in every phase
+  (`s23-tick` 22 / 60 / 23, `s23-fire` 4 / 12 / 5; `cron_runs_not_succeeded`
+  0). The project reports `cron.use_background_workers=off` and
+  `cron.host=localhost`, so jobs run over a libpq connection to localhost,
+  which the allowlist did not gate (configuration read; the mechanism is
+  inferred, not separately probed).
+- **S23d database webhooks deliver.** Enforced phase, hooks to the Edge
+  Function: 13 of 13 answered 200 with the nonce echoed in both runs. Hooks to
+  the Worker: 13 of 13 in run 1, 12 of 13 in run 2; the thirteenth has
+  `status_code` null and `error_msg` `Failed sending data to the peer`. The
+  same error hit one direct pg_net call to the Worker in run 2's OPEN pre phase
+  (3 of 4), so it is not a restriction effect: 2 of 45 pg_net requests to the
+  Worker failed in run 2, 0 of 45 in run 1, and 0 of 90 to the Edge Function
+  across both runs. The module did not look for a re-send of the failed
+  request. The app path: one Data API insert per phase answered 201 (enforced
+  included) and fired both hooks, 2 of 2 responses echoing that row's nonce,
+  in every phase of both runs. S23d is marked fail in run 2 only because its
+  pass rule required every Worker hook to echo.
+- **S23e pg_net direct calls leave.** Enforced phase, `net.http_post` to the
+  Edge Function 12 of 12 and to the Worker 12 of 12, 200 with the nonce
+  echoed, in both runs. The Edge Function wrote 25 receipt rows through
+  `/rest/v1` during the enforced phase in both runs (13 hook calls plus 12
+  direct calls), each with user-agent `pg_net/0.20.4`.
+- **S23g the Management API query endpoint answers under restrict-all.**
+  `POST /database/query` returned 201 mid-window in both runs while the pooler
+  refused this machine (a control-plane path, consistent with L23).
+
+Reading: restrict-all changed nothing measurable for work Postgres starts
+itself. Cron ran on its 2 s schedule with no gap above 2.1 s, and outbound
+HTTP left the database to an external host and to the project's own Edge
+Function throughout the window. The restriction is an inbound filter on the
+DB socket; the pg_net egress surface S08 described stays open under it. A
+webhook's receiver is reached over the public HTTP tier, so an Edge Function
+receiver keeps working under restrict-all as long as it talks back over
+`/rest/v1` (as this one did) rather than opening a direct DB socket, which
+L22 measured failing.
+
+Not measured: the direct 5432 (IPv6) socket as the control (pooler only);
+an Edge Function receiver that connects to the DB directly; windows longer
+than 120 s; regions other than ap-southeast-1; pg_net to a private
+destination; the cause of the two `Failed sending data to the peer` errors
+(the Worker was not tailed). n = 2 runs on one day.
+
+### Teardown (run 7)
+
+Both projects deleted by S23's own finally block (DELETE 200 each) and absent
+from `GET /v1/projects` after 0 s (run 1) and 20 s (run 2); re-checked by
+listing after both runs. The echo Worker was deleted with
+`make echo-worker-down`. Nothing left standing.
+
 ## Remaining
 
 - Phase C PrivateLink (iap-lockdown L20-L23) - needs a Team-tier org, an AWS
@@ -372,6 +470,4 @@ for the second. Nothing left standing.
 - Log Drains delivery to an OTLP destination (Dashboard-only, Team plan) and
   the HTTP-endpoint variant of the before-user-created hook - S18/S19 measured
   the Postgres-function hook and the logs endpoints only.
-- pg_cron jobs and database webhooks under restrict-all (L22 measured one
-  Edge Function).
 - A ban provoked over direct 5432 (IPv6) rather than the pooler.
