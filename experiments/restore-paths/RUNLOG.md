@@ -195,7 +195,7 @@ not resolved.
 |---|---|
 | project status back to `ACTIVE_HEALTHY` (10 s polling), pre-rotation target | 30 s (R2, R3, R6, 10 MB database), 81 s (R5, 574 MB) |
 | same, control restores | 40, 30, 41, 40, 30 s (R2, R3, R4, R5, R6; R4's database was 715 MB, R5's 574 MB) |
-| REST, Auth, Realtime paths (1 s probes) | no failed sample during any of the 9 restores; one simultaneous timeout on all three 338 s after R5's first request, no recovery recorded, not explained |
+| REST, Auth, Realtime paths (1 s probes) | no failed sample during any of the 9 restores (REST here is anon GET /rest/v1/, which never reads the database; see the 2026-10-23 correction below); one simultaneous timeout on all three 338 s after R5's first request, no recovery recorded, not explained |
 | Storage path | a failure window of 12 s in 8 of 9 restores, 24 s in R5's control; mode `The operation timed out`, never an HTTP 5xx |
 | pooler path (5 s login poll) | 5 to 13 s on 10 MB and on R4's control (715 MB); 41 s in R5's pre-rotation restore (574 MB); 23 s in R5's control; error texts `the database system is not accepting connections`, `is starting up`, `is shutting down`, `econnrefused`, `terminating connection due to administrator command` |
 
@@ -372,3 +372,203 @@ Preview branch of the R12 project (`POST /projects/{ref}/branches`,
 Not measured: `supabase migration repair` and `supabase db push` against
 the same history; a branch merge after a rollback; a rollback on a branch
 created with git; a stored rollback that fails on a branch.
+
+## 2026-10-22/23 - RP06 (PITR recovery point) and RP07 (restore time against size)
+
+Questions: how far behind "now" the latest recoverable instant of a PITR
+project sits, under a light writer and idle (the backups guide: WAL backed up
+at two-minute intervals, worst-case RPO two minutes, and an idle database can
+show a restore point far behind the current time); what a restore to that
+instant keeps; and how restore time grows past 1 GB (RP02 stopped at 574 MB).
+
+Same vantage (IPv4-only workstation), Pro org, ap-southeast-1, every project
+created on Small by the module with `pitr_7` applied by the module. All runs
+recorded lab commit `b6bd1d2` and ran from the working tree; the committed
+sources are the final revisions (RP06 from R24, RP07 from R22/R23). Every
+project was deleted in `finally`: `DELETE 200` in every published artifact
+(R14's included), and in the local reports of R16 and R17 (local only, not
+published); a `GET /v1/projects` at 01:04 UTC on 2026-10-23 listed no `rp-*`
+project (author's check, no snapshot saved).
+
+| run | module | start (UTC) | what | artifact |
+|---|---|---|---|---|
+| R14 | RP06 | 2026-10-22 22:38 | RP06a-c (20 min writer phase, 20 min idle phase); RP06d aborted (below) | `out/2026-10-22/run-2026-10-22T22-38-06-919Z-rp06-r1.json` |
+| R15 | RP07 | 2026-10-22 22:38 | 3 GB then 10 GB; first revision (no target or WAL columns, no `rest_read` probe) | `out/2026-10-22/run-2026-10-22T22-38-06-919Z-rp07-r1.json` |
+| R16, R17 | RP07 | 2026-10-22 23:16 | aborted after RP07a by the same socket error; local only, not published | (none) |
+| R18 | RP07 | 2026-10-22 23:37 | 3 GB then 10 GB, target and WAL columns, `rest_read` probe | `out/2026-10-22/run-2026-10-22T23-37-21-953Z-rp07-r2.json` |
+| R19 | RP07 | 2026-10-22 23:37 | as R18 with `RP07_WAIT_ARCHIVER=1` (control) | `out/2026-10-22/run-2026-10-22T23-37-21-953Z-rp07-r3-control.json` |
+| R20, R21 | RP06 | 2026-10-23 00:17 | RP06d only (`RP06_PHASE_MIN=0`), second revision | `out/2026-10-23/run-2026-10-23T00-17-23-628Z-rp06-t1.json`, `...-626Z-rp06-t2.json` |
+| R22 | RP07 | 2026-10-23 00:17 | 10 GB only, plus recovery log lines | `out/2026-10-23/run-2026-10-23T00-17-23-645Z.json` |
+| R23 | RP07 | 2026-10-23 00:17 | 3 GB then 10 GB, plus recovery log lines | `out/2026-10-23/run-2026-10-23T00-17-23-754Z.json` |
+| R24 | RP06 | 2026-10-23 00:55 | RP06d only, final revision, writer for 4 min before the restore | `out/2026-10-23/run-2026-10-23T00-55-48-026Z.json` |
+| R25 | RP06 | 2026-10-23 00:56 | as R24, writer for 5 min | `out/2026-10-23/run-2026-10-23T00-56-12-266Z.json` |
+
+Runs started together share a `startedAt` stamp to the millisecond (R14/R15,
+R16/R17, R18/R19); the published copies carry a suffix to keep them apart.
+R14's RP06d, R16 and R17 died on `The socket connection was closed
+unexpectedly` from a Management API fetch (no retry on a thrown fetch then);
+the modules now retry a throw on their own reads (`again()` in `lib/rp.ts`).
+
+### A correction (2026-10-23) to the `rest` path in RP02 (RUNLOG 2026-10-10 table)
+
+The sampler's `rest` probe is `GET /rest/v1/` with the anon key
+(`platform-downtime/lib/probes.ts`); it answers `401` without reading the
+database, and anything below 500 counts as up. RP02's "REST, Auth and
+Realtime showed no failed 1 s sample" is therefore the HTTP tier answering,
+not a Data API read succeeding. From R18 on, RP07 adds a `rest_read` probe
+(`GET /rest/v1/rp_marker?select=*&limit=1` with the service_role key, up only
+on `200`); RP06 points it at `rp_writes` from R24 (R20/R21 pointed it at a
+table RP06 never creates: `404 PGRST205` throughout, so their `rest_read`
+column is void). Every restore where `rest_read` was valid shows the read
+failing with `503 PGRST002`: 15 s of R24's 30 s to healthy and 14 s of R25's
+41 s, and 192 to 544 s in the seven RP07 restores that carried the probe
+(R18, R19, R22, R23; tables below), while `rest` in the same runs shows no
+failure in 8 of those 9 restores and 6 s in one (R18, 3 GB).
+
+### RP06 - lag of the latest recoverable instant (R14)
+
+Archive settings read from Postgres (RP06a, identical in all five RP06 runs):
+`archive_timeout=120 checkpoint_timeout=300 max_wal_size=4096 wal_level=logical
+wal_segment_size=16777216`, `archive_mode=on`.
+
+The upper bound was read every 15 s from the `restore-pitr` refusal for a
+target a week ahead ("Recovery time target must be within range: <earliest>
+<= t <= <latest>"); lag = local clock at the read minus `<latest>`.
+
+| R14 | writer phase (RP06b) | idle phase (RP06c) |
+|---|---|---|
+| writer | 6115 rows acked, 4.97 rows/s, one session-pooler connection | stopped |
+| samples | 80 | 75 |
+| bound lag min / p50 / max | 1 / 47 / 227 s | 2 / 212 / 752 s |
+| samples over 120 s | 1 (the first, 227 s) | 51 |
+| series | 2 to 107 s rising in 15 s steps, back to 1 or 2 s every 8 samples (120 s) | two resets to 2 s in the first 25 samples, then climbs without a reset to 752 s |
+| `GET database/backups` `physical_backup_data.latest_physical_backup_date_unix` lag min / p50 / max | 1 / 47 / 227 s | 2 / 212 / 752 s |
+| `pg_stat_archiver.last_archived_time` lag min / p50 / max | 2 / 49 / 228 s | 2 / 212 / 752 s |
+
+Reading: the quoted upper bound tracks the archiver's last archive time
+(the three columns' min / p50 / max agree to within 2 s in both phases of
+R14; R24 and R25 read the difference directly as 0 and -1 s). Under this writer the bound advanced once
+per `archive_timeout` and its lag stayed at or under 107 s after the first
+sample, which fits the documented two minutes; idle, nothing was archived
+after the early resets and the lag grew for the rest of the phase. The
+`latest_physical_backup_date_unix` field carries the same value as the
+archiver time, not the time of a physical backup. One writer rate, one
+region, n=1 per phase.
+
+### RP06 - restore to the latest recoverable instant under a writer (R20, R21, R24, R25)
+
+Writer as above (about 5 rows/s), the bound L read after 4 min (R25: 5 min) of
+writes, `restore-pitr {L}` issued at once. "Acked" rows are those the writer
+got a reply for, with `written_at` from the database clock; only rows
+acknowledged before the restore request count. R20 and R21 ran a revision
+whose writer kept writing after the restore was accepted (its later rows
+landed in the restored database). Void in R20 and R21: `rows_restored`,
+`restored_rows_after_target_plus_1s`, `newest_restored_minus_target_s`,
+`acked_total` and `acked_after_target` (all include post-restore writes).
+Standing: `acked_before_target`, `acked_before_target_missing` and
+`acked_before_issue_lost` (6 and 27), because the writer's sequence numbers
+only grew, so a post-restore row cannot fill a lost one, and both counts take
+only rows acknowledged before the request.
+
+| run | bound age at read | back `ACTIVE_HEALTHY` | acked rows written before L that were missing | ages of those rows before L | newest kept row before L | acked rows lost against the moment the restore was issued |
+|---|---|---|---|---|---|---|
+| R20 | 1 s | 40 s | 2 of 1189 | not recorded | not recorded | 6 |
+| R21 | 4 s | 40 s | 4 of 1170 | not recorded | not recorded | 27 |
+| R24 | 87 s | 30 s | 3 of 764 | 0.42, 0.22, 0.02 s | 0.62 s | 436, spanning 87.4 s |
+| R25 | 111 s | 41 s | 4 of 939 | 0.79, 0.59, 0.39, 0.18 s | 0.99 s | 560, spanning 112.3 s |
+
+- In R24 the archiver's last archived segment was `...05` with the writer
+  in `...06`, and `postgres_logs` recorded `starting point-in-time recovery
+  to WAL location (LSN) "0/501CA08"`: the platform restores to an LSN, not to
+  the requested time. R22 and R23 logged `recovery stopping after WAL
+  location (LSN) ...` for their restores too.
+- No restore in R24 or R25 kept a row written after L
+  (`restored_rows_after_target_plus_1s` 0; the newest restored row sat 0.6 s
+  and 1 s before L).
+- Reading (not separated by a probe): L is the time the last segment
+  finished archiving, and the restore stops at the end of that segment's WAL.
+  A commit that landed in the next segment between the segment switch and the
+  archive finishing has a `written_at` before L and is not restored. Here
+  the lost window ran from the newest kept row (0.62 s before L in R24,
+  0.99 s in R25) to L; the missing rows were 0.02 to 0.42 s (R24) and 0.18
+  to 0.79 s (R25) old at L. A restore issued at time T keeps nothing after
+  L, so it loses the writes between L and T, the bound's age at T (87 and
+  111 s here).
+- Per path (R24, R25; 1 s probes): `rest_read` `503 PGRST002` for 15 and 14
+  s; pooler 5 s each; Storage 15 and 24 s (`The operation timed out.`); `rest`,
+  Auth and Realtime no failed sample.
+
+### RP07 - restore time against database size (R15, R18, R19, R22, R23)
+
+Disk grown once to 40 GB with `POST /config/disk` right after PITR was
+enabled: `201`, the new size visible in `config/disk/util` after 302 s (R15,
+R18, R19, R22) and 301 s (R23), polled every 20 s. Fill: 1M-row INSERTs of ~230 B rows over the session
+pooler. After each fill the module waited for the quoted upper bound to pass
+the fill's end plus 10 s, then restored to that bound. Every restore went
+`ACTIVE_HEALTHY -> RESTORING -> ACTIVE_HEALTHY` (10 s polling).
+
+| run | size | fill (s, MB/s) | bound wait (s) | target after fill end (s) | back `ACTIVE_HEALTHY` (s) | `rest_read` down (s) | pooler down (s) | Storage down (s) | rows before / after |
+|---|---|---|---|---|---|---|---|---|---|
+| R15 | 3111 MB | 130, 23.9 | 30 | not recorded | 222 | no probe | 182 | 18 | 11,000,000 / 11,000,000 |
+| R15 | 10441 MB | 311, 23.6 | 30 | not recorded | 787 | no probe | 330 | 12 | 37,000,000 / 31,000,000 |
+| R18 | 3210 MB | 129, 24.8 | 121 | 121 | 221 | 211 | 322 | 12 | 11,000,000 / 11,000,000 |
+| R18 | 10482 MB | 290, 25.1 | 31 | 26 | 555 | 417 | 400 | 15 | 36,000,000 / 36,000,000 |
+| R19 control | 3210 MB | 128, 25 | 131 | 128 | 322 | 202 | 315 | 18 | 11,000,000 / 11,000,000 |
+| R19 control | 10482 MB | 291, 25 | 61 | 51 | 545 | 415 | 402 | 12 | 36,000,000 / 36,000,000 |
+| R22 | 10482 MB | 1114, 9.4 | 152 | 123 | 697 | 544 | 531 | 12 | 36,000,000 / 36,000,000 |
+| R23 | 3210 MB | 116, 27.6 | 208 | 170 | 232 | 192 | 176 | 12 | 11,000,000 / 11,000,000 |
+| R23 | 10482 MB | 216, 33.7 | 31 | 29 | 475 | 320 | 320 | 15 | 36,000,000 / 36,000,000 |
+
+"Down" is the longest contiguous failure window from the sampler at 1 s
+(pooler: the 5 s login poll). R22's fill started from an empty table and was
+the slowest of the runs; its artifact records `fill_error` `Connection
+terminated unexpectedly` and 35 counted statements against 36,000,000 rows,
+so one statement committed after the client lost its connection, and the
+reconnect wait (15 s) sits inside the fill time; the rate itself is not
+explained. The 10 GB rows in R15, R18, R19 and
+R23 are a second fill on top of the restored 3 GB database; R22 filled to
+10 GB in one pass.
+
+- Time to `ACTIVE_HEALTHY`: 221 to 322 s at 3111 to 3210 MB (n=4), 475 to
+  787 s at 10441 to 10482 MB (n=5). Against RP02 (30 s at 10 MB, 81 s at
+  574 MB) time grows with size at this compute; n is small and the spread at
+  each size is wide.
+- What replay cost, from `postgres_logs` (R22, R23): `redo done ...
+  elapsed: 166.13 s` (R23, 3 GB), `278.96 s` (R23, 10 GB), `512.03 s` (R22,
+  10 GB); the rest of the time to healthy is outside replay.
+- The Data API read (`rest_read`, the 7 restores in R18, R19, R22, R23) was
+  down for 192 to 544 s, and the pooler for 176 to 531 s across all 9; the
+  `rest` probe (anon on `/rest/v1/`) showed no failure in 8 of 9 restores
+  and 6 s in one. Auth (`/auth/v1/health`) failed for 144 s in R19's 3 GB
+  restore and not at all in the others; Realtime for 144 s in R18's 3 GB
+  restore and 6 s in R19's 3 GB restore.
+- R18's 3 GB restore ended with the current password refused by the pooler
+  (`cred_final_current` `refused`; pooler down 322 s against 221 s to
+  healthy); every other RP07 restore ended `ok`. Not followed up.
+- **R15's 10 GB restore came back short**: 31,000,000 of 37,000,000 rows,
+  and without the `filled-10gb` marker row written after the fill. The
+  restore answered `201` and the project returned to `ACTIVE_HEALTHY`;
+  nothing in the API said the target had not been reached. That revision did
+  not record the target, the WAL position or the recovery log, so how far
+  short it stopped is known only from the missing rows: the last 6 of 26 fill
+  statements and everything after. The four later 10 GB restores (R18, R19,
+  R22, R23) kept every row, and in each the archiver was caught up at the
+  fill's end and at the restore (`segments_behind=1`: only the segment being
+  written was unarchived). Untested reading: if the archiver falls behind,
+  the quoted bound (last archive time) runs ahead of the archived WAL and a
+  restore to it stops short. Nothing recorded in R15 shows a backlog: its
+  fill rate (23.6 MB/s) sat below R18, R19 and R23 (24.8 to 33.7 MB/s), and
+  its bound wait (30 s) and `wal_mb_before_restore` (4096) match the clean
+  runs. R15 is 1 of 5 10 GB restores; the control (R19, waiting for the
+  archiver to pass the fill-end segment) did not separate anything, because
+  its archiver had already caught up when the wait began (`archiver_wait_s`
+  0 at both sizes). The check before trusting a restore to "latest":
+  compare `pg_stat_archiver.last_archived_wal` with
+  `pg_walfile_name(pg_current_wal_lsn())`; a gap of 1 segment is caught up.
+
+Not measured: which base backup each restore started from (the backups
+endpoint listed no physical backup before any of the 9 RP07 restores, as
+RP02 saw once PITR is on); other compute sizes; a heavy writer's effect on the bound lag;
+restore-to-latest with the archiver measurably behind (the case R15
+suggests); the Dashboard's restore button, which may pick its target
+differently.
