@@ -70,7 +70,8 @@ Docs and public claims, separate from the above:
   Supavisor clusters", dated 2026-08-24, and quotes the same error with `after
   15000ms in Transaction mode`. This project answered 60000 ms in 6 of 6 trials.
   Whether the figure is per cluster, per tenant or per Supavisor release was not
-  separated; one project, one region, one day.
+  separated; one project, one region, one day. Answered on 2026-10-23 (section
+  "Where `after 15000ms` comes from" below): it is a different wait.
 - The connection-management guide
   (https://supabase.com/docs/guides/database/connection-management) says each
   compute add-on has a pre-configured Supavisor pool size; the API returned
@@ -233,9 +234,158 @@ not measured, so the lint flags the literal host, not a prefix number.
   returned 0 A and 1 AAAA record for the direct host; this machine's resolver
   returned 0 IPv4 and 0 IPv6.
 
+## Where `after 15000ms` comes from (PC01, PC05-PC07; runs 8 and 9, 2026-10-23)
+
+The 2026-10-10 runs measured 60,000 ms and left a public `after 15000ms`
+report unexplained. This section answers it from the Supavisor source and then
+reproduces it.
+
+| Run | Evidence dir | Project | Modules | Published artifact |
+|---|---|---|---|---|
+| 8 | `20261023-161142-micro` | `ci_micro`, `max_connections` 60 | PC01, PC05, PC06, PC07, PC09 | `out/2026-10-23/run-2026-10-23T08-11-43-542Z.json` |
+| 9 | `20261023-161147-small` | `ci_small`, `max_connections` 90 | PC01, PC05, PC06, PC07, PC09 | `out/2026-10-23/run-2026-10-23T08-11-48-633Z.json` |
+
+Both runs: 2026-10-23, `ap-southeast-1`, Pro org, pooler prefix
+`aws-0`, same IPv4-only vantage as above, run concurrently under `caffeinate`
+(every `-clock` row passed, 1 to 5 ms drift). The two projects were created
+by `POST /v1/projects` outside the harness and handed to it with
+`PVLAB_PC_ADOPT`, so PC01a's `create_to_healthy_s` of 0 is not a provisioning
+time and PC09 reports them as adopted; both were deleted with `DELETE
+/v1/projects/{ref}` after the runs and answered 404 on a later `GET`.
+
+### Source reading (Supavisor at commit `d875a44f8316`, 2026-10-22; not a measurement)
+
+Supavisor raises `ECHECKOUTTIMEOUT` with the text `unable to check out
+connection from the pool after <N>ms in <mode> mode`
+(https://github.com/supabase/supavisor/blob/d875a44f8316f89f95df698db0ad53e1c1563174/lib/supavisor/errors/checkout_timeout_error.ex#L19)
+from two places, and the two use different N:
+
+1. Waiting for a free pool slot: `pool_checkout` calls `:poolboy.checkout`
+   with `data.timeout` (https://github.com/supabase/supavisor/blob/d875a44f8316f89f95df698db0ad53e1c1563174/lib/supavisor/client_handler.ex#L1105-L1109),
+   which is the tenant user's `pool_checkout_timeout`
+   (https://github.com/supabase/supavisor/blob/d875a44f8316f89f95df698db0ad53e1c1563174/lib/supavisor/client_handler.ex#L1145). The schema default is
+   `60_000` (https://github.com/supabase/supavisor/blob/d875a44f8316f89f95df698db0ad53e1c1563174/lib/supavisor/tenants/user.ex#L18). The Management API does
+   not expose the field: `UpdateSupavisorConfigBody` in
+   https://api.supabase.com/api/v1-json (fetched 2026-10-23) has
+   `default_pool_size` and `pool_mode` only. The wait is divided by the
+   attempt number on a retry after a pooled connection exits mid-checkout
+   (https://github.com/supabase/supavisor/blob/d875a44f8316f89f95df698db0ad53e1c1563174/lib/supavisor/client_handler.ex#L954, at most 2 retries per
+   https://github.com/supabase/supavisor/blob/d875a44f8316f89f95df698db0ad53e1c1563174/lib/supavisor/client_handler.ex#L22), which gives 60,000, 30,000 and
+   20,000 ms, never 15,000.
+2. Handing the slot's backend connection to the client: `DbHandler.checkout`
+   is a `:gen_statem.call` whose timeout defaults to a fixed `15_000`
+   (https://github.com/supabase/supavisor/blob/d875a44f8316f89f95df698db0ad53e1c1563174/lib/supavisor/db_handler.ex#L105) and the caller passes none
+   (https://github.com/supabase/supavisor/blob/d875a44f8316f89f95df698db0ad53e1c1563174/lib/supavisor/client_handler.ex#L958). The backend connection
+   postpones that call until it is `idle` or `busy`
+   (https://github.com/supabase/supavisor/blob/d875a44f8316f89f95df698db0ad53e1c1563174/lib/supavisor/db_handler.ex#L638-L652), that is, while it is still
+   connecting, authenticating or waiting out its 2,500 ms reconnect cooldown
+   (https://github.com/supabase/supavisor/blob/d875a44f8316f89f95df698db0ad53e1c1563174/lib/supavisor/db_handler.ex#L65). A Postgres login that takes longer
+   than 15 s therefore produces `after 15000ms` while the pool has free
+   slots. Authentication itself has a separate 15,000 ms limit
+   (https://github.com/supabase/supavisor/blob/d875a44f8316f89f95df698db0ad53e1c1563174/lib/supavisor/db_handler.ex#L66) that fails with a different error.
+
+The `after <N>ms` text arrived with PR #841 (merged 2026-03-10, first tagged in
+v2.9.0, https://github.com/supabase/supavisor/pull/841). Before it, a
+checkout timeout in transaction mode answered `Unable to check out connection
+from the pool due to timeout` and one in session mode `MaxClientsInSessionMode:
+max clients reached - in Session mode max clients are limited to pool_size`,
+neither with a figure
+(https://github.com/supabase/supavisor/blob/85acdde26b97f1c1b151c1e759f1b581e81e09a6/lib/supavisor/client_handler/error.ex#L251-L263).
+The authentication limit arrived with PR #970 (merged 2026-05-07, first
+tagged in v2.9.4, https://github.com/supabase/supavisor/pull/970). PC06 below
+received that PR's error text, so the platform release serving these two
+projects carried both changes; the exact release was not read.
+
+The same source sizes a pool as `size: min_size, max_overflow: pool_size`,
+with `min_size` 1 for an ordinary user
+(https://github.com/supabase/supavisor/blob/d875a44f8316f89f95df698db0ad53e1c1563174/lib/supavisor/tenant_supervisor.ex#L25 and
+https://github.com/supabase/supavisor/blob/d875a44f8316f89f95df698db0ad53e1c1563174/lib/supavisor/tenant_supervisor.ex#L78-L85). That is one more
+backend than the pool size, which fits PC01b's 16 against the 15 that the
+session-mode error below names, and PC07b's 6 against a pool size of 5. This
+is a reading of the code next to the counts, not a separate probe.
+
+Public reports, read as context: a closed issue in the Supabase repository
+(https://github.com/supabase/supabase/issues/48163, opened 2026-07-21) quotes
+pooler logs where `after 15000ms in Transaction mode` sits next to `DbHandler:
+Connection failed {:error, :etimedout}` lines for the project's database
+address, which is the second path. The status-page mirror cited in PC01 calls
+its `after 15000ms` incident "Error spikes in one of the eu-east-1 Supavisor
+clusters"; that it was the second path is an inference from the wording and
+the code, not something the page states.
+
+### PC01 re-run and PC05: the pool-slot wait does not move (runs 8 and 9)
+
+Measured, 3 trials per row per run unless stated:
+
+| Row | What was varied | Result | Rows |
+|---|---|---|---|
+| PC01b | effective transaction pool, 40 `pg_sleep(25)` clients | 16 active backends at +6 s on both `ci_micro` and `ci_small`; 40 of 40 clients served | PC01b |
+| PC01c | client N+1 behind 16 `pg_sleep(75)` holders, transaction mode | `select 1` failed after 60,007 to 60,013 ms (6 of 6, both runs), `(ECHECKOUTTIMEOUT) unable to check out connection from the pool after 60000ms in Transaction mode` | PC01c-1..3 |
+| PC05b | four extra transaction-mode clients at once: plain; node-postgres `statement_timeout: 5000`; `options: -c statement_timeout=5000`; `connectionTimeoutMillis: 5000` | every client connected in 48 to 58 ms and its `select 1` failed after 60,007 to 60,011 ms with the 60000ms text (24 of 24) | PC05b-1..3 |
+| PC05a | 24 session-mode (5432) clients each `pg_sleep(75)` | 15 active backends at +6 s and 15 served; the other 9 per trial failed at connect after 560 to 597 ms with `(EMAXCONNSESSION) max clients reached in session mode - max clients are limited to pool_size: 15` (27 of 27 waiting clients per run). No session client queued and none saw `ECHECKOUTTIMEOUT` | PC05a-1..3 |
+| PC07a | `PATCH .../config/database/pooler` `{"default_pool_size": 5}` | HTTP 200; read back `default_pool_size` 5 | PC07a |
+| PC07b | pool size 5: 12 `pg_sleep(75)` clients plus one `select 1` | 6 active backends at +6 s; the extra client failed after 60,006 to 60,012 ms with the 60000ms text (6 of 6); 6 of 12 holders also failed, after 60,061 to 60,577 ms | PC07b-1..3 |
+
+Reading. On these two compute sizes the pool-slot wait was 60 s whatever the
+pool size the owner set and whatever the client sent. A Postgres
+`statement_timeout` cannot shorten it: the statement never reaches Postgres
+while it waits for a slot. Session mode on these projects does not wait at
+all once its pool is full; it refuses at connect in under 600 ms.
+
+### PC06: a slow backend login reproduces `after 15000ms` (runs 8 and 9)
+
+Rig: a `login` event trigger (Postgres 17; PC06a records that role
+`postgres` could create it through the Management API) that runs `pg_sleep(d)` only for
+sessions whose startup `application_name` is `Supavisor` (the pooler's own
+backend connections; the Management API session is `mgmt-api`), with d read
+from a table. Each trial set d, terminated the pooler's backends through the
+Management API (`pg_terminate_backend`), then started the clients. Transaction
+rows: 4 concurrent `select 1` clients, then 1 more after they finished, 3
+trials (15 clients per row per run). Session row: 2 concurrent clients, 3
+trials (6 per run). No other client held the pool during these trials.
+
+| Row | Login delay d | Run 8 (`ci_micro`) | Run 9 (`ci_small`) |
+|---|---|---|---|
+| PC06b | 0 s, transaction | 15 of 15 served, 57 to 96 ms from connect start to answer | 15 of 15 served, 52 to 97 ms |
+| PC06c | 8 s, transaction | 15 of 15 served: the 12 concurrent clients after 8,006 to 8,097 ms, the 3 follow-up clients after 64 to 86 ms | 15 of 15 served: concurrent clients after 8,014 to 8,130 ms, follow-up clients after 50 to 73 ms |
+| PC06d | 20 s, transaction | 12 of 15: `(ECHECKOUTTIMEOUT) unable to check out connection from the pool after 15000ms in Transaction mode` after 15,051 to 15,070 ms; 3 of 15: `08006 Failed to connect to database: authentication did not complete within 15000ms` after 14,997 to 15,002 ms | 12 of 15 the same `after 15000ms in Transaction mode`, 15,054 to 15,081 ms; 3 of 15 the `08006` text, 14,997 to 15,015 ms |
+| PC06e | 20 s, session (5432) | 4 of 6: `... after 15000ms in Session mode`, 15,046 to 15,134 ms; 2 of 6 the `08006` text, 15,001 to 15,002 ms | 4 of 6 `after 15000ms in Session mode`, 15,046 to 15,180 ms; 2 of 6 the `08006` text, 14,990 to 14,999 ms |
+
+Reading. Measured: with logins delayed past 15 s, clients on a project whose
+pool-slot wait is 60 s got `ECHECKOUTTIMEOUT ... after 15000ms` in both
+transaction and session mode, on both compute sizes, and the follow-up client
+sent after the first failure got it too (6 of 6 transaction trials). With
+logins delayed 8 s every client was served after about 8 s. In each
+transaction trial exactly one of the 4 concurrent clients got the `08006`
+authentication error instead; in session mode 1 of 2 clients did in trials 2
+and 3, and none in trial 1, in both runs. Which client gets which matches the
+source reading: a client handed a backend that had started authenticating
+before the client's own 15 s timer started sees the authentication limit fire
+first; one handed a backend still connecting or in its reconnect cooldown sees
+its own 15 s checkout limit fire first. That per-client mapping is inferred
+from the code, not logged.
+
+Conclusion for the 60,000 ms vs 15,000 ms question: the figure in the error
+text names which wait expired. `after 60000ms` is the pool-slot wait (the
+tenant's `pool_checkout_timeout`, 60 s on every project measured here);
+`after 15000ms` is the backend-connection handover, which is fixed in the
+code and, per the source, fires when the backend connection a client is
+handed is not ready within 15 s, whatever keeps it from being ready.
+Measured here only with a deliberately slow login; that
+public `after 15000ms` reports were the same path, and not a tenant configured
+with a 15 s pool wait, is inference: no project with a 15,000 ms pool-slot
+wait was found, and the field cannot be read through the Management API.
+
+Not measured: a real network fault between the pooler and Postgres (the
+public issue's case), compute sizes above Small, regions other than
+`ap-southeast-1`, the dedicated pooler (PgBouncer), and whether any tenant
+runs with a `pool_checkout_timeout` other than 60,000.
+
 ## What was not run
 
-- Compute sizes other than Micro, other Supavisor releases, other clusters.
-- No project reporting a 15,000 ms checkout timeout was found, so the 60,000 ms
-  vs 15,000 ms difference is unexplained.
+- Compute sizes other than Micro and Small (Small since 2026-10-23), other
+  Supavisor releases, other clusters.
+- No project with a 15,000 ms pool-slot wait was found. The `after 15000ms`
+  text was reproduced on 2026-10-23 through the other path (PC06, above): a
+  backend login slower than 15 s.
 - Any production client. All clients are `select 1` or `pg_sleep` probes.

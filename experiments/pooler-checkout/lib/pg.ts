@@ -4,7 +4,7 @@
  * the pooler (Management API query endpoint, which does not go through
  * Supavisor).
  */
-import { Client } from "pg";
+import { Client, type ClientConfig } from "pg";
 import { sql } from "../../../harness/src/platform";
 import type { Ctx } from "../../../harness/src/types";
 import { errText, sleep, type PcProject } from "./project";
@@ -21,7 +21,7 @@ export const sharedSession = (p: PcProject): Target => ({ label: "supavisor_sess
 export const dedicated = (p: PcProject): Target => ({ label: "dedicated_6543", host: `db.${p.ref}.supabase.co`, port: 6543, user: "postgres" });
 export const direct = (p: PcProject): Target => ({ label: "direct_5432", host: `db.${p.ref}.supabase.co`, port: 5432, user: "postgres" });
 
-export function mkClient(t: Target, password: string, connectTimeoutMs = 30_000): Client {
+export function mkClient(t: Target, password: string, connectTimeoutMs = 30_000, extra: Partial<ClientConfig> = {}): Client {
   const c = new Client({
     host: t.host,
     port: t.port,
@@ -30,6 +30,7 @@ export function mkClient(t: Target, password: string, connectTimeoutMs = 30_000)
     database: "postgres",
     ssl: { rejectUnauthorized: false },
     connectionTimeoutMillis: connectTimeoutMs,
+    ...extra,
   });
   // A server-side kill surfaces as an 'error' event; without a listener it
   // would take the whole process down mid-run.
@@ -55,9 +56,16 @@ export interface Outcome {
  * (deadlineMs). The deadline is the client giving up, not a server answer, and
  * is reported as code `CLIENT_DEADLINE`.
  */
-export async function timedQuery(t: Target, password: string, query: string, deadlineMs: number, connectTimeoutMs = 30_000): Promise<Outcome> {
+export async function timedQuery(
+  t: Target,
+  password: string,
+  query: string,
+  deadlineMs: number,
+  connectTimeoutMs = 30_000,
+  extra: Partial<ClientConfig> = {},
+): Promise<Outcome> {
   const t0 = Date.now();
-  const c = mkClient(t, password, connectTimeoutMs);
+  const c = mkClient(t, password, connectTimeoutMs, extra);
   let connectMs: number | null = null;
   let tq = 0;
   try {
@@ -88,8 +96,8 @@ export interface Holders {
 }
 
 /** Start n clients on target t, each running `select pg_sleep(sleepSec)`. */
-export function holdPool(t: Target, password: string, n: number, sleepSec: number): Holders {
-  const one = async (): Promise<Outcome> => timedQuery(t, password, `select pg_sleep(${sleepSec})`, (sleepSec + 60) * 1000);
+export function holdPool(t: Target, password: string, n: number, sleepSec: number, connectTimeoutMs = 30_000): Holders {
+  const one = async (): Promise<Outcome> => timedQuery(t, password, `select pg_sleep(${sleepSec})`, (sleepSec + 60) * 1000, connectTimeoutMs);
   return { done: Promise.all(Array.from({ length: n }, one)) };
 }
 
