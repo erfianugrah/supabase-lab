@@ -137,3 +137,251 @@ one - refresh tokens live in the issuing project's auth store, so a promoted
 tenant depends on the hub being alive at refresh time, exactly as the gap
 suspected. Success-body evidence is deliberately absent: GoTrue rotates on
 refresh, so a recorded 200 body would carry live rotated tokens.
+
+## 2026-10-23 - fan-out read across two projects (X04-X07, X99; two runs plus an X07 hang re-run)
+
+The question: in a tenant-per-project layout, one tenant's rows live in more
+than one project and a client (or an Edge Function) reads each project's Data
+API and merges the results. Does one token reach both, what does the merge
+cost against a single-project read of the same rows, does keyset pagination
+stay correct across the merge, and what does the merged read do when one
+project is unavailable?
+
+Setup (`lib/fanout.ts`, self-provisioned, no OpenTofu state): two projects,
+A and B, created through `POST /v1/projects` in a Pro-plan org, ap-southeast-1,
+no compute size requested; read back from `/billing/addons` as `ci_micro` on
+both, PostgreSQL 17.11 (X04a). A's Auth issues the token; B registers A as a
+third-party issuer with `oidc_issuer_url` = A's `/auth/v1`, the shape X01
+measured resolving on create. Both users are created on A with
+`app_metadata.tenant_id`; the policy on both projects is `for select to
+authenticated using (tenant_id = (select auth.jwt() -> 'app_metadata' ->>
+'tenant_id'))`. Each Data API request carries that project's legacy anon JWT
+as `apikey` and the user's A-issued access token as the bearer.
+
+Data, identical in both runs: tenant-a has 576 rows on A and 664 on B (1240
+in all); each project also holds 300 tenant-b rows. A's `fan_all` holds the
+union of both projects' rows under the same policy: it is the single-project
+baseline. Timestamps are microsecond-precision; the seed has 40 exact
+cross-project ties on `created_at` and 100 clusters of three rows inside one
+millisecond spread over both projects. Ground truth for X06 is every tenant-a
+row in `fan_all`, ordered by `(created_at desc, id desc)` in Postgres.
+
+Merge code: `lib/merge.ts`, the same file in both vantages. The Edge Function
+source is that file's text plus a `Deno.serve` handler, deployed to A with
+`verify_jwt` false (each Data API verifies the forwarded token itself).
+Policy "all" fails the merged read on the first leg failure
+(`Promise.all`); policy "settled" waits for both legs and returns what
+answered, flagged partial.
+
+Vantage: this lab's Mac over the public internet (the "client"); the Edge
+Function was served in ap-southeast-1 (`SB_REGION` and `x-sb-edge-region`
+both `ap-southeast-1`, X04f). Harness: `make fanout`, `--destructive`, from
+source with bun; all three artifacts carry lab commit 661afdf with the
+uncommitted tree that adds these modules (between runs 1 and 2, X07 gained the
+dead_ref DNS row and the restart timeline evidence, and leg errors lost the
+request URL; before run 3, the "never answers" target changed, below).
+Published (redacted) under `out/2026-10-23/`:
+
+- run 1 `run-2026-10-23T07-57-57-742Z.json`, 07:57:57 to 08:06:31 UTC:
+  9 pass, 29 info.
+- run 2 `run-2026-10-23T08-07-16-031Z.json`, 08:07:16 to 08:15:45 UTC:
+  9 pass, 30 info.
+- run 3 `run-2026-10-23T08-21-02-092Z.json`, 08:21:02 to 08:25:24 UTC: X04,
+  X07 with `PVLAB_XF_MODES=hang` (the hang cells only), X99. 6 pass, 5 info.
+
+Each run used its own fresh pair; X99 deleted both (DELETE 200 and 200, absent
+from `GET /projects` at the first check, all three runs). Run 3's X04 matched
+runs 1-2 (same counts, refusal and isolation); its trust was accepted after
+1697 ms.
+
+### X04 - one token, both projects
+
+| Check | Run 1 | Run 2 |
+|---|---|---|
+| Before trust: tenant-a token at B | `401 PGRST301` | `401 PGRST301` |
+| Trust create on B (`oidc_issuer_url`) | 201 | 201 |
+| Same token accepted at B after | 1226 ms | 635 ms |
+| tenant-a token: rows on A / on B, tenants seen | 576 / 664, tenant-a only | 576 / 664, tenant-a only |
+| tenant-b token (also A-issued) at B | 200, 300 rows, tenant-b only | 200, 300 rows, tenant-b only |
+| Edge Function on A, fan-out page of 50 | 200, both legs 200, page equals truth | the same |
+
+The poll interval is 500 ms, so the acceptance times carry that error bar.
+RLS on B reads the claim from a token B did not issue and scopes it the same
+way A does.
+
+### X05 - latency, merged two-project read vs single-project read
+
+200 rounds per run, each round one sample of each of the four cells in turn
+(5 warm-up rounds discarded first), page size 50, connections warm. Every
+sample's page was compared with the ground truth's first 50 ids: 0 wrong
+pages and 0 errors in all 8 cells x 200 samples. "single" = one leg, A's
+`fan_all`; "fan-out" = A's and B's `fan_items` in parallel, merged. Edge
+cells: the client round trip to the function on A; `inner` is the
+function's own time from request to response. Milliseconds, nearest-rank
+percentiles; at n = 200 the p99 is the third-largest sample.
+
+| Cell | Run | p50 | p95 | p99 | max | inner p50 / p95 / p99 |
+|---|---|---|---|---|---|---|
+| client_single | 1 | 35.9 | 59.7 | 112.2 | 258.7 | - |
+| client_single | 2 | 34.7 | 84 | 451.2 | 614.5 | - |
+| client_fanout | 1 | 43.6 | 179.2 | 487 | 566.4 | - |
+| client_fanout | 2 | 43 | 233.3 | 427.6 | 700.2 | - |
+| edge_single | 1 | 157.9 | 262.6 | 630.6 | 693.5 | 57.4 / 132.4 / 272.3 |
+| edge_single | 2 | 154 | 396.6 | 481.7 | 884.5 | 55.6 / 137.2 / 364.5 |
+| edge_fanout | 1 | 174.1 | 343.9 | 571.5 | 2531.7 | 75.4 / 202.3 / 338.2 |
+| edge_fanout | 2 | 176 | 379.4 | 645.8 | 812.7 | 75 / 225.3 / 302.2 |
+
+Per leg inside the fan-out cells (p50 / p95 / p99):
+
+| Cell | Run | leg A | leg B |
+|---|---|---|---|
+| client_fanout | 1 | 36.4 / 58.9 / 109.1 | 38.8 / 98.7 / 486.3 |
+| client_fanout | 2 | 35.3 / 81.6 / 233.1 | 40 / 165.8 / 371.9 |
+| edge_fanout | 1 | 58 / 127.1 / 251.5 | 59.8 / 169.8 / 256.9 |
+| edge_fanout | 2 | 53.7 / 167 / 297.8 | 57.6 / 125.9 / 246.3 |
+
+Reading (measured, two runs, one vantage):
+
+- From the client, the median merged read cost 7.7 ms (run 1) and 8.3 ms
+  (run 2) more than the single-project read. The p95 is where the fan-out
+  shows: 179.2 and 233.3 ms against 59.7 and 84 ms. The merged read waits for
+  the slower of two legs, so it takes the worse tail of the two every round;
+  in the client cells of both runs leg B's p95 was above leg A's.
+- The Edge Function added 119 to 133 ms at the median over the same read
+  from the client (round trip 157.9 / 154 ms single, 174.1 / 176 ms
+  fan-out, against 35.9 / 34.7 and 43.6 / 43), for one vantage. Inside
+  the function, one leg to A's own Data API took 56.4 / 54.3 ms at p50,
+  slower than the same read from the client (35.8 / 34.5 ms); the function
+  reaches its project's Data API over the project's public URL. Why that
+  hop is slower was not measured.
+- Fan-out inside the function cost 18 and 19.4 ms at the median over the
+  single read (inner p50 75.4 / 75 against 57.4 / 55.6).
+- Not separated: how much of each tail is the network path from this vantage
+  against the Data API itself. One run 1 edge_fanout sample took 2531.7 ms;
+  its inner time was at most 422.6 ms (the inner max), so most of it was
+  outside the function.
+
+### X06 - keyset pagination across the merge
+
+Page size 20, walked from the first page to exhaustion. Identical counts in
+both runs except `positions differing` for keyset_ms_compare (1202 run 1,
+1206 run 2; ids are random per run).
+
+| Strategy | Pages | Rows returned | Missing | Duplicates | Equals truth |
+|---|---|---|---|---|---|
+| keyset_exact (cursor = last row's `created_at` text verbatim, microsecond-exact merge) | 63 | 1240 | 0 | 0 | yes |
+| keyset_ms_cursor (same, cursor passed through a JS `Date`) | 61 | 1201 | 39 | 0 | no |
+| keyset_ms_compare (`Date` comparator and `Date` cursor) | 61 | 1201 | 39 | 0 | no |
+| offset (each project `offset = page x 20`, merge, keep 20) | 34 | 664 | 576 | 0 | no |
+| single_keyset (A's `fan_all` alone, control) | 63 | 1240 | 0 | 0 | yes |
+| edge_keyset_exact (keyset_exact, each page fetched by the function) | 63 | 1240 | 0 | 0 | yes |
+
+- Keyset by `(created_at, id)` merges correctly across two projects when
+  each leg gets the same cursor filter
+  (`created_at < c OR (created_at = c AND id < i)`) and the cursor keeps the
+  microseconds PostgREST returned. The exact ties broke by id across projects
+  with no row lost or repeated.
+- A cursor that goes through a JS `Date` truncates to milliseconds, so the
+  rows older than the cursor row but inside the same millisecond fall outside
+  `created_at < c` and are skipped. No error and no duplicate shows it; the
+  walk ends 39 rows short. The count belongs to this seed layout
+  (clusters and ties inside one millisecond): the offline replay of the same
+  layout with the same merge code, no network, also loses 39
+  (`lib/merge.test.ts`, "X06 replay over the seed layout"). Data with no two
+  rows in one millisecond would lose none (reasoned, not measured).
+- Per-project OFFSET does not compose with a merge: each page drops the
+  rows the merge did not keep. The walk ended after 34 pages, when the
+  longer project (664 rows) ran out; 664 of 1240 rows came back and 576
+  never did (which project they came from was not recorded).
+
+### X07 - one project unavailable
+
+Per-leg timeout 3000 ms in every cell; n = 20 per cell per run, the four cells
+interleaved. A was healthy throughout and every partial result carried A's
+50 rows. Edge cells: the function answered HTTP 200 in all 160 edge calls
+of runs 1 and 2 and all 40 of run 3, with the failure reported in the body.
+
+| B broken by | Cell | Time to return, p50 / p95 ms (run 1; run 2) | Merged read | B leg |
+|---|---|---|---|---|
+| ref-shaped hostname of no project (DNS `ENOTFOUND` from the client, run 2) | client_all | 2.1 / 7.6; 1.9 / 3.7 | failed 20/20 | no response, `Error` |
+| | client_settled | 48 / 80.6; 34.5 / 53.5 | partial 20/20 | the same |
+| | edge_all | 114.8 / 168.3; 102.9 / 130.7 | failed 20/20 | `TypeError` ... `dns error` (run 2 text; run 1 truncated before it) |
+| | edge_settled | 165.3 / 221.9; 140.6 / 217.7 | partial 20/20 | the same |
+| hostname under `.invalid` | client_all | 2.1 / 4.6; 2.1 / 4 | failed 20/20 | no response, `Error` |
+| | client_settled | 40.6 / 84.5; 33.4 / 41.8 | partial 20/20 | the same |
+| | edge_all | 98.5 / 125.9; 103.3 / 118.7 | failed 20/20 | `TypeError` ... `dns error` (run 2 text) |
+| | edge_settled | 164.3 / 512; 145.5 / 216.7 | partial 20/20 | the same |
+| blackhole: an address where nothing answers the TCP connect (runs 1-2 only; target since removed, see below) | client_all | 3001.8 / 3002.8; 3001.7 / 3002.5 | failed 20/20 | `TimeoutError` |
+| | client_settled | 3002.2 / 3002.8; 3001.7 / 3002.9 | partial 20/20 | the same |
+| | edge_all | 3099.8 / 3136.6; 3104.4 / 3136.8 | failed 20/20 | the same |
+| | edge_settled | 3102 / 3129; 3104.5 / 3140.6 | partial 20/20 | the same |
+| hang: a path on A's Edge Function that accepts the request and answers after 20 s (run 3 only) | client_all | 3002.4 / 3003.1 | failed 20/20 | `TimeoutError` |
+| | client_settled | 3002.7 / 3003.3 | partial 20/20 | the same |
+| | edge_all | 3111 / 3135.7 | failed 20/20 | the same |
+| | edge_settled | 3112.7 / 3148.8 | partial 20/20 | the same |
+| B's trust in A deleted | client_all | 29.8 / 56.8; 30.7 / 44.8 | failed 20/20 | `401 PGRST301` |
+| | client_settled | 43.1 / 73.1; 36.6 / 55.9 | partial 20/20 | the same |
+| | edge_all | 154.8 / 396.7; 144.5 / 355.3 | failed 20/20 | the same |
+| | edge_settled | 176.1 / 600.1; 178.2 / 280 | partial 20/20 | the same |
+
+- Time to error is set by how B fails, and the merge policy decides whether
+  the user sees anything. A DNS failure or a 401 arrives before A's rows,
+  so from the client "all" errored at a p50 of about 2 ms (DNS) or about
+  30 ms (401), and "settled" returned A's half at a p50 of 33.4 to 48 ms,
+  close to a normal single read. A leg that never answers holds both
+  policies to the timeout, whether nothing answers the connect (blackhole,
+  runs 1-2) or the server accepts the request and stays silent (hang, run
+  3): every such cell's p50 was 3001.7 ms or more, from either vantage,
+  because neither policy returns until the slow leg gives up. The per-leg
+  timeout is the latency of a partial result.
+- Method change: runs 1-2 pointed B's leg at a documentation-range address
+  for the blackhole cells. The lab keeps no address literals in committed
+  files, so that target was removed from `tests/x07-fanout-one-down.ts` after
+  run 2 and replaced by the hang path, which run 3 measured. The two are
+  different failures (no TCP answer against an accepted request with no
+  response) and gave the same timing at this timeout; the blackhole numbers
+  stay above as measured, with no code in the repo that reproduces them.
+- Revoking the trust is a fast, clean failure: `401 PGRST301` "No suitable
+  key was found to decode the JWT", the same body as before trust existed.
+  B refused 1741 ms (run 1) and 812 ms (run 2) after the DELETE, and the
+  re-created integration was accepted again after 685 ms and 608 ms.
+
+Restart of B (`POST /v1/projects/{ref}/restart`, HTTP 200), policy
+"settled", one client sample and one edge sample per second until B had
+failed and then answered for 30 s:
+
+| | Run 1 | Run 2 |
+|---|---|---|
+| Samples / span | 82 / 89 s | 86 / 92 s |
+| Samples with B's leg failed | 22 | 19 |
+| First / last B failure after the call | 1.8 s / 58.1 s | 2.8 s / 61.0 s |
+| Partial results / whole-read failures | 22 / 0 | 19 / 0 |
+| B leg failures by kind | edge 521: 6, client 521: 4, client timeout: 6, edge timeout: 5, client `503 PGRST002`: 1 | client 521: 3, edge 521: 3, client timeout: 6, edge timeout: 6, client `503 PGRST002`: 1 |
+
+Run 2's timeline (artifact evidence): 521 at 2.8 to 2.9 s, then every sample
+from 6.9 s to 45.9 s timed out at the 3000 ms budget, then 521 at 47.0 to
+47.4 s, `503 PGRST002` at 49.2 s, 521 again at 60.9 to 61.0 s, then 30 s
+clean. During the timeout stretch each partial result took the full 3000 ms,
+and consecutive samples were 3.1 to 4.0 s apart instead of 1 s. 521 is an
+HTML error page, not a PostgREST body, so a client that parses every error
+as JSON breaks on it.
+
+Pause: `POST /v1/projects/{ref}/pause` on B answered `400 {"message":"Project
+is not free-tier. Please downgrade it to free-tier first and try again."}` in
+both runs, so on a Pro-plan org a paused project was not available as a
+failure mode; restart was used as the real outage.
+
+### What this does not answer
+
+- Other vantages and regions: one client location, one region, both projects
+  side by side. A tenant's projects in two regions would put a cross-region
+  leg in every fan-out.
+- Load: samples were sequential; no concurrency, no rate-limit behaviour.
+- Cold paths: warm connections only; no cold Edge Function start, no
+  first-request TLS or DNS cost.
+- Larger fan-outs: two projects only; the tail effect with N legs was not
+  measured.
+- Writes, Realtime and Storage across projects: only Data API reads.
+- Why the function's leg to its own project is slower than the same read from
+  the client.
+- Token refresh still goes to A (X03); A down was not tested here, only B.
