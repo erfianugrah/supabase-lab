@@ -1,0 +1,246 @@
+{
+  "startedAt": "2026-10-23T08:19:57.569Z",
+  "finishedAt": "2026-10-23T08:20:28.005Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "projectRegion": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "identity-transfer",
+  "labCommit": "661afdf",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "IT01-setup",
+      "title": "keycloak slot pointed at the lab issuer",
+      "status": "pass",
+      "detail": "PATCH /config/auth HTTP 200; /auth/v1/settings external.keycloak true after 4s (2 reads); mailer_autoconfirm=false, security_manual_linking_enabled=false",
+      "measurements": {
+        "patch_status": 200,
+        "settle_s": 4,
+        "settle_reads": 2,
+        "mailer_autoconfirm": "false",
+        "manual_linking_enabled": "false"
+      },
+      "durationMs": 13079
+    },
+    {
+      "id": "IT01a",
+      "title": "first sign-in: new user, identity keyed by subject",
+      "status": "pass",
+      "detail": "user 6c3a7f83... email <email>; auth.identities rows for subject a1: 1, provider_id = identity_data.sub: true",
+      "measurements": {
+        "authorize_status": 302,
+        "callback_status": 302,
+        "session": 1,
+        "identity_rows": 1,
+        "provider_id_equals_sub": "true",
+        "email_verified_in_identity_data": "true"
+      },
+      "durationMs": 13079
+    },
+    {
+      "id": "IT01b",
+      "title": "new subject, same verified email: linked to the existing user",
+      "status": "pass",
+      "detail": "user 6c3a7f83... email <email>; same user as a1: true; identities on that user now: 2",
+      "measurements": {
+        "callback_status": 302,
+        "same_user_as_a1": "true",
+        "identities_on_user": 2,
+        "error_code": "-"
+      },
+      "durationMs": 13079
+    },
+    {
+      "id": "IT01c",
+      "title": "new subject, different email (relay address changed): a new user",
+      "status": "pass",
+      "detail": "b1 user 1f19a319... email <email>; b2 user d9c03a8a... email <email>; different users: true",
+      "measurements": {
+        "b1_session": 1,
+        "b2_session": 1,
+        "different_users": "true"
+      },
+      "durationMs": 13079
+    },
+    {
+      "id": "IT01d",
+      "title": "remap provider_id in SQL, sign in with the new subject and a new email: same user",
+      "status": "pass",
+      "detail": "c1 user 7caafa0a... email <email>; remap updated 1 row(s); c2 (different email) user 7caafa0a... email <email>; same user as c1: true, identities on that user: 1; after the c2 sign-in auth.users.email is the old address and identity_data.email the new one; raw_user_meta_data.sub was c1 straight after the SQL rewrite and c2 after the sign-in (provider_id c1 -> c2, its email copy new); control c1-with-new-email is a different user: true",
+      "measurements": {
+        "remap_rows": 1,
+        "c2_same_user_as_c1": "true",
+        "identities_on_user": 1,
+        "users_email_after": "old",
+        "identity_data_email_after": "new",
+        "token_email_after": "old",
+        "user_metadata_sub_before_signin": "c1",
+        "user_metadata_sub_after_signin": "c2",
+        "user_metadata_provider_id_after_signin": "c2",
+        "user_metadata_email_after_signin": "new",
+        "control_old_subject_new_user": "true",
+        "c2_callback_status": 302
+      },
+      "durationMs": 13079
+    },
+    {
+      "id": "IT01e",
+      "title": "new subject, same email but unverified: not linked",
+      "status": "pass",
+      "detail": "d1 user a310f848... email <email>; d2 no session: error=access_denied code=provider_email_needs_verification \"Unverified email with keycloak. Verify the email with keycloak in order to sign in\"; identities on d1's user: 1; rows the refused sign-in left for d2: 1 identity, 1 user (auth.users.email NULL, confirmed false)",
+      "measurements": {
+        "d2_session": 0,
+        "d2_error": "access_denied",
+        "d2_error_code": "provider_email_needs_verification",
+        "d2_identity_rows": 1,
+        "d2_shadow_user_rows": 1,
+        "d2_shadow_user_email": "null",
+        "d2_shadow_user_confirmed": "false",
+        "identities_on_d1_user": 1
+      },
+      "evidence": "callback error_description: Unverified email with keycloak. Verify the email with keycloak in order to sign in",
+      "durationMs": 13079
+    },
+    {
+      "id": "IT01z",
+      "title": "cleanup",
+      "status": "pass",
+      "detail": "deleted 6 user(s) via admin API, 1 more by identity-subject sweep; auth config restored: HTTP 200",
+      "durationMs": 13079
+    },
+    {
+      "id": "IT02-setup",
+      "title": "keycloak slot pointed at the lab issuer",
+      "status": "pass",
+      "detail": "PATCH /config/auth HTTP 200; /auth/v1/settings external.keycloak true after 0s (1 reads)",
+      "measurements": {
+        "patch_status": 200,
+        "settle_s": 0,
+        "settle_reads": 1
+      },
+      "durationMs": 4145
+    },
+    {
+      "id": "IT02a",
+      "title": "a custom claim is stored on both the identity and the user",
+      "status": "pass",
+      "detail": "user 2e7b181a... email <email>; identity_data.custom_claims.transfer_sub matches; raw_user_meta_data.custom_claims.transfer_sub matches",
+      "measurements": {
+        "session": 1,
+        "identity_data_transfer_sub": "present",
+        "user_metadata_transfer_sub": "present"
+      },
+      "durationMs": 4145
+    },
+    {
+      "id": "IT02b",
+      "title": "a transfer_sub naming the old identity does not find it: a new user",
+      "status": "pass",
+      "detail": "user b160a885... email <email>; same user as e1: false (transfer_sub carried e1's subject and the email matched nothing)",
+      "measurements": {
+        "session": 1,
+        "new_user": "true",
+        "callback_status": 302
+      },
+      "durationMs": 4145
+    },
+    {
+      "id": "IT02c",
+      "title": "sign in again without the claim: the stored copy is not durable",
+      "status": "pass",
+      "detail": "user 2e7b181a... email <email>; same user as e1: true; after a sign-in carrying no transfer_sub, identity_data.custom_claims.transfer_sub is absent and raw_user_meta_data.custom_claims.transfer_sub is absent (raw_user_meta_data still has a custom_claims key: true)",
+      "measurements": {
+        "same_user": "true",
+        "identity_data_transfer_sub_after": "absent",
+        "user_metadata_transfer_sub_after": "absent",
+        "user_metadata_has_custom_claims_key": "true"
+      },
+      "durationMs": 4145
+    },
+    {
+      "id": "IT02z",
+      "title": "cleanup",
+      "status": "pass",
+      "detail": "deleted 2 user(s) via admin API, 0 more by identity-subject sweep; auth config restored: HTTP 200",
+      "durationMs": 4145
+    },
+    {
+      "id": "IT03-setup",
+      "title": "hook enabled against the lab worker",
+      "status": "pass",
+      "detail": "f1 (hook off) user 6716b8ea... email <email>; PATCH hook_before_user_created HTTP 200; first refused signup after 4s (2 sign-in attempts, one fresh subject each); prior config had the hook false",
+      "measurements": {
+        "hook_patch_status": 200,
+        "hook_settle_s": 4,
+        "hook_settle_attempts": 2,
+        "hook_previously_enabled": "false"
+      },
+      "durationMs": 13212
+    },
+    {
+      "id": "IT03a",
+      "title": "a stranger is refused, and the payload carried the provider custom claim",
+      "status": "pass",
+      "detail": "no session: error=access_denied code= \"top%3Dmetadata%7Cuser um%3Dcustom_claims%7Cemail%7Cemail_verified%7Cfull_name%7Ciss%7Cname%7Cphone_verified%7Cprovider_id%7Csub cc%3Dpreferred_username%7Ctransfer_sub tsub%3DTRANSFER-6c3iuw-g email%3Dit03-6c3iuw-g2%40example.com\"; the hook's own digest of the payload: user_metadata keys [custom_claims|email|email_verified|full_name|iss|name|phone_verified|provider_id|sub], custom_claims keys [preferred_username|transfer_sub], transfer_sub matched the claim the issuer sent",
+      "measurements": {
+        "session": 0,
+        "error_code": "",
+        "user_metadata_keys": "custom_claims|email|email_verified|full_name|iss|name|phone_verified|provider_id|sub",
+        "custom_claims_keys": "preferred_username|transfer_sub",
+        "transfer_sub_visible": "true"
+      },
+      "evidence": "callback error_description verbatim: top%3Dmetadata%7Cuser um%3Dcustom_claims%7Cemail%7Cemail_verified%7Cfull_name%7Ciss%7Cname%7Cphone_verified%7Cprovider_id%7Csub cc%3Dpreferred_username%7Ctransfer_sub tsub%3DTRANSFER-6c3iuw-g email%3Dit03-6c3iuw-g2%40example.com",
+      "durationMs": 13212
+    },
+    {
+      "id": "IT03b",
+      "title": "a new subject linking on a verified email: the hook does not run",
+      "status": "pass",
+      "detail": "user 6716b8ea... email <email>; same user as f1: true - signed in while the hook was refusing every new account",
+      "measurements": {
+        "session": 1,
+        "same_user_as_f1": "true",
+        "error_code": "-"
+      },
+      "durationMs": 13212
+    },
+    {
+      "id": "IT03c",
+      "title": "a known subject signing in again: the hook does not run",
+      "status": "pass",
+      "detail": "user 6716b8ea... email <email>; same user as f1: true",
+      "measurements": {
+        "session": 1,
+        "same_user_as_f1": "true",
+        "error_code": "-"
+      },
+      "durationMs": 13212
+    },
+    {
+      "id": "IT03d",
+      "title": "control: hook off, the same persona shape is created",
+      "status": "pass",
+      "detail": "PATCH hook off HTTP 200; user 0cd18c0b... email <email> after 4s (2 attempts). The persona IT03a was refused for differs only in the run-scoped subject and email, so the refusal was the hook",
+      "measurements": {
+        "hook_off_patch_status": 200,
+        "hook_off_settle_s": 4,
+        "hook_off_settle_attempts": 2,
+        "session": 1
+      },
+      "durationMs": 13212
+    },
+    {
+      "id": "IT03z",
+      "title": "cleanup",
+      "status": "pass",
+      "detail": "hook disabled: HTTP 200; deleted 3 user(s) via admin API, 0 more by identity-subject sweep; auth config restored: HTTP 200; hook_before_user_created_enabled read back: false",
+      "durationMs": 13212
+    }
+  ]
+}

@@ -33,10 +33,12 @@
  *               session. The hook did not run.
  *   IT03c       subject f1 again (AccountExists) -> a session. The hook did
  *               not run.
- *   IT03d       control: the hook off, the SAME persona IT03a was refused for
- *               -> a user. Without it, "refused" is a property of the persona
- *               rather than of the hook.
- *   IT03z       cleanup: users deleted, hook and auth config restored.
+ *   IT03d       control: the hook off, a fresh stranger of the same shape IT03a
+ *               was refused for (new subject and email, same claim) -> a user.
+ *               Without it, "refused" is a property of the persona rather
+ *               than of the hook.
+ *   IT03z       cleanup: users deleted, hook and auth config restored, the
+ *               hook flag read back.
  *
  * DESTRUCTIVE: writes auth config incl. the hook (restored in finally),
  * creates users (deleted in finally). Self-skips without ctx.endpoints.issuer.
@@ -73,14 +75,31 @@ const mod: TestModule = {
     // never recorded: the worker does not verify the signature, so this only
     // has to satisfy the format check.
     const hookSecret = `v1,whsec_${Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString("base64")}`;
+    // Disabling sends the enabled flag alone. The first run (2026-10-23)
+    // also sent `hook_before_user_created_uri: ""` and the config API answered
+    // 400 both times, leaving the hook armed.
     const setHook = async (enabled: boolean, route: "reject" | "allow" = "reject") =>
-      mgmt(ctx, "PATCH", `/projects/${ctx.ref}/config/auth`, {
-        hook_before_user_created_enabled: enabled,
-        hook_before_user_created_uri: enabled ? `${issuer.replace(/\/$/, "")}/hook/${route}` : "",
-        ...(enabled ? { hook_before_user_created_secrets: hookSecret } : {}),
-      });
+      mgmt(
+        ctx,
+        "PATCH",
+        `/projects/${ctx.ref}/config/auth`,
+        enabled
+          ? {
+              hook_before_user_created_enabled: true,
+              hook_before_user_created_uri: `${issuer.replace(/\/$/, "")}/hook/${route}`,
+              hook_before_user_created_secrets: hookSecret,
+            }
+          : { hook_before_user_created_enabled: false },
+      );
 
-    /** A fresh stranger; one per polling attempt so no attempt reuses a subject. */
+    /**
+     * A fresh stranger; one per polling attempt, numbered across the whole run
+     * so no attempt reuses a subject. The first run (2026-10-23) restarted the
+     * numbering in each poll, so IT03d's first attempt was IT03-setup's first
+     * stranger signing in again (AccountExists, which the hook never sees) and
+     * proved nothing about the hook being off.
+     */
+    let strangerSeq = 0;
     const stranger = (n: number): Persona => ({
       sub: subj(`g${n}`),
       email: email(`g${n}`),
@@ -100,7 +119,7 @@ const mod: TestModule = {
       let p = stranger(0);
       while (Date.now() - t0 < HOOK_SETTLE_BUDGET_MS) {
         attempts++;
-        p = stranger(attempts);
+        p = stranger(++strangerSeq);
         s = await signIn(ctx, apikey, p);
         if (s.userId) createdUsers.add(s.userId);
         const got = want === "refused" ? !s.userId : !!s.userId;
@@ -213,7 +232,7 @@ const mod: TestModule = {
           hook_off_settle_attempts: freed.attempts,
           session: freed.s.userId ? 1 : 0,
         },
-        evidence: freed.got ? undefined : `last outcome: ${note(freed.s)}`,
+        evidence: [disable.status >= 300 ? `hook-off PATCH body: ${disable.text.slice(0, 300)}` : "", freed.got ? "" : `last outcome: ${note(freed.s)}`].filter(Boolean).join("; ") || undefined,
       });
     } catch (e) {
       out.push({ id: ID, title: this.title, status: "fail", detail: `threw: ${e instanceof Error ? e.message : String(e)}` });
@@ -222,7 +241,7 @@ const mod: TestModule = {
       // The hook goes off first: a restore that leaves it armed would refuse
       // every signup on this project until someone noticed.
       const off = await setHook(false);
-      notes.push(`hook disabled: HTTP ${off.status}`);
+      notes.push(`hook disabled: HTTP ${off.status}${off.status >= 300 ? ` (${off.text.slice(0, 200)})` : ""}`);
       const keys = await fetchKeys(ctx).catch(() => undefined);
       let deleted = 0;
       if (keys) {
@@ -243,6 +262,12 @@ const mod: TestModule = {
         restored = restored && restore.status < 300;
         notes.push(`auth config restored: HTTP ${restore.status}`);
       }
+      // Read the hook flag back rather than trusting the PATCH status.
+      const after = await mgmt(ctx, "GET", `/projects/${ctx.ref}/config/auth`);
+      const stillOn = (after.json as Record<string, unknown> | undefined)?.hook_before_user_created_enabled;
+      notes.push(`hook_before_user_created_enabled read back: ${String(stillOn)} (GET HTTP ${after.status})`);
+      // A failed read-back is not "off": require a 200 that says false.
+      restored = restored && after.status === 200 && stillOn === false;
       out.push({ id: `${ID}z`, title: "cleanup", status: restored && !sweep.error ? "pass" : "fail", detail: notes.join("; ") + (sweep.error ? `; sweep error: ${sweep.error}` : "") });
     }
     return out;

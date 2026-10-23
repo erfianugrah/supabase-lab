@@ -1697,7 +1697,7 @@ Edge Function on the project and registered with `POST
   themselves); `lib/rtws.ts` is a raw-protocol Realtime socket that keeps
   every frame verbatim.
 
-## experiments/identity-transfer - key facts (IT01 2026-09-07 managed micro; ITL1-ITL3 2026-09-11 local rig)
+## experiments/identity-transfer - key facts (IT01 2026-09-07 managed micro; ITL1-ITL3 2026-09-11 local rig; IT01-IT03 2026-10-23 managed micro x3)
 
 - Question: a person returns from an OAuth provider with a NEW subject (the
   Apple Developer team-transfer shape - Apple's `sub` and private relay email
@@ -1771,9 +1771,27 @@ Edge Function on the project and registered with `POST
   (`hook_before_user_created_enabled` / `_uri` / `_secrets`) was driven on a
   managed Micro project by security-lockdown S19d (2026-09-03): a
   Postgres-function hook rejected a blocked domain with its own 400 text,
-  active 5 s after the PATCH. Not probed on managed: whether the hook arms on
-  CreateAccount only, as on self-hosted v2.197.0 (IT02 and IT03 are the
-  managed-vantage modules and have NOT been run).
+  active 5 s after the PATCH. Whether the hook arms on CreateAccount only on
+  managed was unprobed until IT03 (2026-10-23, next bullet).
+- IT01-IT03 (2026-10-23, managed micro, ap-southeast-1, Pro org, three fresh
+  projects, one battery each; `out/2026-10-23/`, run 1 16 pass 2 fail, runs 2
+  and 3 18 pass): the refactored IT01 reproduced every 2026-09-07 measurement
+  in 3 of 3 runs (`pvlab --diff`: 34 unchanged), and its new IT01d keys show
+  `raw_user_meta_data` sub/provider_id/email moving to the new values at the
+  sign-in after the remap, as ITL1c did locally. IT02 matched ITL2a-c in 3 of
+  3 runs (claim stored on both rows, a `transfer_sub` naming the old subject
+  still gives a new user, one sign-in without it removes both copies). IT03,
+  an https HTTP hook at the issuer worker: armed on CreateAccount alone
+  (LinkAccount and AccountExists sign-ins got sessions while it refused every
+  stranger, 3 of 3), payload carries `user.user_metadata.custom_claims
+  .transfer_sub`, refusal is `error=access_denied` with an empty
+  `error_code`; a hook change took effect within 4-5 s in both directions
+  (second sign-in after the PATCH, 3 s pause between attempts). Turn the hook
+  off with `hook_before_user_created_enabled: false` ALONE (adding
+  `hook_before_user_created_uri: ""` got HTTP 400, run 1, 2 of 2 calls), then
+  read the flag back. Run 1's IT03d/IT03z failures were module bugs (that 400
+  and a stranger numbering that re-signed an existing user), fixed before runs
+  2 and 3; the artifacts' lab commit 661afdf predates that fix.
 
 ## experiments/audit-integrity - key facts (validated 2026-09-08, micro x2 on Pro + Team orgs; entitlements and members read on Free + Pro + Team)
 
