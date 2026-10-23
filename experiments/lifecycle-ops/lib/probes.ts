@@ -57,3 +57,53 @@ export function p50(xs: number[]): number {
   const s = [...xs].sort((a, b) => a - b);
   return s[Math.floor((s.length - 1) / 2)] as number;
 }
+
+/** Tag carried in the holder's statement text, so pg_stat_activity can find it. */
+export const LOCK_TAG = "pvlab_lock_holder";
+
+/**
+ * LO06's induced fault: one session takes an ACCESS EXCLUSIVE lock on `table`
+ * and sleeps inside the transaction, so every read of that table waits behind
+ * it while the server, the sockets and the control plane stay healthy. A
+ * restart ends the session; so would pg_terminate_backend (cheaper, and what
+ * an operator who knew the cause would use). Resolves once the lock is held;
+ * `ended` settles with the error text when the session is killed.
+ * `host` may be an IPv6 literal with `servername` the TLS name (see directProbe).
+ */
+export async function holdLock(opts: {
+  host: string;
+  port: number;
+  user: string;
+  password: string;
+  servername?: string;
+  table: string;
+  sleepS?: number;
+}): Promise<{ ended: Promise<string>; release: () => Promise<void> }> {
+  const client = new Client({
+    host: opts.host,
+    port: opts.port,
+    user: opts.user,
+    database: "postgres",
+    password: opts.password,
+    ssl: { rejectUnauthorized: false, ...(opts.servername ? { servername: opts.servername } : {}) },
+    connectionTimeoutMillis: 10_000,
+  });
+  let endedResolve: (s: string) => void = () => {};
+  const ended = new Promise<string>((r) => (endedResolve = r));
+  client.on("error", (e) => endedResolve(`client error: ${e.message}`));
+  await client.connect();
+  await client.query("begin");
+  await client.query("set local statement_timeout = 0");
+  await client.query("set local idle_in_transaction_session_timeout = 0");
+  await client.query(`lock table ${opts.table} in access exclusive mode`);
+  client
+    .query(`select pg_sleep(${opts.sleepS ?? 3600}) /* ${LOCK_TAG} */`)
+    .then(() => endedResolve("sleep finished"))
+    .catch((e: unknown) => endedResolve(e instanceof Error ? e.message : String(e)));
+  return {
+    ended,
+    release: async () => {
+      await client.end().catch(() => {});
+    },
+  };
+}

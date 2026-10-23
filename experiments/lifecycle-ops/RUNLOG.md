@@ -294,6 +294,10 @@ Management API disagree.
 | Budget a restart as an outage on every path, REST reads and Realtime included: about 1 minute on Auth, Storage, pooler and direct on 2026-10-10 with the pooler able to run 2.5 times that; corrected 2026-10-23 (#204), when REST reads (`rest_read`) failed in 5 of 5 restarts, p50 150 s, beside Auth p50 149 s, and the largest window on any path was 182 s. The 2026-10-10 "expect REST to keep answering" came from an HTTP-tier probe | maintenance planning | LO05b (n=5 each, one project per date) |
 | Do not read the control-plane status as the end of an outage | health checks | LO05b (status `ACTIVE_HEALTHY` at 41 s, pooler down to 151 s) |
 | Do not send a restart to a project minutes old; read the 400 as "wait" | automation | LO05f (two projects, boundary unresolved) |
+| Detect a stuck project with a data read (one known row through the Data API), sustained for a set time; do not use socket checks or the project status as the signal | health checks | LO06 drill 3 (2026-10-23: with the lock alone, direct and pooler `select 1` failed 0 samples while `rest_read` failed 21) |
+| Verify a self-restart on the data path; the status led reads by at least 24 and 14 s (10 s status poll) | automation | LO06c/d (n=2), LO05 2026-10-23 (n=5) |
+| Keep a cooldown longer than the verify budget, and a per-hour cap that escalates instead of restarting | automation | LO06d/e; the API answers 200 to a duplicate restart (LO05c) |
+| Let an open incident that advises a restart through the change gate as a warning | change pipeline | `lib/runbook.test.ts` with two incidents' wording; design choice |
 
 ## 2026-10-23 - LO05 re-run with data-path probes (#204)
 
@@ -351,3 +355,96 @@ lines are not cited. The sampler now caps each probe call at 30 s and LO05's
 readiness loop uses the same cap. The stall happened before the cap existed,
 a deadline may not fix that state, and the cause is not established; this run
 did not stall.
+
+## 2026-10-23 - LO06 cluster B drill: detect, self-restart, verify (#150)
+
+Why: the cluster B runbook named in the original lifecycle-ops scope (a
+project whose reads fail while the control plane reads it healthy, and for
+which a restart is the remedy) was never built. Cluster B is two status-page
+incidents whose advice to affected users was to restart the project:
+"Unresponsive Projects" (2026-09-10 to 09-12, Nano projects unresponsive after
+hours) and "401 errors due to JWT rejections" (2026-08-14 to 09-30). Neither
+cause can be induced from a client.
+
+Built: `lib/runbook.ts` (detector, guard rails, a `supervise` loop with every
+side effect injected), `lib/runbook.test.ts` (23 tests, the loop under a fake
+clock), `RUNBOOK-cluster-b.md` (the prose runbook), and the drill module LO06.
+Defaults (design choices): sample every 2 s; detect when `rest_read` has
+failed on every sample for 60 s and at least 10 samples; restart only if the
+status is `ACTIVE_HEALTHY`, the last restart is 15 min old or more, fewer than
+2 restarts in the last 60 min (else escalate), the project is past its first
+ten minutes, and the status-page gate allows it; recovered when every probe
+answers on every sample for 10 s; escalate if not recovered 600 s after the
+POST.
+
+Fault induced (a stand-in, said so in the module): one session over the direct
+path took an ACCESS EXCLUSIVE lock on the probe table and ran `pg_sleep`
+inside the transaction. Reads of that table wait behind it while the server,
+its sockets and the control-plane status stay healthy; a restart ends the
+session. For a known lock `pg_terminate_backend` is the cheaper fix.
+
+Run: one Micro project (requested size), `ap-southeast-1`, Pro org, probes
+`rest_read` (trigger), direct 5432 and pooler 6543 `select 1` (context),
+artifact `out/2026-10-23/run-2026-10-23T08-45-26-339Z.json`. 6 of 6 results
+passed. The anon role's `statement_timeout` read `3s`.
+
+| step | drill 1 (LO06c) | drill 2 (LO06d) | drill 3 (LO06e) |
+| --- | --- | --- | --- |
+| first failed `rest_read` after the lock was held | 3 s | 3 s | 3 s |
+| detected after the lock was held | 64 s | 64 s | 65 s |
+| decisions | restart | hold (cooldown), then restart | escalate |
+| POST after detection | 0 s, HTTP 200 | 760 s, HTTP 200 | no POST |
+| status back to `ACTIVE_HEALTHY` after the POST | 34 s | 46 s | - |
+| reads recovered after the POST (all three probes, 10 s sustained) | 58 s | 60 s | - |
+| detection to recovered | 59 s | 820 s | - |
+| lock-holding session ended after the POST | 3 s | 2 s | - |
+| holder sessions left after the episode | 0 | 0 | 1, then terminated |
+
+Failed samples during the lock alone (drill 3, no restart): `rest_read` 21,
+direct 0, pooler 0, and `rest_read` failed only with `HTTP 500 57014` (the
+anon role's 3 s statement timeout). During drills 1 and 2 direct failed 5 and
+7 samples and pooler 6 and 6 over the whole episode; the module does not
+time-stamp failures, and drill 3 (lock alone: 0 and 0) suggests they fell
+around the restart. `rest_read`'s modes over drills 1 and 2 were
+`HTTP 500 57014`, `HTTP 525`, `HTTP 521` and `timeout`. In drill 3, `pg_terminate_backend` ended 1 session and all three
+probes answered again 4 s later.
+
+Baseline (LO06b): the runbook watched the healthy project for 649 s (325
+rounds at 2 s) before the first drill: 0 failed samples on any probe, no
+detection. One window, n=1: it bounds nothing about blip rates on other days.
+
+At the gate reads behind the two restart decisions (drills 1 and 2; the hold
+and escalate decisions record no gate result) the status page had one open
+incident, unscoped and without lifecycle wording ("API Gateway Request Issues", impact minor); the gate let
+the restarts through with a warning.
+
+Reading:
+
+- A socket check would not have caught this fault: with the lock alone
+  (drill 3) direct and pooler answered on every sample while `rest_read`
+  failed 21. Detection has to read data.
+- n=2 restarts: the status was read `ACTIVE_HEALTHY` at 34 and 46 s (status
+  polled every 10 s), reads recovered at 58 and 60 s after the POST, so the
+  status led by at least 24 and 14 s. LO05 (2026-10-23) showed the same order
+  in each of its 5 runs: status back 41 to 172 s after the POST, reads back 48
+  to 182 s (first failure p50 2 s plus windows of 46 to 181 s). Both LO06
+  times sit at the low end; with n=2 this says nothing new about the range.
+- Drill 2 shows the cooldown holding a restart for 760 s while reads failed
+  and the status read `ACTIVE_HEALTHY`. That is the state a detector sees
+  right after its own restart, until reads return; without the cooldown it
+  would restart again.
+- The plain LO01 gate refuses a restart during both cluster B incidents (their
+  status-page wording in `lib/runbook.test.ts`): "Unresponsive Projects" names
+  no region and its title matches the gate's restart wording; the JWT incident
+  matches on "restart" in its update text. The runbook's `gateView` treats an
+  open incident that advises a restart as a warning. That classification is a
+  regex checked against two incidents' text and no others.
+
+Runbook steps that did not match reality: none in this run. Detection came
+61, 61 and 62 s after the first failed sample: the 60 s time condition set
+the detection latency, and the 10-sample condition was met before it.
+
+Not measured: a real cluster B cause (a Nano hang, a PostgREST time cache), a
+user-JWT read probe, a restart that fails to clear the fault (the unit tests
+cover the `unrecovered` path only), a status page that cannot be read, compute
+sizes other than Micro, other regions.
