@@ -274,6 +274,12 @@ facts):
   EXTENSION ... VERSION` ignored with a warning, and the realtime-schema
   lockdown as `postgres`. One Pro project per run (DD01-DD04, DD99). Measured
   2026-10-10; see its RUNLOG.
+- `advisor-coverage` - the built-in security and performance advisors
+  against a community single-file SQL audit (supabase-audit, fetched pinned
+  by commit) on 36 seeded schema issues: which side catches each, and an
+  anon request through the Data API wherever they disagree on an exposure.
+  One Pro project per run (AV01-AV03, AV99). Measured 2026-10-23, two runs;
+  see its RUNLOG.
 - `realtime-surface` - Realtime behaviour from changelog and blog claims:
   Postgres Changes AND filters, operators, `select` and DELETE; loss during a
   disconnect and a heartbeat canary; Broadcast Replay limits; binary Broadcast

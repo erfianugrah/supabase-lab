@@ -4416,3 +4416,55 @@ in the RUNLOG.
   after its first good one. Data API requests end with `504 upstream
   request timeout` at about 125 s (run 1, one burst) while the statement
   keeps running, so hold for under 120 s.
+
+## experiments/advisor-coverage - key facts (validated 2026-10-23, two runs, one Pro-org project each, ap-southeast-1, Postgres 17.11)
+
+The built-in advisors (`GET /v1/projects/{ref}/advisors/security` and
+`/performance`) against the community single-file audit supabase-audit
+(`audit.sql` at EstasDespedido/supabase-audit f8d15fa, MIT, fetched at run
+time and SHA-256-checked, never vendored) on 36 seeded fixtures. Every cell
+was the same in both runs. See RUNLOG.md; artifacts in `out/2026-10-23/`.
+
+- **Totals: both 8, audit only (`tool only` in the artifact) 8, advisors
+  only 14, neither 6 of 36.** On a
+  fresh project the audit returned 0 rows and the advisors 1 lint
+  (`auth_db_connections_absolute`, INFO). audit.sql ran inside a READ ONLY
+  transaction without error.
+- **The audit's own fix for check 4 leaves the function callable.** Default
+  privileges in `public` grant EXECUTE on new functions to anon and
+  authenticated by name, so after `REVOKE EXECUTE ... FROM PUBLIC` the anon
+  RPC still answered 200 (AV03b); the audit stopped reporting it, the
+  advisors did not. Revoke from `anon, authenticated` too.
+- **Check 1 misses two readable tables**: one granted to PUBLIC and one in a
+  second exposed schema both served anon the seeded row (AV03a, AV03e); the
+  advisors flagged both. The advisors found the added schema although
+  `pgrst.db_schemas` was unset as `postgres` and on `authenticator`.
+- **Audit only**: SELECT `USING (true)` for anon (by design excluded from
+  the splinter lint), policy recursion, INSERT without SELECT policy (insert
+  with `return=representation` 401 42501, `return=minimal` 201, AV03d),
+  credential-named columns by substring or on RLS-on tables, SECURITY
+  DEFINER open to PUBLIC in an unexposed schema (RPC 406 PGRST106, so not
+  reachable while the schema stays unexposed), and DELETE `USING (true)` for
+  anon (F07) and a `password` column on an RLS-off table (F15), both lints
+  the endpoint did not return.
+- **Advisors only**: PUBLIC and second-schema exposure, the F09 case above,
+  invoker functions without a pinned search_path, `current_setting()` in
+  policies, `auth.users` behind a view (ERROR vs the audit's generic
+  REVIEW), composite foreign keys indexed on the leading column only, no
+  primary key, duplicate and unused indexes, multiple permissive policies,
+  a policy on an RLS-off table, `user_metadata` in a policy, a materialized
+  view granted to anon.
+- **Neither** (6): F06 UPDATE `USING (true)` for authenticated, F18 `ssn` on
+  an RLS-off table, F21 a policy mixing wrapped and unwrapped `auth.uid()`
+  (both sides skip any policy containing `select auth.uid()`), F22 the
+  control, F35 `autovacuum_enabled = false`, F36 a public bucket with an
+  anon listing policy. Four splinter lints were not returned by the endpoint
+  on either project: `rls_policy_always_true` (F06, F07),
+  `sensitive_columns_exposed` (F15, F18), `autovacuum_disabled` (F35),
+  `public_bucket_allows_listing` (F36); F07 and F15 still landed in audit
+  only because the audit caught them. The endpoint did return the newer
+  `anon_/authenticated_security_definer_function_executable`. The v1 spec
+  marks the endpoint experimental. Dashboard advisor pages not checked.
+- **Audit false positive seen**: check 3 reports a restrictive INSERT policy
+  (`WITH CHECK (body is not null)`) as CRITICAL "Policy open to anon",
+  because it reads `USING` only and coalesces the null to `true`.
