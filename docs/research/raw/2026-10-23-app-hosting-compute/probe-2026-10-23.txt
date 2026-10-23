@@ -1,0 +1,7 @@
+Management API probe, 2026-10-23, Pro org, one throwaway project (ap-southeast-1), deleted after the run. Refs and org slug redacted.
+
+2026-10-23T08:03:43Z entitlement keys matching compute/worker/service/container/app: (1 key: instances.compute_update_available_sizes, the database instance-size set)
+2026-10-23T08:03:43Z entitlement count: 64
+2026-10-23T08:03:46Z c-list GET /v2/projects/<ref>/compute -> 404 {"error":{"code":"compute_not_enabled","message":"Compute is not available for this project"}}
+2026-10-23T08:03:47Z c-get GET /v2/projects/<ref>/compute/probe-nl -> 404 {"error":{"code":"compute_not_enabled","message":"Compute is not available for this project"}}
+2026-10-23T08:03:47Z c-upload POST /v2/projects/<ref>/compute/probe-nl/uploads -> 404 {"error":{"code":"compute_not_enabled","message":"Compute is not available for this project"}}
