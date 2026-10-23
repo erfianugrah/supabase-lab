@@ -4206,3 +4206,67 @@ and PT02g rows are probe artefacts (named in the RUNLOG); other run 1 / run
   through PostgREST's own query shape, larger compute, GraphQL exposure of
   partitions. The Postgres version was queried at setup but not written to
   the artifact; the PostgREST version was not read.
+
+## experiments/hyperdrive-direct - key facts (H01 2026-10-05 Micro; H02 2026-10-23 Small, ap-southeast-1, Pro org, two runs)
+
+Self-provisioning (one throwaway project per module, Worker and Hyperdrive
+configs made with wrangler, all deleted in `finally`). Wrangler needs the
+Global API Key trio (`CLOUDFLARE_EMAIL`, `CLOUDFLARE_API_KEY`,
+`CLOUDFLARE_ACCOUNT_ID`). H02 artifacts `out/2026-10-23/`; run 2 is the
+reference, run 1 (an earlier, uncommitted module version) is named as such
+in the RUNLOG.
+
+- H01: Hyperdrive reaches the IPv6-only direct connection with no IPv4
+  add-on; node-postgres named prepared statements work through it.
+- **Small: non-superusers are refused at 87 client backends in total**
+  (`max_connections` 90 minus `superuser_reserved_connections` 3;
+  `reserved_connections` 0); superuser backends count toward the 87, so
+  with `postgres_exporter` connected, non-superusers get 86. At 87 the
+  Management API query endpoint, which logs in as `postgres` (not a
+  superuser), is refused with `53300: remaining connection slots are
+  reserved for roles with the SUPERUSER attribute`. Supabase's own client
+  backends at idle: `authenticator` 2, `pgbouncer` 1, `supabase_admin`
+  (`postgres_exporter`) 1.
+- **`--origin-connection-limit` caps Hyperdrive's origin connections; wrangler's
+  help calls it a "(soft) maximum".** The API accepts 5-1500 (a create with
+  1 was refused, code 2021; Cloudflare says the maximum depends on the
+  Workers plan). A config created without it read back 60 and held exactly
+  60 under 80 concurrent 60 s holds. Limit 5 read 5 at three samples (run
+  2, pre-warmed) and 6, all sleeping (run 1). After 8 bursts of 5, `hd_a`
+  held 10 backends from 7 client addresses (more than one burst needs;
+  several pools is one reading).
+- **Errors through the Worker (`pg`):** at the config's own limit a request
+  waits about 15 s and gets `58000 Timed out while waiting for an open slot
+  in the pool.` (15642-17557 ms) or `Connection terminated unexpectedly`
+  (also seen at 811 ms on the Postgres-refusal path); Postgres refusing a
+  new origin connection passes straight through in under 1.2 s as `53300
+  remaining connection slots are reserved for roles with the SUPERUSER
+  attribute` or `53300 sorry, too many clients already`.
+- **In both orderings (one run each), requests that needed a new Postgres
+  connection failed and the side already connected kept working.** Data
+  API pool held first: the Management API was refused first (87 backends),
+  then Hyperdrive got the 53300 errors; the 30 Data API holds all answered
+  200. Hyperdrive first, after a reset that terminated PostgREST's
+  connections (2 `authenticator` backends reopened before the burst): 19
+  of 30 Data API calls answered 200 and 11 plus a ping answered `503
+  PGRST002 Could not query the database for the schema cache. Retrying.`
+  (no PGRST000/001/003); whether that is slot exhaustion or a schema-cache
+  reload is not separated (RUNLOG).
+- **In one run, Hyperdrive kept 60 idle origin connections for at least
+  891 s:** 60 idle `hd_a` backends at every sample after load stopped
+  (watch cap 900 s). Cloudflare's limits page lists a 10 minute idle
+  connection timeout for origin connections; this run saw them past it,
+  and the module recorded only state, so it cannot separate a pool floor,
+  keepalive queries or a timeout that does not apply here. Count a config
+  at its origin connection limit when budgeting slots.
+- In run 2 PostgREST's idle pool closed (31 to 1 `authenticator`) between
+  43 and 54 s after its 100 s holds returned; in run 1 its 31 idle
+  connections stayed open for the whole remaining watch (at least 92 s
+  idle, t+222 to t+314 s). Cause not separated.
+- Harness: read `pg_stat_activity` through a connection that is already
+  open (H02 uses config B and a SECURITY DEFINER function); the Management
+  API cannot observe a full database. Wait for 10 good answers in a row
+  after a Worker deploy: run 1 got 9 `404` HTML answers from workers.dev
+  after its first good one. Data API requests end with `504 upstream
+  request timeout` at about 125 s (run 1, one burst) while the statement
+  keeps running, so hold for under 120 s.
