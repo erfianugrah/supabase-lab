@@ -89,6 +89,10 @@ export function redact(text: string, vantage: string[] = [], other: string[] = [
     // token, and it still does not belong in a public repo.
     .replace(/\bpat:\d+/g, "pat:<id>")
     .replace(/\boauth:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g, "oauth:<id>")
+    // GoTrue error bodies name the request with an `error_id` UUID
+    // (cross-project-auth X08g, 2026-10-23); in the raw artifact the body is
+    // usually a string field, so its quotes arrive escaped (`\"error_id\":\"...`).
+    .replace(/(\berror_id\\*"\s*:\s*\\*")[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/g, "$1<error-id>")
     // A stack trace or captured stderr names the operator's home directory.
     .replace(/\/(?:Users|home)\/[^/\s"'\\]+/g, "~");
 }

@@ -1,0 +1,236 @@
+{
+  "startedAt": "2026-10-23T10:39:59.520Z",
+  "finishedAt": "2026-10-23T10:40:57.784Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "cross-project-auth",
+  "labCommit": "77cdea0",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "X08a",
+      "title": "Setup: trust on B, Storage/Realtime fixtures on both, aud hook live on A",
+      "status": "pass",
+      "detail": "trust created HTTP 201; fixtures A {\"sql\":201,\"sqlTries\":1,\"sqlFirstError\":\"\",\"bucket\":200,\"upload\":200,\"warmJoin\":\"ok\"} B {\"sql\":201,\"sqlTries\":1,\"sqlFirstError\":\"\",\"bucket\":200,\"upload\":200,\"warmJoin\":\"ok\"}; B first accepted the pre-hook tenant-a token: REST 164 ms, Storage 1002 ms, Realtime 1912 ms (from the same start; no refusals); hook SQL 201, config PATCH 200, override visible in a fresh token after 3288 ms (3 s poll; aud=\"authenticated\")",
+      "measurements": {
+        "tpa_created_status": 201,
+        "tpa_existing": 0,
+        "b_accept_rest_ms": 164,
+        "b_accept_storage_ms": 1002,
+        "b_accept_realtime_ms": 1912,
+        "hook_sql_status": 201,
+        "hook_patch_status": 200,
+        "hook_live_ms": 3288
+      },
+      "durationMs": 45980
+    },
+    {
+      "id": "X08b",
+      "title": "Control: aud \"authenticated\" (hook in path, no override) on all seven cells",
+      "status": "pass",
+      "detail": "a_rest=ACCEPT b_rest=ACCEPT a_storage=ACCEPT b_storage=ACCEPT a_realtime=ACCEPT b_realtime=ACCEPT a_auth_user=ACCEPT",
+      "measurements": {
+        "a_rest": "200 rows=576 tenants=tenant-a",
+        "b_rest": "200 rows=664 tenants=tenant-a",
+        "a_storage": "200 body matches",
+        "b_storage": "200 body matches",
+        "a_realtime": "join ok",
+        "b_realtime": "join ok",
+        "a_auth_user": "200 user.aud=authenticated",
+        "aud": "\"authenticated\""
+      },
+      "evidence": "alg=ES256; kid=present; iss=https://<ref-a>.supabase.co/auth/v1; aud=\"authenticated\"; role=authenticated; client_id=absent; scope=; tenant_id=tenant-a; amr=password; aal=aal1; ttl_s=3600; claim_names=aal,amr,app_metadata,aud,email,exp,iat,is_anonymous,iss,phone,role,session_id,sub,user_metadata",
+      "durationMs": 45980
+    },
+    {
+      "id": "X08c",
+      "title": "Admin API: create user with aud \"spoke-api\", then password grant",
+      "status": "info",
+      "detail": "admin create HTTP 200, user.aud in response \"spoke-api\"; password grant HTTP 400 {\"code\":400,\"error_code\":\"invalid_credentials\",\"msg\":\"Invalid login credentials\"}",
+      "measurements": {
+        "create_status": 200,
+        "create_user_aud": "spoke-api",
+        "grant_status": 400
+      },
+      "durationMs": 45980
+    },
+    {
+      "id": "X08d",
+      "title": "aud = \"spoke-api\" (string)",
+      "status": "info",
+      "detail": "token aud \"spoke-api\"; a_rest=ACCEPT b_rest=ACCEPT a_storage=ACCEPT b_storage=ACCEPT a_realtime=ACCEPT b_realtime=ACCEPT a_auth_user=ACCEPT",
+      "measurements": {
+        "aud": "\"spoke-api\"",
+        "grant_status": 200,
+        "a_rest": "200 rows=576 tenants=tenant-a",
+        "b_rest": "200 rows=664 tenants=tenant-a",
+        "a_storage": "200 body matches",
+        "b_storage": "200 body matches",
+        "a_realtime": "join ok",
+        "b_realtime": "join ok",
+        "a_auth_user": "200 user.aud=authenticated"
+      },
+      "evidence": "alg=ES256; kid=present; iss=https://<ref-a>.supabase.co/auth/v1; aud=\"spoke-api\"; role=authenticated; client_id=absent; scope=; tenant_id=tenant-a; amr=password; aal=aal1; ttl_s=3600; claim_names=aal,amr,app_metadata,aud,email,exp,iat,is_anonymous,iss,phone,role,session_id,sub,user_metadata",
+      "durationMs": 45980
+    },
+    {
+      "id": "X08e",
+      "title": "aud = [\"spoke-api\"] (array, no \"authenticated\")",
+      "status": "info",
+      "detail": "token aud [\"spoke-api\"]; a_rest=ACCEPT b_rest=ACCEPT a_storage=ACCEPT b_storage=ACCEPT a_realtime=ACCEPT b_realtime=ACCEPT a_auth_user=ACCEPT",
+      "measurements": {
+        "aud": "[\"spoke-api\"]",
+        "grant_status": 200,
+        "a_rest": "200 rows=576 tenants=tenant-a",
+        "b_rest": "200 rows=664 tenants=tenant-a",
+        "a_storage": "200 body matches",
+        "b_storage": "200 body matches",
+        "a_realtime": "join ok",
+        "b_realtime": "join ok",
+        "a_auth_user": "200 user.aud=authenticated"
+      },
+      "evidence": "alg=ES256; kid=present; iss=https://<ref-a>.supabase.co/auth/v1; aud=[\"spoke-api\"]; role=authenticated; client_id=absent; scope=; tenant_id=tenant-a; amr=password; aal=aal1; ttl_s=3600; claim_names=aal,amr,app_metadata,aud,email,exp,iat,is_anonymous,iss,phone,role,session_id,sub,user_metadata",
+      "durationMs": 45980
+    },
+    {
+      "id": "X08f",
+      "title": "aud = [\"authenticated\", \"spoke-api\"]",
+      "status": "info",
+      "detail": "token aud [\"authenticated\",\"spoke-api\"]; a_rest=ACCEPT b_rest=ACCEPT a_storage=ACCEPT b_storage=ACCEPT a_realtime=ACCEPT b_realtime=ACCEPT a_auth_user=ACCEPT",
+      "measurements": {
+        "aud": "[\"authenticated\",\"spoke-api\"]",
+        "grant_status": 200,
+        "a_rest": "200 rows=576 tenants=tenant-a",
+        "b_rest": "200 rows=664 tenants=tenant-a",
+        "a_storage": "200 body matches",
+        "b_storage": "200 body matches",
+        "a_realtime": "join ok",
+        "b_realtime": "join ok",
+        "a_auth_user": "200 user.aud=authenticated"
+      },
+      "evidence": "alg=ES256; kid=present; iss=https://<ref-a>.supabase.co/auth/v1; aud=[\"authenticated\",\"spoke-api\"]; role=authenticated; client_id=absent; scope=; tenant_id=tenant-a; amr=password; aal=aal1; ttl_s=3600; claim_names=aal,amr,app_metadata,aud,email,exp,iat,is_anonymous,iss,phone,role,session_id,sub,user_metadata",
+      "durationMs": 45980
+    },
+    {
+      "id": "X08g",
+      "title": "aud claim removed by the hook",
+      "status": "info",
+      "detail": "no token: create HTTP 200; password grant HTTP 500 {\"code\":500,\"error_code\":\"unexpected_failure\",\"msg\":\"output claims do not conform to the expected schema: \\n- (root): aud is required\\n\",\"error_id\":\"<error-id>\"}; retry HTTP 500 {\"code\":500,\"error_code\":\"unexpected_failure\",\"msg\":\"output claims do not conform to the expected schema: \\n- (root): aud is required\\n\",\"error_id\":\"<error-id>\"}",
+      "measurements": {
+        "create_status": 200,
+        "grant_status": 500,
+        "grant_body": "{\"code\":500,\"error_code\":\"unexpected_failure\",\"msg\":\"output claims do not conform to the expected schema: \\n- (root): aud is required\\n\",\"error_id\":\"<error-id>\"}"
+      },
+      "durationMs": 45980
+    },
+    {
+      "id": "X09a",
+      "title": "OAuth 2.1 server enabled on A through the Management API",
+      "status": "pass",
+      "detail": "before: oauth_server_enabled=false, discovery HTTP 404 grants [] {\"code\":404,\"error_code\":\"feature_disabled\",\"msg\":\"OAuth server is disabled\"}; PATCH /config/auth HTTP 200; read back oauth_server_enabled=true, authorization_path=/oauth/consent, dynamic_registration=false; discovery right after the PATCH HTTP 404 {\"code\":404,\"error_code\":\"feature_disabled\",\"msg\":\"OAuth server is disabled\"}; first 200 after 5263 ms (2 polls, 5 s apart; last refusal 404 {\"code\":404,\"error_code\":\"feature_disabled\",\"msg\":\"OAuth server is disabled\"}); then: discovery HTTP 200 issuer https://<ref-a>.supabase.co/auth/v1 grants [authorization_code,refresh_token] scopes [openid,profile,email,phone,offline_access]",
+      "measurements": {
+        "enabled_before": "false",
+        "patch_status": 200,
+        "enabled_after": "true",
+        "discovery_before_status": 404,
+        "discovery_before_grants": "",
+        "discovery_immediate_status": 404,
+        "oauth_live_ms": 5263,
+        "oauth_live_polls": 2,
+        "discovery_after_status": 200,
+        "discovery_after_grants": "authorization_code,refresh_token",
+        "discovery_issuer": "https://<ref-a>.supabase.co/auth/v1"
+      },
+      "durationMs": 10080
+    },
+    {
+      "id": "X09b",
+      "title": "Confidential client registered; headless code flow issues an access token",
+      "status": "pass",
+      "detail": "register HTTP 201; authorize 302, consent 200, token 200; token_type bearer, response scope \"\", refresh token present; GET authorization 200 ({\"authorization_id\":\"<x>\",\"redirect_uri\":\"http://localhost:54321/callback\",\"client\":{\"id\":\"67a4182e-b650-4378-9373-6a70e); consent POST 200",
+      "measurements": {
+        "register_status": 201,
+        "authorize_status": 302,
+        "consent_status": 200,
+        "token_status": 200,
+        "alg": "ES256",
+        "kid": "present",
+        "iss": "https://<ref-a>.supabase.co/auth/v1",
+        "aud": "\"authenticated\"",
+        "role": "authenticated",
+        "client_id": "present",
+        "scope": "openid email",
+        "tenant_id": "tenant-a",
+        "amr": "oauth_provider/authorization_code",
+        "aal": "aal1",
+        "ttl_s": 3600,
+        "claim_names": "aal,amr,app_metadata,aud,client_id,email,exp,iat,is_anonymous,iss,phone,role,scope,session_id,sub,user_metadata"
+      },
+      "evidence": "alg=ES256; kid=present; iss=https://<ref-a>.supabase.co/auth/v1; aud=\"authenticated\"; role=authenticated; client_id=present; scope=openid email; tenant_id=tenant-a; amr=oauth_provider/authorization_code; aal=aal1; ttl_s=3600; claim_names=aal,amr,app_metadata,aud,client_id,email,exp,iat,is_anonymous,iss,phone,role,scope,session_id,sub,user_metadata",
+      "durationMs": 10080
+    },
+    {
+      "id": "X09c",
+      "title": "OAuth 2.1 access token (aud as issued) on A and B: PostgREST, Storage, Realtime, A /auth/v1/user",
+      "status": "info",
+      "detail": "aud \"authenticated\", client_id present, scope \"openid email\"; a_rest=ACCEPT b_rest=ACCEPT a_storage=ACCEPT b_storage=ACCEPT a_realtime=ACCEPT b_realtime=ACCEPT a_auth_user=ACCEPT",
+      "measurements": {
+        "a_rest": "200 rows=576 tenants=tenant-a",
+        "b_rest": "200 rows=664 tenants=tenant-a",
+        "a_storage": "200 body matches",
+        "b_storage": "200 body matches",
+        "a_realtime": "join ok",
+        "b_realtime": "join ok",
+        "a_auth_user": "200 user.aud=authenticated"
+      },
+      "durationMs": 10080
+    },
+    {
+      "id": "X09d",
+      "title": "OAuth refresh token: presented to B's /oauth/token, then to A's",
+      "status": "info",
+      "detail": "B HTTP 404 {\"code\":404,\"error_code\":\"feature_disabled\",\"msg\":\"OAuth server is disabled\"}; A HTTP 200 new access token aud \"authenticated\", client_id present",
+      "measurements": {
+        "refresh_at_b_status": 404,
+        "refresh_at_b_body": "{\"code\":404,\"error_code\":\"feature_disabled\",\"msg\":\"OAuth server is disabled\"}",
+        "refresh_at_a_status": 200
+      },
+      "durationMs": 10080
+    },
+    {
+      "id": "X09e",
+      "title": "OAuth token with aud \"spoke-api\" (access token hook keyed on client_id) on all seven cells",
+      "status": "info",
+      "detail": "second flow, same user and client: skipped: GET authorization 200 returned the code (prior consent); aud \"spoke-api\", client_id present; a_rest=ACCEPT b_rest=ACCEPT a_storage=ACCEPT b_storage=ACCEPT a_realtime=ACCEPT b_realtime=ACCEPT a_auth_user=ACCEPT",
+      "measurements": {
+        "aud": "\"spoke-api\"",
+        "a_rest": "200 rows=576 tenants=tenant-a",
+        "b_rest": "200 rows=664 tenants=tenant-a",
+        "a_storage": "200 body matches",
+        "b_storage": "200 body matches",
+        "a_realtime": "join ok",
+        "b_realtime": "join ok",
+        "a_auth_user": "200 user.aud=authenticated"
+      },
+      "evidence": "alg=ES256; kid=present; iss=https://<ref-a>.supabase.co/auth/v1; aud=\"spoke-api\"; role=authenticated; client_id=present; scope=openid email; tenant_id=tenant-a; amr=oauth_provider/authorization_code; aal=aal1; ttl_s=3600; claim_names=aal,amr,app_metadata,aud,client_id,email,exp,iat,is_anonymous,iss,phone,role,scope,session_id,sub,user_metadata",
+      "durationMs": 10080
+    },
+    {
+      "id": "X99",
+      "title": "Both projects deleted and gone from the listing",
+      "status": "pass",
+      "detail": "DELETE {\"a\":200,\"b\":200}; absent from GET /projects after 0 s",
+      "measurements": {
+        "delete_status": "{\"a\":200,\"b\":200}",
+        "gone_from_listing_s": 0
+      },
+      "durationMs": 2204
+    }
+  ]
+}
