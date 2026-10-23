@@ -27,6 +27,7 @@
  * in-process (their arguments never reach an exec).
  */
 import { describe, expect, test } from "bun:test";
+import { $ } from "bun";
 import { resolve } from "node:path";
 
 const ROOT = resolve(import.meta.dir, "../..");
@@ -350,9 +351,11 @@ export function scanShell(file: string, src: string): Offence[] {
   return out.sort((x, y) => x.line - y.line);
 }
 
+// Tracked files only, like argv-secrets.test.ts: gitignored vendor checkouts
+// (e.g. experiments/client-keyed-objects/work/) are not the lab's scripts.
 async function shellScripts(): Promise<string[]> {
-  const found = await Array.fromAsync(new Bun.Glob("{experiments,harness}/**/*.sh").scan({ cwd: ROOT }));
-  return found.filter((f) => !f.includes("node_modules/")).sort();
+  const ls = await $`git -C ${ROOT} ls-files -- ${"experiments/*.sh"} ${"harness/*.sh"}`.quiet().text();
+  return ls.split("\n").filter((f) => f && !f.includes("node_modules/")).sort();
 }
 
 describe("shell scanner", () => {
