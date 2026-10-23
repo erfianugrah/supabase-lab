@@ -24,12 +24,16 @@ Reference: COMPUTE-DISK.md at repo root. Probes: `.pi/probe-compute-disk.sh D01[
 - D07 (autoscale surface, Team): identical gap to D04.
 - D08 (IOPS/throughput gate): POST config/disk accepted AND verified applied
   on Micro (the dashboard's "LARGE required" text is a UI gate only).
-- D09 (resize/downgrade timing with 250ms sampling, local vantage):
-  upgrade micro->small 105s (max contiguous REST outage 1.0s), upgrade
-  small->large 61s (17.0s), downgrade large->small 61s (0s), downgrade
-  small->micro 73s (0s); Auth /auth/v1/health showed no contiguous outage in
-  any op. Adjacent resize PATCHes are rate-limited: 429
-  `We are still processing addon changes, please try again in N minute(s)`.
+- D09 (resize up/down, local vantage, 2026-10-23 module, n=1): every resize
+  took all three data paths down for 144.528 to 254.886 s. Longest `rest_read`
+  outage 231.465 s Micro -> Small, 223.28 s Small -> Large, 152.466 s
+  Large -> Small, 254.886 s Small -> Micro; `auth_health` and `realtime_join`
+  within 10 s of it in each op. The project read `ACTIVE_HEALTHY` about 18 to 35 s
+  before REST recovered. The 2026-08-19 figures that stood here (1.0 s,
+  17.0 s, 0 s, 0 s; 61 s for two ops) came from the accounting defect and
+  from refused PATCHes: see the 2026-10-23 entry. Adjacent resize PATCHes are
+  rate-limited: 429 `We are still processing addon changes, please try again
+  in N minute(s)`.
 - D10 (paid fill, 2026-10-01): Pro starts on 2 GB; a 1.90x burst did not trip
   read-only; autoscale at 90% went 2 -> 8 GB, then 8 -> 12 GB; read-only at
   95% measured with automatic return after the grow; with the manual quota
@@ -53,6 +57,119 @@ Reference: COMPUTE-DISK.md at repo root. Probes: `.pi/probe-compute-disk.sh D01[
   the quota; the second round caught the cooldown on the second attempt.
   Recorded as nondeterministic, not a clean pass/fail.
 
+## 2026-10-23 - D09 outage accounting fixed; a resize is minutes down, not seconds (#175)
+
+The 2026-10-13 entry below found that D09 dropped an outage still open when a
+phase ended and timed refused PATCHes as resizes. This entry fixes the module,
+re-reads both earlier runs with the fixed accounting, and re-runs D09 once.
+
+What changed in the module (`tests/d09-compute-resize-timing.ts`,
+`lib/outage.ts`):
+
+- One sample timeline per path for the whole run. An outage (first failing
+  sample to the first success after it) belongs to the phase it started in, at
+  full length, even when it runs into a later phase; the later phase reports
+  that time as `carried_in_s`. An outage still open when sampling stops is
+  closed at the stop and flagged `outage_open_at_end`. `lib/outage.test.ts`
+  rebuilds the 2026-10-13 sample counts as a synthetic stream: the old
+  per-phase accumulator gives 0 and 15.063 s on it, the timeline gives one
+  49.813 s outage on Micro -> Small and 0 s plus 15.063 s carried in on the
+  next phase (the synthetic sample times, not the run's, set the 49.813 s).
+- A PATCH answered `429 ... try again in N minute(s)` is retried after N
+  minutes, and a phase starts only at an accepted PATCH
+  (`<op>_addon_429_retries`). After `ACTIVE_HEALTHY` the module waits until
+  every path has been up for 15 s before the next PATCH.
+- Probes: `rest_read` and `realtime_join` from `harness/src/real-probes.ts`
+  (#204) replace the old `dpython_probe` read; `auth_health` is
+  `GET /auth/v1/health` WITH the anon key. The old module sent that request
+  with no key. On 2026-10-23 the endpoint answered `401` without a key
+  (`auth_health_noapikey_status`), and only `200` counted as up.
+
+### Re-read of the 2026-08-19 and 2026-10-13 runs (offline)
+
+The old module kept, per phase, the OK samples, the total and the longest
+outage that a later success closed. A closed outage of d seconds holds at most
+d / 0.25 failures (sample starts are at least 250 ms apart), and there are at
+most as many closed outages as successes, so any failures beyond that were
+still open when the phase ended (`openTailLowerBound` in `lib/outage.ts`,
+tested). The 2026-10-13 artifact is published at
+`out/2026-10-13/run-2026-10-13T03-46-20-408Z.json`; it holds an uptime
+percentage, not counts or PATCH statuses, so the PATCH statuses and OK/total
+counts below are from the runs' console output. The 2026-08-19 artifact was
+written to a temporary directory and is lost. Neither console output is
+committed.
+
+| Run | Op | PATCH | Old `_s` | Old REST max | REST OK | Re-read |
+|---|---|---|---|---|---|---|
+| 2026-08-19 | micro -> small | accepted | 105 | 1.0 s | 6 of 69 | at least 39 failures open at the phase end, at least 9.5 s |
+| 2026-08-19 | small -> large | 429 "... 2 minute(s)" | 61 | 17.0 s | 130 of 154 | no resize ran; 61 s is the 60 s status wait |
+| 2026-08-19 | large -> small | 429 "... 1 minute(s)" | 61 | 0 | 245 of 245 | no resize ran |
+| 2026-08-19 | small -> micro | accepted | 73 | 0 | 12 of 51 | 39 failures open when sampling stopped, at least 9.5 s, end not observed |
+| 2026-10-13 | micro -> small | accepted | 39 | 0 | 17 of 46 | 29 failures open at the phase end, at least 7.0 s |
+| 2026-10-13 | small -> large | 429 "... 3 minute(s)" | 61 | 15.063 s | 175 of 195 | no resize ran |
+| 2026-10-13 | large -> small | 429 "... 2 minute(s)" | 61 | 0 | 244 of 244 | no resize ran |
+| 2026-10-13 | small -> micro | 429 "... 1 minute(s)" | 63 | 0 | 250 of 250 | no resize ran |
+
+Reading (inference from the aggregates, not a sample-level measurement):
+
+- The 17.0 s (2026-08-19) and 15.063 s (2026-10-13) outages sat in phases whose
+  PATCH was refused, right after a Micro -> Small phase that ended mid-outage.
+  Read as the tail of the Micro -> Small outage, that outage was one window of
+  at least 26.5 s on 2026-08-19 (9.5 + 17.0; the aggregates cap it at 121 s)
+  and between 22.063 and 50.313 s on 2026-10-13 (7.0 + 15.063 at the least;
+  the open tail started no earlier than the 18th sample, 4.25 s in, and ended
+  by the phase end under 39.5 s, so at most 35.25 s). This assumes the refused
+  phase opened on a failing sample, which the aggregates do not show.
+- No Small -> Large resize ran in either run, so neither run measured one.
+  The "61 s" figures are the module's 60 s wait for a status change that a
+  refused PATCH never causes.
+- The 2026-08-19 Small -> Micro "0 s" was an outage of at least 9.5 s that
+  was still open when the module stopped sampling.
+- The old Auth column read 0 s in every op. If `/auth/v1/health` answered `401`
+  without a key then as it did on 2026-10-23, no Auth sample ever counted as
+  up and no outage was ever closed, so 0 s meant "never closed". Not
+  re-checked against those dates.
+
+### Re-run (D09, 2026-10-23)
+
+One run, local vantage, Pro org, `ap-southeast-1`, one throwaway project
+created and deleted by the module, run from the working tree on lab commit
+661afdf with this entry's module changes. Artifact:
+`out/2026-10-23/run-2026-10-23T07-56-13-302Z.json` (facts next to it).
+Probe table ready 7 s after seeding; baseline 0 failures on every path (0/39
+`rest_read`, 0/40 `auth_health`, 0/10 `realtime_join`). Every PATCH answered
+`200` on the first attempt; none of the three follow-on PATCHes was refused,
+each sent after the data paths had been up for 15 s (whether that wait is what
+avoided the 429 was not separated), and the compute read back as `ci_small`,
+`ci_large`, `ci_small`, `ci_micro` in turn.
+
+| Op | `ACTIVE_HEALTHY` after | `rest_read` max outage | `auth_health` max outage | `realtime_join` max outage | `rest_read` recovered | Last failure, any path |
+|---|---|---|---|---|---|---|
+| upgrade micro -> small | 218 s | 231.465 s | 231.433 s | 228.188 s | 249.832 s | 250 s |
+| upgrade small -> large | 216 s | 223.28 s | 223.516 s | 223.421 s | 233.974 s | 234 s |
+| downgrade large -> small | 136 s | 152.466 s | 152.375 s | 144.528 s | 171.37 s | 171 s |
+| downgrade small -> micro | 245 s | 254.886 s | 254.869 s | 244.941 s | 273.785 s | 274 s |
+
+Times are seconds after the accepted PATCH was sent. `rest_read` and
+`auth_health` each had two outages per op, the shorter one 1.3 to 2.0 s
+(total minus max); the long one carries the figure above. No outage was open
+at a phase end and nothing was carried into the next phase (`carried_in_s` 0
+throughout). Failure modes: `HTTP 521` and `timeout` on REST and Auth;
+`pg_changes: {:error, "Too many database timeouts"}` and
+`timeout at pg_changes` on Realtime.
+
+- A resize in either direction took REST, Auth and Realtime down together for
+  between 144.528 and 254.886 s in this run (n=1 per op). Downgrades were not
+  free: Small -> Micro was the longest of the four.
+- `ACTIVE_HEALTHY` came before the data paths: REST recovered about 32, 18,
+  35 and 29 s after the status poll first read healthy (recovered minus the
+  whole-second `ACTIVE_HEALTHY` figure, per op; the poll runs every 3 s). The old
+  module stopped sampling at that status, which is how its open outages arose.
+- platform-downtime's 2026-10-23 data-path re-measure of Micro -> Small saw a
+  `rest_read` window of 171 s (first failure to sustained recovery, a
+  different metric on a different project); this run's 231.465 s is the same
+  order. n=1 each; not a like-for-like comparison.
+
 ## 2026-10-13 - D09 re-run after the explicit Data API grant (#128)
 
 Task 20 of `docs/plans/2026-10-13-lab-backlog-waves.md` appended `grant
@@ -60,8 +177,8 @@ select, insert, update, delete on table public.dpython_probe to anon,
 authenticated, service_role` to the SQL that creates the table D09's REST
 sampler reads with the anon key. One run, local vantage, Pro org,
 ap-southeast-1, run from source at lab commit 8ec7f86, project provisioned and
-deleted by the module. Artifact (private, no `publish-evidence` target):
-`evidence/20261013-114620/run-2026-10-13T03-46-20-408Z.json`.
+deleted by the module. Artifact:
+`out/2026-10-13/run-2026-10-13T03-46-20-408Z.json` (published 2026-10-23).
 
 | Op | PATCH | `_s` | REST max outage | REST samples OK | Findings line above |
 |---|---|---|---|---|---|
@@ -85,7 +202,8 @@ success of the micro -> small phase, and the 15.063 s in the next (refused)
 phase reads as the tail of the same outage. The findings-line figures
 (committed 2026-08-19 in cdfd05a, also in AGENTS.md) carry the
 same pattern (61 s for two ops, 17.0 s outage on an op after the first) and
-may have the same cause; their artifact was not re-read here.
+may have the same cause; their artifact was not re-read here. (Re-read and
+corrected in the 2026-10-23 entry above.)
 
 ## 2026-10-05 - the spend cap does not gate a manual grow past 8 GB (D12)
 

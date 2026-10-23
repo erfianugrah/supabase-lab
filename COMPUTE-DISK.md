@@ -69,18 +69,29 @@ target tier allows (doc-verified - server won't start).
 
 - PATCH /v1/projects/{ref}/billing/addons {addon_type:"compute_instance", addon_variant}
 - D01 measured micro->small settled in 107s.
-- D09 (this lab, local vantage, REST-anon-read + Auth health sampled every
-  250ms):
-  | op | settle time | max contiguous REST outage | max Auth outage |
-  |---|---|---|---|
-  | upgrade micro->small | 105 s | 1.0 s | 0 s |
-  | upgrade small->large | 61 s | 17.0 s | 0 s |
-  | downgrade large->small | 61 s | 0 s | 0 s |
-  | downgrade small->micro | 73 s | 0 s | 0 s |
+- D09 (this lab, local vantage, Pro, ap-southeast-1, 2026-10-23, n=1 per op;
+  `rest_read` anon row read and `auth_health` with the anon key every 250 ms,
+  `realtime_join` every 1 s; seconds after the accepted PATCH):
+  | op | `ACTIVE_HEALTHY` after | longest `rest_read` outage | longest `auth_health` outage | longest `realtime_join` outage |
+  |---|---|---|---|---|
+  | upgrade micro->small | 218 s | 231.465 s | 231.433 s | 228.188 s |
+  | upgrade small->large | 216 s | 223.28 s | 223.516 s | 223.421 s |
+  | downgrade large->small | 136 s | 152.466 s | 152.375 s | 144.528 s |
+  | downgrade small->micro | 245 s | 254.886 s | 254.869 s | 244.941 s |
+  REST recovered about 18 to 35 s after the status first read `ACTIVE_HEALTHY`.
+  The 2026-08-19 table that stood here (1.0 s, 17.0 s, 0 s, 0 s REST; 0 s
+  Auth; 61 s for two ops) is withdrawn: open outages were dropped at each
+  phase end, two of the four PATCHes were refused (no Large resize ran), and
+  the Auth sample carried no apikey (counts and PATCH statuses from console
+  output, not committed). Details and the re-read bounds:
+  experiments/compute-disk/RUNLOG.md, 2026-10-23 entry.
 - Consecutive resize PATCHes are themselves rate-limited: a second resize
-  immediately after the previous one settled returns 429
-  `We are still processing addon changes, please try again in 1-2 minutes`
-  (measured D09).
+  sent once the status read `ACTIVE_HEALTHY` again returned 429
+  `We are still processing addon changes, please try again in N minute(s)`,
+  N from 1 to 3 (D09, 2026-08-19 and 2026-10-13). On 2026-10-23 none of the
+  three follow-on PATCHes was refused; each was sent after the data paths had
+  been up for 15 s (whether that wait is what avoided the 429 was not
+  separated).
 - platform-downtime (measured): restart ~75s on Auth (HTTP 521), resize up
   ~2x restart (Auth 131s vs 75s). Doc-verified: "typically less than 2 minutes."
 
@@ -196,7 +207,7 @@ Compute-hours billed hourly (paused doesn't count), NOT covered by spend cap
 | D06b | TRUNCATE rejected in read-only |
 | D07 | same autoscale surface gap on Team |
 | D08 | IOPS/throughput accepted + applied on Micro |
-| D09 | upgrade/downgrade timings + sampled window (see report) |
+| D09 | resize up/down: 144.528-254.886 s data-path outage per op, status healthy before REST (2026-10-23) |
 | D10 | Pro 2 GB start; 1.9x burst no read-only; autoscale 2->8 then 8->12; read-only at 95% + auto-return; quota-spent burst -> 53100 + 7 min outage (1 of 2 runs), read-only (the other) |
 | D11 | grow from 2 GB: 4/5 GB 400 (gp3 IOPS floor), 6 GB 201 |
 
