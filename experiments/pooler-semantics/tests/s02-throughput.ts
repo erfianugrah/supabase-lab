@@ -194,9 +194,14 @@ const mod: TestModule = {
 
       ctx.log(`${t.id} ${t.label}: ${RUNS}x${TIME_S}s + ${WARMUP_S}s warmup, ${CLIENTS} clients`);
       const url = connString(target, user, ctx.dbPassword);
+      // The connstring (password included) goes in the environment, not
+      // --db-url: an argument is visible in ps for the whole run. sbperf reads
+      // one target from PG_ANALYSER_DB_URL (SBPERF_DB_URL before the rename)
+      // when no --db-url is given, and still hands pgbench the password as
+      // PGPASSWORD. A password-less --db-url would not work here: sbperf sets
+      // PGPASSWORD from the URL, so an empty one would override ours.
       const args = [
         "bench",
-        "--db-url", url,
         "--ref", ctx.ref,
         "--builtin", BUILTIN,
         "--clients", String(CLIENTS),
@@ -213,8 +218,11 @@ const mod: TestModule = {
       // set here reaches pgbench. --yes is deliberately NOT passed: it would
       // disable the busy-client refusal, which is one of the guardrails this
       // module exists to inherit.
+      // Drop numbered PG_ANALYSER_DB_URL_N / SBPERF_DB_URL_N from the caller's
+      // env: sbperf would add them as extra targets and bench refuses more than one.
+      const baseEnv = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(PG_ANALYSER|SBPERF)_DB_URL_\d+$/.test(k)));
       const proc = await $`${bin} ${args}`
-        .env({ ...process.env, PGSSLMODE: "require" })
+        .env({ ...baseEnv, PG_ANALYSER_DB_URL: url, SBPERF_DB_URL: url, PGSSLMODE: "require" })
         .quiet()
         .nothrow();
       const stdout = proc.stdout.toString();

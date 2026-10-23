@@ -75,8 +75,9 @@ async function findInLogs(ctx: Ctx, rich: string, simple: string, timeoutMs: num
   return { found: false, lagS: Math.round((Date.now() - t0) / 1000), via, err: `${err ? `${err}; ` : ""}${polls} polls, ${last}` };
 }
 
-function psqlAttempt(connstr: string): string {
-  const r = spawnSync("psql", [connstr, "-tAc", "select 1"], { env: { ...process.env, PGCONNECT_TIMEOUT: "5" }, timeout: 12_000, encoding: "utf8" });
+/** `connstr` carries no password (psql's argv is visible in ps); it goes in PGPASSWORD. */
+function psqlAttempt(connstr: string, password: string): string {
+  const r = spawnSync("psql", [connstr, "-tAc", "select 1"], { env: { ...process.env, PGPASSWORD: password, PGCONNECT_TIMEOUT: "5" }, timeout: 12_000, encoding: "utf8" });
   // The pooler's resolved address is in every libpq error; keep it out of the artifact.
   return r.status === 0 ? "OK" : (r.stderr || r.error?.message || "").replace(/\s+/g, " ").replace(/\b\d{1,3}(\.\d{1,3}){3}\b/g, "<ip>").slice(0, 160);
 }
@@ -200,9 +201,10 @@ const mod: TestModule = {
       const proj = await mgmt(ctx, "GET", `/projects/${ctx.ref}`);
       const region = (proj.json as { region?: string })?.region || ctx.region;
       const pooler = `aws-0-${region}.pooler.supabase.com`;
-      const badConn = `postgres://postgres.${ctx.ref}:wrong-password-${nonce()}@${pooler}:5432/postgres?sslmode=require`;
+      const conn = `postgres://postgres.${ctx.ref}@${pooler}:5432/postgres?sslmode=require`;
+      const badPw = `wrong-password-${nonce()}`;
       const errs: string[] = [];
-      for (let i = 0; i < ATTEMPTS; i++) errs.push(psqlAttempt(badConn));
+      for (let i = 0; i < ATTEMPTS; i++) errs.push(psqlAttempt(conn, badPw));
       await new Promise((r) => setTimeout(r, 15_000));
       const after = await mgmt(ctx, "POST", `/projects/${ctx.ref}/network-bans/retrieve`);
       const enriched = await mgmt(ctx, "POST", `/projects/${ctx.ref}/network-bans/retrieve/enriched`);
@@ -217,7 +219,7 @@ const mod: TestModule = {
         if (!b2.some((ip) => newBans.includes(ip))) newBans = [];
       }
       const dbPw = ctx.dbPassword || process.env.PVLAB_DB_PASSWORD || "";
-      const pwOk = dbPw ? psqlAttempt(`postgres://postgres.${ctx.ref}:${encodeURIComponent(dbPw)}@${pooler}:5432/postgres?sslmode=require`).replace(dbPw, "<pw>") : "skipped";
+      const pwOk = dbPw ? psqlAttempt(conn, dbPw).replace(dbPw, "<pw>") : "skipped";
       const distinctErr = [...new Set(errs)].join(" | ").slice(0, 300);
       out.push({
         id: "S18e",

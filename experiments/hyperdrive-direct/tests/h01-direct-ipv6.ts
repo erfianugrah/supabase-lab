@@ -136,6 +136,7 @@ const mod: TestModule = {
       let createErr = "";
       for (let i = 0; i < 6 && !configId; i += 1) {
         try {
+          // argv-secret-ok: wrangler hyperdrive create has no env path for the origin password; per-run random password of the project this module creates and deletes (the Cloudflare REST API, as in sqlite-edge-compare/lib/vendors.ts, would avoid it)
           const out = await wrangler(env, ["hyperdrive", "create", `${workerName}-direct`, "--connection-string", connStr, "--caching-disabled"], workdir);
           configId = out.match(/[0-9a-f]{32}/)?.[0] ?? "";
           if (!configId) createErr = out.replace(/postgres(ql)?:\/\/[^\s]+/g, "<conn>").slice(0, 300);

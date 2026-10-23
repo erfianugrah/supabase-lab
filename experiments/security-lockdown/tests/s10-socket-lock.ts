@@ -16,9 +16,10 @@ const RESTRICT = { dbAllowedCidrs: ["192.0.2.0/24"], dbAllowedCidrsV6: ["2001:db
 const OPEN = { dbAllowedCidrs: ["0.0.0.0/0"], dbAllowedCidrsV6: ["::/0"] };
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-function psqlOk(connstr: string): { ok: boolean; err: string } {
+/** `connstr` carries no password (psql's argv is visible in ps); it goes in PGPASSWORD. */
+function psqlOk(connstr: string, password: string): { ok: boolean; err: string } {
   const r = spawnSync("psql", [connstr, "-tAc", "select 1"], {
-    env: { ...process.env, PGCONNECT_TIMEOUT: "8" },
+    env: { ...process.env, PGPASSWORD: password, PGCONNECT_TIMEOUT: "8" },
     timeout: 20_000,
     encoding: "utf8",
   });
@@ -39,10 +40,10 @@ const mod: TestModule = {
     }
     const proj = await mgmt(ctx, "GET", `/projects/${ctx.ref}`);
     const region = (proj.json as { region?: string })?.region || ctx.region;
-    const connstr = `postgres://postgres.${ctx.ref}:${encodeURIComponent(pw)}@aws-0-${region}.pooler.supabase.com:5432/postgres?sslmode=require`;
+    const connstr = `postgres://postgres.${ctx.ref}@aws-0-${region}.pooler.supabase.com:5432/postgres?sslmode=require`;
     const results: TestResult[] = [];
 
-    const base = psqlOk(connstr);
+    const base = psqlOk(connstr, pw);
     results.push({
       id: "S10a",
       title: "baseline: psql connects through the pooler",
@@ -57,7 +58,7 @@ const mod: TestModule = {
       let lastErr = "";
       const t0 = Date.now();
       while (Date.now() - t0 < 90_000 && !refused) {
-        const r = psqlOk(connstr);
+        const r = psqlOk(connstr, pw);
         if (!r.ok) { refused = true; lastErr = r.err; break; }
         await sleep(5000);
       }

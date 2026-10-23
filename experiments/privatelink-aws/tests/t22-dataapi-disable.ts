@@ -199,10 +199,12 @@ async function pushOverEndpoint(ctx: Ctx) {
     `create table if not exists ${PROBE_TABLE} (id int primary key, at timestamptz default now());\n` +
       `grant select, insert, update, delete on table ${PROBE_TABLE} to anon, authenticated, service_role;\n`,
   );
-  const url = `postgresql://postgres:${encodeURIComponent(ctx.dbPassword)}@${ctx.phzHost}:5432/postgres?sslmode=require`;
+  // No password in --db-url (bash's and the CLI's argv): the CLI resolves a
+  // missing password from PGPASSWORD (libpq order: URL, PGPASSWORD, .pgpass).
+  const url = `postgresql://postgres@${ctx.phzHost}:5432/postgres?sslmode=require`;
   const p = await $`bash -lc ${`printf 'y\\n' | supabase db push --db-url '${url}' --include-all`}`
     .cwd(dir)
-    .env({ ...process.env, SUPABASE_ACCESS_TOKEN: ctx.pat ?? "" })
+    .env({ ...process.env, SUPABASE_ACCESS_TOKEN: ctx.pat ?? "", PGPASSWORD: ctx.dbPassword })
     .quiet()
     .nothrow();
   const out = (p.stdout.toString() + p.stderr.toString()).trim();

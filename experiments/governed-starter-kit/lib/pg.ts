@@ -15,10 +15,11 @@
 import { $ } from "bun";
 import type { Ctx } from "../../../harness/src/types";
 
+/** No password in the URL: it would sit in psql's argv. psql reads PGPASSWORD. */
 export function poolerUrl(ctx: Ctx): string {
   const host = ctx.endpoints.pooler;
   if (!host) throw new Error("no pooler host - set PVLAB_ENDPOINT_POOLER");
-  return `postgresql://postgres.${ctx.ref}:${encodeURIComponent(ctx.dbPassword)}@${host}:6543/postgres?connect_timeout=15`;
+  return `postgresql://postgres.${ctx.ref}@${host}:6543/postgres?connect_timeout=15`;
 }
 
 export interface Outcome {
@@ -28,7 +29,10 @@ export interface Outcome {
 }
 
 async function psql(ctx: Ctx, sqlText: string): Promise<Outcome> {
-  const p = await $`psql ${poolerUrl(ctx)} -qAt -v ON_ERROR_STOP=1 -c ${sqlText}`.quiet().nothrow();
+  const p = await $`psql ${poolerUrl(ctx)} -qAt -v ON_ERROR_STOP=1 -c ${sqlText}`
+    .env({ ...process.env, PGPASSWORD: ctx.dbPassword })
+    .quiet()
+    .nothrow();
   const out = p.stdout.toString().trim();
   const err = p.stderr.toString().trim();
   if (p.exitCode !== 0) return { ok: false, value: err || out };

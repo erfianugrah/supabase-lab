@@ -48,8 +48,9 @@ export async function psql(ctx: Ctx, sql: string): Promise<{ ok: boolean; out: s
     const host = `aws-${shard}-${region}.pooler.supabase.com`;
     const dns = await $`dig +short ${host} A`.quiet().nothrow();
     if (dns.exitCode !== 0 || !dns.stdout.toString().trim()) continue;
-    const url = `postgres://postgres.${ctx.ref}:${encodeURIComponent(ctx.dbPassword)}@${host}:5432/postgres?sslmode=require`;
-    const p = await $`psql ${url} -X -A -t -c ${sql}`.quiet().nothrow();
+    // Password via PGPASSWORD, not the URL: a URL argument is visible in ps.
+    const url = `postgres://postgres.${ctx.ref}@${host}:5432/postgres?sslmode=require`;
+    const p = await $`psql ${url} -X -A -t -c ${sql}`.env({ ...process.env, PGPASSWORD: ctx.dbPassword }).quiet().nothrow();
     return { ok: p.exitCode === 0, out: (p.stdout.toString() + p.stderr.toString()).trim() };
   }
   return { ok: false, out: `no pooler shard resolved for region ${region} (tried aws-0, aws-1)` };

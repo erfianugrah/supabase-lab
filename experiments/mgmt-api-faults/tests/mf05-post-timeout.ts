@@ -45,6 +45,7 @@ const mod: TestModule = {
         await px.reset();
         await px.setRules([{ id: "hold75", method: "POST", path: "^/v1/projects$", mode: "delay-after", delayMs: 75_000 }]);
         const a = await runCmd(
+          // argv-secret-ok: `projects create` takes the password only as --db-password (no env or stdin path, CLI 2.121.0); a per-run random password for a project this module deletes
           ["supabase", "--profile", profile, "--workdir", dir, "projects", "create", nameA, "--org-id", org, "--db-password", dbPassword(), "--region", "ap-southeast-1", "--yes"],
           { cwd: dir, env: { SUPABASE_ACCESS_TOKEN: ctx.pat ?? "" }, timeoutMs: 420_000 },
         );

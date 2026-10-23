@@ -131,14 +131,15 @@ export class Rig {
     const pw = password();
     await $`docker rm -f ${SRV}`.quiet().nothrow();
     // An argument array, not a multi-line template: Bun's shell treats a newline as a command separator.
+    // The password rides `-e NAME` from the docker client's env, not `-e NAME=value` (argv, visible in ps).
     const args = [
       "run", "-d", "--name", SRV, "--volumes-from", DATA, "-p", `127.0.0.1:${PORT}:5432`,
-      "-e", `POSTGRES_PASSWORD=${pw}`, "-e", "POSTGRES_HOST=/var/run/postgresql",
-      "-e", "PGPORT=5432", "-e", "POSTGRES_PORT=5432", "-e", `PGPASSWORD=${pw}`,
+      "-e", "POSTGRES_PASSWORD", "-e", "POSTGRES_HOST=/var/run/postgresql",
+      "-e", "PGPORT=5432", "-e", "POSTGRES_PORT=5432", "-e", "PGPASSWORD",
       "-e", "PGDATABASE=postgres", "-e", "POSTGRES_DB=postgres", "-e", "JWT_EXP=3600",
       ref, "postgres", "-c", "config_file=/etc/postgresql/postgresql.conf", "-c", "log_min_messages=fatal",
     ];
-    await $`docker ${args}`.quiet();
+    await $`docker ${args}`.env({ ...process.env, POSTGRES_PASSWORD: pw, PGPASSWORD: pw }).quiet();
     const deadline = Date.now() + 240_000;
     let lastErr = "";
     while (Date.now() < deadline) {

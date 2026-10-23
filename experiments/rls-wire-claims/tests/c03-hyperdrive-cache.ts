@@ -243,6 +243,7 @@ const mod: TestModule = {
       const mk = async (name: string, cache: boolean): Promise<string> => {
         const args = [
           "hyperdrive", "create", name,
+          // argv-secret-ok: wrangler hyperdrive create has no env path for the origin password; per-run random password of a role on the project this module creates and deletes (the Cloudflare REST API, as in sqlite-edge-compare/lib/vendors.ts, would avoid it)
           "--connection-string", connStr,
           ...(cache ? ["--max-age", "60"] : ["--caching-disabled"]),
         ];
