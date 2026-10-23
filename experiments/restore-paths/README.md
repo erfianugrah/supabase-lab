@@ -24,6 +24,7 @@ is built for linux-x64.
 | RP05 | What `DELETE database/migrations?gte=` and the stored `rollback` SQL do to schema, data and history, on the production project and on a git-less preview branch; plus a failing apply |
 | RP06 | PITR recovery point on Small: lag of the platform's latest recoverable instant under a light writer and idle (`RP06_PHASE_MIN`, default 20; 0 skips to the restore), then a restore to that instant with the writer running and a count of acknowledged rows kept and lost |
 | RP07 | PITR restore time against database size past 1 GB (`RP07_SIZES_GB`, default 3,10; `RP07_COMPUTE`, default small; disk grown once to `RP07_DISK_GB`, default 40): fill, archive catch-up, restore to the latest instant, per-path outage including a Data API read, rows kept, Postgres recovery log lines. `RP07_WAIT_ARCHIVER=1` also waits for `pg_stat_archiver` to pass the fill-end segment |
+| RP09 | Logical slots (`pgoutput` and `wal2json` via the SQL interface over the session pooler, `wal2json` streamed by `pg_recvlogical` over direct IPv6) across compute resize Small to Medium and back, read-replica create and remove, and restart: slot present, `active`, `confirmed_flush_lsn` before vs after, retained WAL, duplicates and gaps against a steady writer; then `restore-point` and `undo` |
 
 ## Run
 
@@ -36,6 +37,7 @@ make daily     # RP04, ~4 minutes while backups/restore refuses, up to ~30 if a 
 make rollback  # RP05, ~1-2 minutes including the preview branch; PVLAB_ORG_PRO
 make rpo       # RP06, ~50 minutes (RP06_PHASE_MIN=0: ~10 minutes, restore only); PVLAB_ORG_PRO
 make size      # RP07, 36.6 to 46.5 minutes per run on Small (2026-10-22/23); PVLAB_ORG_PRO
+make slots     # RP09, about 18 minutes on Small (2026-10-23); needs pg_recvlogical and an IPv6 route; PVLAB_ORG_PRO
 ```
 
 Output lands in `evidence/<timestamp>/` (gitignored: reports carry project
@@ -43,8 +45,8 @@ refs and hostnames).
 
 ## Measured
 
-See RUNLOG.md (2026-10-10, 2026-10-20, 2026-10-22/23). Short form, from one vantage (an IPv4-only
-workstation), ap-southeast-1 projects:
+See RUNLOG.md (2026-10-10, 2026-10-20, 2026-10-22/23, and RP09 on 2026-10-23). Short form, from one vantage (an IPv4-only
+workstation; it had an IPv6 route for RP09), ap-southeast-1 projects:
 
 | finding | value | module |
 |---|---|---|
@@ -67,7 +69,10 @@ workstation), ap-southeast-1 projects:
 | Migration rollback route on a production project | `400` "You cannot rollback a production branch."; schema and history unchanged; the stored `rollback` SQL is returned by `GET migrations/{version}` | RP05 |
 | Migration rollback route on a git-less preview branch | `200`; history rows from the cut onward removed; the one stored `rollback` ran (column dropped); a migration with none stored kept its table (n=1) | RP05 |
 | Failing migration apply | `400` with the Postgres error; the first statement's table absent and no history row | RP05 |
+| Logical slots across resize Small to Medium and back, read-replica create/remove, restart | all 3 slots present after every step in 3 of 3 runs (2026-10-23, S1 to S3); `confirmed_flush_lsn` after each Postgres restart equal to what the consumer had confirmed; every acked row (3421, 3767, 3143) delivered once to each consumer, 0 duplicates, 0 gaps; the replica listed no slots | RP09 |
+| Slot limits on Small and Medium | `max_replication_slots` and `max_wal_senders` 10 (the compute guide says 5); `max_slot_wal_keep_size` `2GB` on Small | RP09 |
+| Pro: `restore-point` and `undo` | `400` "This endpoint is unavailable at the moment" for GET, POST and undo, 3 of 3 projects, 2026-10-23; Enterprise not run | RP09 |
 
 Not measured: restore-to-new-project, the Dashboard's physical-backup restore (so no daily-backup restore downtime),
-direct 5432 (IPv6-only), restore time at production data sizes, and any
+direct 5432 during restores, restore time at production data sizes, and any
 restore on a project older than a few minutes.
