@@ -3202,7 +3202,7 @@ because `harness/dist/pvlab` is a linux-x64 build.
   closed unexpectedly`) killed R16, R17 and R14's RP06d; module reads go
   through `again()`.
 
-## experiments/pooler-checkout - key facts (validated 2026-10-10, Micro, ap-southeast-1 and us-east-1, Pro org, Supavisor aws-0 hosts)
+## experiments/pooler-checkout - key facts (validated 2026-10-10 and 2026-10-23, Micro and Small, ap-southeast-1 and us-east-1, Pro org, Supavisor aws-0 hosts)
 
 Self-provisioning (Management API create and delete, no OpenTofu state), one
 Micro project per run. IPv4-only vantage in Singapore. Raw artifacts are in the
@@ -3214,9 +3214,28 @@ ignored `evidence/`; redacted copies in `out/2026-10-10/`. Details: RUNLOG.md.
   52 ms and its first `select 1` fails after 60,007 to 60,009 ms (6 of 6
   trials) with `XX000 (ECHECKOUTTIMEOUT) unable to check out connection from the
   pool after 60000ms in Transaction mode`. A statement that queues for less than
-  60 s is served (6,018 to 6,056 ms behind 8 s holders). A public status mirror
-  quotes `after 15000ms` for other clusters; this project did not reproduce
-  that figure, and what sets it was not separated.
+  60 s is served (6,018 to 6,056 ms behind 8 s holders).
+- **`after 60000ms` and `after 15000ms` are two different waits** (RUNLOG
+  "Where `after 15000ms` comes from", 2026-10-23, Micro and Small). 60000 is
+  the pool-slot wait, the tenant's `pool_checkout_timeout`; the Management API
+  cannot read or set it. It was 60,006 to 60,012 ms with pool size 5 set
+  through `PATCH .../config/database/pooler` (PC07b, 6 of 6) and 60,007 to
+  60,011 ms with a client `statement_timeout`, `options -c
+  statement_timeout` or 5 s connect timeout (PC05b, 24 of 24). 15000 is Supavisor's fixed wait for the slot's backend
+  connection to finish connecting and logging in (`DbHandler.checkout`,
+  default `15_000`, source pinned in the RUNLOG). Reproduced with a `login`
+  event trigger sleeping 20 s for the pooler's backends: 12 of 15 transaction
+  clients per run got `(ECHECKOUTTIMEOUT) ... after 15000ms in Transaction
+  mode` and 4 of 6 session clients `... in Session mode`, the rest `08006
+  ... authentication did not complete within 15000ms`; at 8 s every client
+  was served after about 8 s (PC06). That public `after 15000ms` reports were
+  this path is inference.
+- **Session mode refuses instead of queueing:** with its pool (15) full, the
+  next session client failed at connect in 560 to 597 ms with
+  `(EMAXCONNSESSION) max clients reached in session mode - max clients are
+  limited to pool_size: 15` (PC05a). The transaction pool held 16 backends
+  and the pool set to 5 held 6, which fits the source's one warm backend plus
+  `pool_size` overflow (a code reading, not a separate probe).
 - **Fallback to the Supavisor session pooler (5432) works while the transaction
   pool is exhausted:** 49 to 70 ms from the primary's failure to the fallback's
   answer (PC02a), 56 to 117 ms after the server's own 60 s error (PC02c). The

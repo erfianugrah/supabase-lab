@@ -8,7 +8,7 @@
 ROOT := $(abspath ../..)
 TS := $(shell date +%Y%m%d-%H%M%S)
 # MANDATORY: one registry carries every experiment's tests.
-ONLY ?= PC01,PC02,PC03,PC04,PC09
+ONLY ?= PC01,PC02,PC03,PC04,PC05,PC06,PC07,PC09
 # Prefix of the project names this experiment creates; `sweep` deletes by it.
 PREFIX ?= pc-checkout-
 
