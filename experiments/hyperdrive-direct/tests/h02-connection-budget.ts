@@ -72,9 +72,9 @@ const RECOVERY_S = Number(process.env.PVLAB_H02_RECOVERY_S || 900);
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const median = (xs: number[]) => (xs.length ? [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)]! : -1);
 // biome-ignore lint/suspicious/noControlCharactersInRegex: ANSI colour codes in wrangler output
-const ANSI = /\x1b\[[0-9;]*m/g;
+export const ANSI = /\x1b\[[0-9;]*m/g;
 
-async function wrangler(args: string[], cwd: string): Promise<string> {
+export async function wrangler(args: string[], cwd: string): Promise<string> {
   try {
     const { stdout, stderr } = await run("wrangler", args, { env: process.env, timeout: 180_000, cwd });
     return `${stdout}\n${stderr}`;
@@ -135,7 +135,7 @@ create or replace function public.h02_kill(r text) returns int language sql secu
 revoke all on function public.h02_snap(), public.h02_kill(text) from public, anon, authenticated, service_role;
 grant execute on function public.h02_snap(), public.h02_kill(text) to hd_b;`;
 
-interface Hold {
+export interface Hold {
   status: number;
   ms: number;
   ok: boolean;
@@ -145,7 +145,7 @@ interface Hold {
 }
 
 /** Summary of a set of request outcomes; error texts verbatim with counts and their latency range. */
-function summarise(xs: Hold[]): Record<string, string | number> {
+export function summarise(xs: Hold[]): Record<string, string | number> {
   const okMs = xs.filter((x) => x.ok).map((x) => x.ms);
   const errs = xs.filter((x) => !x.ok);
   const byErr: Record<string, number[]> = {};
