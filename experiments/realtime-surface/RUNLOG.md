@@ -1,14 +1,15 @@
 # realtime-surface RUNLOG
 
 Chronological record of what was run. Projects were created on a Pro-plan
-organization, region ap-southeast-1, default compute, no add-ons, and deleted by
-the module that created them. Org slugs and project refs are not recorded.
+organisation, region ap-southeast-1, default compute (RT05: resized to Small),
+no add-ons, and deleted by the module that created them. Org slugs and project refs are not recorded.
 Vantage: a local macOS machine (not in the project's region); the current
 `@supabase/supabase-js` is whatever the installed package.json said at run time
 (RT01a records it), and the old client is the one pinned in this directory's
 `package.json`. Every count is n=1 per row on one project unless a row says
-otherwise. Published artifacts: `out/2026-10-10/` (redacted, with `.facts.md`
-beside each).
+otherwise (RT05: two reps per burst row, one for its two over-range pool
+probes). Published artifacts: `out/2026-10-10/` and
+`out/2026-10-22/` (redacted, with `.facts.md` beside each).
 
 Sources for the claims each module is measured against:
 
@@ -234,6 +235,139 @@ server version, and says older clients drop binary silently.
   minimum versions are not located), the Realtime server version, binary on
   `realtime.send_binary(..., private => false)`, an `ArrayBuffer` larger than
   16 bytes over WebSocket, any size limit.
+
+## 2026-10-22 - RT05 (subscription bursts: Postgres Changes pool, private Broadcast)
+
+Artifact: `out/2026-10-22/run-2026-10-22T22-53-26-669Z.json` (1 pass, 4 fail).
+The four `fail` rows are RT05c at 100, 500, 1000 and 2000 joins. RT05c grades
+H1 (below), not joins: it compares the default `postgres_changes_pool` with
+`postgres_changes_pool` 20, and at those four levels neither of those two
+settings produced a timeout, so H1 was not exercised there; under those two
+settings every channel at those levels joined except 27 in the project's
+first burst (below). After
+this run the module grades such rows `info` (`tests/rt05-subscription-burst.ts`,
+the RT05c status line); the data is unchanged. Run started 2026-10-22 22:53:26
+UTC and finished 2026-10-23 00:00:42 UTC. One project on the Pro organisation,
+ap-southeast-1, resized to Small before the first burst (RT05-setup read
+`max_connections` 90, the Small figure in compute-disk D01), Postgres 17.11.
+The module deleted it (HTTP 200 in the local run log, not in `out/`); a `GET
+/v1/projects` afterwards listed no `rt-*` project.
+
+Claims measured against: the Realtime settings page
+(https://supabase.com/docs/guides/realtime/settings, "Postgres Changes
+connection pool size", default 2, range 1 to 20, "Too low: subscription
+creation times out during bursts. Clients receive a `postgres_changes` system
+error with `Too many database timeouts` and retry after 5 to 10 seconds."), the
+limits page (https://supabase.com/docs/guides/realtime/limits) and the Postgres
+Changes page's single-thread, per-subscriber authorisation note. The two
+hypotheses: H1, a burst at the default `postgres_changes_pool` gets `Too many
+database timeouts` and the same burst at `postgres_changes_pool` 20 gets none;
+H2, private Broadcast fed by a database trigger joins every channel at every
+burst size.
+
+Shape, the same for every burst row: 10 Auth users, all members of one tenant
+in `rt05_members`; table `rt05_items` with a select policy for `authenticated`
+that checks membership through `(select auth.uid())`; an AFTER INSERT trigger
+on it calling `realtime.send(..., private => true)` on topic
+`rt05:tenant:<tenant>`, and a `realtime.messages` select policy on the same
+membership. N WebSockets from one local process (anon key in the URL), opened
+at 100 per second, one channel each, joined with a user session token
+(round-robin over the 10 users); then all N `phx_join` frames sent in one loop
+with no pacing (how long the loop took was not recorded). The client is raw
+protocol and never rejoins or retries, so each outcome below is the server's
+first answer to one join. A Postgres Changes channel (`pc`) counts as ready on
+`system {extension: postgres_changes, status: ok}`; a private Broadcast channel
+(`bc`) on the `phx_reply` ok. After the channels settle, canary inserts every
+2 s until one arrives, then one measured insert; fan-out latency is from that
+insert's return on the orchestrator to each channel's receipt, on the same
+clock. Two reps per burst row, except the two over-range probes
+(RT05b-bound21 and RT05b-bound100, 500 joins, one rep each).
+
+- **Config as created (RT05a-read).** `postgres_changes_pool` null,
+  `connection_pool` 2, `max_concurrent_users` 10000, `max_joins_per_second`
+  2500, `max_channels_per_client` 100. The limits page's Pro column says 500
+  concurrent connections and 500 joins per second; this project read the
+  values in the limits page's "Pro (no spend cap)" and Team columns (10000 and
+  2500). Which of those applies to this organisation (its spend-cap state) was
+  not read. Because 5000 fitted under 10000, the module did not PATCH
+  `max_concurrent_users`.
+- **Pool connections seen.** Realtime's connections were sampled from
+  `pg_stat_activity` once a second while each burst settled. The ones named
+  `realtime_subscription_manager_pub` peaked at 4 on every default-config row
+  but the first (8), and at 1, 20, 21 and 81 with `postgres_changes_pool` set
+  to 1, 20, 21 and 100. That name tracking the setting is the basis for reading
+  it as the Postgres Changes pool. With the setting null it held 4 of those
+  connections where the docs give a default of 2; explicit settings from 2 to
+  19 were not tested.
+- **H1 held at 5000 joins and at no lower level.** Default config: 1421 of 5000
+  and 1611 of 5000 channels got `system` `{:error, "Too many database
+  timeouts"}` (`pc_error`), and `realtime.subscription` held 3579 and 3389
+  rows, the ready count. 500, 1000 and 2000 joins: every channel ready, both
+  reps. 100 joins: rep 2 100 of 100; rep 1 73 of 100, the project's first burst
+  (next bullet), with no timeouts. With `postgres_changes_pool` 20: every
+  channel ready at every level, including 5000 of 5000 in both reps
+  (RT05c-5000 pass). With `postgres_changes_pool` 1 the timeouts started at a
+  lower level: 1234 and 1202 of 2000, 3858 and 3829 of 5000; 1000 joins and
+  below all ready. Whether a channel that got the timeout would have recovered
+  through the retry the settings page describes was not measured.
+- **No other failure class appeared**, apart from the first burst on the new
+  project: 100 joins, 26 `join_error` `UnableToConnectToProject` and 1
+  `phx_error`; the second rep 100 of 100. No rate-limit reply
+  (`ClientJoinRateLimitReached`, `ConnectionRateLimitReached`,
+  `too_many_joins`), no socket failure (5000 of 5000 opened every time), no
+  `no_reply`. `pg_postmaster_start_time` did not change across any burst.
+- **Join to ready, p50 / p95.** At 5000: default `pc` 2964 / 5690 and 2864 /
+  5688 ms (ready channels only), `postgres_changes_pool` 20 `pc` 2038 / 3863
+  and 2028 / 3860 ms, `bc` (default config) 1730 / 3266 and 2067 / 3646 ms. At
+  1000: default `pc` 825 / 1490 and 730 / 1380 ms, `postgres_changes_pool` 1
+  `pc` 2600 / 4872 and 2595 / 4937 ms, `postgres_changes_pool` 20 `pc` 422 /
+  798 and 426 / 779 ms, `bc` (default config) 374 / 668 and 376 / 679 ms.
+- **H2 held: private Broadcast joined every channel at every level** (100 to
+  5000, both reps, no error; `bc` ran at the default config only), and every
+  ready channel of both kinds received the measured insert (delivered equals
+  ready on all 42 burst rows).
+- **Fan-out of one insert, p50 / p95 / max ms.** `bc` (default config): 6/7/7
+  and 4/6/6 at 100; 9/14/15 and 9/11/11 at 500; 14/225/226 and 17/226/227 at
+  1000; 30/442/652 and 18/234/237 at 2000; 234/877/1771 and 235/874/887 at
+  5000. `pc`, default config: 375/376/376 (73 ready) and 463/465/465 at 100;
+  572/575/581 and 613/616/864 at 500; 209/427/428 and 678/891/892 at 1000;
+  483/693/700 and 873/1294/1299 at 2000; 909/1338/1760 (3579 ready) and
+  936/1352/1358 (3389 ready) at 5000. `pc`, `postgres_changes_pool` 20:
+  45/46/46 and 512/513/513 at 100; 1286/1701/1709 and 1270/1457/1688 at 5000
+  (5000 of 5000). One process received every frame, so at 5000 sockets the
+  client's own scheduling is inside both kinds' figures; that share was not
+  separated.
+- **The pool's upper bound is not enforced at the documented 20.** PATCH
+  `postgres_changes_pool` 21 and 100 both answered 204 and read back (the
+  OpenAPI schema gives 1 to 100). After a 500-join burst with
+  `postgres_changes_pool` 21: 30 client backends of `max_connections` 90, and
+  a Management API query answered 201. After a 500-join burst with
+  `postgres_changes_pool` 100: `realtime_subscription_manager_pub` peaked at
+  81 during the burst, client backends afterwards were 90 of 90, and a
+  Management API query answered `503 Failed to run sql query: FATAL: 53300:
+  sorry, too many clients already` (RT05a-bound100-conns).
+- Not measured: whether a channel that got `Too many database timeouts`
+  recovers through the documented retry or needs a rejoin (the client never
+  retries, and the module stops watching once every channel has settled);
+  several channels per socket; `filter=` subscriptions; compute above Small;
+  joins from more than one client address; how the platform counts joins per
+  second against the 2500 read here; explicit `postgres_changes_pool` values
+  from 2 to 19; any `connection_pool` (the Realtime authorisation pool) other
+  than 2.
+
+Unpublished dev iterations the same day, all on one reused dev project, a
+different project from the artifact's (nothing from them is in `out/`): the
+orchestrator's pooler session was terminated with `57P01` (administrator
+command) shortly after the Small resize and the unhandled error killed the
+run, so the module reconnects now and records `postmaster_restarted`; the
+measured insert picked its tenant with `limit 1` and hit an earlier run's
+tenant, so neither kind received it (0 of N), and the insert now names the
+tenant; re-issuing user tokens before every burst ended one iteration with a
+failed password grant, so tokens are re-issued every 40 minutes; one iteration
+began while another still had `postgres_changes_pool` 21 set and met `53300`
+at setup, two runs on one project, so not counted. By the local shell clock
+(not in `out/`), the dev project was healthy by 22:39 UTC and deleted at 22:53
+UTC on 2026-10-22.
 
 ## Harness lessons (2026-10-10, unpublished iterations)
 

@@ -2321,7 +2321,7 @@ Numbers: `RUNLOG.md`, artifacts `out/2026-10-08/`.
 - iap-lockdown: `lib/inventory.ts` GraphQL probe now sends `{ __typename }` and
   `http()` reports `errors[0].message` or `ok:<type>` as the row code.
 
-## experiments/realtime-surface - key facts (validated 2026-10-10, Pro org, n = 1 per row)
+## experiments/realtime-surface - key facts (validated 2026-10-10, Pro org, n = 1 per row; RT05 2026-10-22, two reps per burst row)
 
 - **Postgres Changes filters and `select` against Postgres's own evaluation**
   (RT01): 19 filters (AND over two and three columns, two conditions on one
@@ -2361,6 +2361,34 @@ Numbers: `RUNLOG.md`, artifacts `out/2026-10-08/`.
   client only. Private-channel policy applied to binary as to JSON (no select
   policy: join refused; select-only topic: WebSocket send errored, REST 403,
   secret API key 202).
+- **Subscription bursts on Small** (RT05, 2026-10-22, one project, two reps
+  per burst row and one for each over-range pool probe, N WebSockets with one
+  channel each, all N joins sent at once by a raw-protocol client that never
+  retries; see RUNLOG): Postgres Changes on an RLS table with the pool as
+  created (`postgres_changes_pool` null) joined every channel at 500 to 2000
+  in both reps; at 100 joins rep 2 joined 100 of 100 and rep 1, the project's
+  first burst, 73 of 100 (26 `UnableToConnectToProject`, 1 `phx_error`, no
+  timeouts). At 5000 joins 1421 and 1611 of 5000 got `system` `{:error, "Too
+  many database timeouts"}` as their first answer; the settings page says
+  clients "retry after 5 to 10 seconds", and recovery was not measured.
+  `postgres_changes_pool` 20 joined 5000 of 5000 both reps;
+  `postgres_changes_pool` 1 got timeouts from 2000 joins (1234, 1202 of 2000).
+  The null default held 4 `realtime_subscription_manager_pub` connections, not
+  the documented 2; that name peaked at 1, 20, 21 and 81 at settings 1, 20, 21
+  and 100. No rate-limit or socket error at 5000; the project's config read
+  `max_concurrent_users` 10000 and `max_joins_per_second` 2500, not the limits
+  page's Pro 500/500. Private Broadcast from an AFTER INSERT trigger
+  (`realtime.send`, default config only) joined 5000 of 5000 and delivered one
+  insert at p50 234 and 235 ms, against 909 and 936 ms for the ready Postgres
+  Changes channels at 5000 joins (default pool) and 1286 and 1270 ms with
+  `postgres_changes_pool` 20; at 100 joins, 4 to 6 ms against 375 and 463 ms
+  (default pool) and 45 and 512 ms (`postgres_changes_pool` 20). The
+  Management API accepts `postgres_changes_pool` 21 and 100 (docs: 1 to 20);
+  with `postgres_changes_pool` 100 on Small, `realtime_subscription_manager_pub`
+  peaked at 81 during a 500-join burst, client backends afterwards were 90 of
+  90, and a Management query answered 503 with `53300: sorry, too many clients
+  already`. Raw-protocol harness: `lib/burst.ts` (records each channel's
+  `phx_reply` and `system` frame without a supabase-js client per socket).
 
 ## experiments/auth-providers - key facts (AU01-AU04 2026-10-10, self-provisioned throwaway projects)
 
