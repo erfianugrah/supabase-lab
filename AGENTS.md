@@ -164,6 +164,8 @@ platform behaviour or writing it into docs
   for docker, a 0600 file for `aws ssm send-command --parameters file://`. A
   CLI with no env path (`projects create --db-password`, `wrangler hyperdrive
   create`) takes an `argv-secret-ok: <reason>` comment.
+  `harness/src/shell-secrets.test.ts` does the same for every `experiments/` and
+  `harness/` `*.sh` (`# argv-secret-ok: <reason>` for a justified exception).
 - Secrets reach the runner only at invocation time, inside the SSM
   `send-command` payload (`suite.sh` reads them from `secrets.tfvars`).
   Nothing secret is baked into user_data or the AMI, and the runner holds
@@ -730,10 +732,12 @@ each user's auth rows". Findings and artifacts in RUNLOG.md; out/2026-09-25/.
   `first_fail_s`).
 - **The Auth probe is `GET /auth/v1/health` with an anon key** (`lib/setup.ts`
   `AUTH_PATH`, `lib/probes.ts`), not an authenticated operation. D01's 75 s and
-  D03's 131 s are that endpoint (and so are the 2026-10-23 Auth figures above); compute-disk D09 sampled the same endpoint on
-  2026-08-19 and saw 0 s across four resizes, so the 2026-08-04 and 2026-10-23
-  runs here disagree with the 2026-08-19 D09 run on one surface, and no run
-  has probed an authenticated Auth call across a resize.
+  D03's 131 s are that endpoint (and so are the 2026-10-23 Auth figures above); compute-disk D09's 2026-08-19
+  "0 s across four resizes" on that endpoint is withdrawn: D09 then sent no
+  apikey and dropped outages still open at a phase end (compute-disk key
+  facts, 2026-10-23); its 2026-10-23 re-run with the anon key saw
+  144.528-254.886 s per resize, in line with the runs here. No run has probed
+  an authenticated Auth call across a resize.
   Write-ups must not call these figures an "authenticated Auth path".
 - **A resize cost about twice a restart on 2026-08-04** - Auth 131 s resizing
   up against 75 s restarting, pooler 207 s against 158 s (n=1). Not
@@ -1682,8 +1686,10 @@ history.
   the apikey by value and PostgREST verifies only the bearer, or a gateway
   cache had not expired yet (L05 measured ~45 s for the legacy-key disable);
   not separated.
-- Not settled: whether Storage/Realtime verify a third-party token (bucket
-  list answers anon too), pooler behaviour under load, an image ahead of the
+- Storage and Realtime verify a third-party token themselves on managed
+  (third-party-auth TPA05/TPA06, 2026-10-23); not re-run on this self-hosted
+  stack.
+- Not settled: pooler behaviour under load, an image ahead of the
   platform (no public tag newer than v2.196.0 on 2026-09-02), making the
   managed Auth endpoint unreachable (no lever).
 - Ops: four throwaway projects in one day; SH05 and SH06 each revoke the
