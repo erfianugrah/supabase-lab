@@ -15,6 +15,12 @@ OpenTofu state):
   old and new builds served side by side after a redeploy, does supabase-js
   `functions.invoke` retry a 503 the function returns, and what are the p50/p95
   over a sampling window, against an RPC twin of the same logic?
+- ER03: the ER01 matrix on a Bun server (`server/bun.ts`, `Bun.serve` on
+  loopback) in three env configurations, and the named-key forms of `auth`
+  (`publishable:<name>`, `secret:<name>`, `:*`, an unconfigured name, arrays)
+  on Bun and on an Edge Function, against a project holding one extra key of
+  each kind. Also records whether a deployed function sees a key created after
+  its deploy. Vercel is not covered (no credential).
 
 The Workers-runtime leg runs the Worker bundle on workerd inside a container
 and, when a Cloudflare token is supplied, also deploys it to workers.dev and
@@ -25,6 +31,7 @@ deletes it again. A run without the token has only the workerd targets.
 ```
 sx SUPABASE_ACCESS_TOKEN -- make probe PVLAB_ORG_PRO=<pro org slug> ONLY=ER01
 sx SUPABASE_ACCESS_TOKEN -- make probe PVLAB_ORG_PRO=<pro org slug> ONLY=ER02
+sx SUPABASE_ACCESS_TOKEN -- make probe PVLAB_ORG_PRO=<pro org slug> ONLY=ER03
 make unit      # pure logic: expectation table, drift arithmetic, percentile
 ```
 
@@ -33,7 +40,9 @@ Needs Docker for ER01's workerd leg. For the Cloudflare leg, put
 the environment (for example `sx CLOUDFLARE_WORKERS_TOKEN=CLOUDFLARE_WORKERS_TOKEN CLOUDFLARE_ACCOUNT_ID SUPABASE_ACCESS_TOKEN -- make probe ...`)
 and have `wrangler` on PATH; the Worker is named with the prefix, receives the
 keys as secrets, and is deleted at the end of the module.
-`ER_PROJECT_PREFIX` names the throwaway projects and Workers (default `er-`). `ER_CYCLES` (default 5) and `ER_WINDOW_S` (default
+`ER_PROJECT_PREFIX` names the throwaway projects and Workers (default `er-`).
+`ER_PASSES` (default 2) repeats each ER03 matrix; `ER_REFS_FILE`, if set, gets
+the ER03 project ref appended (keep it outside the repo). `ER_CYCLES` (default 5) and `ER_WINDOW_S` (default
 600) size ER02. The harness registry is generated at build time: run
 `bun harness/scripts/gen-registry.ts` after adding this directory so the runner
 finds the modules.

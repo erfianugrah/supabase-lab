@@ -419,3 +419,188 @@ prefix (the same count as before the run). That listing is a console check made
 by the operator and is not published; the module's own re-read of the
 Worker list is. Docker containers from ER01's workerd leg were removed by the
 module. No AWS resource was created.
+
+## ER03 - Bun server and the named-key syntax (2026-10-23)
+
+Question: does `@supabase/server` behave on a Bun server as it does on an Edge
+Function, and do the named-key forms of `auth` (`publishable:<name>`,
+`secret:<name>`, the wildcard `:*`, a name that is not configured, and arrays
+mixing them) do what the package docs say? Package `@supabase/server` 1.9.1
+(the pin in this directory), Bun 1.3.14, lab commit 661afdf plus the
+uncommitted ER03 files.
+
+Runs (n = 2 projects, one per run, each with every matrix run twice):
+
+| run | started (UTC) | finished (UTC) | results | artifact |
+|---|---|---|---|---|
+| run A | 2026-10-23 08:40:04 | 08:46:35 | 64 (56 pass, 3 info, 5 fail) | `out/2026-10-23/run-2026-10-23T08-40-04-847Z.json` |
+| run B | 2026-10-23 08:47:08 | 08:53:27 | 64 (51 pass, 13 info, 0 fail) | `out/2026-10-23/run-2026-10-23T08-47-08-955Z.json` |
+
+The 5 `fail` rows of run A and 5 of the `info` rows of run B are the same
+rows (one `auth` option each, named-key modes on the singular-env Bun server,
+below); between the runs the
+module was changed to report that target as `info`, because its expectations
+assume named keys the server was never given. Run A's `ER03-cmp` detail prints
+"of undefined" for each denominator (a key-name defect, fixed for run B); its
+measurements carry the denominators (`*_cells`: 70 and 80).
+
+Two earlier attempts the same morning, 08:35 and 08:39 UTC, threw before any
+matrix ran and are not published: the first because the Edge Function source
+kept a template placeholder (a module defect), the second because the
+Management API refused the key name `web` (below). Both deleted their
+project (`project delete 200`).
+
+### Targets
+
+All four targets answer from the same handler table (`lib/named.ts`
+`AUTH_TABLE`), so each cell is the same `auth` option on each target.
+
+| target | what it is | env given to the library |
+|---|---|---|
+| `ef` | Edge Function, `verify_jwt` false, deployed through the Management API | the platform's injected variables |
+| `bunsing` | `server/bun.ts` on `Bun.serve`, loopback, this machine | `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` (the `default` keys); no JWKS variable, so the library derives the JWKS URL from `SUPABASE_URL` |
+| `bunplur` | same server, own process | `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEYS` and `SUPABASE_SECRET_KEYS` as JSON objects holding `default` and the extra key |
+| `bunovr` | same server, own process | no `SUPABASE_*` variable at all; url, both key sets and the project's JWKS (240 bytes) passed through the `env` option |
+
+Each Bun process got only those variables plus `PATH` and `HOME`, and was
+started with `--no-env-file`; its `_runtime` answer (in `ER03-runtime`) lists
+the `SUPABASE_*` names it saw. Vantage: this machine in Singapore for every
+request; the Bun servers fetched the project's JWKS over the internet.
+
+Fixtures are those of ER01 (same code paths): a real user token, a real expired
+token (issued under `jwt_exp` 300, used after its `exp`), a third-party token
+from a registered issuer, a foreign ES256 token, a legacy HS256 token, the
+legacy anon and service_role keys, and the `default` publishable and secret
+keys. Added for ER03: one extra publishable key named `web_app` and one extra
+secret key named `automations`, created through `POST /v1/projects/{ref}/api-keys`.
+
+### The docs' example key name is refused
+
+The package docs use `web` as the example name (`publishable:web`). Creating a
+publishable key with that name answered HTTP 400 `name: Too small: expected
+string to have >=4 characters` in both runs (`ER03-keys`,
+`docs_example_name_create_status`). `web_app` (from the package README) and
+`automations` were created with HTTP 201.
+
+### Base matrix: 14 credentials x 5 modes, per target
+
+| target | docs-stated cells that differ from the docs (run A / run B, 2 passes each) | docs-silent cells | cells that differ between passes | cells that differ from `ef`, same run, pass 1 |
+|---|---|---|---|---|
+| `ef` | 0 / 0 | 26 of 70 | 0 / 0 | - |
+| `bunsing` | 0 / 0 | 26 of 70 | 0 / 0 | 5 of 70 |
+| `bunplur` | 0 / 0 | 26 of 70 | 0 / 0 | 5 of 70 |
+| `bunovr` | 0 / 0 | 26 of 70 | 0 / 0 | 5 of 70 |
+
+The 5 cells that differ from the Edge Function are the `unknown_secret` row (a
+well-formed `sb_secret_` key no project issued), on every Bun target: the Edge
+Function gateway answers `401 gw:Invalid API key` in every mode, the Bun server
+answers `200 ran:none` in `none`, `401 lib:UNUSABLE_CREDENTIAL` in `user` and
+`401 lib:INVALID_API_KEY` in `secret`, `publishable` and `['user','secret']`.
+This is the same row, with the same Worker-side values, that ER01 found between
+the Edge Function and the Workers runtime. A real user token with no `apikey`
+ran in `user` mode on all three Bun configurations (`200 ran:user`), including
+`bunsing`, where the JWKS URL was derived, not set.
+
+### Named-key matrix: 8 credentials x 10 `auth` options, per target
+
+Credentials: the `default` publishable key, the `web_app` publishable key, the
+`default` secret key, the `automations` secret key, the unknown `sb_secret_`
+key, a user token alone, a user token with the `web_app` publishable key, and
+nothing. The handler reports `ctx.authKeyName`, so a cell that ran names the key
+that matched (`200 ran:secret/automations`).
+
+On `ef`, `bunplur` and `bunovr`: 0 docs-stated cells differed from the docs in
+either run (77 docs-stated cells of 80, 2 passes each), 0 cells differed
+between passes, and the Bun cells differed from the `ef` cells only in the
+`unknown_secret` row (10 of 80: `401 gw:Invalid API key` on the Edge Function;
+on Bun `401 lib:INVALID_API_KEY`, or `500 lib:NO_KEYS_CONFIGURED` for the three
+options containing the name `nokey`, which is not configured). The cells, from
+`ER03-ef-n_*` in run B (run A identical):
+
+The `unknown_secret` column is left out: on the Edge Function it was
+`401 gw:Invalid API key` in every option, both runs.
+
+| `auth` | `default` pub | `web_app` pub | `default` secret | `automations` secret | user token alone | user token + `web_app` pub | nothing |
+|---|---|---|---|---|---|---|---|
+| `'publishable'` | 200 ran:publishable/default | 401 lib:INVALID_API_KEY | 401 lib:INVALID_API_KEY | 401 lib:INVALID_API_KEY | 401 lib:INVALID_CREDENTIALS | 401 lib:INVALID_API_KEY | 401 lib:MISSING_CREDENTIALS |
+| `'publishable:web_app'` | 401 lib:INVALID_API_KEY | 200 ran:publishable/web_app | 401 lib:INVALID_API_KEY | 401 lib:INVALID_API_KEY | 401 lib:INVALID_CREDENTIALS | 200 ran:publishable/web_app | 401 lib:MISSING_CREDENTIALS |
+| `'publishable:*'` | 200 ran:publishable/default | 200 ran:publishable/web_app | 401 lib:INVALID_API_KEY | 401 lib:INVALID_API_KEY | 401 lib:INVALID_CREDENTIALS | 200 ran:publishable/web_app | 401 lib:MISSING_CREDENTIALS |
+| `'publishable:nokey'` | 500 lib:NO_KEYS_CONFIGURED | 500 lib:NO_KEYS_CONFIGURED | 500 lib:NO_KEYS_CONFIGURED | 500 lib:NO_KEYS_CONFIGURED | 401 lib:INVALID_CREDENTIALS | 500 lib:NO_KEYS_CONFIGURED | 401 lib:MISSING_CREDENTIALS |
+| `'secret'` | 401 lib:INVALID_API_KEY | 401 lib:INVALID_API_KEY | 200 ran:secret/default | 401 lib:INVALID_API_KEY | 401 lib:INVALID_CREDENTIALS | 401 lib:INVALID_API_KEY | 401 lib:MISSING_CREDENTIALS |
+| `'secret:automations'` | 401 lib:INVALID_API_KEY | 401 lib:INVALID_API_KEY | 401 lib:INVALID_API_KEY | 200 ran:secret/automations | 401 lib:INVALID_CREDENTIALS | 401 lib:INVALID_API_KEY | 401 lib:MISSING_CREDENTIALS |
+| `'secret:*'` | 401 lib:INVALID_API_KEY | 401 lib:INVALID_API_KEY | 200 ran:secret/default | 200 ran:secret/automations | 401 lib:INVALID_CREDENTIALS | 401 lib:INVALID_API_KEY | 401 lib:MISSING_CREDENTIALS |
+| `'secret:nokey'` | 500 lib:NO_KEYS_CONFIGURED | 500 lib:NO_KEYS_CONFIGURED | 500 lib:NO_KEYS_CONFIGURED | 500 lib:NO_KEYS_CONFIGURED | 401 lib:INVALID_CREDENTIALS | 500 lib:NO_KEYS_CONFIGURED | 401 lib:MISSING_CREDENTIALS |
+| `['user','publishable:web_app']` | 401 lib:INVALID_API_KEY | 200 ran:publishable/web_app | 401 lib:INVALID_API_KEY | 401 lib:INVALID_API_KEY | 200 ran:user | 200 ran:user | 401 lib:MISSING_CREDENTIALS |
+| `['publishable:nokey','secret']` | 500 lib:NO_KEYS_CONFIGURED | 500 lib:NO_KEYS_CONFIGURED | 200 ran:secret/default | 500 lib:NO_KEYS_CONFIGURED | 401 lib:INVALID_CREDENTIALS | 500 lib:NO_KEYS_CONFIGURED | 401 lib:MISSING_CREDENTIALS |
+
+What the cells add to the docs:
+
+- A named key sent to a bare mode is refused with `INVALID_API_KEY`, and the
+  body's `hint` names the key and the modes that would take it (verbatim in the
+  artifact, `ER03-ef-n_sec_bare`: "The key is the secret key named
+  \"automations\", but auth: 'secret' accepts only the key named \"default\".
+  Use auth: 'secret:automations' to accept that key, or auth: 'secret:*' to
+  accept any secret key."), with `details.matchedKeyName` "automations". This
+  is what the docs say.
+- A name that is not configured answers `500 NO_KEYS_CONFIGURED` only when an
+  `apikey` is sent; a request with only a user token answers
+  `401 INVALID_CREDENTIALS` and one with nothing `401 MISSING_CREDENTIALS`.
+  In `['publishable:nokey','secret']` the `default` secret key ran, as the docs
+  say; the `automations` secret key, which matches neither mode, got the
+  `500 NO_KEYS_CONFIGURED` of the unreachable mode, not the
+  `401 INVALID_API_KEY` a bare `'secret'` gives it.
+- In the publishable-only options a user token next to the named publishable
+  key did not change the outcome: `200 ran:publishable/web_app`. The docs do not
+  say whether those modes read the bearer (the 1 docs-silent cell in each).
+- `bunsing`, which only has the singular variables, holds one key per kind
+  under `default`: `'publishable:web_app'` and `'secret:automations'` answered
+  `500 NO_KEYS_CONFIGURED` to every request that carried an `apikey`, `:*`
+  accepted the `default` key and refused the named one (`401 INVALID_API_KEY`),
+  and in `['user','publishable:web_app']` the `web_app` publishable key alone
+  answered `500 NO_KEYS_CONFIGURED`. Those five cells are the 10
+  docs-differing observations (5 cells x 2 passes) on that target, and 27 of
+  its 80 cells differ from `ef`. A server given only `SUPABASE_SECRET_KEY` therefore cannot
+  check a named key; it needs the plural variable or `env.secretKeys`.
+
+### Does a running Edge Function see a key created after its deploy?
+
+The Edge Function was deployed and answering before the two extra keys were
+created; the module then read the injected key names (`?mode=_env`) every
+10 s for 180 s, and redeployed if both names had not appeared. A time in the
+table is the first poll that showed the name, so it is an upper bound at about
+10 s resolution; the poll at 3 s after the create calls showed neither name in
+either run.
+
+| run | names before | publishable `web_app` seen | secret `automations` seen | redeploy |
+|---|---|---|---|---|
+| A | `default` / `default` | by 16 s after the create calls began | by 16 s | not needed |
+| B | `default` / `default` | by 15 s | not within 180 s (18 polls) | HTTP 201; both names by 5 s after the redeploy call (first poll) |
+
+Each `_env` answer carried a different module boot time (one per poll, in the
+`ER03-keys` evidence), so each poll was served by a freshly loaded function and
+the stale secret key set in run B was not one long-lived instance holding old
+variables. Two readings, not separated: the platform pushes new
+key names into a running deployment with a variable lag (run A both by 16 s;
+run B the secret name not within 180 s), or the push is triggered by an event
+that run B's secret-key create did not raise, and only a redeploy re-reads the
+key set. One observation each way. The named matrices ran after both names were visible,
+so they are not affected.
+
+### Not run
+
+- Vercel: no Vercel credential is available to the lab, so neither a Vercel
+  function nor the Supabase Vercel integration's `SUPABASE_SECRET_KEY` sync
+  (which the docs say tracks the newest secret key) was run. The library side
+  of that case is in the table: the newest key, `automations`, sent to bare
+  `'secret'` on the Edge Function gets `401 INVALID_API_KEY` with the hint
+  above, and `'secret:*'` accepts it.
+- Bun behind a proxy or a hosting platform, Node, Deno outside Edge Functions;
+  a request rate or latency; `verify_jwt` true with named keys; revoking or
+  rotating a named key; legacy keys disabled.
+
+### Cleanup
+
+Each module run deleted its project (`ER03z`: `project delete 200`, issuer
+delete 200, 3 Bun processes stopped). After the last run a
+`GET /v1/projects` listing (08:54 UTC, console check, not published) showed
+none of the four projects these runs created.
