@@ -19,7 +19,7 @@ restart", was `[doc]` only).
 | LO01 | read-only, no credential: the shape of status.supabase.com `components.json` and `incidents.json` (region names repeated 10 to 11 times, no region field on incidents, no `unresolved.json`), the gate's decision per region now, and a replay of the incident feed through the gate |
 | LO03 | create through `createWithFallback` ([unknown region, ap-southeast-1], then two plain creates): status and body of requests that must fail, orphan check, status transitions and seconds to `ACTIVE_HEALTHY` (n=3), delete-to-gone |
 | LO04 | `POST /v1/projects` whose response the caller abandoned, then the identical request re-sent: duplicate or name collision |
-| LO05 | restart envelope: one Micro project restarted 5 times behind the gate, REST, Auth, Storage, pooler (6543) and direct (5432) sampled at 500 ms; per-path p50 and max of first failure and outage window; a restart refused or accepted inside the post-create window; a second restart sent while one is in flight |
+| LO05 | restart envelope: one Micro project restarted 5 times behind the gate, REST, Auth, Storage, pooler (6543) and direct (5432) sampled at 500 ms, plus since 2026-10-23 a Realtime handshake and the data-path probes `rest_read` and `realtime_join` (the REST probe before that date answered at the HTTP tier only, see RUNLOG); per-path p50 and max of first failure and outage window; a restart refused or accepted inside the post-create window; a second restart sent while one is in flight |
 
 LO02 is not used. The restart module first ran under that id, failed at
 readiness (the direct probe's name lookup, see `lib/probes.ts` and RUNLOG), and

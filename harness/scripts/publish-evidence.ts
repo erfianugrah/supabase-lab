@@ -51,7 +51,17 @@ export function redact(text: string, vantage: string[] = [], other: string[] = [
   // addresses as deliberate test inputs.
   const sub = (a: string, label: string) => {
     const esc = a.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    // An IPv6 literal followed by `:port` (`connect ECONNREFUSED <v6>:5432`)
+    // fails the trailing guard below because the port's digits are hex; match
+    // that form first, a port being 1-5 digits that end the token (2026-10-23).
+    if (a.includes(":")) {
+      out = out.replace(new RegExp(`(?<![0-9a-fA-F.:])${esc}:(\\d{1,5})(?![0-9a-fA-F.:])`, "g"), `${label}:$1`);
+    }
     out = out.replace(new RegExp(`(?<![0-9a-fA-F.:])${esc}(?![0-9a-fA-F.:]*[0-9a-fA-F])`, "g"), label);
+    // Supavisor's allow-list refusal prints the client address as an Erlang
+    // tuple, `{192, 0, 2, 4}`, which the dotted match above never sees.
+    const v4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(a);
+    if (v4) out = out.replace(new RegExp(`\\{${v4[1]},\\s*${v4[2]},\\s*${v4[3]},\\s*${v4[4]}\\}`, "g"), `{${label}}`);
   };
   for (const a of vantage.filter(Boolean)) sub(a, "<vantage-ip>");
   for (const a of other.filter(Boolean)) sub(a, "<addr>");

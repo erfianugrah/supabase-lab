@@ -199,7 +199,15 @@ runs). Both runs:
   hop, so a TLS client is refused while that hop catches up; 3/17 in the
   rerun, 13 s, `Failed to connect to database: {:error, :econnrefused}` (the
   restart). Switching off: 1/13 both times, 1 s, `the database system is
-  shutting down`. The REST probe never failed.
+  shutting down`. The REST probe never failed. (Correction 2026-10-23,
+  #204: that probe was medium-serverless's anon `GET /rest/v1/`, which the
+  API gateway answers with 401 before PostgREST or the database is reached,
+  and which counted any status below 500 as up, so it says the HTTP tier
+  answered, not that reads worked through the restart. Measured with the
+  HTTP-only probe, not re-run. platform-downtime's 2026-10-23 data-path
+  re-measure ran two full project restarts (D01) and saw REST reads fail for
+  194 and 247 s; TL16's switch restarts only Postgres, and that case was not
+  re-measured.)
 - Plaintext (`sslmode=disable`), rerun: refused on all four paths at the
   first poll after the PUT returned - 3 s after the PUT was sent, with the PUT
   taking 2537 ms and a 3 s poll interval. The refusal text per path:

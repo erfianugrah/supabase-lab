@@ -124,6 +124,16 @@ describe("redact removes every identifier class from a published artifact", () =
 // other artifacts deliberately carry documentation-range addresses as test
 // inputs (x-forwarded-for=203.0.113.9), and a shape rule would erase them.
 describe("redact removes the addresses it is told to, and only those", () => {
+  test("the Erlang tuple form Supavisor prints becomes {<vantage-ip>}", () => {
+    expect(redact("(EADDRNOTALLOWED) address not in tenant allow_list: {192, 0, 2, 44}", ["192.0.2.44"])).toBe(
+      "(EADDRNOTALLOWED) address not in tenant allow_list: {<vantage-ip>}",
+    );
+    expect(redact("allow_list: {192, 0, 2, 4}", ["192.0.2.44"])).toBe("allow_list: {192, 0, 2, 4}");
+  });
+  test("a listed IPv6 literal followed by :port is still replaced", () => {
+    expect(redact("connect ECONNREFUSED 2001:db8:1:2::abcd:5432", [], ["2001:db8:1:2::abcd"])).toBe("connect ECONNREFUSED <addr>:5432");
+    expect(redact("2001:db8:1:2::abcd:5432:1", [], ["2001:db8:1:2::abcd"])).toBe("2001:db8:1:2::abcd:5432:1");
+  });
   test("a listed IPv4 literal becomes <vantage-ip>", () => {
     expect(redact('no pg_hba.conf entry for host "192.0.2.44", user "postgres"', ["192.0.2.44"])).toBe('no pg_hba.conf entry for host "<vantage-ip>", user "postgres"');
   });
