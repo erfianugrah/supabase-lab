@@ -7,6 +7,7 @@
  * the session pooler with search_path=auth). Every helper takes the base URL
  * so the same probe runs against either side, and the report reads as pairs.
  */
+import { createHmac } from "node:crypto";
 import type { Ctx } from "../../../harness/src/types";
 
 export interface Probe {
@@ -185,3 +186,59 @@ export async function restRead(ctx: Ctx, keys: Keys, accessToken: string): Promi
 
 export const randomEmail = (tag: string) => `sha.${tag}.${Date.now()}@example.com`;
 export const randomPassword = () => `Pvlab-${crypto.randomUUID().slice(0, 12)}!A1`;
+
+// ---------------------------------------------------------------------------
+// SH07: which layer refused, forged apikeys, and the time series reading
+// ---------------------------------------------------------------------------
+
+/**
+ * Which layer answered a refusal on the Data API path. A `PGRST` code means
+ * the request got past the gateway and PostgREST refused it; an api-key
+ * message without one is the gateway. Anything else stays `other` so an
+ * unseen body shape is read from the raw text rather than filed under a layer.
+ */
+export function refusedBy(p: Probe): "" | "gateway" | "postgrest" | "other" {
+  if (p.status >= 200 && p.status < 300) return "";
+  const code = String(p.json.code ?? "");
+  if (/^PGRST/.test(code)) return "postgrest";
+  const msg = String(p.json.message ?? p.json.msg ?? p.json.error ?? "");
+  if ((p.status === 401 || p.status === 403) && /api key|legacy/i.test(msg)) return "gateway";
+  return "other";
+}
+
+/**
+ * Same header, claims merged with `patch`, signed HS256 under `secret`. With
+ * a random secret: a JWT the platform never issued. With the project's own
+ * secret and a changed claim: a validly signed key whose string differs from
+ * the issued one, which separates a value match from a signature check.
+ */
+export function resignHs256(token: string, secret: string, patch: Record<string, unknown> = {}): string {
+  const [h, c0] = token.split(".");
+  const c = Object.keys(patch).length
+    ? Buffer.from(JSON.stringify({ ...(JSON.parse(Buffer.from(c0 ?? "", "base64url").toString("utf8")) as Record<string, unknown>), ...patch })).toString("base64url")
+    : c0;
+  const sig = createHmac("sha256", secret).update(`${h}.${c}`).digest("base64url");
+  return `${h}.${c}.${sig}`;
+}
+
+export interface Mark {
+  t: number;
+  status: number;
+}
+
+/**
+ * Read a status series taken at increasing delays. `flipAt` is the first mark
+ * from which every later mark is non-200; a series that goes back to 200
+ * after a refusal is non-monotonic and has no flip.
+ */
+export function transition(series: Mark[]): { label: string; flipAt: number | null; monotonic: boolean } {
+  const ok = series.map((m) => m.status === 200);
+  const firstBad = ok.indexOf(false);
+  if (firstBad === -1) return { label: "200 throughout", flipAt: null, monotonic: true };
+  if (ok.slice(firstBad).some(Boolean)) {
+    return { label: `non-monotonic: ${series.map((m) => `${m.t}:${m.status}`).join(" ")}`, flipAt: null, monotonic: false };
+  }
+  const at = series[firstBad]!.t;
+  if (firstBad === 0) return { label: `non-200 from the first mark (${at} s)`, flipAt: at, monotonic: true };
+  return { label: `flipped between ${series[firstBad - 1]!.t} s and ${at} s`, flipAt: at, monotonic: true };
+}

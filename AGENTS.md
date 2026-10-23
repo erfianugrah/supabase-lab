@@ -1704,11 +1704,16 @@ history.
   and STILL read 200 from PostgREST after the legacy HS256 key was revoked
   (with the legacy anon apikey and with `sb_publishable_`). Managed
   `/auth/v1/user` refuses third-party tokens (`403 bad_jwt`). The anon JWT
-  under the revoked key still passed as apikey in SH06 (probed 10 s after the
-  revoke) but not as bearer in SH05 (within 4 s): either the gateway matches
-  the apikey by value and PostgREST verifies only the bearer, or a gateway
-  cache had not expired yet (L05 measured ~45 s for the legacy-key disable);
-  not separated.
+  under the revoked key still passes as apikey with an ES256 bearer and no
+  cache window explains it (SH07, 2026-10-23, n=3): 200 at every mark from 10
+  to 600 s and after a project restart (661 to 672 s). The managed gateway
+  refused (`Invalid API key`) a JWT with the issued claims re-signed under a
+  random secret and, before and after the revoke (n=2), one signed with the
+  project's own legacy secret with `iat` + 1, so it accepts only the issued
+  key: a valid signature is not enough (V) and the issued claims with another
+  signature are refused (F). Whether it compares the whole string or checks
+  the claims and the signature was not separated.
+  PostgREST refuses the same anon key as a bearer (`401 PGRST301`) from 10 s.
 - Storage and Realtime verify a third-party token themselves on managed
   (third-party-auth TPA05/TPA06, 2026-10-23); not re-run on this self-hosted
   stack.
