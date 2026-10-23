@@ -490,3 +490,13 @@ the seed was added. The other three degraders read as before: `/api-keys` 1524
 -> 2 bytes, `/config/database/pooler` 568 -> 2, `/advisors/performance` 590 ->
 12. No Data API request touches `z01_rls_off`; the grant's evidence is the
 seed's 201 and the advisor finding it produced.
+
+## 2026-10-23 - `/advisors/security` added to the expected degraders (#174)
+
+Code change only, no new run. `SILENT_DEGRADERS` in `lib/surface.ts` now lists
+four endpoints: the three from 2026-09-09 plus `/advisors/security`, from the
+2026-10-13 run above (200 with 618 bytes awake, 200 with 12 bytes parked).
+Expected, not run: given the same readings, the next Z01 run passes Z01e with
+four known degraders, and a fifth endpoint still fails it as new. The
+2026-10-13 FAIL stays recorded as measured; its cause was the stale expected
+list in the module.

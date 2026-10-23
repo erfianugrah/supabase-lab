@@ -1838,11 +1838,13 @@ every run, printing uncovered operations by name.
   production free-plan projects that auto-paused read NXDOMAIN on both
   resolvers, identical to the manual-pause reading. The control project carries
   that result - nothing touched it after its create call.
-- **Three endpoints answer `200` with an empty body when parked** after
+- **Four endpoints answer `200` with an empty body when parked** after
   answering `200` with content while awake: `/api-keys` (1524 B to `[]`),
   `/advisors/performance` (763 B to `{"lints":[]}`), `/config/database/pooler`
-  (574 B to `[]`). A status-code check cannot tell "nothing to report" from
-  "could not look", so a fleet-wide advisor sweep scores every parked tenant
+  (574 B to `[]`), all 2026-09-09; and `/advisors/security` (618 B to
+  `{"lints":[]}`, 2026-10-13, n=1, the first run whose seed table carried an
+  anon grant and so a security finding). A status-code check cannot tell
+  "nothing to report" from "could not look", so a fleet-wide advisor sweep scores every parked tenant
   clean. Z01 seeds a real advisor finding before its awake pass so the check
   has something to lose; an earlier size-threshold version reported eight false
   positives on endpoints that are legitimately empty on a fresh project.

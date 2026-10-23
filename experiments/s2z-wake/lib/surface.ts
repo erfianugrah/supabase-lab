@@ -150,14 +150,18 @@ export const PARAMLESS_GETS: string[] = [
  * this check flagged any 200-with-small-body while parked and reported eight
  * "new" degraders on the first real run: `/actions`, `/branches`, `/functions`,
  * `/secrets` and friends are legitimately `[]` on a fresh project, awake or
- * parked. `/advisors/security` was in this list for the same bad reason -
- * a fresh project has no security lints, so it reads `{"lints":[]}` either way
- * and this experiment cannot tell whether parking silenced it.
+ * parked. `/advisors/security` was first dropped from this list for the same
+ * bad reason - a fresh project has no security lints, so it read
+ * `{"lints":[]}` either way. Since the advisor seed grants anon access to its
+ * RLS-off table (2026-10-13) the awake pass has a security finding to lose, and
+ * it does: 618 B awake, 12 B parked.
  *
- * Measured 2026-09-09 on a project seeded with a real advisor finding.
+ * Measured 2026-09-09 (first three) and 2026-10-13 (`/advisors/security`) on a
+ * project seeded with a real advisor finding.
  */
 export const SILENT_DEGRADERS = [
   "/api-keys",
   "/advisors/performance",
+  "/advisors/security",
   "/config/database/pooler",
 ] as const;
