@@ -36,8 +36,49 @@ export function parseEnv(text: string): Record<string, string> {
   return out;
 }
 
+/**
+ * Compose project of the stack under test: `supabase` (the name in the
+ * upstream file) unless `make ... SLOT=x` set COMPOSE_PROJECT_NAME to sd-x and
+ * passed it as PVLAB_ENDPOINT_PROJECT. A SLOT stack also has no fixed
+ * container names; `cname` maps the upstream names the modules use.
+ */
+let PROJECT = "supabase";
+export const projectName = (): string => PROJECT;
+export const setProject = (p: string): void => {
+  PROJECT = p || "supabase";
+};
+
+/** Upstream container_name -> compose service, for stacks whose fixed names were removed (SLOT). */
+const UPSTREAM_NAMES: Record<string, string> = {
+  "supabase-studio": "studio",
+  "supabase-envoy": "api-gw",
+  "supabase-auth": "auth",
+  "supabase-rest": "rest",
+  "realtime-dev.supabase-realtime": "realtime",
+  "supabase-storage": "storage",
+  "supabase-imgproxy": "imgproxy",
+  "supabase-meta": "meta",
+  "supabase-edge-functions": "functions",
+  "supabase-db": "db",
+  "supabase-pooler": "supavisor",
+  "supabase-analytics": "analytics",
+  "supabase-vector": "vector",
+};
+
+/**
+ * The container behind an upstream container name in the stack under test:
+ * the name itself on the default `supabase` project, `<project>-<service>-1`
+ * on a SLOT stack (whose container_name lines are commented out).
+ */
+export function cname(name: string): string {
+  if (PROJECT === "supabase") return name;
+  const svc = UPSTREAM_NAMES[name];
+  return svc ? `${PROJECT}-${svc}-1` : name;
+}
+
 /** The rig described by the run's endpoints, or null with a reason. */
 export function rigOf(ctx: Ctx): { rig: Rig } | { skip: string } {
+  setProject(ctx.endpoints["project"] ?? "");
   const dir = ctx.endpoints["stack_dir"] ?? "";
   const gw = ctx.endpoints["gw"] ?? "";
   if (!dir || !gw) return { skip: "PVLAB_ENDPOINT_STACK_DIR / PVLAB_ENDPOINT_GW not set (run `make stack up`, then `make probe`)" };
@@ -97,12 +138,13 @@ export const basic = (rig: Rig): Record<string, string> => ({
   authorization: `Basic ${Buffer.from(`${rig.env.DASHBOARD_USERNAME}:${rig.env.DASHBOARD_PASSWORD}`).toString("base64")}`,
 });
 
-/** The three compose layers this experiment stacks; every call names the same set it started with. */
-export type Layer = "logs" | "saml" | "kong";
+/** The compose layers this experiment stacks; every call names the same set it started with. */
+export type Layer = "logs" | "saml" | "kong" | "amd64";
 const LAYER_FILE: Record<Layer, string> = {
   logs: "docker-compose.logs.yml",
   saml: "", // resolved against this experiment's compose/ dir
   kong: "docker-compose.kong.yml",
+  amd64: "docker-compose.amd64.yml", // generated into the stack dir by lib/amd64-layer.ts
 };
 
 export function files(rig: Rig, layers: Layer[]): string[] {
@@ -135,7 +177,7 @@ export async function sh(cmd: string[]): Promise<{ code: number; out: string; er
 
 /** Names of running containers in the stack's compose project. */
 export async function runningContainers(): Promise<{ name: string; image: string; ports: string }[]> {
-  const r = await sh(["docker", "ps", "--filter", "label=com.docker.compose.project=supabase", "--format", "{{.Names}}\t{{.Image}}\t{{.Ports}}"]);
+  const r = await sh(["docker", "ps", "--filter", `label=com.docker.compose.project=${PROJECT}`, "--format", "{{.Names}}\t{{.Image}}\t{{.Ports}}"]);
   return r.out
     .split("\n")
     .filter(Boolean)
@@ -147,7 +189,7 @@ export async function runningContainers(): Promise<{ name: string; image: string
 
 /** `docker inspect` of one container, parsed. */
 export async function inspect(name: string): Promise<any | null> {
-  const r = await sh(["docker", "inspect", name]);
+  const r = await sh(["docker", "inspect", cname(name)]);
   if (r.code !== 0) return null;
   try {
     return JSON.parse(r.out)[0];
@@ -168,7 +210,7 @@ export function envOf(info: any): Record<string, string> {
 
 /** psql as supabase_admin over the container's unix socket. Rows as arrays of text. */
 export async function sql(query: string, user = "supabase_admin"): Promise<string[][]> {
-  const r = await sh(["docker", "exec", "supabase-db", "psql", "-U", user, "-d", "postgres", "-At", "-F", "\t", "-c", query]);
+  const r = await sh(["docker", "exec", cname("supabase-db"), "psql", "-U", user, "-d", "postgres", "-At", "-F", "\t", "-c", query]);
   if (r.code !== 0) throw new Error(`psql: ${r.err.trim().slice(0, 300)}`);
   return r.out
     .split("\n")
@@ -216,10 +258,13 @@ export async function tcpOpen(host: string, port: number, ms = 3000): Promise<bo
 export async function activeLayers(): Promise<Layer[]> {
   const names = (await runningContainers()).map((c) => c.name);
   const layers: Layer[] = [];
-  if (names.includes("supabase-analytics")) layers.push("logs");
+  if (names.includes(cname("supabase-analytics"))) layers.push("logs");
   const auth = await inspect("supabase-auth");
   if (envOf(auth).GOTRUE_SAML_ENABLED === "true") layers.push("saml");
   if (names.includes("supabase-kong")) layers.push("kong");
+  // SD12: a stack started with the generated amd64 layer keeps it on recreate.
+  const fnImage = String((await inspect("supabase-edge-functions"))?.Image ?? "");
+  if (fnImage && (await sh(["docker", "image", "inspect", "-f", "{{.Architecture}}", fnImage])).out.trim() === "amd64") layers.push("amd64");
   return layers;
 }
 
