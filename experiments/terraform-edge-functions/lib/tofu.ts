@@ -53,7 +53,14 @@ export interface TofuRun {
   ms: number;
 }
 
-export async function tofu(dir: string, args: string[], pat: string, timeoutMs = 900_000): Promise<TofuRun> {
+/** `env` adds variables for this run only (TF_LOG, SUPABASE_API_ENDPOINT for TF06's recording proxy). */
+export async function tofu(
+  dir: string,
+  args: string[],
+  pat: string,
+  timeoutMs = 900_000,
+  env: Record<string, string> = {},
+): Promise<TofuRun> {
   const cache = join(tmpdir(), "pvlab-tf-plugin-cache");
   await mkdir(cache, { recursive: true });
   const t0 = performance.now();
@@ -64,6 +71,7 @@ export async function tofu(dir: string, args: string[], pat: string, timeoutMs =
       SUPABASE_ACCESS_TOKEN: pat,
       TF_IN_AUTOMATION: "1",
       TF_PLUGIN_CACHE_DIR: cache,
+      ...env,
     },
     stdout: "pipe",
     stderr: "pipe",

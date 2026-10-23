@@ -42,6 +42,20 @@ and what the Management API lists afterwards.
 | TF05a, TF05b | the same 24 functions straight through `POST /functions/deploy`, 24 in flight and 1 in flight |
 | TF01z | cleanup: functions, secrets, project |
 
+A second module, `tests/tf06-parallel-loss-trace.ts`, id `TF06`, watches the
+loss: per round, 24 fresh slugs applied at `-parallelism=24` (or posted by
+the module itself, all in flight) through a recording proxy on 127.0.0.1
+(`SUPABASE_API_ENDPOINT`), while a poller reads the listing and
+`GET /functions/{slug}` every 250 ms; then a re-plan through the proxy,
+per-slug GET and invoke (body tag checked), and a listing at +299 s.
+
+| id | what it does |
+|---|---|
+| TF06a, TF06c | provider rounds: the wire (POSTs, statuses, 201 bodies), the listed set over time, TF_LOG counts |
+| TF06b, TF06d | after those rounds: refresh GETs and plan, per-slug GET, invocations, late listing |
+| TF06e, TF06f | the same with the module sending the 24 deploys, no provider |
+| TF06z | cleanup: project |
+
 ## Run
 
 ```bash
@@ -53,4 +67,10 @@ module took 49 minutes in the last complete run (2026-10-10). `PVLAB_REF=<ref>` 
 project (kept; only `pvlab-tf-*` functions and `TFEF_*` secrets are removed).
 `make lock` refreshes `tf/.terraform.lock.hcl`.
 
-Results and caveats: `RUNLOG.md`; run artifacts in `out/2026-10-10/` (`make publish-evidence RUN=...` writes there).
+`make probe ONLY=TF06` runs the loss trace (16 minutes with the default three rounds on 2026-10-23, one project).
+`PVLAB_TF_LOG_DIR` sets where the raw TF_LOG files go (default: the OS temp
+dir; they carry the project ref, keep them out of the repo),
+`PVLAB_REF_LOG` gets the created ref appended, and `TF06_ROUNDS` (default
+`tofu,tofu,api`) sets the rounds.
+
+Results and caveats: `RUNLOG.md`; run artifacts in `out/2026-10-10/` (TF01) and `out/2026-10-23/` (TF06) (`make publish-evidence RUN=...` writes there).
