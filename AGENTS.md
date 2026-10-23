@@ -1549,7 +1549,7 @@ Open work lives on the task board (project work-supabase-lab); this section keep
   egress stays open. Enable webhooks via `POST
   /database/webhooks/enable` (201). Evidence `out/2026-10-23/`.
 
-## experiments/edge-function-limits - key facts (validated 2026-09-02, micro, Pro org)
+## experiments/edge-function-limits - key facts (validated 2026-09-02, micro, Pro org; EF09, EF13, EF14 2026-10-23 on a Pro and a Free project)
 
 One project, no AWS. Separates the ceilings that get reported as one "Edge
 Functions limit". Docs figures pinned in `lib/docs.ts` with the read date; the
@@ -1586,12 +1586,21 @@ RUNLOG has the module table and per-row evidence.
   are relative to `supabase/` (`./functions/<name>/...`), and a wrong glob
   ships a 654 B bundle silently. `npm:sharp` bundles (201) and 500s at run time.
 - **Runtime ceilings**: a 3 s CPU loop and a 400 MB allocation both answer
-  `546 WORKER_RESOURCE_LIMIT` with identical bodies (500 ms and 64 MB pass;
-  the docs place the limits at 2 s and 256 MB, not measured to the edge) -
-  indistinguishable from the response. Idle: edge-resilience W13. **Active
-  wall clock (EF09)**: a stream ticking every 5 s was cut after 395 s (paid
-  project; docs 400 s), seen by the client as a truncated body, not an HTTP
-  error.
+  `546 WORKER_RESOURCE_LIMIT` with identical bodies (500 ms and 64 MB pass) -
+  indistinguishable from the response. To the edge (EF13, 2026-10-23, n = 3
+  per rung, Pro and Free alike): a busy loop of 1950 ms answered, 2000 ms
+  got 546 (docs 2 s; the loop's ms do not include any CPU the runtime may
+  count for booting the isolate, not measured); 240 MiB
+  allocated answered, 248 MiB got 546 on 3/3 except ArrayBuffer on Free (2/3
+  answered, heap 7 + external 251 = 258 MiB on those two; whether the
+  runtime samples memory or counts more than heap plus external was not
+  probed), docs 256MB (MB or MiB not stated). One
+  refusal of 18 on Free answered 503. Idle: edge-resilience W13. **Active
+  wall clock (EF09)**: a stream ticking every 5 s was cut after its tick at
+  395 s on Pro (2026-09-02 n = 1; 2026-10-23 395/396/395 s) and 145 s on Free
+  (2026-10-23, 3/3), docs 400 s / 150 s, seen by the client as a truncated
+  body, not an HTTP error. Every request ran on its own fresh isolate, so the
+  docs' per-worker sharing case is still not run.
 - **Log limits bite exactly (EF08)**: a 12,019-char line stored as 10,000
   chars + ` ....[truncated]`; 150 events in one invocation -> the first 100
   kept. Neither fails the invocation. Read back via the logs endpoint with
@@ -1599,11 +1608,25 @@ RUNLOG has the module table and per-row evidence.
   Retry your query.` to all four queries tried with neither
   `iso_timestamp_start` nor `iso_timestamp_end` (2026-09-02), the erfi.dev
   logs-endpoint guide's own SQL example among them.
-- **The recursive cap did not bite (EF10)**: ~110,600 nested calls/min for a
-  minute at concurrency 100 (docs ~5000/min); 27 refusals (13 outer, 14
+- **The recursive cap did not bite (EF10, 2026-09-02, docs then ~5000/min;
+  the docs changed 2026-09-23, see EF14)**: ~110,600 nested calls/min for a
+  minute at concurrency 100; 27 refusals (13 outer, 14
   inner) across 59,562 chains / ~119,000 nested calls answered
   `429 RATE_LIMIT_EXCEEDED "Too many requests. Re-try the request in 1
   seconds."`, nothing else refused.
+- **Nested-call budget (EF14, 2026-10-23, Pro and Free, docs since
+  2026-09-23: 30 per trace per 60 s)**: the 31st function-to-function
+  `fetch()` from one invocation throws `RateLimitError: Rate limit exceeded
+  for trace <id>. Retry after <n>ms.` (n 56,020 to 59,996) inside the caller (no HTTP
+  status), sequential or parallel, 18/18 fans of 40. A new invocation gets a
+  fresh 30; two concurrent invocations got 25 + 25; calls 31-36 after a 62 s
+  pause went through. Self-calling chains (one function, plain `fetch()`) did
+  NOT share a budget: depth 40 (40 hop calls) and depth 5 with 10 leaf calls
+  per hop (65 calls in one chain) completed without refusal; the docs'
+  A->B->C example across three distinct functions was not run. Two invocations with
+  the same client `traceparent` got 20 + 20; the budget's trace is not the
+  W3C trace id. Measured shape: 30 outbound calls per calling invocation per
+  60 s (per invocation vs per isolate not separated).
 - **Races repeated (EF11)**: delete-during-deploy x10 -> 8 healthy, 2 absent,
   every redeploy 201/200, 0 corrupted (the 2 absent slugs each had a delete in
   flight, so 201-then-absent is not counted as the third signature); same-slug

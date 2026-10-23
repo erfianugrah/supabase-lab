@@ -7,8 +7,9 @@ deploy path, with the platform's error verbatim - and, for the failures that
 are not limits at all, whether the functions actually landed.
 
 The documented figures are pinned in `lib/docs.ts` with the date they were
-read (2026-09-02). Every module compares the runtime against those constants,
-so `pvlab --diff` shows which side moved when they disagree.
+read (2026-09-02, re-read 2026-10-23: only the nested-call figure had
+changed). Every module compares the runtime against those constants, so
+`pvlab --diff` shows which side moved when they disagree.
 
 Full write-up: https://erfi.dev/reference/supabase-edge-function-limits/
 
@@ -24,10 +25,12 @@ Full write-up: https://erfi.dev/reference/supabase-edge-function-limits/
 | EF06 | destructive | Restrictions: HTML rewritten to text/plain, ports 25/587 blocked (443 control), Worker and node:vm unavailable, static files via API vs via CLI, `npm:sharp`. |
 | EF07 | destructive | Runtime ceilings: CPU 500 ms vs 3 s, memory 64 MB vs 400 MB. Idle timeout referenced to edge-resilience W13, not re-run. |
 | EF08 | destructive | The two log limits that reject nothing: a log line of 12,000 payload characters (12,019 sent with its marker) and a 150-event burst, read back through the Management API logs endpoint (`source = 'function_logs'`, with the time window the endpoint requires). |
-| EF09 | destructive | Wall clock on an ACTIVE request: a stream that ticks every 5 s asks for 450 s; where the platform cuts it. |
-| EF10 | destructive | The recursive-call cap (~5000 per minute in the docs): one minute of self-calling chains at concurrency 100, depth 2. |
+| EF09 | destructive | Wall clock on an ACTIVE request: a stream that ticks every 5 s asks for 450 s; where the platform cuts it. Since 2026-10-23 three 450 s streams per run, the org's plan read from the Management API, and each stream stamped with its isolate's id and age. |
+| EF10 | destructive | The recursive-call cap (~5000 per minute in the docs as read 2026-09-02): one minute of self-calling chains at concurrency 100, depth 2. |
 | EF11 | destructive | The metadata races repeated: delete during deploy x10 with a redeploy after each; same slug 4 concurrent x5. |
 | EF12 | destructive | Concurrency: no published per-project/per-function limit (per_worker policy); a CPU-exhausting request in a concurrent burst takes queued light requests down with it as 546. Control: light requests alone all 200. |
+| EF13 | destructive | CPU and memory to the edge: a busy-loop ladder 1000-3000 ms and two allocation ladders (ArrayBuffer, JS heap) 128-400 MiB, three requests per rung. |
+| EF14 | destructive | The nested-call budget as documented since 2026-09-23 (30 per trace per 60 s): sequential and parallel fans of 40, two traces at once, a depth-40 chain, a 62 s pause after call 30, a client-supplied `traceparent`, and a chain whose hops each fan out. |
 
 Pure logic (docs table, spec readers, the triage classifier) is unit tested:
 `make unit` (or `bun test experiments/edge-function-limits` at the root). The
@@ -41,6 +44,154 @@ classifier's tests include the strings the platform actually returned below.
    merged with 429.
 3. Whether anyone checked the functions landed rather than trusting the exit
    code. Exit 0 or 2xx with the function absent afterwards is `silent-loss`.
+
+## EF09 on Free and paid, EF13, EF14: 2026-10-23 (two fresh projects, ap-southeast-1)
+
+Two throwaway projects created through the Management API the same morning
+and deleted after the runs: project 1 in the Pro org (micro), project 2 in a
+Free org (the Free default size, not recorded). EF09 and EF13 read the
+org's plan from the Management API into `plan`; EF14 does not, so the
+project column in the table below is the operator's record for EF14. Docs
+re-read the
+same day: https://supabase.com/docs/guides/functions/limits and
+https://supabase.com/docs/guides/functions/recursive-functions. Every figure
+in `lib/docs.ts` read the same as on 2026-09-02 except the nested-call line,
+which supabase/supabase#50806 (merged 2026-09-23) changed from "~5000
+requests per minute" to "30 requests per trace, within a 60-second window",
+budgeted "per trace, not per project".
+
+Evidence, all in `out/2026-10-23/`:
+
+| artifact | project | modules |
+| --- | --- | --- |
+| `run-2026-10-23T08-13-07-430Z.json` | 2 (Free) | EF09 |
+| `run-2026-10-23T08-21-50-368Z.json` | 1 (Pro) | EF09 |
+| `run-2026-10-23T08-15-52-095Z.json` | 1 (Pro) | EF13, EF14 |
+| `run-2026-10-23T08-21-31-417Z.json` | 2 (Free) | EF13, EF14 |
+| `run-2026-10-23T08-13-07-398Z.json` | 1 (Pro) | EF14 first run, before EF14h existed |
+
+### Wall clock on an active request (EF09), Free and Pro, n = 3 each
+
+- Project 2 (Free): three 450 s streams ticking every 5 s each delivered
+  their last tick at 145 s (29 ticks) and the body failed at 150 s, seen by
+  the client as `ZlibError` on the response stream, as on 2026-09-02. The
+  30 s control completed (6 ticks).
+- Project 1 (Pro): last tick at 395, 396 and 395 s (79 ticks each), body
+  failed at 400, 401 and 400 s. Same shape as the single 2026-09-02 run
+  (last tick 395 s).
+- So the active request was cut between its last tick and the next one: in
+  (145 s, 150 s] on Free and within (395 s, 401 s] on Pro, against documented
+  figures of 150 s and 400 s.
+- Every stream, the controls included, reported an isolate 3 to 5 ms old
+  when the request arrived (`worker_age_at_start_ms`), and a different
+  isolate id each time. Each request booted its own isolate, so these runs
+  measure the wall clock of an isolate that served one request. The docs
+  define the figure per worker ("a worker can serve multiple requests"); the
+  shared warm-worker case did not arise and is still not run.
+
+### CPU and memory to the edge (EF13), Pro and Free, n = 3 per rung
+
+The over-limit response was the same on every refused request on both
+projects but one (below): `546 {"code":"WORKER_RESOURCE_LIMIT","message":"Function failed
+due to not having enough compute resources (please check logs)"}`. The
+requests that answered ran on fresh isolates (`served` 1
+on 103 of the 104 responses that answered 200; the exception, project 1's
+ArrayBuffer 160 MiB second pass, answered on an isolate serving its second
+request).
+
+- CPU busy loop (EF13a): 1950 ms answered 200 3/3, 2000 ms answered 546
+  3/3, on both projects; every rung up to 1950 passed and every rung from
+  2000 to 3000 failed, none mixed. One of the 18 refusals on project 2,
+  the 2250 ms rung's first pass, answered 503 instead of 546; its body was
+  not kept (the module recorded only the count of distinct refusal bodies,
+  2, and since this run also keeps each one). The loop's milliseconds are wall time
+  inside a tight loop; they do not include any CPU the runtime may count
+  for booting the isolate and evaluating the module (not measured). The bracket (1950, 2000] ms is consistent with the documented
+  2 s; the probe cannot say whether the budget is exactly 2000 ms.
+- Memory, ArrayBuffer (EF13b): project 1 (Pro): 240 MiB 3/3 ok, 248 MiB 0/3.
+  Project 2 (Free): 240 MiB 3/3, 248 MiB 2/3, 256 MiB and above 0/3. At
+  240 MiB the function's own `Deno.memoryUsage()` read heap 7 MiB and
+  external 243 MiB. The two successful 248 MiB requests on Free read
+  external 251 MiB with heap 7 MiB, 258 MiB in all (heap 7 + external 251),
+  more than the docs' 256MB read as MiB (the docs do not say which); the
+  same rung was refused 3/3 on Pro and on the third Free request. Whether
+  the runtime samples memory, or counts something other than heap plus
+  external, was not probed.
+- Memory, JS heap (EF13c): 240 MiB ok 3/3 and 248 MiB refused 3/3 on both
+  projects; at 240 MiB the reading was heap 247 to 252 MiB, external 3 MiB.
+- `Deno.memoryUsage().rss` read 0 in every response; heap and external are
+  populated.
+- Read for both: with the runtime's own baseline (about 7 MiB of heap
+  before the allocation), an allocation of about 240 MiB is the last rung
+  that passed on every request. The ladder steps are 8 MiB near the edge, so
+  the edge is bracketed to that step, not located.
+
+### The nested-call budget (EF14), Pro and Free
+
+Rows b, c, d, e, f and g ran in all three EF14 artifacts (n = 3 per row per
+artifact, 9 in all); row h ran in the second Pro artifact and the Free one
+(n = 3 each, 6 in all). Pro and Free gave the same outcome on every row.
+
+- Refusal shape: the 31st function-to-function `fetch()` from one invocation
+  threw inside the calling function, `RateLimitError: Rate limit exceeded for
+  trace <trace id>. Retry after 57179ms.` (retry figure from the first
+  artifact's EF14b1), with no HTTP response. This is the
+  `Deno.errors.RateLimitError` the recursive-functions page documents; the
+  2026-09-02 EF10 refusal (`429 RATE_LIMIT_EXCEEDED`, 1 s retry hint) was a
+  different limiter.
+- Sequential fan of 40 from one invocation (EF14b): 30 ok, calls 31 to 40
+  refused, 9/9. The refused call 31 returned 2,664 to 3,981 ms after the
+  fan started, with a retry hint of 56,020 to 57,337 ms. Parallel fan of 40
+  (EF14d): 30 ok, 10 refused, 9/9, retry hint 59,991 to 59,996 ms. Both
+  hints point at about 60 s after the first call.
+- Fresh budget for a separate invocation (EF14b): each of the three back to
+  back invocations, the second and third started right after the previous
+  one had been refused, again got exactly 30. Two invocations at once with
+  25 calls each (EF14c): 25 + 25 = 50 ok, 9/9 rounds. Not per project.
+- Window (EF14f): 30 calls, a 62 s pause, then 6 more: 36/36 ok, call 31
+  returned 64,215 to 65,622 ms after the fan started, 9/9. A fresh budget
+  60 s on, as documented; whether the window is fixed or sliding was not
+  separated.
+- Self-calling chains did not share one budget (EF14e, EF14h). What ran:
+  one function (`pvlab-ef14-hop`) calling itself with a plain `fetch()` GET
+  and the anon key. A chain of depth 40, one nested call per hop, completed
+  all 40 hop calls, 9/9. A
+  chain of depth 5 whose hops each first made 10 leaf calls (60 leaf calls
+  and 5 hop calls, 65 nested calls in one chain, at most 11 from any one
+  invocation) completed all 65 with no refusal, 6/6. The docs' example says
+  that when A calls B and B calls C, "all three calls count toward the same
+  30-request budget"; a budget shared along these chains would have refused
+  at 30. Not run: three distinct functions A -> B -> C,
+  `supabase.functions.invoke`, and the docs' POST with a publishable key.
+  Measured: the budget behaved as 30 outbound calls per calling
+  invocation per 60 s. Not separated: per invocation vs per isolate (EF14
+  did not record isolate ids; EF09 and EF13 found every request on a fresh
+  isolate the same day).
+- The "trace" in the error is not the W3C trace: the calling function
+  received a `traceparent`, and the leaf received the same trace id (EF14a,
+  `leaf_trace_equals_outer` 1). With a client-supplied `traceparent`, the
+  function and its leaves saw the client's trace id, and two invocations
+  carrying the same one each completed 20 calls, 40 in all (EF14g, 9/9). The
+  id in the error message is 32 hex characters that differ from invocation
+  to invocation.
+- Headers a leaf received from a nested call (names only, EF14a): accept,
+  accept-encoding, accept-language, baggage, cdn-loop, cf-connecting-ip,
+  cf-ew-via, cf-ray, cf-visitor, cf-worker, host, sb-api-key-compatibility,
+  sb-forwarded-for, sb-request-id, traceparent, user-agent, x-amzn-trace-id,
+  x-forwarded-for, x-forwarded-port, x-forwarded-proto.
+- EF10 (2026-09-02) chains made one nested call per invocation and two per
+  chain (depth 2), so by these results they could not reach this budget; the 27 refusals it saw carried a
+  different error.
+
+Read: a fan-out of more than 30 calls from one invocation fails at call 31
+with a thrown `RateLimitError`, not an HTTP status, and the retry hint is
+about a minute. Spreading the same calls across invocations of a
+self-calling chain was not refused at these sizes; a queue that triggers
+separate invocations was not run.
+The docs' per-chain example, as a self-calling chain, did not reproduce;
+treat that as measured on 2026-10-23 on two projects for one function
+calling itself with plain `fetch()`, not as a contract, and not as a
+result for three distinct functions.
 
 ## EF04 re-run 2026-10-19 (micro, ap-southeast-1, Pro org; CLI 2.121.0, Docker present)
 
@@ -280,6 +431,10 @@ and destroyed the same afternoon.
   not a ceiling a self-calling function meets at this rate on a Micro
   project; the only limiter that answered carries a 1 s retry hint, which
   reads as a per-second limiter.
+- Docs moved after this run: since 2026-09-23 (supabase/supabase#50806) the
+  figure is 30 function-to-function requests per trace in 60 s, and EF14
+  (2026-10-23) measured that budget. EF10's depth-2 chains made one nested
+  call per invocation and two per chain, and could not reach it.
 
 ### The metadata races, repeated (EF11) - still no corruption signature
 
@@ -304,7 +459,7 @@ and destroyed the same afternoon.
   organisation below its plan figure" stays a statement about what an
   override is rather than a measurement.
 - The wall clock on a FREE project (documented 150 s active): only a paid
-  project was used.
+  project was used. Run 2026-10-23 (EF09 above): cut in (145 s, 150 s], n = 3.
 
 ## Operational notes
 

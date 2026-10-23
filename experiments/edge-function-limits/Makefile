@@ -9,7 +9,7 @@ TS := $(shell date +%Y%m%d-%H%M%S)
 # EF02 reads organization entitlements. Everything else deploys into the lab
 # project and is destructive by construction.
 READONLY := EF01,EF02
-DESTRUCTIVE := EF03,EF04,EF05,EF06,EF07,EF08,EF09,EF10,EF11,EF12
+DESTRUCTIVE := EF03,EF04,EF05,EF06,EF07,EF08,EF09,EF10,EF11,EF12,EF13,EF14
 
 .PHONY: init fmt validate apply probe probe-destructive unit destroy
 
@@ -46,7 +46,7 @@ probe:
 		--only $(READONLY) --out evidence/$(TS)
 	@echo "== evidence/$(TS) =="
 
-# EF03-EF11 deploy functions and secrets into the lab project and delete them
+# EF03-EF14 deploy functions and secrets into the lab project and delete them
 # afterwards. ONLY=EF04 narrows the run. BUILD=0 RUNNER="bun $(ROOT)/harness/
 # src/run.ts" runs from source without recompiling dist/pvlab (Linux refuses
 # to overwrite a running executable while another battery uses it).

@@ -362,3 +362,20 @@ export async function cleanupPrefix(ctx: Ctx, prefix: string): Promise<{ deleted
   }
   return { deleted: mine.length - left.length, left };
 }
+
+/**
+ * The plan of the organization that owns `ctx.ref`, read from the Management
+ * API so a run artifact says which plan's figure it measured (EF09 on Free vs
+ * paid). "unknown" when either read fails.
+ */
+export async function projectPlan(ctx: Ctx): Promise<string> {
+  try {
+    const p = await mgmt(ctx, "GET", `/projects/${ctx.ref}`);
+    const org = (p.json as { organization_id?: string } | undefined)?.organization_id;
+    if (!org) return "unknown";
+    const o = await mgmt(ctx, "GET", `/organizations/${org}`);
+    return String((o.json as { plan?: string } | undefined)?.plan ?? "unknown");
+  } catch {
+    return "unknown";
+  }
+}
