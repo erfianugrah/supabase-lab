@@ -37,7 +37,7 @@
   `bun test exit 0`. The pass count grows as tasks land: Task 1 adds 6 unit
   tests, and `harness/src/identifiers.test.ts` adds one case per new file
   under `experiments/*/out/` (every published run adds 2: the JSON and its
-  `.facts.md`). Baseline at 0d18eb0: `1596 pass`; with this plan file committed
+  `.facts.md`). Baseline at 8fcdf00: `1596 pass`; with this plan file committed
   (it is a tracked markdown file the scan covers) `1597 pass`. The running total for
   in-order execution is given in each task's verify step.
 - `make publish-evidence` prints one line per run:
@@ -521,7 +521,7 @@ Offline check that rendering an old artifact works (no ref, so no network):
 
 Run: `bun harness/src/run.ts --facts experiments/data-api-defaults/out/2026-10-13/run-2026-10-13T00-06-25-892Z.json | sed -n 3p`
 
-Expected: `Source artifact: run started 2026-10-13T00:06:25.892Z, finished ... vantage local, harness region ap-southeast-1 (not read from the project), lab commit 91fe131. Project ref omitted on purpose.`
+Expected: `Source artifact: run started 2026-10-13T00:06:25.892Z, finished ... vantage local, harness region ap-southeast-1 (not read from the project), lab commit 27a322f. Project ref omitted on purpose.`
 
 - [x] **Step 5: Commit**
 
@@ -1594,7 +1594,7 @@ git commit -m "docs(governed-starter-kit): add publish-evidence, publish the cit
 - Modify: `experiments/usage-metering/RUNLOG.md` (append section)
 
 usage-metering has no Makefile, so publish with the script directly. M03 left
-no artifact (its AGENTS.md figures come from the fee7a22 commit message). M07's
+no artifact (its AGENTS.md figures come from the 2cf4b01 commit message). M07's
 artifact is NOT published: its evidence text lists the account's own project
 names, which redaction does not touch; its measurement figures are quoted from
 the facts render instead. The figures below were pasted from
@@ -1621,7 +1621,7 @@ Expected: five `published ... -> .../out/2026-08-18` lines with 4, 3, 3, 3,
 
 ## 2026-08-18 - M03 to M07, written up from the run artifacts (work-supabase-lab#43)
 
-The modules landed in fee7a22 ("M03-M07 green") on 2026-08-18 with no RUNLOG
+The modules landed in 2cf4b01 ("M03-M07 green") on 2026-08-18 with no RUNLOG
 entry. Figures are pasted from `pvlab --facts` of the local artifacts. The lab
 commit stamped in them (5bce8da) predates the history rewrites and does not
 resolve. Vantage local; every project in ap-southeast-1 on the Pro org,
@@ -1638,7 +1638,7 @@ artifact.
 
 | Probe | Result | Read |
 |---|---|---|
-| M03 | no artifact in `evidence/` | the M03 figures in AGENTS.md (3 projects, $29.43/mo compute) come from the fee7a22 commit message and cannot be checked against a run |
+| M03 | no artifact in `evidence/` | the M03 figures in AGENTS.md (3 projects, $29.43/mo compute) come from the 2cf4b01 commit message and cannot be checked against a run |
 | M04-control | gateway 200 | - |
 | M04a | throwaway project provisioned in 137 s; upstream and two scoped keys set up (pass) | - |
 | M04b | key A: 7 sent, 7 answered 200; key B: 5 sent, 5 answered 200 | - |
@@ -1720,7 +1720,7 @@ each, 0 unredacted tokens and 0 credential ids.
 ```text
 ## 2026-08-18 - I04: a free org's compute surface and pause lifecycle (written up from the artifacts, work-supabase-lab#47)
 
-Module `tests/i04-free-org.ts`, landed in d62dafd. Written from the local
+Module `tests/i04-free-org.ts`, landed in 5820a31. Written from the local
 artifacts with `pvlab --facts`; the lab commit stamped in them (f0c4460)
 predates the history rewrites and does not resolve. One free-org project per
 run in ap-southeast-1, created and deleted by the module; n = 3 runs.
@@ -1944,14 +1944,14 @@ Redacted copies, a `.facts.md` beside each, `out/2026-10-10/`:
 **Replace in `experiments/data-api-defaults/RUNLOG.md`:**
 
 ```text
-70e4244 plus the uncommitted tree that adds this experiment. n = 1 project per
+d8a16df plus the uncommitted tree that adds this experiment. n = 1 project per
 run, one trial per probe. Postgres 17.11 on both projects.
 ```
 
 **with:**
 
 ```text
-70e4244 plus the uncommitted tree that adds this experiment. n = 1 project per
+d8a16df plus the uncommitted tree that adds this experiment. n = 1 project per
 run, one trial per probe. Postgres 17.11 on both projects. Published
 (redacted, recovered from a session scratchpad on 2026-10-13): run 1
 `out/2026-10-09/run-2026-10-09T23-58-24-538Z.json` (UTC start date), run 2
@@ -2119,7 +2119,7 @@ the 2026-10-13 stocktake and is not touched.
 > **STATUS (stocktake 2026-10-13): SHIPPED** 2026-08-04: sampler and
 > `ctx.endpoints` in 4771889, D01/D02 with the Makefile and RUNLOG in f11146c,
 > D03/D04 in 597be6c (bite-time fix 04771e4, 2026-08-05); D05 added
-> 2026-10-01 in 5fd3267. The checkboxes below were never ticked;
+> 2026-10-01 in d293251. The checkboxes below were never ticked;
 > `experiments/platform-downtime/RUNLOG.md` is the record of what ran.
 ```
 
@@ -2154,7 +2154,7 @@ the 2026-10-13 stocktake and is not touched.
 > **STATUS (stocktake 2026-10-13): SHIPPED** 2026-08-04: matrix primitive in
 > 9c8835e, sbperf reader in f3f5624, the nine probes and S01 in 67c95c2, S02
 > in e9858c2. Task 7's experiment Makefile was never written; the first run
-> went through medium-serverless on 2026-09-30 (1de7be3). The checkboxes
+> went through medium-serverless on 2026-09-30 (ab47c63). The checkboxes
 > below were never ticked; `experiments/pooler-semantics/RUNLOG.md` is the
 > record.
 ```
@@ -2186,9 +2186,9 @@ the 2026-10-13 stocktake and is not touched.
 ```text
 # search tier: document search + cross-document discovery
 
-> **STATUS (stocktake 2026-10-13): SHIPPED** 2026-08-11 in 834dfa5
+> **STATUS (stocktake 2026-10-13): SHIPPED** 2026-08-11 in 83b6f8b
 > (`search_documents`, `cross_document_entities`, the UI panel); loop outcome
-> in f55d768. The checkboxes below were never ticked;
+> in 595ab29. The checkboxes below were never ticked;
 > `experiments/pdf-corpus-graph/RUNLOG.md` is the record.
 ```
 
@@ -2423,7 +2423,7 @@ commits.
 
 - [x] **Step 2: Push** (the commit ids lexicanum links pin to must exist on the remote)
 
-> Done 2026-10-13: 20 commits 6cee831..89b018f pushed; the public mirror shows 89b018f.
+> Done 2026-10-13: 20 commits 0addf0c..1047e1b pushed; the public mirror shows 1047e1b.
 
 ```bash
 git push
@@ -2445,7 +2445,7 @@ fallbacks).
 - [x] **Step 4: Lexicanum re-cite (separate repo, separate commit; not part of this plan's execution)**
 
 > Done 2026-10-13 in lexicanum 7a99147: 97 rows on 20 pages link the
-> facts.md published at b237121 (76 files, all verified to exist). Unpublished
+> facts.md published at ddd41b2 (76 files, all verified to exist). Unpublished
 > modules unchanged (SP04, M03, M07, I01-I03, K06, K07). audit-trail-integrity
 > and multi-tenant-placement had no rows for these experiments. Older
 > experiments with out/ but no row links (client-retries, mgmt-api-faults,
@@ -2683,7 +2683,7 @@ git commit -m "fix: explicit Data API grants on SQL-created tables before the 20
 > O03 fails at O03b (`consent=404`, 2 of 2 runs) before O03c's grant runs;
 > W12 not run, because edge-resilience's tofu state is empty and `make up`
 > provisions two projects and a Worker (later the same day: W12 ran on one
-> API-created project instead and passed, 67c7d9c, #176); T22 waits for #130. D09 surfaced an
+> API-created project instead and passed, bdb79b1, #176); T22 waits for #130. D09 surfaced an
 > outage-accounting gap in the module (compute-disk RUNLOG). Artifacts stay
 > in `evidence/` (none of the four experiments has a `publish-evidence`
 > target).
@@ -2872,7 +2872,7 @@ environment unless the entry says local.
 
 ## Dry-run status
 
-Dry-run 2026-10-13 on a copy of the repo at 0d18eb0 (rsync without `.git`
+Dry-run 2026-10-13 on a copy of the repo at 8fcdf00 (rsync without `.git`
 and `node_modules`, `node_modules` symlinked back, a fresh git index built
 from the real repo's `git ls-files` so the identifier scan sees the same
 tracked set). Every Replace/Append block in Tasks 1, 1b, 2-18 and 20 (74
@@ -2880,7 +2880,7 @@ blocks) was applied by a script that parses this file and refuses a block
 whose old text does not occur exactly once; every command block of those
 tasks that needs no network or credential was run as written.
 
-- Baseline: `tsc exit 0`; `bun test` 1596 pass / 0 fail at 0d18eb0, 1597
+- Baseline: `tsc exit 0`; `bun test` 1596 pass / 0 fail at 8fcdf00, 1597
   with this plan file added.
 - After Tasks 1, 1b, 2-12, 14-16, the offline parts of 13, 17 and 18, and
   Task 20: `tsc exit 0`; `bun test` 1755 pass / 0 fail; the app's

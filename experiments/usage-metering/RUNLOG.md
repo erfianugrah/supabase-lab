@@ -78,7 +78,7 @@ answers a plain PAT. M01c now records the real Content-Type header.
 
 ## 2026-08-18 - M03 to M07, written up from the run artifacts (work-supabase-lab#43)
 
-The modules landed in fee7a22 ("M03-M07 green") on 2026-08-18 with no RUNLOG
+The modules landed in 2cf4b01 ("M03-M07 green") on 2026-08-18 with no RUNLOG
 entry. Figures are pasted from `pvlab --facts` of the local artifacts. The lab
 commit stamped in them (5bce8da) predates the history rewrites and does not
 resolve. Vantage local; every project in ap-southeast-1 on the Pro org,
@@ -95,7 +95,7 @@ artifact.
 
 | Probe | Result | Read |
 |---|---|---|
-| M03 | no artifact in `evidence/` | the M03 figures in AGENTS.md (3 projects, $29.43/mo compute) come from the fee7a22 commit message and cannot be checked against a run |
+| M03 | no artifact in `evidence/` | the M03 figures in AGENTS.md (3 projects, $29.43/mo compute) come from the 2cf4b01 commit message and cannot be checked against a run |
 | M04-control | gateway 200 | - |
 | M04a | throwaway project provisioned in 137 s; upstream and two scoped keys set up (pass) | - |
 | M04b | key A: 7 sent, 7 answered 200; key B: 5 sent, 5 answered 200 | - |
@@ -118,7 +118,7 @@ the SQL that creates `public.m01_payload` (M01) and `public.metering_hourly`
 (M05). Until the 2026-10-30 default change these grants repeat what the
 default already gives; the re-run checks that they execute and change no
 result. One run each, local vantage, Pro org, ap-southeast-1, run from source
-(`bun harness/src/run.ts`) at lab commit b270a45, each project provisioned and
+(`bun harness/src/run.ts`) at lab commit 8ec7f86, each project provisioned and
 deleted by its module. Artifacts are private (this experiment has no
 `publish-evidence` target): M05 `evidence/20261013-114237/run-2026-10-13T03-42-38-273Z.json`,
 M01 `evidence/20261013-114309/run-2026-10-13T03-43-10-147Z.json`.

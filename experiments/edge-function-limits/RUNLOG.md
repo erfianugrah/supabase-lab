@@ -320,7 +320,7 @@ and destroyed the same afternoon.
   override the Makefile's. `dist/pvlab` is linux-x64, so the run went from
   source: `sx SUPABASE_ACCESS_TOKEN -- sh -c 'TOK="$SUPABASE_ACCESS_TOKEN" make -e
   probe-destructive ONLY=EF04 BUILD=0 RUNNER="bun $HOME/work/supabase-lab/harness/src/run.ts"'`.
-  Since f8f3c6d `harness/pvlab.mk` picks the source runner on macOS by itself
+  Since 6e624be `harness/pvlab.mk` picks the source runner on macOS by itself
   (drop `BUILD=0 RUNNER=...`), and `make probe-bg` detaches through
   `$(HARNESS_DETACH)`, a perl `POSIX::setsid` fallback where `setsid(1)` is
   missing (work-supabase-lab#198). A fresh host needs `tofu init` first.

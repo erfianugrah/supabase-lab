@@ -8,7 +8,7 @@ below). Data planes in Sydney (Supabase `ap-southeast-2`, Micro, Postgres
 17.11; Turso `aws-ap-southeast-2`, libSQL; D1 hint `oc`). Drivers in the
 Worker: the D1 binding, `@libsql/client/web` and node-postgres (`pg`) through
 Hyperdrive; each row records the driver and its version. Code: lab commit
-e1fa570 (recorded in each artifact) with this experiment uncommitted in the
+f7e86f3 (recorded in each artifact) with this experiment uncommitted in the
 working tree; `lib/client.ts` changed once during the battery (TD02n below).
 
 Figures below are quoted from the published artifacts (`pvlab --facts`
@@ -411,7 +411,7 @@ same `@libsql/client/web` client against that database. TD01 to TD07 run it
 next to the libSQL one where the fixture has it (`withTursodb`,
 `lib/td04-07-plan.ts`). Same vantage (this machine in Singapore), same
 regions, Worker at SIN unless a row says otherwise. Code: the working tree on
-top of lab commit 4edcdd1.
+top of lab commit 066dd4a.
 
 Code changes before or during this run, each recorded here because a row
 depends on it:
@@ -688,7 +688,7 @@ a `/cdn-cgi/trace` fetched inside it (not a documented Durable Objects API):
 BNE at fixture up (in `/meta` only, not in an artifact), the colo D1's primary
 reported (`served_by_colo` BNE in TD05a-d1).
 
-r3 ran from an uncommitted working tree on top of lab commit 54a4973 (the
+r3 ran from an uncommitted working tree on top of lab commit 72db4ea (the
 artifacts' `labCommit` does not contain the Durable Object backend, `TD05_SKIP`
 or the TD07 fix); the code is committed with this write-up.
 

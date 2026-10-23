@@ -70,7 +70,7 @@ permanently changes its cost basis.
 
 ## 2026-08-18 - I04: a free org's compute surface and pause lifecycle (written up from the artifacts, work-supabase-lab#47)
 
-Module `tests/i04-free-org.ts`, landed in d62dafd. Written from the local
+Module `tests/i04-free-org.ts`, landed in 5820a31. Written from the local
 artifacts with `pvlab --facts`; the lab commit stamped in them (f0c4460)
 predates the history rewrites and does not resolve. One free-org project per
 run in ap-southeast-1, created and deleted by the module; n = 3 runs.

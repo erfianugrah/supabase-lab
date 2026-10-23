@@ -59,7 +59,7 @@ Task 20 of `docs/plans/2026-10-13-lab-backlog-waves.md` appended `grant
 select, insert, update, delete on table public.dpython_probe to anon,
 authenticated, service_role` to the SQL that creates the table D09's REST
 sampler reads with the anon key. One run, local vantage, Pro org,
-ap-southeast-1, run from source at lab commit b270a45, project provisioned and
+ap-southeast-1, run from source at lab commit 8ec7f86, project provisioned and
 deleted by the module. Artifact (private, no `publish-evidence` target):
 `evidence/20261013-114620/run-2026-10-13T03-46-20-408Z.json`.
 
@@ -83,7 +83,7 @@ next success, so a run of failures still open when a phase ends is dropped.
 17 OK of 46 with a max outage of 0 means the 29 failures came after the last
 success of the micro -> small phase, and the 15.063 s in the next (refused)
 phase reads as the tail of the same outage. The findings-line figures
-(committed 2026-08-19 in c6e19da, also in AGENTS.md) carry the
+(committed 2026-08-19 in cdfd05a, also in AGENTS.md) carry the
 same pattern (61 s for two ops, 17.0 s outage on an op after the first) and
 may have the same cause; their artifact was not re-read here.
 

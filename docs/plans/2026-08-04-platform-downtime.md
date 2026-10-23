@@ -3,7 +3,7 @@
 > **STATUS (stocktake 2026-10-13): SHIPPED** 2026-08-04: sampler and
 > `ctx.endpoints` in 4771889, D01/D02 with the Makefile and RUNLOG in f11146c,
 > D03/D04 in 597be6c (bite-time fix 04771e4, 2026-08-05); D05 added
-> 2026-10-01 in 5fd3267. The checkboxes below were never ticked;
+> 2026-10-01 in d293251. The checkboxes below were never ticked;
 > `experiments/platform-downtime/RUNLOG.md` is the record of what ran.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development
