@@ -3775,3 +3775,85 @@ the two targets apart from plan costs and the encoded path length.
   JSON), access-key and client-key credentials, a second ZeroKMS region or
   vantage, concurrency, writes without grants, edge_logs retention, the
   wrapper inside an Edge Function (WebAssembly build).
+
+## experiments/partitioned-tenancy - key facts (validated 2026-10-22, default compute (Micro, not read back), ap-southeast-1, Pro org, three runs)
+
+Self-provisioning (`pvlab-pt-*`, deleted by PT99), run from source with bun.
+An append-only multi-tenant table (`tenant_id`, `created_at`, `payload`)
+partitioned and read through the Data API under a tenant policy on the
+parent. Artifacts `out/2026-10-22/` (runs 1-3). Run 1's PT01e, PT01g, PT01j
+and PT02g rows are probe artefacts (named in the RUNLOG); other run 1 / run
+2 differences are run-to-run variation; run 2's PT04 is void.
+
+- **The Data API does not serve partitions.** All three partitions read
+  directly answered `404` to anon and to tenant 1 (code `PGRST205` recorded
+  for the anon reads in run 2), and inserts into `pt_audit_2026_10` as
+  tenant 1 and as anon answered `404 PGRST205`. All 3 partitions had
+  `relrowsecurity = false`, and the sampled partition `pt_audit_2026_10`
+  carries the legacy `arwdDxtm` grants for anon and authenticated. The
+  OpenAPI document listed the parent and 0 of 3 partitions (PT01c/d/f, runs
+  1-2). The tenant policy on the parent alone isolated reads (anon 0 rows,
+  tenant 1: 5 rows, tenant 2: 7 rows) and its WITH CHECK refused a
+  cross-tenant insert `403 42501` (PT01b/f). PostgREST version and code path
+  not read.
+- **A DETACHED partition is served, without the parent's policy.** After
+  `DETACH PARTITION` (PT04e, runs 1 and 3) or pg_partman retention with
+  `retention_keep_table = true` (PT02g, run 2) the table keeps its rows and
+  its anon grant, has RLS off, and an anon Data API read answered 200 with
+  rows from all tenants in the table: 1000 rows (the limit) from all 50
+  tenants in PT04e; 2 rows from tenants 1 and 2, the only two, in PT02g.
+  Revoking or enabling RLS on a child before detaching it,
+  or pg_partman's `retention_schema` pointed at an unexposed schema, should
+  close it (reasoned: grants and RLS belong to the table; not run).
+- **The security advisor flags what the API does not serve.**
+  `rls_disabled_in_public` on each of the 3 attached partitions (none on the
+  parent) (PT01e, run 2); revoking anon/authenticated on a partition clears
+  it, enabling RLS with no policy turns it into `rls_enabled_no_policy`
+  (PT01j). Both leave parent reads intact, and a tenant insert through the
+  parent still routes into the revoked partition (201, PT01h). The advisors
+  were not read after a detach, so whether they flag the exposed detached
+  table is not measured.
+- **pg_partman 5.3.1 per the docs works; no background worker.** The
+  documented `create extension pg_partman with schema partman` and
+  `create_parent(... p_type := 'range' ...)` answer 201; `pg_partman_bgw` is
+  not preloaded (0 settings), so maintenance must be called:
+  `call partman.run_maintenance_proc()` runs through the Management query
+  endpoint (not timed) and through a session (68 ms run 1, 69 ms run 2), and
+  a pg_cron job ran it (`succeeded`), first seen within 61 s (run 1) and 30 s
+  (run 2) at 15 s polling (PT02a/d/f). Children get no RLS and no policies,
+  but do get the anon grant (15 of 15); RLS on the template table plus
+  `inherit_privileges = true` did not carry RLS to new children (0 of 2)
+  (PT02c/e). Retention with keep_table false drops attached children; the 5
+  tables detached earlier stay in `public` (whether pg_partman still tracks
+  them was not read) (PT02g).
+- **Pruning survives a tenant policy, in two different ways** (2,000,000 rows,
+  PT03, runs 1-2): a time filter prunes at plan time to 1 of 12 monthly
+  partitions (1.97 / 1.83 ms against 22.17 / 22.44 ms unfiltered);
+  hash-by-tenant under the wrapped `(select auth.jwt() ...)` policy plans all
+  16 and never executes 15 (run-time pruning on the InitPlan), 9.48 / 9.84
+  ms; the bare `auth.jwt()` form is pruned at executor startup (Subplans
+  Removed 15) yet ran slower, 14.25 / 14.8 ms; postgres with a literal tenant
+  6.56 / 6.75 ms; postgres with no filter (2000000 rows counted) 361.69 /
+  362.64 ms. Micro shared CPU: relative figures only.
+- **DETACH CONCURRENTLY did not disturb Data API clients; plain DETACH behind
+  an open transaction did** (PT04, runs 1 and 3). Concurrent detach of a
+  1M-row partition: 12-13 ms DDL, no client error, slowest overlapping
+  request 54 ms. With a 15 s transaction open on the parent, DETACH
+  CONCURRENTLY of the 200,000-row `dt_events_2026_05` waited 12010 / 12011
+  ms and every overlapping request succeeded (reads 438 / 408, writes 454 /
+  437; run 1 / run 3). Plain DETACH of the 200,000-row `dt_events_2026_06`
+  under the same kind of transaction also waited 12011 ms, but clients
+  queued behind its lock and one read and one write per run answered `500
+  57014` at 8027-8048 ms (consistent with an 8 s statement timeout for the
+  authenticated role; the role setting was not read).
+- **Run hazard: in run 2 the postgres session refused every PT04 DDL as
+  read-only** (`25006 ... read-only transaction`) while the Data API writes
+  in the same four windows all answered 2xx (210, 213, 212, 197 writes,
+  non-2xx 0); why was not read. Run 3 ran PT04 alone on a fresh project
+  (PT04z reads `default_transaction_read_only` and size first: off, 369 MB)
+  and the DDL succeeded.
+- Not run: archiving a detached table elsewhere (Storage, another database),
+  `retention_schema`, ATTACH cost, sub-partitioning, LIST by tenant, pruning
+  through PostgREST's own query shape, larger compute, GraphQL exposure of
+  partitions. The Postgres version was queried at setup but not written to
+  the artifact; the PostgREST version was not read.
