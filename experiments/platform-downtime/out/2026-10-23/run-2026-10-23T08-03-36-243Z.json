@@ -1,0 +1,57 @@
+{
+  "startedAt": "2026-10-23T08:03:36.243Z",
+  "finishedAt": "2026-10-23T08:05:06.272Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "projectRegion": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "platform-downtime",
+  "labCommit": "661afdf",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "D05",
+      "title": "DB password reset: per-path outage, and does the restart reset pg_stat_checkpointer?",
+      "status": "fail",
+      "detail": "pg_postmaster_start_time() never changed within the probe window - no restart was confirmed, so the checkpointer question is moot for this run (raise MAX_WAIT_MS or re-run)",
+      "measurements": {
+        "probe_interval_ms": 500,
+        "rest_http_first_fail_s": "n/a",
+        "rest_http_window_s": "n/a",
+        "rest_http_mode": "none",
+        "rest_http_failed_samples": "0 of 157",
+        "auth_first_fail_s": "n/a",
+        "auth_window_s": "n/a",
+        "auth_mode": "none",
+        "auth_failed_samples": "0 of 154",
+        "storage_first_fail_s": "n/a",
+        "storage_window_s": "n/a",
+        "storage_mode": "none",
+        "storage_failed_samples": "0 of 147",
+        "realtime_ws_first_fail_s": 77,
+        "realtime_ws_window_s": 1,
+        "realtime_ws_mode": "WebSocket connection to 'wss://<ref>.supabase.co/realtime/v1/webs",
+        "realtime_ws_failed_samples": "1 of 140",
+        "rest_read_first_fail_s": "n/a",
+        "rest_read_window_s": "n/a",
+        "rest_read_mode": "none",
+        "rest_read_failed_samples": "0 of 154",
+        "realtime_join_first_fail_s": "n/a",
+        "realtime_join_window_s": "n/a",
+        "realtime_join_mode": "none",
+        "realtime_join_failed_samples": "0 of 132",
+        "postmaster_start_before": "2026-10-23T07:44:20.792Z",
+        "postmaster_start_after": "2026-10-23T07:44:20.792Z",
+        "checkpointer_source": "pg_stat_checkpointer",
+        "checkpointer_stats_reset_before": "2026-10-02T17:53:10.203Z",
+        "checkpointer_stats_reset_after": "2026-10-02T17:53:10.203Z"
+      },
+      "durationMs": 90029
+    }
+  ]
+}

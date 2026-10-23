@@ -51,12 +51,17 @@ export function redact(text: string, vantage: string[] = [], other: string[] = [
   // addresses as deliberate test inputs.
   const sub = (a: string, label: string) => {
     const esc = a.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    // An IPv6 literal followed by `:port` (`connect ECONNREFUSED <v6>:5432`)
+    // An address followed by `:port` (`connect ECONNREFUSED <addr>:5432`)
     // fails the trailing guard below because the port's digits are hex; match
-    // that form first, a port being 1-5 digits that end the token (2026-10-23).
-    if (a.includes(":")) {
-      out = out.replace(new RegExp(`(?<![0-9a-fA-F.:])${esc}:(\\d{1,5})(?![0-9a-fA-F.:])`, "g"), `${label}:$1`);
-    }
+    // that form first, a port being 1-5 digits that end the token. IPv6 since
+    // 2026-10-23 (#204); IPv4 too since #208, when an IPv4 add-on address
+    // reached out/ through a dedicated-pooler ECONNREFUSED.
+    // The IPv6 guard after the port refuses a following `:` or hex digit, since
+    // `<v6>:5432:1` can be a longer IPv6 address. An IPv4 literal has no such
+    // reading, so after its port only a further digit or `.` blocks the match
+    // (`<addr>:5432: connection refused` is redacted).
+    const portGuard = a.includes(":") ? "(?![0-9a-fA-F.:])" : "(?![0-9.])";
+    out = out.replace(new RegExp(`(?<![0-9a-fA-F.:])${esc}:(\\d{1,5})${portGuard}`, "g"), `${label}:$1`);
     out = out.replace(new RegExp(`(?<![0-9a-fA-F.:])${esc}(?![0-9a-fA-F.:]*[0-9a-fA-F])`, "g"), label);
     // Supavisor's allow-list refusal prints the client address as an Erlang
     // tuple, `{192, 0, 2, 4}`, which the dotted match above never sees.

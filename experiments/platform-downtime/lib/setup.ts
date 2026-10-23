@@ -52,7 +52,7 @@ export async function resolvePooler(ctx: Ctx): Promise<PoolerTarget | null> {
  * from a known-good state; if it cannot, the data-path probes are left out
  * and the note says why, rather than voiding the whole run.
  */
-export async function buildProbes(ctx: Ctx): Promise<{ probes: Probe[]; note: string }> {
+export async function buildProbes(ctx: Ctx, opts: { pooler?: boolean } = {}): Promise<{ probes: Probe[]; note: string }> {
   const anon = ctx.anonKey as string;
   const probes: Probe[] = [
     restProbe(ctx.apiHost, anon),
@@ -74,6 +74,8 @@ export async function buildProbes(ctx: Ctx): Promise<{ probes: Probe[]; note: st
   // from sample zero, which the healthy-at-start guard would then report as
   // "already failing before the operation" and skip the whole module - a
   // missing password should cost you one PATH, not the run.
+  // D05 changes the password the pooler probe authenticates with, so it opts out.
+  if (opts.pooler === false) return { probes, note: `${seedNote}; pooler excluded by the caller` };
   const pooler = await resolvePooler(ctx);
   if (pooler && ctx.dbPassword) {
     probes.push(poolerProbe(pooler.host, pooler.port, pooler.user, ctx.dbPassword));

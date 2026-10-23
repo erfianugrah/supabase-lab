@@ -81,6 +81,9 @@ probe-destructive:
 # project on the Pro org, runs PD_ONLY (default D01,D02,D03,D04) PD_PASSES
 # times (default 2) against it, deletes it. PD_SIZE=medium with
 # PD_RESIZE_UP=ci_large PD_RESIZE_DOWN=ci_medium times a Medium <-> Large pair.
+# PD_ONLY=D05 PD_PASSES=2 re-ran D05 on 2026-10-23 (#208). PD_EXPERIMENT,
+# PD_REGION and PD_PLAN let medium-serverless reuse the wrapper (its
+# `make selfprov`); see lib/selfprov.ts.
 # Needs SUPABASE_ACCESS_TOKEN and PVLAB_ORG_PRO in the environment.
 selfprov:
 	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "export SUPABASE_ACCESS_TOKEN"; exit 1)
