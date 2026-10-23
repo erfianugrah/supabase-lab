@@ -149,10 +149,13 @@ protection observed is the platform's same-name 400 (MF02c).
   a measurement on the versions named at the top.
 - Real incident behaviour: none of the cells reproduce an actual outage; the
   injected 5xx are a model of one.
-- Connection-level faults (reset, refused, TLS failure, DNS failure).
-- A tool that retries a POST and generates a fresh name each time.
+- Connection-level faults (reset, refused, TLS failure, DNS failure): run
+  2026-10-23 (MF06-MF08, below).
+- A tool that retries a POST and generates a fresh name each time: run
+  2026-10-23 (MF07c).
 - The orphan-detection side: orphans were found here by listing the org with
-  the PAT and matching the name; no alert or reconciler was exercised.
+  the PAT and matching the name; a reconciler was built and run on 2026-10-23
+  (MF07e, MF08).
 
 ## Cleanup and cost
 
@@ -164,3 +167,122 @@ counted in that figure. All counted projects were deleted by the modules'
 `finally` sweep; a `GET /v1/projects` after the last run listed 0 projects
 with the prefix and no proxy container remained. Project-hours are
 small (well under 1 h in total); no add-ons were enabled.
+
+## 2026-10-23 - connection-level faults and orphan reconciliation (Pro org, ap-southeast-1)
+
+Vantage: the same Mac (darwin arm64). Tools: supabase CLI 2.121.0 (Homebrew;
+the 2026-10-10 runs used 2.120.0, and MF01-MF05 were not re-run on 2.121.0),
+Bun 1.3.14 for the harness and the Bun `fetch()` client, Node v26.12.1 for the
+Node `fetch()` client. The lab harness ran from its working tree on top of
+661afdf with the new modules (MF06-MF08, `lib/connfault.ts`,
+`lib/clients.ts`, `lib/reconcile.ts`) not yet committed; the artifacts name
+661afdf.
+
+Method. The container proxy of MF01-MF05 answers HTTP; here the fault is the
+connection, so the proxy is a raw TCP listener in the test process
+(`lib/connfault.ts`) that reads an HTTP/1.1 request and forwards it to
+`https://api.supabase.com` with `fetch()`. `reset-before` reads the whole
+request and aborts the connection with an RST (`socket.terminate()`; curl
+reports exit 56 "Connection reset by peer", checked in
+`lib/connfault.test.ts`); `close-before` closes it with a FIN (curl exit 52,
+"Empty reply from server"); `reset-after` forwards, waits for upstream's
+answer, then sends the RST. Connection refused is a loopback port with nothing
+listening; the TLS failure is a loopback listener with a fresh self-signed
+certificate; the DNS failure is a host under the reserved `.invalid` TLD. The
+CLI is pointed at each target with a `--profile` file, as in MF03. Clients:
+the CLI (`projects list`, `projects create`), Bun `fetch()` and Node
+`fetch()` (each one call, 30 s timeout, no retry code of its own;
+`lib/clients.ts`). Attempts are proxy-log rows, or TCP connections accepted by
+the TLS listener; for refused and DNS there is no listener to count at, and
+the CLI's `--debug` log prints one "HTTP GET:" line per command while the
+proxy counted 6 attempts, so it is not an attempt count either.
+
+Artifacts (redacted, with facts): MF06 three runs,
+`out/2026-10-23/run-2026-10-23T08-26-58-210Z.json`,
+`out/2026-10-23/run-2026-10-23T08-28-46-346Z.json`,
+`out/2026-10-23/run-2026-10-23T08-29-08-425Z.json`; MF07 one run,
+`out/2026-10-23/run-2026-10-23T08-29-47-990Z.json` (43 s, 08:29:47.990 to
+08:30:31.279 UTC); MF08 one run,
+`out/2026-10-23/run-2026-10-23T08-32-56-569Z.json`. Each MF06 cell below is
+n=3 (the three runs agreed on every count and outcome; times are the three
+values); MF07 and MF08 cells are n=1.
+
+### MF06 - faults before upstream (no project can be created)
+
+| fault | CLI `projects list` (GET) | CLI `projects create` (POST) | Bun `fetch()` GET / POST | Node `fetch()` GET / POST |
+|---|---|---|---|---|
+| reset-before (RST) | 6 attempts over 6 connections, first to last 2 / 7 / 5 ms; exit 1 in 455 / 520 / 633 ms | 1 attempt; exit 1 | 1 attempt each; `ECONNRESET` "The socket connection was closed unexpectedly" | 1 attempt each; `ECONNRESET` "read ECONNRESET" |
+| close-before (FIN) | 6 attempts over 6 connections, first to last 6 / 2 / 11 ms; exit 1 | 1 attempt; exit 1 | 1 attempt each; `ECONNRESET`, same message as the RST | 1 attempt each; `UND_ERR_SOCKET` "other side closed" |
+| refused | exit 1 (attempts not countable) | exit 1 | `ConnectionRefused` "Unable to connect" | `ECONNREFUSED` |
+| TLS, self-signed certificate | 6 TCP connections to the listener; exit 1 | 1 TCP connection; exit 1 | 1 TCP connection each; `DEPTH_ZERO_SELF_SIGNED_CERT` | 1 TCP connection each; `DEPTH_ZERO_SELF_SIGNED_CERT` |
+| DNS, `.invalid` host | exit 1 (attempts not countable) | exit 1 | GET `ConnectionRefused` "Unable to connect"; POST `FailedToOpenSocket` "Was there a typo in the url or port?" | `ENOTFOUND` (getaddrinfo) |
+
+- The CLI printed the same message for all five faults: `failed to list
+  projects: HttpClientError: Transport error (GET <url>)`, and for the create
+  `{"_tag":"Error","error":{"code":"ProjectsCreateNetworkError","message":"failed
+  to create project: HttpClientError: Transport error (POST <url>)"}}`. Every
+  CLI cell exited 1 within 116-633 ms of process start.
+- No request byte reached the TLS listener in any of its 18 cells (6 cells x
+  3 runs). The listener's own handshake callback reported a completed
+  handshake for the two Bun cells in two of the three runs and in none of the
+  others; that callback is not used as evidence here.
+- MF06f, a Bun or Node POST reset before upstream after a GET answered 200 on
+  the same client: Bun sent the POST on the GET's connection and made 1
+  attempt (3 of 3 runs). Node opened a second connection for the POST (3 of
+  3), so a reset on a reused connection was not exercised for Node.
+- MF06g: 0 projects carried the run's name tag after each run (17 create
+  names used per run).
+
+Reading: the CLI 2.121.0 retries a GET 5 times on a reset, a clean close and a
+TLS failure (6 attempts, 2-11 ms first to last for the reset and the close;
+MF03 measured the same budget for a 500 on 2.120.0), and does not retry a
+create POST on any of them. Neither `fetch()` made a second attempt in any
+cell where attempts were countable. A client sees the same error for
+"nothing was sent" and "the answer was lost": Bun reports `ECONNRESET` for
+both an RST and a FIN, and the CLI's message names no cause at all. Bun's
+error name for an unresolvable host is `ConnectionRefused` on the GET, so the
+name is not a reliable cause either.
+
+### MF07 - the create landed, the connection was reset (creates 5 projects)
+
+| cell | measured |
+|---|---|
+| a: CLI `projects create`, RST after upstream answered | upstream 201; 1 POST; CLI exit 1 after 1859 ms with the same `ProjectsCreateNetworkError` "Transport error" message as MF06; 1 project with the name |
+| b: Bun `fetch()` POST, RST after upstream answered | upstream 201; 1 POST; threw `ECONNRESET` after 1633 ms; 1 project with the name |
+| c: client that retries with a fresh name (timestamp suffix), first attempt reset after upstream answered | 2 attempts, upstream 201 on both, the second heard; 2 projects; its ledger holds 1 |
+| d: client that, on a transport error, lists the org for the name it sent before retrying | 1 POST; the name was in the listing at the first look, 79 ms after the error; adopted, 1 project, in the ledger |
+| e: reconciler, first version (kept projects with `created_at` at or after the module start) | 5 projects listed with the tag, 2 ledger lines; it classified 0 as orphan and 0 as tracked; the five `created_at` values were 486-564 s old when read, inside a 43 s run |
+| f: after deleting the five | 5 DELETEs accepted; 0 tagged projects listed; the 2 ledger lines report as having no project |
+
+The first reconciler filtered on `created_at` and so dropped every project the
+run had just created; the module now records that count as
+`created_at_after_start` and the reconciler no longer reads `created_at`.
+
+### MF08 - the reconciler on one induced orphan (creates 1 project)
+
+| cell | measured |
+|---|---|
+| a: Bun `fetch()` POST, RST after upstream answered | upstream 201; 1 project with the name; the time the POST reached the proxy minus `created_at`: 219 s from upstream's answer, 219 s from the listing |
+| b: `lib/reconcile.ts` as a command, empty ledger, state file, 30 s grace from first sighting | pass 1: exit 0, 1 young, 0 orphan; pass 2 after 35 s: exit 3, 1 orphan, the induced name; a `created_at >= start` filter keeps 0 of 1 |
+| c: after the delete | 1 DELETE accepted; listing empty for the tag; reconciler exit 0, 0 orphan |
+
+Reading: the reconciler (prefix and org scope, ledger match by ref or name,
+grace measured from the reconciler's own first sighting) found the induced
+orphan and only it. `created_at` on a fresh project preceded the create
+request by 219 s (MF08a) and the five MF07 projects read 486-564 s old within
+43 s of the run starting, so `created_at` is not the time of the request on
+this platform (n=6 projects, one day, one region). Why it precedes the request
+was not investigated; a grace window or a "created since" filter keyed on it
+misclassifies fresh projects.
+
+Not measured: a reset partway through the request body or the response body;
+a TLS failure after the handshake; DNS failures other than NXDOMAIN (timeout,
+SERVFAIL); the CLI's attempt count on refused and DNS failures; Node `fetch()`
+on a reused connection; the OpenTofu provider under connection faults; the
+MF07c-d retry policies with any client other than Bun `fetch()`; MF07a-d with
+n above 1; a reconciler that deletes.
+
+Cleanup: 6 projects created on 2026-10-23 (MF07 5, MF08 1), each alive for
+under 1 minute, all deleted by the modules; a `GET /v1/projects` at
+2026-10-23T08:33:42Z listed 0 projects with the `mf-` prefix. MF06 created
+none (MF06g). No container was used.
