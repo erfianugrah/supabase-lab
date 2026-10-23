@@ -15,7 +15,7 @@ means the source named in the module header; "measured" means the artifact.
 Harness: `make run ONLY=DC05,DC06,DC07,DC99` with
 `PVLAB_DC_REGION=ap-northeast-2` and `PVLAB_DC_SIZE=small`, lab commit
 661afdf plus the uncommitted DC05-DC07 modules. One Pro-org project, Small
-for the whole run (2 vCPU per the compute docs; `max_connections` 90 was
+for the whole run (shared CPU per the compute docs, no core count published; `max_connections` 90 was
 read by DC04a on the same size, not in this artifact; `db_pool` unset at
 creation), deleted by DC99. The artifact's top-level `region`
 (ap-southeast-1) is the harness default; the project's region came from
@@ -180,7 +180,7 @@ Readings:
   its table), collapsing at 8 and 16; its pool 20 against 200 contrast was
   on 4 cores. Its workaround is a `db-pool` at least as large as the number
   of concurrent requests; the fix it points to is hasql-pool PR #58
-  (https://github.com/nikita-volkov/hasql-pool/pull/58). On 2 vCPU shared
+  (https://github.com/nikita-volkov/hasql-pool/pull/58). On a shared-CPU Small
   with Postgres, flat throughput across pool sizes is consistent with the
   issue's small-core rows. Whether requests queued for a connection at all
   in the 30 and 60 arms is not established (the pool series are snapshots).
@@ -232,7 +232,7 @@ series and two schema cache series. Small: pool max 30, `db_pool` null,
 resize, settled 68 s after the PATCH): `max_connections` 480, `db_pool`
 null, pool max 70.
 
-### DC04b - Small (2 vCPU)
+### DC04b - Small (shared CPU)
 
 | concurrency | req/s | p50 / p99 ms | success | waiting max (available then, of max) | timeouts | node CPU % | `authenticator` mid-step | client errors |
 |---|---|---|---|---|---|---|---|---|
@@ -248,7 +248,7 @@ Reading: from 256 on, throughput stopped at about 920 to 1,020 req/s while
 latency doubled per step, and at 256 the pool reported 139 requests
 waiting while 11 connections were available, timeouts flat, and the
 `authenticator` backends idle. That is the waiting-with-free-slots pattern,
-on 2 vCPU, with node CPU at 73.9 %. Postgres and PostgREST share that node,
+on Small (shared CPU), with node CPU at 73.9 %. Postgres and PostgREST share that node,
 so node CPU does not say which process used it; no per-process figure was
 read. The 512 row repeats the 256 row's pool figures exactly and the 1024
 row reads 0 waiting with every slot available while 12.8 % of requests
@@ -276,7 +276,7 @@ the change between two payload refreshes, not the whole step.
 | 1536 | 539 | 801 / 4460 | 0.375 | 0 (66 of 70) | 0.1 | idle:67 | 403:8856 | 14,729 |
 
 Reading: on 16 vCPU the same request scaled linearly to 3,158 req/s at 512
-with nothing waiting and node CPU at 11.5 %. The pattern DC04b met on 2 vCPU
+with nothing waiting and node CPU at 11.5 %. The pattern DC04b met on Small
 did not appear up to that rate. Above 512 the run stopped measuring
 PostgREST: the client logged "Network is unreachable (os error 51)" on
 thousands of requests, and from 1024 the answers that came back included
