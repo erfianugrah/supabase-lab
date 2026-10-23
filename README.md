@@ -439,6 +439,12 @@ facts):
   transaction semantics (D1 has `batch()`, no `BEGIN`) and a Turso embedded
   replica (TD01-TD08). Self-provisioning, Pro org plus Turso and Cloudflare
   accounts. Measured 2026-10-15; see its README (by use case) and RUNLOG.
+- `compute-surface` - Supabase Compute (private alpha): CS00 records the
+  enrollment gate on the published v2 compute routes (list, get, upload
+  slot, deploy, delete), the org entitlement keys and the CLI's
+  experimental `supabase compute` command, without deploying anything.
+  Self-provisioning, one Micro project, Pro org. Measured 2026-10-23: gate
+  closed (`404 compute_not_enabled` on every route); see its RUNLOG.
 
 ## Ad-hoc platform probes (no experiment dir)
 

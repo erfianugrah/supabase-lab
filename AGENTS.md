@@ -3840,6 +3840,29 @@ does not use the code under test. Details: RUNLOG.md.
   refuses `--use-migra`. Image transformation, pooler and drift behaviour: RUNLOG CL22c, CL22d.
   Unmeasured: amd64, CI runners, idle stops, pooler SQL path.
 
+## experiments/compute-surface - key facts (CS00 validated 2026-10-23, one Micro project, ap-southeast-1, Pro org)
+
+Self-provisioning (`compute-surface-` prefix; never `cs-`, which long-lived
+projects in the lab org use), deleted in `finally`. See its RUNLOG.
+
+- **Compute gate closed for a new Pro-org project** (CS00, n = 1): list,
+  get, upload slot, deploy (schema-valid body, no upload) and delete on
+  `/v2/projects/{ref}/compute...` all answered `404
+  {"error":{"code":"compute_not_enabled","message":"Compute is not available
+  for this project"}}`; no 403, and the list without a token answered 401.
+  The v2 document lists no 404 for these routes. The org's 64 entitlements
+  hold no Compute key (the only match, `instances.compute_update_available_sizes`,
+  is the database size set).
+- **The stable CLI carries `supabase compute`** (2.121.0, Homebrew): hidden
+  unless `SUPABASE_EXPERIMENTAL_COMPUTE=1`; the global `--experimental` flag
+  does not reveal it. `compute list --project-ref` on the gated project
+  exits 1 with "Compute is not available for project `<ref>`. Compute is in
+  private alpha."
+- CS00 never deploys: it sends the deploy call only when list answered
+  `compute_not_enabled`. After an enrollment, re-run CS00 and
+  `pvlab --diff` against `out/2026-10-23/`; the `gate` measurement flips.
+  CS01-CS07 (README) wait for enrollment and for a read of the alpha terms.
+
 ## experiments/self-hosted-defaults - key facts (SD01-SD08, validated 2026-10-10, local rig)
 
 Local rig, no project or PAT: `make stack up probe clean` clones
