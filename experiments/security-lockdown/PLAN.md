@@ -189,3 +189,23 @@ alibis the other. One micro, no restart, no containers.
   Ops: no containers, no restart, self-contained. Safe to run with the rest of
   the read-only battery; `destructive` only because it creates and drops
   objects and a pg_tle extension.
+
+### S23 - background work under restrict-all (2026-10-23)
+
+Restrictions gate inbound connections to the DB socket (S02/S10); L22 showed an
+Edge Function losing its direct socket. Open: work Postgres starts itself.
+On a fresh self-provisioned Pro Micro, with restrict-all applied and the
+pooler refusing the orchestrator as the control:
+
+  - a pg_cron job writing a timestamp row every 2 s - rows and
+    `cron.job_run_details` per phase (pre / enforced / post);
+  - database webhooks (`supabase_functions.http_request` triggers) to the
+    project's own Edge Function and to an external lab Cloudflare Worker,
+    fired by cron and by a Data API insert;
+  - direct `net.http_post` to the same two receivers.
+
+  Receivers echo the nonce from the request body, so `net._http_response`
+  holds the receipt. Ops: `make echo-worker-up` (needs CLOUDFLARE_API_TOKEN
+  and CLOUDFLARE_ACCOUNT_ID), `make probe-s23 ECHO_WORKER=<url>` with
+  SUPABASE_ACCESS_TOKEN and PVLAB_ORG_PRO in the env, `make echo-worker-down`.
+  The module deletes its project in finally.

@@ -1362,7 +1362,7 @@ Open work lives on the task board (project work-supabase-lab); this section keep
 - Cloudflare pieces are OpenTofu (provider v4, gated on `enable_cloudflare`);
   real CF ids live in gitignored `cloudflare.auto.tfvars`.
 
-## experiments/security-lockdown - key facts (validated 2026-08-28; S13-S15 2026-08-31; S16-S21 2026-09-03)
+## experiments/security-lockdown - key facts (validated 2026-08-28; S13-S15 2026-08-31; S16-S21 2026-09-03; S23 2026-10-23)
 
 - S01: the Management API security advisor catches every seeded exposure
   (rls_disabled_in_public, rls_enabled_no_policy, security_definer_view,
@@ -1484,6 +1484,20 @@ Open work lives on the task board (project work-supabase-lab); this section keep
   by a caller timeout skips its `finally` (S18 left a user and would have left
   a ban). Run long modules with `make probe-bg` or a background shell, never
   under a 10-minute foreground timeout.
+- S23 (2026-10-23, 2 runs, fresh Pro Micro each, self-provisioned via
+  `make probe-s23`): restrict-all (TEST-NET CIDRs, pooler refusing the
+  orchestrator with `EADDRNOTALLOWED`) changes nothing for work Postgres starts
+  itself. A 2 s pg_cron job wrote 60 rows in the 120 s enforced window in both
+  runs (longest gap 2.1 s; run 2 `cron.job_run_details` all `succeeded`);
+  `cron.host=localhost`, `cron.use_background_workers=off`. Database webhooks
+  (`supabase_functions.http_request`) and direct `net.http_post` reached both
+  the project's own Edge Function and an external Cloudflare Worker with 200
+  and the nonce echoed (enforced: hooks 13 of 13 per receiver, direct 12 of 12,
+  except one Worker hook in run 2 with `Failed sending data to the peer`, an
+  error also seen once with no restriction). A Data API insert under
+  restrict-all fires its webhooks. Restrictions are inbound only; pg_net
+  egress stays open. Enable webhooks via `POST
+  /database/webhooks/enable` (201). Evidence `out/2026-10-23/`.
 
 ## experiments/edge-function-limits - key facts (validated 2026-09-02, micro, Pro org)
 
