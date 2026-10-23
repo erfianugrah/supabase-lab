@@ -1,0 +1,133 @@
+{
+  "startedAt": "2026-10-23T08:07:48.510Z",
+  "finishedAt": "2026-10-23T08:08:33.960Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "data-api-defaults",
+  "labCommit": "661afdf",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "DD05a",
+      "title": "DD05a: default privileges for public, before and after the opt-in revoke",
+      "status": "pass",
+      "detail": "revoke HTTP 201; tables acl after={postgres=arwdDxtm/postgres,anon=Dxtm/postgres,authenticated=Dxtm/postgres,service_role=Dxtm/postgres}",
+      "measurements": {
+        "tables_acl_before": "{postgres=arwdDxtm/postgres,anon=arwdDxtm/postgres,authenticated=arwdDxtm/postgres,service_role=arwdDxtm/postgres}",
+        "sequences_acl_before": "{postgres=rwU/postgres,anon=rwU/postgres,authenticated=rwU/postgres,service_role=rwU/postgres}",
+        "revoke_status": 201,
+        "tables_acl_after": "{postgres=arwdDxtm/postgres,anon=Dxtm/postgres,authenticated=Dxtm/postgres,service_role=Dxtm/postgres}",
+        "sequences_acl_after": "{postgres=rwU/postgres,anon=w/postgres,authenticated=w/postgres,service_role=w/postgres}",
+        "anon_tables_privs_after": "Dxtm",
+        "anon_sequences_privs_after": "w"
+      },
+      "durationMs": 44168
+    },
+    {
+      "id": "DD05b",
+      "title": "DD05b: edge-resilience seed (w_probe), publishable read without and with the seed's GRANT",
+      "status": "pass",
+      "detail": "no grant -> 401 {\"code\":\"42501\",\"details\":null,\"hint\":\"Grant the required privileges to the current role with: GRANT SELECT ON public.w_probe TO anon;\",\"message\":\"permission denied for table w_probe\"}; with grant -> 200 [{\"id\":1}]",
+      "measurements": {
+        "seed_status": 201,
+        "relacl_without_grant": "{postgres=arwdDxtm/postgres,anon=Dxtm/postgres,authenticated=Dxtm/postgres,service_role=Dxtm/postgres}",
+        "without_status": 401,
+        "without_code": "42501",
+        "without_hint": "Grant the required privileges to the current role with: GRANT SELECT ON public.w_probe TO anon;",
+        "grant_status": 201,
+        "relacl_with_grant": "{postgres=arwdDxtm/postgres,anon=arwdDxtm/postgres,authenticated=arwdDxtm/postgres,service_role=arwdDxtm/postgres}",
+        "with_status": 200,
+        "with_seconds_to_serve": 0
+      },
+      "durationMs": 44168
+    },
+    {
+      "id": "DD05c",
+      "title": "DD05c: usage-metering M05 store table, service_role insert without and with M05's GRANT",
+      "status": "pass",
+      "detail": "no grant -> service_role 403, sb_secret 403 {\"code\":\"42501\",\"details\":null,\"hint\":\"Grant the required privileges to the current role with: GRANT INSERT ON public.metering_hourly TO service_role;\",\"message\":\"permission denied for table metering_hourly\"}; with grant -> 201, 201",
+      "measurements": {
+        "create_status": 201,
+        "service_role_without_status": 403,
+        "service_role_without_code": "42501",
+        "sb_secret_without_status": 403,
+        "sb_secret_without_code": "42501",
+        "sb_secret_without_hint": "Grant the required privileges to the current role with: GRANT INSERT ON public.metering_hourly TO service_role;",
+        "grant_status": 201,
+        "sb_secret_with_status": 201,
+        "service_role_with_status": 201
+      },
+      "durationMs": 44168
+    },
+    {
+      "id": "DD05d",
+      "title": "DD05d: edge-resilience W12 with grants=none (expect 42501)",
+      "status": "pass",
+      "detail": "W12 fail: Insert failed: HTTP 401 {\"code\":\"42501\",\"details\":null,\"hint\":\"Grant the required privileges to the current role with: GRANT INSERT ON public.probe_canary TO anon;\",\"message\":\"permission denied for table probe_canary\"}",
+      "measurements": {
+        "grants": "none",
+        "w12_status": "fail",
+        "insert_denied_42501": 1,
+        "table_relacl": "{postgres=arwdDxtm/postgres,anon=Dxtm/postgres,authenticated=Dxtm/postgres,service_role=Dxtm/postgres}",
+        "sequence_relacl": "{postgres=rwU/postgres,anon=w/postgres,authenticated=w/postgres,service_role=w/postgres}",
+        "publication_setup": "true",
+        "attempt_1_1_error": "Insert failed: HTTP 401 {\"code\":\"42501\",\"details\":null,\"hint\":\"Grant the required privileges to the current role with: GRANT INSERT ON public.probe_canary TO anon;\",\"message\":\"permission denied for table probe_canary\"}",
+        "attempt_1_2_error": "Insert failed: HTTP 401 {\"code\":\"42501\",\"details\":null,\"hint\":\"Grant the required privileges to the current role with: GRANT INSERT ON public.probe_canary TO anon;\",\"message\":\"permission denied for table probe_canary\"}",
+        "attempt_1_3_error": "Insert failed: HTTP 401 {\"code\":\"42501\",\"details\":null,\"hint\":\"Grant the required privileges to the current role with: GRANT INSERT ON public.probe_canary TO anon;\",\"message\":\"permission denied for table probe_canary\"}",
+        "attempt_1_4_error": "Insert failed: HTTP 401 {\"code\":\"42501\",\"details\":null,\"hint\":\"Grant the required privileges to the current role with: GRANT INSERT ON public.probe_canary TO anon;\",\"message\":\"permission denied for table probe_canary\"}"
+      },
+      "durationMs": 44168
+    },
+    {
+      "id": "DD05e",
+      "title": "DD05e: edge-resilience W12 with grants=table (recorded)",
+      "status": "info",
+      "detail": "W12 pass: realtime probe successful: conn1=480ms, conn2=277ms",
+      "measurements": {
+        "grants": "table",
+        "w12_status": "pass",
+        "insert_denied_42501": 0,
+        "table_relacl": "{postgres=arwdDxtm/postgres,anon=arwdDxtm/postgres,authenticated=arwdDxtm/postgres,service_role=arwdDxtm/postgres}",
+        "sequence_relacl": "{postgres=rwU/postgres,anon=w/postgres,authenticated=w/postgres,service_role=w/postgres}",
+        "publication_setup": "true",
+        "connection1_ms": 480,
+        "connection2_ms": 277
+      },
+      "durationMs": 44168
+    },
+    {
+      "id": "DD05f",
+      "title": "DD05f: edge-resilience W12 with grants=all (expect pass)",
+      "status": "pass",
+      "detail": "W12 pass: realtime probe successful: conn1=474ms, conn2=403ms",
+      "measurements": {
+        "grants": "all",
+        "w12_status": "pass",
+        "insert_denied_42501": 0,
+        "table_relacl": "{postgres=arwdDxtm/postgres,anon=arwdDxtm/postgres,authenticated=arwdDxtm/postgres,service_role=arwdDxtm/postgres}",
+        "sequence_relacl": "{postgres=rwU/postgres,anon=rwU/postgres,authenticated=rwU/postgres,service_role=rwU/postgres}",
+        "publication_setup": "true",
+        "connection1_ms": 474,
+        "connection2_ms": 403
+      },
+      "durationMs": 44168
+    },
+    {
+      "id": "DD99",
+      "title": "DD99: project deleted and gone from the listing",
+      "status": "pass",
+      "detail": "DELETE 200; absent from GET /projects after 0s",
+      "measurements": {
+        "delete_status": 200,
+        "gone_from_listing_s": 0
+      },
+      "durationMs": 1282
+    }
+  ]
+}
