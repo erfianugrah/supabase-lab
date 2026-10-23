@@ -2,7 +2,7 @@
  * DC07 - Once requests are queuing for the Data API's pool, does a bigger
  * `db_pool` raise throughput, lower it, or change nothing?
  *
- * DC04b (Small, 2 vCPU, pool 30) stopped at about 920 req/s from 256
+ * DC04b (Small, shared CPU, pool 30) stopped at about 920 req/s from 256
  * concurrent point reads, with Postgres backends mostly idle; one metrics
  * snapshot in that step read 139 waiting with 11 available.
  * `pgrst_db_pool_waiting` counts requests from asking the pool to the end of
