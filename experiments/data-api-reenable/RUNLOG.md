@@ -174,6 +174,47 @@ enable already starts a new PostgREST process, which reads its config and loads
 the schema cache at start, so a reload has nothing left to do. Why the NOTIFY
 arm came out slower is not explained by this run (n=3 pairs).
 
+## 2026-10-23 - run 3 (fresh Micro, ap-southeast-1): DA01 and DA03 with the GraphQL fix (#129)
+
+Purpose: prove the GraphQL signal from c71a01b on a project that, like every new
+project, starts without `pg_graphql`. DA03 now reads `pg_extension` first,
+installs `pg_graphql` when absent and drops it in `finally` (DA03y). The
+`graphql` probe has POSTed `{ __typename }` and labelled the errors envelope
+`200 not-ok` since run 1 (`lib/reenable.ts`). One fresh project (tofu,
+`micro`), `make probe ONLY=DA01,DA03 RUNNER_FLAGS=--destructive` from lab
+commit 661afdf with a clean tree, local vantage, n=1. Artifact:
+`out/2026-10-23/run-2026-10-23T07-55-04-028Z.{json,facts.md}`.
+
+| Reading | run 1 (2026-09-24) | run 3 (2026-10-23) |
+|---|---|---|
+| `pg_graphql` at start | not read (the module did not check) | `no`; installed by the module, dropped after (DA03y pass) |
+| DA01 `graphql` on a healthy project | `200 not-ok` | `200 not-ok` |
+| DA03 `graphql` before the off switch | `200 not-ok` | `200` |
+| DA03 `graphql` 60 s after `rest_table` settled | `406 PGRST106` | `406 PGRST106` |
+| DA03 `extra_schema` at the same point | `406 PGRST106` | `406 PGRST106` |
+| `db_schema` after the Studio-equivalent write | `public` | `public` |
+
+What changed: run 1's DA03 never saw GraphQL served, so its `before off` column
+could not show that the Studio-equivalent enable broke a working endpoint. Run
+3 shows it: `200` (served) before, `406 PGRST106` after, the same code as the
+extra schema. The run 1 conclusion stands: the after reading is `406 PGRST106`
+without the extension (run 1) and with it (run 3), which fits PostgREST
+refusing `graphql_public` once it is no longer in `db_schema` (inference from
+the code; the request never reaching `pg_graphql` was not probed). DA01 still
+reads `200 not-ok` because it runs before DA03 installs the extension: on a new
+project the status says 200 and the body is the errors envelope run 1 recorded
+(`pg_graphql extension is not enabled.`).
+
+Timings in this run (`graphql` 973 ms, `rest_table` 1050 ms, `extra_schema`
+1094 ms after the enable) sit inside DA02's 887-2870 ms; n=1, not a new
+recovery figure.
+
+privatelink-aws T22 carries the same change (POST `{ __typename }`,
+`graphql_state`, `pg_graphql_installed`) and was not run: it needs the AWS
+PrivateLink rig.
+
+Teardown: `tofu destroy` 2026-10-23, the Management API answers 404 for the ref.
+
 ## What this does NOT answer
 
 - The Dashboard click's own recovery time (DA06, manual, not run).

@@ -268,10 +268,11 @@ can be done about the managed HTTP tier on `<ref>.supabase.co`.
   what a connected client may do; it does not remove the endpoint.
 - Auth and Storage have no equivalent toggle.
 
-## experiments/data-api-reenable - key facts (validated 2026-09-24)
+## experiments/data-api-reenable - key facts (validated 2026-09-24; DA03 re-run 2026-10-23)
 
 One project, no AWS. What re-enabling the Data API costs a client, and what a
-client can poll. See RUNLOG.md; artifacts in `out/2026-09-24/`.
+client can poll. See RUNLOG.md; artifacts in `out/2026-09-24/` and
+`out/2026-10-23/`.
 
 - "Off" points PostgREST at a nonexistent schema: the platform restarts it with
   `db-schemas=pg_pgrst_no_exposed_schemas`, the schema-cache load fails, and
@@ -299,10 +300,16 @@ client can poll. See RUNLOG.md; artifacts in `out/2026-09-24/`.
   `logs` table (`where source = 'postgrest_logs'`, measured 2026-10-10 on a
   fresh project, edge-resilience RUNLOG), and `logs.all` answers 410 since
   2026-09-23. DA02L was ported to `logsQuery` on 2026-10-10 and has not been
-  re-run end to end since. The project created for this run (2026-09-24) did
-  not have `pg_graphql`
-  enabled, so `/graphql/v1` returned 200 with an errors envelope and is not a
-  health signal.
+  re-run end to end since.
+- `/graphql/v1` status is not a GraphQL-on signal: new projects have no
+  `pg_graphql`, and the endpoint answers 200 with an errors envelope (DA01
+  `200 not-ok`, 2026-09-24 and 2026-10-23). Read the body of a POSTed
+  `{ __typename }` and `pg_extension` (`harness/src/graphql.ts`). DA03 installs
+  the extension when absent and drops it after; re-run 2026-10-23 (n=1) it read
+  `200` served before the off switch and `406 PGRST106` after the
+  Studio-equivalent enable, the same after-reading as 2026-09-24 without the
+  extension. privatelink-aws T22 carries the same change, not run (needs the
+  AWS PrivateLink rig).
 
 ## experiments/data-api-capacity - key facts (validated 2026-10-22/23, Pro org; DC01-03 ap-southeast-1 Small then Large, DC04 ap-northeast-2 Small then 4XL, DC05-07 ap-northeast-2 Small)
 

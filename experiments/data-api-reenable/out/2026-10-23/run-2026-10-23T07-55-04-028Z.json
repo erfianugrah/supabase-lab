@@ -1,0 +1,65 @@
+{
+  "startedAt": "2026-10-23T07:55:04.028Z",
+  "finishedAt": "2026-10-23T07:56:23.813Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "projectRegion": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "data-api-reenable",
+  "labCommit": "661afdf",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "DA01",
+      "title": "Baseline: fixture seeded, readiness candidates on a healthy project",
+      "status": "pass",
+      "detail": "rest_root_svc=200 rest_rpc=200 rest_admin_ready=200 rest_table=200 graphql=200 not-ok mgmt_health_rest=ACTIVE_HEALTHY",
+      "measurements": {
+        "db_schema": "public,graphql_public",
+        "base_rest_root_svc": "200",
+        "base_rest_rpc": "200",
+        "base_rest_admin_ready": "200",
+        "base_rest_table": "200",
+        "base_graphql": "200 not-ok",
+        "base_mgmt_health_rest": "ACTIVE_HEALTHY"
+      },
+      "durationMs": 1911
+    },
+    {
+      "id": "DA03",
+      "title": "Dashboard-equivalent re-enable on a project exposing an extra schema",
+      "status": "info",
+      "detail": "before off: {\"extra_schema\":\"200\",\"rest_table\":\"200\",\"graphql\":\"200\"}; 60s after rest_table settled (enable + settle + 60s): {\"extra_schema\":\"406 PGRST106\",\"rest_table\":\"200\",\"graphql\":\"406 PGRST106\"}; db_schema now \"public\"",
+      "measurements": {
+        "db_schema_before": "public,graphql_public,da_api",
+        "db_schema_after": "public",
+        "pg_graphql_at_start": "no",
+        "pg_graphql_installed_by_module": "yes",
+        "after_extra_schema": "406 PGRST106",
+        "after_rest_table": "200",
+        "after_graphql": "406 PGRST106"
+      },
+      "evidence": "rest_table: 1050:200\ngraphql: 973:406 PGRST106\nextra_schema: 1094:406 PGRST106",
+      "durationMs": 77873
+    },
+    {
+      "id": "DA03z",
+      "title": "restore PostgREST config",
+      "status": "pass",
+      "detail": "restored",
+      "durationMs": 77874
+    },
+    {
+      "id": "DA03y",
+      "title": "drop the pg_graphql this module installed",
+      "status": "pass",
+      "detail": "dropped",
+      "durationMs": 77874
+    }
+  ]
+}
