@@ -15,7 +15,7 @@
  *           third-party token is a data-plane credential, not a GoTrue session.
  *
  * Not settled by this module: Storage/Realtime acceptance of the same token
- * (self-hosted-auth SH06e covers Storage), and whether the gateway validates
+ * (TPA05 and TPA06 probe it), and whether the gateway validates
  * `iss` strictly vs resolving purely by `kid` - the token sets iss to the
  * jwks_url, which resolves either way.
  *

@@ -1,0 +1,234 @@
+{
+  "startedAt": "2026-10-23T08:05:56.795Z",
+  "finishedAt": "2026-10-23T08:07:59.526Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "projectRegion": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "third-party-auth",
+  "labCommit": "661afdf",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "TPA06-setup",
+      "title": "issuer registered; Realtime accepts the first private join for token A",
+      "status": "pass",
+      "detail": "jwks 200; register 201; PostgREST first 200 5s after registration; first private join ok 0s after the PostgREST 200; replies before that: none",
+      "measurements": {
+        "register_status": 201,
+        "rest_accepted_after_s": 5,
+        "realtime_accepted_after_rest_s": 0
+      },
+      "durationMs": 122730
+    },
+    {
+      "id": "TPA06a-A",
+      "title": "private join tenant:acme with token A",
+      "status": "pass",
+      "detail": "phx_reply {\"status\":\"ok\",\"response\":{\"postgres_changes\":[]}} (expected joined)",
+      "measurements": {
+        "joined": 1
+      },
+      "durationMs": 122730
+    },
+    {
+      "id": "TPA06a-A2",
+      "title": "private join tenant:acme with token A2",
+      "status": "pass",
+      "detail": "phx_reply {\"status\":\"ok\",\"response\":{\"postgres_changes\":[]}} (expected joined)",
+      "measurements": {
+        "joined": 1
+      },
+      "durationMs": 122730
+    },
+    {
+      "id": "TPA06a-B",
+      "title": "private join tenant:acme with token B",
+      "status": "pass",
+      "detail": "phx_reply {\"status\":\"error\",\"response\":{\"reason\":\"Unauthorized: You do not have permissions to read from this Channel topic: tenant:acme\"}} (expected refused)",
+      "measurements": {
+        "joined": 0
+      },
+      "durationMs": 122730
+    },
+    {
+      "id": "TPA06a-noclaim",
+      "title": "private join tenant:acme with token noclaim",
+      "status": "pass",
+      "detail": "phx_reply {\"status\":\"error\",\"response\":{\"reason\":\"Unauthorized: You do not have permissions to read from this Channel topic: tenant:acme\"}} (expected refused)",
+      "measurements": {
+        "joined": 0
+      },
+      "durationMs": 122730
+    },
+    {
+      "id": "TPA06a-forged",
+      "title": "private join tenant:acme with token forged",
+      "status": "pass",
+      "detail": "phx_reply {\"status\":\"error\",\"response\":{\"reason\":\"JwtSignatureError: Failed to validate JWT signature\"}} (expected refused)",
+      "measurements": {
+        "joined": 0
+      },
+      "durationMs": 122730
+    },
+    {
+      "id": "TPA06a-unknownkid",
+      "title": "private join tenant:acme with token unknownkid",
+      "status": "pass",
+      "detail": "phx_reply {\"status\":\"error\",\"response\":{\"reason\":\"JwtSignerError: Failed to generate JWT signer for key ID (kid) \\\"3b352e90-1e44-44dc-ae96-cd678e65331c\\\", check your JWT secret or JWKS configuration\"}} (expected refused)",
+      "measurements": {
+        "joined": 0
+      },
+      "durationMs": 122730
+    },
+    {
+      "id": "TPA06a-expired",
+      "title": "private join tenant:acme with token expired",
+      "status": "pass",
+      "detail": "phx_reply {\"status\":\"error\",\"response\":{\"reason\":\"InvalidJWTToken: Token has expired 623 seconds ago\"}} (expected refused)",
+      "measurements": {
+        "joined": 0
+      },
+      "durationMs": 122730
+    },
+    {
+      "id": "TPA06a-anon",
+      "title": "private join tenant:acme with token anon",
+      "status": "pass",
+      "detail": "phx_reply {\"status\":\"error\",\"response\":{\"reason\":\"Unauthorized: You do not have permissions to read from this Channel topic: tenant:acme\"}} (expected refused)",
+      "measurements": {
+        "joined": 0
+      },
+      "durationMs": 122730
+    },
+    {
+      "id": "TPA06b",
+      "title": "realtime.send to each tenant topic reaches only that topic's joined sockets",
+      "status": "pass",
+      "detail": "B private join tenant:globex: ok; A received [\"to-acme\"], A2 [\"to-acme\"], B [\"to-globex\"]",
+      "measurements": {
+        "a_received": 1,
+        "a2_received": 1,
+        "b_received": 1
+      },
+      "durationMs": 122730
+    },
+    {
+      "id": "TPA06c-A",
+      "title": "client Broadcast (ack) on tenant:acme from A (can_write=true)",
+      "status": "pass",
+      "detail": "ack ok {\"status\":\"ok\",\"response\":{}}; received by A 1, by A2 1 (expected delivered)",
+      "measurements": {
+        "delivered": 2
+      },
+      "durationMs": 122730
+    },
+    {
+      "id": "TPA06c-A2",
+      "title": "client Broadcast (ack) on tenant:acme from A2 (no can_write claim)",
+      "status": "pass",
+      "detail": "ack error {\"status\":\"error\",\"response\":{\"error\":\"unauthorized\"}}; received by A 0, by A2 0 (expected not delivered)",
+      "measurements": {
+        "delivered": 0
+      },
+      "durationMs": 122730
+    },
+    {
+      "id": "TPA06d-A",
+      "title": "Postgres Changes INSERT with RLS tenant = claim, token A",
+      "status": "pass",
+      "detail": "join ok {\"status\":\"ok\",\"response\":{\"postgres_changes\":[{\"id\":22143918,\"event\":\"INSERT\",\"schema\":\"public\",\"table\":\"tpa06_rows\"}]}}; system system [\"ok\",\"postgres_changes\",\"Subscribed to PostgreSQL\"]; measured rows received acme 3 of 3, globex 0 of 3 (canary rounds 1; expected acme 3, globex 0)",
+      "measurements": {
+        "join_ok": 1,
+        "acme_rows": 3,
+        "globex_rows": 0,
+        "canary_rounds": 1
+      },
+      "durationMs": 122730
+    },
+    {
+      "id": "TPA06d-B",
+      "title": "Postgres Changes INSERT with RLS tenant = claim, token B",
+      "status": "pass",
+      "detail": "join ok {\"status\":\"ok\",\"response\":{\"postgres_changes\":[{\"id\":22143918,\"event\":\"INSERT\",\"schema\":\"public\",\"table\":\"tpa06_rows\"}]}}; system system [\"ok\",\"postgres_changes\",\"Subscribed to PostgreSQL\"]; measured rows received acme 0 of 3, globex 3 of 3 (canary rounds 1; expected acme 0, globex 3)",
+      "measurements": {
+        "join_ok": 1,
+        "acme_rows": 0,
+        "globex_rows": 3,
+        "canary_rounds": 1
+      },
+      "durationMs": 122730
+    },
+    {
+      "id": "TPA06d-anon",
+      "title": "Postgres Changes INSERT with RLS tenant = claim, token anon",
+      "status": "pass",
+      "detail": "join ok {\"status\":\"ok\",\"response\":{\"postgres_changes\":[{\"id\":22143918,\"event\":\"INSERT\",\"schema\":\"public\",\"table\":\"tpa06_rows\"}]}}; system system [\"ok\",\"postgres_changes\",\"Subscribed to PostgreSQL\"]; measured rows received acme 0 of 3, globex 0 of 3 (canary rounds 1; expected acme 0, globex 0)",
+      "measurements": {
+        "join_ok": 1,
+        "acme_rows": 0,
+        "globex_rows": 0,
+        "canary_rounds": 1
+      },
+      "durationMs": 122730
+    },
+    {
+      "id": "TPA06d-forged",
+      "title": "Postgres Changes INSERT with RLS tenant = claim, token forged",
+      "status": "pass",
+      "detail": "join error {\"status\":\"error\",\"response\":{\"reason\":\"JwtSignatureError: Failed to validate JWT signature\"}}; system none; measured rows received acme 0 of 3, globex 0 of 3 (canary rounds 1; expected acme 0, globex 0)",
+      "measurements": {
+        "join_ok": 0,
+        "acme_rows": 0,
+        "globex_rows": 0,
+        "canary_rounds": 1
+      },
+      "durationMs": 122730
+    },
+    {
+      "id": "TPA06e-E",
+      "title": "private channel whose 30 s token is left alone",
+      "status": "info",
+      "detail": "join ok; frames (seconds relative to exp): 0.0s system [\"error\",\"system\",\"Token has expired 0 seconds ago\"] | 0.0s phx_close; realtime.send at 15s after exp received 0",
+      "measurements": {
+        "frames": 2,
+        "received_after_exp": 0
+      },
+      "durationMs": 122730
+    },
+    {
+      "id": "TPA06e-R",
+      "title": "private channel whose 30 s token is refreshed at ~10 s with a fresh token",
+      "status": "info",
+      "detail": "join ok; frames (seconds relative to exp): none; realtime.send at 15s after exp received 1",
+      "measurements": {
+        "frames": 0,
+        "received_after_exp": 1
+      },
+      "durationMs": 122730
+    },
+    {
+      "id": "TPA06e-F",
+      "title": "private channel whose 30 s token is pushed a forged token at ~10 s",
+      "status": "info",
+      "detail": "join ok; frames (seconds relative to exp): -19.0s system [\"error\",\"system\",\":signature_error\"] | -19.0s phx_close; realtime.send at 15s after exp received 0",
+      "measurements": {
+        "frames": 2,
+        "received_after_exp": 0
+      },
+      "durationMs": 122730
+    },
+    {
+      "id": "TPA06z",
+      "title": "cleanup: issuer, policies, table, JWKS function",
+      "status": "pass",
+      "detail": "tpa delete 200; functions deleted 1",
+      "durationMs": 122730
+    }
+  ]
+}

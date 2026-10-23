@@ -8,7 +8,7 @@ TS := $(shell date +%Y%m%d-%H%M%S)
 # Every module registers an in-process ES256 issuer as third-party auth, so all
 # are destructive (they deploy a JWKS function, register an issuer, and create
 # tables/users, all cleaned up in finally).
-IDS ?= TPA01,TPA02,TPA03,TPA04
+IDS ?= TPA01,TPA02,TPA03,TPA04,TPA05,TPA06
 
 .PHONY: init fmt validate apply probe publish-evidence destroy
 

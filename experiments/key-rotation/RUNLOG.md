@@ -150,3 +150,6 @@ observed window, even with a current issuer JWKS.
 - The exact mechanism the spoke uses to cache JWKS (in-process, database, or
   config-based; timeout vs event-driven invalidation).
 - Anything about Storage or Realtime accepting a foreign-issuer token.
+  For a lab-held ES256 issuer registered as third-party auth, third-party-auth
+  TPA05/TPA06 (2026-10-23) found both verify it; a hub project's own signing
+  key as the issuer was not run there.

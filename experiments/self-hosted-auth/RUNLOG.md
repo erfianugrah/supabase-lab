@@ -195,6 +195,9 @@ lives on the project's own hostname.
 
 - Whether Storage or Realtime verify a third-party token: the bucket-list
   probe answers anon too. Realtime was not probed.
+  Closed 2026-10-23 by third-party-auth TPA05/TPA06 for a lab-held ES256
+  issuer registered the same way: Storage and Realtime both verify the
+  signature, kid and exp, and their policies read the token's claims.
 - Everything ran as `postgres` through the session pooler. Whether GoTrue's
   connection pool behaves under load through Supavisor session mode, and
   what happens on the transaction pooler, was not measured.

@@ -1646,6 +1646,48 @@ history.
   `gotrue-down` / `probe IDS=...` (`BUILD=0 RUNNER="bun .../run.ts"` to run
   from source while another battery holds the binary) / `destroy`.
 
+## experiments/third-party-auth - key facts (TPA01-TPA04 2026-09-08 Pro and Free; TPA05-TPA06 2026-10-23, one Micro project, Pro org, ap-southeast-1, n = 2)
+
+An in-process ES256 key is the external issuer; its JWKS is served from an
+Edge Function on the project and registered with `POST
+/config/auth/third-party-auth {jwks_url}`. RUNLOG has every row verbatim.
+
+- PostgREST trusts the issuer's token; managed `/auth/v1/user` refuses it
+  (`403`); RLS reads its `sub` and custom claims (TPA01-TPA02). GoTrue and its
+  migrations stay on the project (TPA03). Not plan-gated (Free and Pro).
+- **Storage verifies the token itself** (TPA05): on a private bucket with
+  storage.objects policies keyed on a `tenant` claim, the right-tenant token
+  downloaded, listed, uploaded and created a signed URL; a token from the
+  same issuer with another `tenant` got `400` NoSuchKey on download and sign,
+  `200 []` on list, and `400` "new row violates row-level security policy"
+  on upload; one with no `tenant` and the anon key as bearer (download only)
+  got the same NoSuchKey. A forged signature (registered kid, other key) got
+  `400 {"statusCode":"403",...,"message":"signature verification failed"}`,
+  and an unregistered kid and an expired token were refused too. The body
+  shape shows Storage answered, so the gateway passed those tokens through
+  (read from the response shape, not probed at the gateway). A signed URL, once created,
+  serves the object with no token (HS512, Storage's own key).
+- **Realtime verifies the token at join** (TPA06): private `tenant:acme`
+  joined for the matching claim and was refused (`Unauthorized: You do not
+  have permissions to read from this Channel topic`) for another tenant, no
+  claim, or no access_token; forged -> `JwtSignatureError`, unknown kid ->
+  `JwtSignerError`, expired -> `InvalidJWTToken: Token has expired ...`.
+  An INSERT policy on a `can_write` claim decided client Broadcast (ack ok vs
+  `{"error":"unauthorized"}`). Postgres Changes under RLS on the claim
+  delivered 3 of 3 own-tenant rows and 0 of 3 other-tenant rows per token.
+- **Expiry on an open channel**: Realtime sent `system` "Token has expired 0
+  seconds ago" and `phx_close` at the token's exp; an `access_token` push with
+  a fresh token about 10 s after mint kept the channel receiving 15 s past
+  exp; a forged `access_token` push closed it at once (`:signature_error`).
+- Both services accepted a new issuer on the first probe after PostgREST's
+  first `200` (5 s after registration, polled every 5 s, both runs).
+- Not run: Presence, TUS/S3 uploads, `iss` mismatch, a token without `role`,
+  `sb_publishable_` as apikey on these paths, the project-A-Auth-as-issuer
+  shape (cross-project-auth).
+- Ops: TPA05/TPA06 need only `PVLAB_REF` and a PAT (they fetch keys
+  themselves); `lib/rtws.ts` is a raw-protocol Realtime socket that keeps
+  every frame verbatim.
+
 ## experiments/identity-transfer - key facts (IT01 2026-09-07 managed micro; ITL1-ITL3 2026-09-11 local rig)
 
 - Question: a person returns from an OAuth provider with a NEW subject (the
