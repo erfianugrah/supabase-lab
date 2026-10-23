@@ -16,6 +16,7 @@ import { planRun } from "./plan";
 import { diffArtifacts, renderDiffMarkdown } from "./diff";
 import { renderFacts } from "./facts";
 import { renderMarkdown } from "./report";
+import { preventIdleSleep, suspendedMs, withHostSuspension } from "./host-pause";
 import type { RunArtifact, TestModule, TestResult, Where } from "./types";
 
 function arg(name: string, fallback?: string): string | undefined {
@@ -134,6 +135,8 @@ const main = async () => {
   const experiment = arg("experiment") ?? process.env.PVLAB_EXPERIMENT;
   const only = arg("only")?.split(",").map((s) => s.trim()).filter(Boolean);
 
+  // A sleeping orchestrator makes every timing across the sleep wrong (host-pause.ts).
+  preventIdleSleep();
   const ctx = await buildCtx({ where });
   const modules = await loadTests(testsDir);
 
@@ -169,23 +172,25 @@ const main = async () => {
   for (const m of run) {
     console.log(`\n[${m.id}] ${m.title}${m.destructive ? " (destructive)" : ""}`);
     const t0 = performance.now();
+    const w0 = Date.now();
     try {
       const r = await m.run(ctx);
       const arr = Array.isArray(r) ? r : [r];
-      for (const one of arr) {
+      const suspended = suspendedMs(w0, Date.now(), t0, performance.now());
+      for (const raw of arr) {
+        const one = withHostSuspension(raw, suspended);
         one.durationMs = Math.round(performance.now() - t0);
         results.push(one);
         console.log(`  -> ${one.status}${one.detail ? `: ${one.detail}` : ""}`);
       }
     } catch (e) {
       // A thrown error is a harness/test bug, distinct from a measured failure.
-      results.push({
-        id: m.id,
-        title: m.title,
-        status: "fail",
-        detail: `test threw: ${e instanceof Error ? e.message : String(e)}`,
-        durationMs: Math.round(performance.now() - t0),
-      });
+      const threw = withHostSuspension(
+        { id: m.id, title: m.title, status: "fail", detail: `test threw: ${e instanceof Error ? e.message : String(e)}` },
+        suspendedMs(w0, Date.now(), t0, performance.now()),
+      );
+      threw.durationMs = Math.round(performance.now() - t0);
+      results.push(threw);
       console.log(`  -> threw: ${e instanceof Error ? e.message : String(e)}`);
     }
   }

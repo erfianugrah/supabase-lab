@@ -69,7 +69,14 @@ export function storageProbe(apiHost: string, anonKey: string): Probe {
  * Prepared-statement behaviour across a pooled connection is deliberately not
  * exercised: that is a pooler-semantics question, not a downtime one.
  */
-export function poolerProbe(host: string, port: number, user: string, password: string): Probe {
+/** `ssl` is overridable only so a test can point the probe at a plaintext fake pooler. */
+export function poolerProbe(
+  host: string,
+  port: number,
+  user: string,
+  password: string,
+  ssl: false | { rejectUnauthorized: boolean } = { rejectUnauthorized: false },
+): Probe {
   return {
     name: "pooler",
     async run() {
@@ -79,8 +86,11 @@ export function poolerProbe(host: string, port: number, user: string, password: 
         user,
         database: "postgres",
         password,
-        ssl: { rejectUnauthorized: false },
+        ssl,
         connectionTimeoutMillis: TIMEOUT_MS,
+        // connectionTimeoutMillis stops at ReadyForQuery; without this a query
+        // the pooler holds while the database is away never settles (#211).
+        query_timeout: TIMEOUT_MS,
       });
       try {
         await client.connect();

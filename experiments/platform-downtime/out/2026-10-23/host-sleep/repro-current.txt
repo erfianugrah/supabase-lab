@@ -1,0 +1,4 @@
+pid <pid> sampler=harness/src/sampler.ts query_timeout=unset
+  pooler down at +609ms: probe did not answer within 3000 ms
+  pooler down at +3811ms: probe did not answer within 3000 ms
+returned after 7013 ms: rest_http samples=30 failures=0 modes=[] | pooler samples=5 failures=2 modes=["probe did not answer within 3000 ms"]

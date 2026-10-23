@@ -1,0 +1,23 @@
+
+experiments/platform-downtime/out/2026-10-23/run-2026-10-23T01-43-22-996Z.json  2026-10-23T01:43:22.996Z -> 2026-10-23T02:05:02.834Z  sleeps inside: 2, 306 s; wall 1299.8 s, summed durationMs 998.5 s
+  D01 wall 01:43:22-01:51:46 (503 s, monotonic 503 s) no sleep
+  D02 wall 01:51:46-01:52:59 (73 s, monotonic 73 s) no sleep
+  D03 wall 01:52:59-02:00:45 (466 s, monotonic 203 s) sleep 01:56:21-02:00:44 (263 s) at +202 s
+  D04 wall 02:00:45-02:05:07 (262 s, monotonic 219 s) sleep 02:00:54-02:01:37 (43 s) at +9 s
+  reconstructed end 02:05:07 vs finishedAt 02:05:02 (diff -5 s)
+
+experiments/platform-downtime/out/2026-10-23/run-2026-10-23T01-43-23-054Z.json  2026-10-23T01:43:23.054Z -> 2026-10-23T01:45:37.759Z  sleeps inside: 0, 0 s; wall 134.7 s, summed durationMs 134.7 s
+
+experiments/platform-downtime/out/2026-10-23/run-2026-10-23T01-47-38-287Z.json  2026-10-23T01:47:38.287Z -> 2026-10-23T01:54:52.493Z  sleeps inside: 0, 0 s; wall 434.2 s, summed durationMs 434.2 s
+
+experiments/platform-downtime/out/2026-10-23/run-2026-10-23T01-55-35-451Z.json  2026-10-23T01:55:35.451Z -> 2026-10-23T02:05:03.275Z  sleeps inside: 2, 306 s; wall 567.8 s, summed durationMs 266.5 s
+  D03 wall 01:55:35-02:00:53 (318 s, monotonic 55 s) sleep 01:56:21-02:00:44 (263 s) at +46 s
+  D04 wall 02:00:53-02:05:07 (255 s, monotonic 212 s) sleep 02:00:54-02:01:37 (43 s) at +1 s
+  reconstructed end 02:05:07 vs finishedAt 02:05:03 (diff -5 s)
+
+experiments/platform-downtime/out/2026-10-23/run-2026-10-23T02-07-03-305Z.json  2026-10-23T02:07:03.305Z -> 2026-10-23T02:29:42.345Z  sleeps inside: 3, 539 s; wall 1359.0 s, summed durationMs 826.4 s
+  D01 wall 02:07:03-02:21:55 (892 s, monotonic 353 s) sleep 02:12:07-02:15:20 (193 s) at +304 s; sleep 02:15:51-02:19:54 (243 s) at +528 s; sleep 02:20:04-02:21:47 (103 s) at +781 s
+  D02 wall 02:21:55-02:23:11 (77 s, monotonic 77 s) no sleep
+  D03 wall 02:23:11-02:27:03 (232 s, monotonic 232 s) no sleep
+  D04 wall 02:27:03-02:29:48 (165 s, monotonic 165 s) no sleep
+  reconstructed end 02:29:48 vs finishedAt 02:29:42 (diff -6 s)
