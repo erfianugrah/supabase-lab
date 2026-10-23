@@ -101,7 +101,7 @@ refresh rotates -> org-scoped access -> revoke kills instantly.
 Task 20 of `docs/plans/2026-10-13-lab-backlog-waves.md` added `grant select,
 insert, update, delete on table public.o03_docs to anon, authenticated,
 service_role` to O03c's setup SQL. Two runs, local vantage, Pro org,
-ap-southeast-1, run from source at lab commit b270a45, each project
+ap-southeast-1, run from source at lab commit 8ec7f86, each project
 provisioned and deleted by the module. Artifacts are private (no
 `publish-evidence` target here): `evidence/20261013-114454/run-2026-10-13T03-44-55-057Z.json`
 and `evidence/20261013-114559/run-2026-10-13T03-45-59-555Z.json`.

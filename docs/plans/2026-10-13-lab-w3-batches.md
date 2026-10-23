@@ -38,7 +38,7 @@
   `cd harness && bun test` runs only `harness/src/*.test.ts`;
   `harness/src/identifiers.test.ts` adds one case per tracked or addable
   `.md`, `.ts`, `Makefile` (and a few other) file, so every new file adds one
-  to the pass count. Baseline at c8501f6 (the dry-run's tree): `1779 pass`;
+  to the pass count. Baseline at 7425778 (the dry-run's tree): `1779 pass`;
   with this plan file committed `1780 pass`. Each task gives its running total for in-order
   execution; if the baseline has moved (other work landed first), expect
   the same deltas on top of it.
@@ -2389,7 +2389,7 @@ logged.>
   next boot. <One clause on what that rules in or out.>
 ```
 
-- [x] **Step 3: Commit and board** (commit 9d39466; board moves still open, see #41)
+- [x] **Step 3: Commit and board** (commit ccd7d06; board moves still open, see #41)
 
 ```bash
 git add experiments/platform-downtime/RUNLOG.md experiments/platform-downtime/out \
@@ -2404,7 +2404,7 @@ Move #67 to review only if the logs gave a signal; otherwise comment the
 negative and leave it in To-Do.
 
 Executed 2026-10-13: Steps 1-2 filled from the facts tables and the
-diagnostic read (dates, values; the `lab commit` slot names 1a7158f plus the
+diagnostic read (dates, values; the `lab commit` slot names 5f373b8 plus the
 uncommitted O1 change, which is what the artifacts record). Deviations,
 Step 3: the commit is in the operator's commit script (agent commits
 blocked), with `AGENTS.md` as it stood at the end of B01 so B02's AGENTS.md
@@ -2612,7 +2612,7 @@ it. L01b needs `PVLAB_PAT2` in the env. L02 (<date>, work-supabase-lab#42):
 budget about 15 times; run nothing else with that token meanwhile.
 ```
 
-- [x] **Step 4: Commit and board** (commit 9d39466; board moves still open)
+- [x] **Step 4: Commit and board** (commit ccd7d06; board moves still open)
 
 ```bash
 git add experiments/platform-facts/RUNLOG.md experiments/platform-facts/out \
@@ -2789,7 +2789,7 @@ Makefile to the `RUNNER`/`BUILD` block from Task O1 Step 7 if it still calls
   with `sb_` keys and `utils/upgrade-pg17.sh` on a PG15 data directory.
 - Prerequisite: kind and Docker; manifests and rig changes written.
 - Predictions to test (2026-10-16 code read, `experiments/multigres/RUNLOG.md`,
-  commit 8e53ee6): the operator passes no multiorch timer flags, so the
+  commit e463b1e): the operator passes no multiorch timer flags, so the
   MG02/MG03/MG04 windows should match the all-in-one runs give or take the
   1 s default cycle; the gateway buffer is on under the operator (off in the
   image), so held vs refused connects should differ; whether Kubernetes
@@ -2934,7 +2934,7 @@ Checklist for the user:
 
 ## Dry-run status
 
-Dry-run 2026-10-13 on a copy of the repo at c8501f6 (b270a45 plus two
+Dry-run 2026-10-13 on a copy of the repo at 7425778 (8ec7f86 plus two
 docs-only commits from a concurrent session; neither touches a file this plan
 changes): rsync without `.git`, `node_modules` (symlinked back),
 `secrets.tfvars`, tofu state and plan files and `evidence/`, then a fresh git

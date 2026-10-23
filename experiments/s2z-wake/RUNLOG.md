@@ -463,7 +463,7 @@ namespace. Checked 2026-09-23.
 Task 20 of `docs/plans/2026-10-13-lab-backlog-waves.md` appended `grant
 select, insert, update, delete on table public.z01_rls_off to anon,
 authenticated, service_role` to the advisor seed. One run, local vantage, run
-from source (harness unchanged since b270a45; the artifact stamps 315c0a6, a
+from source (harness unchanged since 8ec7f86; the artifact stamps 229f5e0, a
 docs-only commit that landed mid-run), production control plane, free-plan
 org, ap-southeast-1. Free-plan because a Pro org cannot pause (`400 Project is
 not free-tier`, restore-paths key facts in AGENTS.md), so Z01c-Z01e need a

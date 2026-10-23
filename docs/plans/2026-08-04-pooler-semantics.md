@@ -3,7 +3,7 @@
 > **STATUS (stocktake 2026-10-13): SHIPPED** 2026-08-04: matrix primitive in
 > 9c8835e, sbperf reader in f3f5624, the nine probes and S01 in 67c95c2, S02
 > in e9858c2. Task 7's experiment Makefile was never written; the first run
-> went through medium-serverless on 2026-09-30 (1de7be3). The checkboxes
+> went through medium-serverless on 2026-09-30 (ab47c63). The checkboxes
 > below were never ticked; `experiments/pooler-semantics/RUNLOG.md` is the
 > record.
 

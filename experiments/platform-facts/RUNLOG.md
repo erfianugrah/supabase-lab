@@ -209,7 +209,7 @@ Read-only on Team; `auth.platform.sso` yes on Team only;
 ## 2026-10-13 - F07: eligibility across the lab orgs (work-supabase-lab#41)
 
 Harness: `make fleet ORGS=<pro>,<team>,<free>,<free2>` (slugs from the
-environment; the account has two Free orgs, both listed), lab commit 1a7158f
+environment; the account has two Free orgs, both listed), lab commit 5f373b8
 with the W3 plan's Task O3 F07 change uncommitted at run time; published
 `out/2026-10-13/run-2026-10-13T05-09-07-979Z.facts.md`.
 4 projects, all in the Pro org (the Team and both Free orgs listed none):

@@ -10,7 +10,7 @@ page named in the module header.
 ## 2026-10-22 - three runs (vantage: this lab's Mac, over the public internet)
 
 Harness: `make run`, `--destructive`. All three artifacts carry lab commit
-b6bd1d2; the uncommitted tree that adds this experiment differed per run
+3a2f9bd; the uncommitted tree that adds this experiment differed per run
 (the probe changes below). One fresh project per run. The Postgres version
 was queried at setup (`lib/project.ts`) but not written to the artifact; the
 PostgREST version was not read. Published (redacted) under

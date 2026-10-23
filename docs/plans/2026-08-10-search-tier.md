@@ -1,8 +1,8 @@
 # search tier: document search + cross-document discovery
 
-> **STATUS (stocktake 2026-10-13): SHIPPED** 2026-08-11 in 834dfa5
+> **STATUS (stocktake 2026-10-13): SHIPPED** 2026-08-11 in 83b6f8b
 > (`search_documents`, `cross_document_entities`, the UI panel); loop outcome
-> in f55d768. The checkboxes below were never ticked;
+> in 595ab29. The checkboxes below were never ticked;
 > `experiments/pdf-corpus-graph/RUNLOG.md` is the record.
 
 > **For agentic workers:** Steps use checkbox (`- [ ]`) syntax for tracking.

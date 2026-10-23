@@ -49,7 +49,7 @@ multiply the budget.
 
 ## 2026-10-13 - L02: breach shape per endpoint and burst (work-supabase-lab#42)
 
-Harness: `make probe ONLY=L02`, lab commit 1a7158f with the W3 plan's Task
+Harness: `make probe ONLY=L02`, lab commit 5f373b8 with the W3 plan's Task
 O4 L02 change uncommitted at run time, one throwaway Pro project (Micro,
 ap-southeast-1) for the project-scoped rows; 05:09 to 05:27 UTC; published
 `out/2026-10-13/run-2026-10-13T05-09-36-511Z.facts.md`.

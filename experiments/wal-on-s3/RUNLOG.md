@@ -12,7 +12,7 @@ UTC), on one laptop with Docker Desktop. Image `orioledb/orioledb:beta19-pg17`:
 `PostgreSQL 17.11 OrioleDB beta 19`, extension version 1.10. S3 server RustFS
 1.0.3 on the same Docker network, so S3 latency here is local, not AWS. Each
 case starts a new S3 server, bucket and cluster. Both artifacts record lab
-commit 02d3083, which predates this directory: the module ran from an
+commit a5fc7d6, which predates this directory: the module ran from an
 uncommitted tree (the one committed with this RUNLOG), and the `region` field
 is the harness default, not part of the rig.
 

@@ -323,7 +323,7 @@ module could race.
 
 Harness: `make probe-destructive ONLY=D01`, three runs on one Micro project
 in ap-southeast-1 (Pro org), started 04:50, 04:57 and 05:01 UTC. The
-artifacts record lab commit 1a7158f; the D01 change from the W3 plan's Task
+artifacts record lab commit 5f373b8; the D01 change from the W3 plan's Task
 O1 was in the working tree, uncommitted, and is the commit before this
 entry. Published: `out/2026-10-13/run-<stamp>.facts.md` for each run
 (stamps `2026-10-13T04-50-42-266Z`, `2026-10-13T04-57-36-867Z`,

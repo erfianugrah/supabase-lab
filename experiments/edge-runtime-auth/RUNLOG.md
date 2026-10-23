@@ -22,7 +22,7 @@ published `@supabase/server` 1.9.1 package (https://github.com/supabase/server).
 | wrangler in the container | 4.149.0 | `wrangler --version` in the image |
 | workerd build | not recorded | bundled inside wrangler; no version query was run |
 | vantage | this machine, Singapore; Cloudflare trace `colo=SIN loc=SG` | `ER02-setup` |
-| lab commit | 70e4244 plus the uncommitted experiment directory | artifact header |
+| lab commit | d8a16df plus the uncommitted experiment directory | artifact header |
 
 ## What the workerd runs are, and are not
 

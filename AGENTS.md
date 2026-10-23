@@ -1187,7 +1187,7 @@ a throwaway probe Worker + two Hyperdrive configs via wrangler (account from
 
 ## Pending / gated work
 
-Open work lives on the task board (project work-supabase-lab); this section keeps the how-to. O01c/d/e, L01b, M02, M04 and M07 last ran green on 2026-08-18 (byo-oauth and rate-limits RUNLOGs, dd77ae3, fee7a22).
+Open work lives on the task board (project work-supabase-lab); this section keeps the how-to. O01c/d/e, L01b, M02, M04 and M07 last ran green on 2026-08-18 (byo-oauth and rate-limits RUNLOGs, bf1faec, 2cf4b01).
 
 - O01c/d/e (byo-oauth re-run, consent drill) -> work-supabase-lab#182. Inputs `PVLAB_OAUTH_CLIENT_ID/SECRET/REFRESH_TOKEN` in `.pi/oauth-drill.env` (gitignored); a green O01e burns the grant - re-consent to re-run. Consent steps: experiments/byo-oauth/RUNLOG.md.
 - L01b (rate-limits, second user) -> work-supabase-lab#183. Input `PVLAB_PAT2` in the same file.
@@ -1902,7 +1902,7 @@ assumes prose quotes by paste.
   markdown tables (offline, no credential). Quote from it.
 - `make publish-evidence RUN=evidence/<ts>/run-<stamp>.json` (per experiment)
   redacts refs, project and pooler hostnames, emails and home-directory paths
-  (since 2026-10-13, 78b7f3e) and writes the artifact
+  (since 2026-10-13, fe57b6d) and writes the artifact
   plus its facts.md to `out/<date>/`, which IS committed (`.gitignore` carves
   dated `experiments/*/out/20*/` directories out of `**/out/`; raw artifacts
   at an `out/` root stay ignored). edge-resilience's 14 raw runs from
@@ -2128,7 +2128,7 @@ Redacted artifacts: `out/2026-09-30/`. Details: RUNLOG.md.
   destroyed or the whole run dies; `import.meta.dir` in the compiled binary is
   the bundle. `publish-evidence` redacts keys and values alike (it runs over
   the raw JSON text). Until 2026-10-06 its `\b[a-z]{20}\b` let a ref
-  touching `_` through (`b4d1083`, work-supabase-lab#10); a dot-joined
+  touching `_` through (`2220627`, work-supabase-lab#10); a dot-joined
   `postgres.<ref>` was always caught, so the 2026-09-30 key leak most likely
   had the ref next to `_` or a digit (inferred - the leaked key was not kept).
 

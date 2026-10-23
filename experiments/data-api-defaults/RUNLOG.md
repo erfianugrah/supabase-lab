@@ -9,7 +9,7 @@ public notice cited in the module header; "measured" means the artifact.
 ## 2026-10-10 - two runs (vantage: this lab's Mac, over the public internet)
 
 Harness: `make run`, modules DD01-DD04 and DD99, `--destructive`, lab commit
-70e4244 plus the uncommitted tree that adds this experiment. n = 1 project per
+d8a16df plus the uncommitted tree that adds this experiment. n = 1 project per
 run, one trial per probe. Postgres 17.11 on both projects. Published
 (redacted, recovered from a session scratchpad on 2026-10-13): run 1
 `out/2026-10-09/run-2026-10-09T23-58-24-538Z.json` (UTC start date), run 2
@@ -195,8 +195,8 @@ anon change.
 ## 2026-10-13 - DD01S standing-project baseline, before 2026-10-30
 
 Harness: `make run-standing`, module DD01S only, `--destructive` (one probe
-table created and dropped; no GRANT, REVOKE or ALTER sent), lab commit 91fe131
-plus the staged tree that adds DD01S (second reading at lab commit 471375b).
+table created and dropped; no GRANT, REVOKE or ALTER sent), lab commit 27a322f
+plus the staged tree that adds DD01S (second reading at lab commit a5a34fe).
 Two readings 15 minutes apart (00:06Z and 00:21Z) on n = 1 existing project, created
 2026-04-07 (before the 2026-05-30 new-project default), Postgres 17.6, not a
 lab-provisioned project. Published: `out/2026-10-13/`. The artifact header's

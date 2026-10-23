@@ -26,7 +26,7 @@ this experiment did with each:
 
 ## Runs and artifacts
 
-All carry `lab commit 70e4244`, the repo HEAD underneath the uncommitted
+All carry `lab commit d8a16df`, the repo HEAD underneath the uncommitted
 experiment files, not the module source.
 
 | run | artifact | what | result |
