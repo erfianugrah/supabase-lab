@@ -6,7 +6,7 @@
 # ER_PROJECT_PREFIX tags the throwaway projects by name (default "er-").
 ROOT := $(abspath ../..)
 TS := $(shell date +%Y%m%d-%H%M%S)
-ONLY ?= ER01,ER02
+ONLY ?= ER01,ER02,ER03
 export ER_PROJECT_PREFIX ?= er-
 
 .PHONY: unit probe publish-evidence
@@ -21,7 +21,8 @@ unit:
 # Worker to workers.dev and deletes it again. Modules are destructive by
 # construction (they create and delete a project). Wall clock measured on
 # 2026-10-10 with both running concurrently (workerd leg only): ER01 6m15s,
-# ER02 13m10s. ER01 with the Cloudflare leg: see RUNLOG.md.
+# ER02 13m10s. ER01 with the Cloudflare leg, and ER03 (Bun servers on this
+# machine, named keys; ER_PASSES, default 2): see RUNLOG.md.
 probe:
 	@test -n "$(PVLAB_ORG_PRO)" || (echo "PVLAB_ORG_PRO required"; exit 1)
 	@mkdir -p evidence/$(TS)
