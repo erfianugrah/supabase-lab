@@ -133,6 +133,10 @@ default window when no start is given, the row cap, and MCP-tool versus
 endpoint parity on the same SQL and window. Cost: one micro project for
 about 30 min. Blockers: none. Part of this ran today (above).
 
+Ran 2026-10-23 as OB03d (two runs, `experiments/observability-surface/RUNLOG.md`
+and its `out/2026-10-23/`): the 48 h zero above fits a range kept as [start, start +
+24 h] (no rows older than 24 h were available to confirm), `count(*)` is accepted, and every result is cut at 1000 rows.
+
 ### 5. Enterprise-Managed Auth for MCP
 
 Not runnable by the lab today. Needs a Team or Enterprise org with SSO

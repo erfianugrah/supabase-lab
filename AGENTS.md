@@ -2995,10 +2995,10 @@ Numbers: `RUNLOG.md`, artifacts `out/2026-10-08/`.
   workers.dev hostname was once refused on the first provider create (cause
   not captured); `createProviderWhenResolvable` waits.
 
-## experiments/observability-surface - key facts (2026-10-10, Pro-plan org)
+## experiments/observability-surface - key facts (2026-10-10, OB03d 2026-10-23, Pro-plan org)
 
 Self-provisioning (`ob-surface-` projects, ap-southeast-1), no OpenTofu state.
-Modules OB01-OB05; docs claims and measurements are kept apart in RUNLOG.md.
+Modules OB01-OB05 and OB03d; docs claims and measurements are kept apart in RUNLOG.md.
 
 - **supabase-js trace propagation (OB01)**: with the OTel API resolvable at run
   time, 2.111.0, 2.112.0 and 2.117.3 all attach `traceparent` (never `tracestate`
@@ -3035,10 +3035,32 @@ Modules OB01-OB05; docs claims and measurements are kept apart in RUNLOG.md.
   Sources on a project: `auth_audit_logs`, `auth_logs`, `edge_logs`,
   `function_edge_logs`, `function_logs`, `pgbouncer_logs`, `postgres_logs`,
   `postgrest_logs`, `realtime_logs`, `storage_logs`, `supavisor_logs`. Filter on
-  `source`; `select *` answered a backend error in an exploratory query (not archived), so name the columns. A 300-request
+  `source`; `select *` is refused (OB03d), so name the columns. A 300-request
   burst: 300 rows. `usage.api-requests-count` equalled the project's
   `edge_logs` row count (341); the platform organization usage route rejects a
   PAT (401), so logs GB usage is not reachable by token.
+- **Logs endpoint and `query_logs` edges (OB03d, 2 runs, 1200 marker rows,
+  n = 5 per cell unless stated)**: a range over 24 h is not refused: it is
+  kept as [start, start + 24 h], so one ending now silently drops its newest
+  part (24 h + 1 min, n = 5, and + 2 and + 10 min, n = 3, returned 0 until
+  the markers were older than the overshoot, then 1200; 25 h and 48 h ending
+  now 0; 48 h starting 1 h ago 1200), HTTP 200, no error or warning key. No bounds at all: HTTP 200
+  `Backend error! Retry your query. Please contact support if this
+  continues.` (10 of 10), not the OpenAPI's "last 1
+  minute"; one bound only: no error, and markers 70 s or older were never
+  returned (0 of 5 each; a short window is the inference).
+  `count(*)` is accepted (docs say rejected); `select *` gives HTTP 200
+  `{"error":"restricted wildcard (*) in a result column"}`. Every result is
+  cut at 1000 rows whatever the LIMIT (1001 to 20000, or none), with no flag;
+  MCP LIMIT 2000 also 1000 (n = 3). No `sql` returns 100 rows, and in 3 of
+  3 recorded readings from several sources, not only `edge_logs`. Hosted MCP `query_logs` (0.14.0)
+  agrees on counts, cap, `count(*)` and the `select *` text, but with no
+  window returns all 1200 markers (n = 5, markers at most 904 s old; the
+  schema documents a 24 h default, its length not measured) and refuses 48 h
+  (`isError: true`, "The log window can be at most 24 hours."); the `select
+  *` query error (the only one sent through MCP, n = 5) came back `isError:
+  false` inside the untrusted-data boundary. Pass both bounds, keep ranges at or
+  under 24 h, check `error` in every 200 body, page by time at 1000 rows.
 - **Notebooks (OB05)**: `supabase notebooks pull` writes
   `supabase/notebooks/<name>.json` (keys `description`, `favorite`, `content`;
   no id in the file); `push` creates by name and updates in place, cell ids
