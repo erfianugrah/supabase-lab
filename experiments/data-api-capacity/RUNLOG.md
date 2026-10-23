@@ -1,0 +1,166 @@
+# RUNLOG - data-api-capacity
+
+Chronological record of what was run. Org and project identifiers are not
+recorded; the org class is (Pro). Each run provisions one throwaway project
+through `POST /v1/projects` (ap-southeast-1, `desired_instance_size: small`),
+resizes it to Large in DC01c and deletes it in DC99. Postgres 17.11 and
+PostgREST 14.18 (the `application_name` of its connections) were read from
+the runs' console output, not from the published artifacts; DC01a records
+both from the next run on. Vantage: this lab's Mac in Singapore over the
+public internet, so every client time below includes the round trip. "Docs"
+means the source named in the module header; "measured" means the artifact.
+
+## 2026-10-22/23 - four runs (run 4 is the reference)
+
+Harness: `make run` (DC01, DC02, DC03, DC99, `--destructive`), lab commit
+b6bd1d2 plus the uncommitted tree that adds this experiment. All figures
+below are run 4 unless a run is named. Published (redacted):
+
+- run 1 `out/2026-10-22/run-2026-10-22T23-02-55-371Z.json` (13 results)
+- run 2 `out/2026-10-22/run-2026-10-22T23-43-28-093Z.json` (10 results)
+- run 4 `out/2026-10-23/run-2026-10-23T00-37-06-485Z.json` (14 results)
+
+each with a `.facts.md`. Run 3 died in DC02 on an unhandled `ECONNRESET`
+from `api.supabase.com` (a `PATCH /postgrest` inside the ping sampler) and
+wrote no artifact; its project was deleted with `make clean DELETE=1` at
+about 00:36 UTC (console time, not in an artifact). Its console output is
+not cited for any figure.
+
+What changed between runs, and why the earlier rows are not used where run 4
+differs:
+
+- Run 1 sent PostgREST config PATCHes without waiting for the restart each
+  one causes and did not record PATCH times. Its DC02d row (the restart
+  count; run 4 moved it to DC02e) lists six "Starting PostgREST" lines from
+  23:09:56 to 23:35:05 UTC. Where DC02 began and ended in run 1 is not fixed
+  by the artifact: the module durations (DC01 419046 ms, DC02 650760 ms,
+  DC03 332782 ms, DC99 1398 ms) add up to about 1404 s, against 2295 s
+  between the run's start and finish stamps. Three of run 1's rows look like
+  restart overlaps: DC02b at timeout 4 s (0 holders sleeping at probe time),
+  DC02c (`db_pool` 1000 burst: 218 of 220 requests ended on the client with
+  "The socket connection was closed unexpectedly") and the DC03a anon row
+  (client errors at 18.1 s, no error text recorded). DC02 now waits for the
+  restart log line after every PATCH and records the delay (`waitRestart`),
+  and run 4's DC02d measures a restart's effect on purpose.
+- Run 2: DC01c settled 41 s after the resize PATCH; the next row is a
+  module-level DC01 failure, "threw: The operation timed out." (DC01d did not
+  report), then DC02 could not measure the pool, and DC03's first calls
+  failed at once on the client (status 0, 0.0 s, no error text recorded)
+  until one hung for 78.6 s. DC01c now watches the Data API for 300 s after
+  settling, and DC03 waits for 10 consecutive good pings before it starts.
+- From run 4 every Data API request is sent with `keepalive: false` (a fresh
+  connection per request), and PATCH and logs calls catch client-side
+  network errors. The client-side failures before that: run 1, "The socket
+  connection was closed unexpectedly" on 218 of 220 DC02c requests; run 2,
+  status 0 with no text recorded; run 3, an `ECONNRESET` from
+  `api.supabase.com` (console only). The first and third match a client
+  reusing a pooled socket the server had closed; that is a reading of the
+  client side; no separating probe was run. Run 4 still has status-0 rows (listed
+  where they occur) whose error text was not recorded.
+- Module durations do not add up to the wall clock in runs 2 and 4 either:
+  561029 ms against 800 s, and 2323221 ms against 2419 s. The cause is not
+  separated.
+
+### DC01 - default pool and the default wait for PGRST003
+
+Docs (Management API spec, `V1UpdatePostgrestConfigBody` and the GET
+response): `db_pool` "If `null`, the value is automatically configured based
+on compute size"; `db_pool_acquisition_timeout` "If `null`, ... configured to
+10". PostgREST docs: a request waits for a pooled connection until
+db-pool-acquisition-timeout, then answers 504 PGRST003.
+
+| row | measured |
+|---|---|
+| DC01a Small, `GET /postgrest` | `db_pool` null, `db_pool_acquisition_timeout` 10 (a number, not null); `max_connections` 90 |
+| DC01a Small, pool | 30 `authenticator` backends in `PgSleep` mid-burst, both bursts of 100 (runs 1, 2 and 4: 30 / 30 each) |
+| DC01a Small, burst outcomes | 100 + 100 of 200 answered 200, 0 PGRST003 (12 s sleeps, so the queue drained in waves of 30 within the wait described in DC01b) |
+| DC01b Small, pool held, two single requests (service_role key) | 504 PGRST003 after 61364 ms and 61972 ms; each request's User-Agent appears on 6 PostgREST access-log lines, all 504 (run 1: 61343 / 61493 ms, run 2: 61972 / 61795 ms, 6 lines each) |
+| DC01c resize Small to Large | `PATCH /billing/addons` 200; `max_connections` 160, ACTIVE_HEALTHY and 5 good pings 66 s after the PATCH (run 1: 66 s, run 2: 41 s); the next 300 s of 1 s pings: 0 of 300 failed |
+| DC01d Large, pool | 50 / 50 mid-burst, bursts of 140 (run 1: 50 / 50); `db_pool` still null, timeout 10, `max_connections` 160 |
+
+Reading (no separate probe): 6 access-log lines for one client request
+means PostgREST received that request 6 times in total, so something between
+the client and PostgREST sends the request again after a PGRST003, and a
+request that never gets a connection waits about 6 x the acquisition timeout
+before the client sees the 504. DC02b shows the same factor at 2 s and 4 s.
+The component and its policy are not identified.
+
+### DC02 - changing the pool settings
+
+| row | measured |
+|---|---|
+| DC02a `db_pool` 70 (default 50 + 20) | PATCH 200, PostgREST restart logged 0.7 s after, readback 70; 0 of 357 pings (250 ms apart) failed in 90 s; mid-burst pool 70 with 110 requests |
+| DC02a `db_pool` 90 | PATCH 200, restart 0.7 s after, readback 90; 0 of 358 pings failed; mid-burst pool 90 with 130 requests (129 answered 200, 1 status 0 on the client) |
+| DC02b acquisition timeout 2 s, pool held (90 of 90 sleeping), two single requests (service_role key) | 504 PGRST003 after 13767 and 13752 ms, 6 PostgREST lines each (504:6) |
+| DC02b acquisition timeout 4 s, pool held (90 of 90 sleeping), two single requests | request 1: 504 PGRST003 after 25007 ms, 6 lines (504:6). Request 2: status 0 at the client's 105001 ms timeout and 0 PostgREST lines; not explained. The 4 s figure is n = 1 |
+| DC02c bounds sent | `db_pool` 1001: 400 `db_pool: Too big: expected number to be <=1000`; `db_pool` -1: 400 `db_pool: Too small: expected number to be >=0`; acquisition timeout 61: 400 `db_pool_acquisition_timeout: Too big: expected number to be <=60`. A 0 for either was not sent |
+| DC02c control: `db_pool` PATCHed back to 50 (and timeout 10) just before, then 220 concurrent 15 s sleeps | 150 answered 200, 70 answered 504 PGRST003 between 10923 and 20903 ms (median 20855); mid-burst pool 50 |
+| DC02c `db_pool` 1000 on Large (`max_connections` 160), same burst | PATCH 200, readback 1000, restart 0.7 s after; 154 answered 200, 66 answered 503 with PostgREST's own message `{"code":"PGRST002",...,"message":"Could not query the database for the schema cache. Retrying."}`; the mid-burst read through the Management API query endpoint gave no row (its status and error were not recorded); after the burst, 5 consecutive good pings took 6 s (the check's floor is about 4 s, so no outage after the burst was measured) |
+| DC02c restore (`db_pool` 50, timeout 10) | PATCH 200, restart 0.5 s after, 5 good pings in 4 s |
+| DC02d no-change `db_pool` PATCH with 20 requests sleeping 60 s in flight (sent 5 s before the PATCH), twice | restart logged 55.3 s after the PATCH both times; all 20 in-flight requests answered 200 both times; 5 of 267 and 5 of 265 pings failed (status 0, no text, 10 s client timeout), first at 1.3 s and 0.8 s, in one run of about 50 s that ended before the logged 55.3 s restart |
+| DC02e | 9 "Starting PostgREST" lines for 9 accepted PATCHes |
+
+Readings (no separate probes):
+
+- Every accepted PostgREST config PATCH restarted PostgREST, including one
+  that changed nothing (DC02d, as data-api-reenable found). Across the seven
+  PATCHes in DC02a to DC02c the restart came 0.5 to 0.9 s after the PATCH;
+  ping failures were recorded for three of them (the two DC02a PATCHes and
+  `db_pool` 1000), and none failed. With 60 s requests in flight (DC02d) it
+  came 55.3 s after, about when they finished (they were sent 5 s before the
+  PATCH), all of them completed, and new requests got no answer in the
+  meantime. That fits a restart that drains in-flight requests before
+  stopping, with new requests held behind it.
+- Under load the wait for PGRST003 was shorter than for a lone request: in
+  the 220-request control the 70 PGRST003 answers came after 10923 to 20903
+  ms (median 20855), one or two acquisition timeouts. This is inferred from
+  latency only; `burst()` does not count access-log lines, so attempts per
+  request were not counted there. The policy (a budget, a cap on concurrent
+  resends, or something else) is not separated.
+- `db_pool` above what Postgres can give changed the failure in this one
+  burst per arm: 504 PGRST003 at `db_pool` 50 became 503 PGRST002 at 1000,
+  and the Management API read in the same burst gave no row. No connection
+  count near 160 was observed (the mid-burst read is the one that failed).
+
+### DC03 - statement timeouts through the Data API
+
+Docs (Supabase timeouts guide): anon 3 s, authenticated 8 s, set per role.
+
+| row | measured |
+|---|---|
+| DC03a `rolconfig` | anon `{statement_timeout=3s}`; authenticated `{statement_timeout=8s}`; service_role null; authenticator `{"session_preload_libraries=supautils, safeupdate",statement_timeout=8s,lock_timeout=8s}` |
+| DC03a `dc_sleep` (no function setting) | anon key, 5 s sleep: 500 57014 after 3062 / 3057 ms. Anon key plus a user token (authenticated), 10 s: 8065 / 8048 ms. service_role key, 10 s: 500 57014 after 8056 / 8048 ms. Body: `{"code":"57014","details":null,"hint":null,"message":"canceling statement due to statement timeout"}` |
+| DC03b `dc_sleep_long` (`set statement_timeout = '30s'` on the function), 12 s sleep | 200 for all three keys, twice each, 12067 to 12105 ms |
+| DC03c `alter role authenticated set statement_timeout = '15s'`, user token, 10 s sleep | right after the ALTER: 500 57014 at 8078 / 8064 ms; after `notify pgrst, 'reload config'`: 200 at 10076 / 10103 ms; after `'reload schema'` as well: 200 at 10098 / 10080 ms; back to 8 s plus a config reload: 500 57014 at 8074 ms |
+| DC03d anon key plus a user token (authenticated), `dc_tick_sleep(10)` (nextval, then a sleep past 8 s) | 500 57014 at 8058 and 8296 ms; the sequence counted 1 execution per request and PostgREST logged 1 line per request (500:1) (run 2: the same) |
+
+Readings: service_role carries no timeout of its own, so a Data API request
+under it runs with the 8 s that `authenticator` logs in with. A function's
+own `set statement_timeout` applied to the call for every key, anon's 3 s
+included, so the competing hypothesis in the module header (the timer starts
+before the function's setting applies) did not hold here. An `alter role`
+reaches the Data API only at the next config reload. A 500 under the
+authenticated role (DC03d) was not sent again, while the PGRST003 probes
+(DC01b, DC02b, service_role key) were.
+
+### Not run
+
+- Compute sizes other than Small and Large; another region; a Team or
+  Enterprise org.
+- `db_pool` 0; `db_pool_acquisition_timeout` 0.
+- Requests through Supavisor or direct Postgres (only the Data API path).
+- A separating probe for which component sends PGRST003 requests again, or
+  for its policy under load; attempt counts inside a burst.
+- Client-side error text for the status-0 rows in run 4 (not recorded).
+
+### Cost
+
+Project time from the artifacts' start and finish stamps: run 1 about 38
+minutes (23:02:55 to 23:41:10 UTC), run 2 about 13 minutes (23:43:28 to
+23:56:48), run 4 about 40 minutes (00:37:06 to 01:17:25). Run 3's project
+was created at 23:58:02 (the epoch in its generated name) and deleted with
+`make clean DELETE=1` at about 00:36 (console time), about 38 minutes. Each
+project was Small until DC01c and Large after. One development project
+(Small, never resized, created 22:37:39 by the same reading of its name) was
+deleted with `make clean DELETE=1` just before run 1, about 25 minutes. All
+times 2026-10-22/23 UTC.
