@@ -280,6 +280,24 @@ facts):
   anon request through the Data API wherever they disagree on an exposure.
   One Pro project per run (AV01-AV03, AV99). Measured 2026-10-23, two runs;
   see its RUNLOG.
+- `data-api-capacity` - the Data API (PostgREST) connection pool and
+  capacity: pool size with `db_pool` unset per compute size, what a client
+  sees behind a full pool (504 PGRST003, resends), what a `/postgrest` PATCH
+  restarts, statement timeouts per role, throughput under request rate on
+  Small and 4XL, what the `pgrst_db_pool_*` series on the metrics endpoint
+  count and how often they change, connections left after a statement-timeout
+  burst, `db_pool` size once requests queue, and a 4XL under a mixed load from
+  in-region Edge Function clients (DC01-DC08, DC99). Self-provisioning, one
+  Pro project per run. Measured 2026-10-22/23; see its
+  RUNLOG and https://erfi.dev/reference/supabase-data-api-capacity/.
+- `hyperdrive-direct` - Cloudflare Hyperdrive against the direct connection:
+  reaching the IPv6-only host without the IPv4 add-on and named prepared
+  statements (H01, Micro, 2026-10-05), and Hyperdrive and the Data API sharing
+  `max_connections` on Small: usable slots, the origin connection limit,
+  which side fails first and with what error, and recovery (H02, two runs),
+  then when idle origin connections close and why the Data API answers 503
+  PGRST002 when Hyperdrive fills the slots (H03, three runs), 2026-10-23.
+  Self-provisioning with wrangler; see its RUNLOG.
 - `realtime-surface` - Realtime behaviour from changelog and blog claims:
   Postgres Changes AND filters, operators, `select` and DELETE; loss during a
   disconnect and a heartbeat canary; Broadcast Replay limits; binary Broadcast
