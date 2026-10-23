@@ -30,13 +30,16 @@ mkdir -p "$OUT/platform" "$OUT/control"
 run_arm() {
   local arm="$1" slug="$2" tok="$3" base="$4" suffix="$5"
   echo "== arm: $arm (org: $slug) =="
-  # env(1) because an expanded NAME=value word is an argument, not an
-  # assignment, when it comes out of ${var:+...}.
-  env SUPABASE_ACCESS_TOKEN="$tok" PVLAB_ORG_SLUGS="$slug" \
-    ${base:+SUPABASE_MGMT_BASE_URL="$base"} \
-    ${suffix:+SUPABASE_API_HOST_SUFFIX="$suffix"} \
-    "$ROOT/harness/dist/pvlab" --where local --experiment sfp-platforms \
-    --only "$IDS" --destructive --out "$OUT/$arm" 2>&1 | tail -5
+  # Exported in a subshell, not via env(1): `env NAME=value` puts the token
+  # in env's argv (ps-visible) until it execs pvlab. The optional overrides
+  # are exported only when set, as the old ${var:+...} words did.
+  (
+    export SUPABASE_ACCESS_TOKEN="$tok" PVLAB_ORG_SLUGS="$slug"
+    if [ -n "$base" ]; then export SUPABASE_MGMT_BASE_URL="$base"; fi
+    if [ -n "$suffix" ]; then export SUPABASE_API_HOST_SUFFIX="$suffix"; fi
+    exec "$ROOT/harness/dist/pvlab" --where local --experiment sfp-platforms \
+      --only "$IDS" --destructive --out "$OUT/$arm"
+  ) 2>&1 | tail -5
 }
 
 run_arm platform "$PLATFORM" "$TOK_P" \
