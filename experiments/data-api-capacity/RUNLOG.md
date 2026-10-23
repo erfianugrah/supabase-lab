@@ -10,6 +10,203 @@ both from the next run on. Vantage: this lab's Mac in Singapore over the
 public internet, so every client time below includes the round trip. "Docs"
 means the source named in the module header; "measured" means the artifact.
 
+## 2026-10-23 - DC05-DC07, the pool metrics, aborted connections, pool size under load (one run)
+
+Harness: `make run ONLY=DC05,DC06,DC07,DC99` with
+`PVLAB_DC_REGION=ap-northeast-2` and `PVLAB_DC_SIZE=small`, lab commit
+661afdf plus the uncommitted DC05-DC07 modules. One Pro-org project, Small
+for the whole run (2 vCPU per the compute docs; `max_connections` 90 was
+read by DC04a on the same size, not in this artifact; `db_pool` unset at
+creation), deleted by DC99. The artifact's top-level `region`
+(ap-southeast-1) is the harness default; the project's region came from
+`PVLAB_DC_REGION` and is not recorded in this artifact (DC04a and DC05a
+record it as `project_region_requested` from the next run on). Same client
+as DC04: this lab's Mac in Singapore; `oha` 1.16.0 for DC07 (console, not
+in the artifact's tool versions). The PostgREST version is not recorded in
+this artifact (DC04a, same day and region, read 14.18). Metric series are
+`pgrst_db_pool_*` from `/customer/v1/privileged/metrics`; "truth" is
+`pg_stat_activity` for `usename = 'authenticator'` read through the
+Management API query endpoint. Published:
+`out/2026-10-23/run-2026-10-23T07-49-11-858Z.json` (17 results) and its
+`.facts.md`.
+
+What the two pool series are, from PostgREST v14.18 source (source-read;
+Supabase's build is assumed to match the tag, not checked):
+`pgrst_db_pool_waiting` goes up when a request asks the pool for a
+connection and down when its session returns (`usePool` in
+https://github.com/PostgREST/postgrest/blob/v14.18/src/PostgREST/AppState.hs),
+so it counts requests queued for a connection plus requests holding one;
+its help text, "Requests waiting to acquire a pool connection", describes
+only the first part. `pgrst_db_pool_available` is connections opened minus
+connections in use (`calcAvailable` in
+https://github.com/PostgREST/postgrest/blob/v14.18/src/PostgREST/Metrics.hs),
+so open idle pool connections.
+
+### DC05a - how often the metric series change
+
+1 s scrapes for 100 s while held `dc_sleep_xl` requests stepped 0, 5, 15,
+25, 0 every 20 s (holds of 18 s), truth about every 2.5 s.
+
+| measured | value |
+|---|---|
+| scrapes | 100 (0 failed) |
+| distinct waiting/available/max tuples | 2: `0/1/30` from 0 s to 60 s, `25/0/30` from 62 s to 99 s |
+| changes | 1 |
+| lag from each step (5, 15, 25, 0 held) to the first changed scrape | 41.5, 21.5, 1.5, -1 (none) s |
+| response headers (first scrape only) | `cf-cache-status=DYNAMIC`, `date` current |
+| truth, authenticator total/in PgSleep/idle | 2/0/2 to 20 s; 6/5/1 from 22 s; 16/15/1 from 41 s; 16/0/16 at 58 s; 26/25/1 from 61 s; 26/0/26 from 81 s |
+
+Reading: the series moved once in 100 s while the truth moved five times.
+No refresh landed between about 22 s and 58 s (the 5- and 15-held states
+never appeared) or between 81 s and 99 s (the 25-held state was still
+shown 18 s after the holds ended). The step lags in the table are all the
+one change at 62 s, measured from different starts. The endpoint answered
+`DYNAMIC` with a current `date` on the first scrape, so the staleness sits
+behind the edge. If the payload refreshes on a fixed period, that period is
+at least about 40 s; no upper bound was measured.
+
+### DC05b - what the series read, against pg_stat_activity
+
+10 then 40 requests held for 30 s on a pool of 30; five scrapes 1.5 s apart
+from 12 s into the hold, truth at the third.
+
+| held | scrapes (waiting/available/max) | truth total / in PgSleep / idle | "available" if it meant open idle / max minus checked out | hold outcomes |
+|---|---|---|---|---|
+| 10 | `25/0/30` x4, then `10/15/30` | 26 / 10 / 16 | 16 / 20 | 200:10 |
+| 40 | `10/15/30` x5 | 31 / 30 / 1 | 1 / 0 | 200:40 |
+
+Readings, against the source definitions above (three snapshots that line
+up with a known state):
+
+- `available` read 15 with 10 held (16 idle `authenticator` backends), 0
+  with 25 held (DC05a, 62 s; 1 idle) and 1 at rest (DC05a, 0 s; 2 idle).
+  That agrees with open idle pool connections; max minus checked out would
+  have read 20, 5 and 30. In those three, one idle `authenticator` backend
+  was not counted, which fits a connection outside the pool (PostgREST's
+  listener; not identified).
+- `waiting` read 25 with 25 held and 10 with 10 held on a pool of 30 where
+  nothing queued: the holders alone, as queued-plus-holding predicts. DC07
+  pool 15 at c=128 read 31 waiting on a pool max of 15, so it does include
+  queued requests when there are some.
+- The 40-held row is the 10-held snapshot, still being served; the queued
+  state (30 in PgSleep, 10 waiting for a connection) was never scraped.
+
+### DC05c - pool max after a db_pool PATCH
+
+| PATCH | status | restart line after | `pgrst_db_pool_max` read the new value after |
+|---|---|---|---|
+| `db_pool` 20 (from unset, 30) | 200 | 1.2 s | 1.4 s (first scrape) |
+| `db_pool` 30 | 200 | 1 s | 28.9 s (22 scrapes) |
+
+Reading: the PATCH restarted PostgREST within about 1 s both times; the
+metric followed after 1.4 s once and 28.9 s the other time. The 1.4 s case
+needs a refresh in the 0.2 s after the restart line, so a competing reading
+is that a restart resets or refreshes the payload; not separated. Either
+fits DC04d, where each arm read the previous arm's pool.
+
+### DC06 - statement timeouts from a lock, then the pool
+
+20 workers looping anon GETs on `dc_items` (anon `statement_timeout` 3 s,
+measured by DC03a in an earlier run on another project, not in this
+artifact); `begin; lock table public.dc_items in access exclusive mode;
+select pg_sleep(N); commit;` through the Management API; 75 s observed
+after the lock; `authenticator` states every 5 s. Control (2 s) ran first.
+One run per arm. The pool was 30 (DC05c's last PATCH) against 20 workers,
+so no request waited for a pool connection: a cancellation while queued
+for the pool was not exercised.
+
+| lock asked / held | before | during (to 4 s after the lock) | after (4 s to 75 s after) | 25P02 after | most `idle in transaction (aborted)` seen | requests |
+|---|---|---|---|---|---|---|
+| 2 s / 2.7 s | 200:2034 | 200:664 | 200:9857 | 0 | 0 | 12555 |
+| 12 s / 12.6 s | 200:2050 | 200:643, 500 57014:60 | 200:9920 | 0 | 0 | 12673 |
+
+States sampled in the 12 s arm: `active:20 idle:1` twice during the lock,
+`idle:21` from 1.4 s after it, with at most 2 `idle in transaction` (not
+aborted) in any later sample.
+
+Reading: 60 requests were cancelled by anon's statement timeout while
+waiting on the lock, and none of the pooled connections they used was left
+aborted: every request from 4 s to 75 s after the lock answered 200, and no
+sample showed an aborted backend. The competing hypothesis in the module
+header stays open: a stall where Postgres stops as a whole (cancellations
+landing at a different protocol step) was not made, since this lab has no
+way to SIGSTOP Postgres on a managed project.
+
+### DC07 - db_pool 15, 30, 60 on Small under closed-loop load
+
+Each arm: PATCH, wait for the restart line, 30 s settle, then the DC04 step
+(`oha`, 40 s, one indexed point read `GET
+/rest/v1/dc_items?id=eq.4242&select=id,payload`, anon key) at 128, 256,
+512 concurrent, 20 s apart. Success is 200s over all attempts, client-side
+errors included.
+
+| `db_pool` (restart after PATCH) | concurrency | req/s | p50 / p99 ms | success | waiting max (available then, of max) | `authenticator` mid-step | client errors | client load1 |
+|---|---|---|---|---|---|---|---|---|
+| 15 (1.1 s) | 128 | 814 | 147 / 422 | 1 | 31 (1 of 15) | idle:12 idle in transaction:4 | none | 8.8 |
+| 15 | 256 | 853 | 288 / 667 | 1 | 0 (15 of 15) | idle:15 idle in transaction:1 | 1 connection closed | 12.9 |
+| 15 | 512 | 863 | 615 / 1073 | 0.992 | 0 (15 of 15) | idle:16 | 280, 262 of them os error 51 | 11.7 |
+| 30 (1.5 s) | 128 | 834 | 147 / 376 | 1 | 0 (0 of 30) | idle:28 idle in transaction:1 | none | 4.9 |
+| 30 | 256 | 902 | 281 / 470 | 0.998 | 0 (28 of 30) | idle:28 idle in transaction:1 | 60 timeouts | 3.6 |
+| 30 | 512 | 878 | 618 / 863 | 0.985 | 0 (28 of 30) | idle:27 idle in transaction:2 | 516, 478 of them os error 51 | 4.2 |
+| 60 (1.3 s) | 128 | 836 | 147 / 348 | 1 | 0 (0 of 60) | idle:35 | none | 3.7 |
+| 60 | 256 | 909 | 277 / 579 | 1 | 0 (34 of 60) | idle:31 idle in transaction:4 | 17 timeouts | 4.2 |
+| 60 | 512 | 868 | 615 / 940 | 0.993 | 0 (34 of 60) | idle:34 idle in transaction:1 | 238, 165 of them os error 51 | 3.6 |
+
+Every `db_pool` PATCH answered 200 and read back the value set. Every
+answer in every step was a 200; the failures are client-side (`Network is
+unreachable (os error 51)`, timeouts, closed connections). Node CPU was not
+computed in any step (-1): the CPU counters on the metrics endpoint did not
+change across any step's scrapes. The pool columns are snapshots (DC05).
+
+Readings:
+
+- Pool size made no difference this run can separate. Pool 15 / 30 / 60
+  gave 814 / 834 / 836 req/s at 128, 853 / 902 / 909 at 256 and
+  863 / 878 / 868 at 512. The same configuration measured twice (DC04b,
+  default pool 30, against this run's pool 30) differed by 9, 23 and 40
+  req/s at 128, 256 and 512, against 56 req/s between pool 15 and 60 at
+  256. One step per cell, no repeats; the pool 15 arm also ran with the
+  Mac's load1 at 8.8 to 12.9 against 3.6 to 4.9 in the others.
+- The same Mac reached 1699 req/s at 256 and 3158 at 512 against a 4XL
+  (DC04c, same day). The Small ceiling here is about the DC04b figure (925
+  at 256), with latency doubling per step as there.
+- Mid-step, most `authenticator` backends were idle at every pool size, and
+  the 60 pool never showed more than 35 `authenticator` backends. Which
+  process used the node's CPU was not measured.
+- Upstream PostgREST issue #5336
+  (https://github.com/PostgREST/postgrest/issues/5336) reports throughput
+  collapsing when requests wait for a pool connection, growing with
+  PostgREST's cores: mild at 2 cores (5,714 req/s, 293 us per request in
+  its table), collapsing at 8 and 16; its pool 20 against 200 contrast was
+  on 4 cores. Its workaround is a `db-pool` at least as large as the number
+  of concurrent requests; the fix it points to is hasql-pool PR #58
+  (https://github.com/nikita-volkov/hasql-pool/pull/58). On 2 vCPU shared
+  with Postgres, flat throughput across pool sizes is consistent with the
+  issue's small-core rows. Whether requests queued for a connection at all
+  in the 30 and 60 arms is not established (the pool series are snapshots).
+
+### Not run
+
+- A pool metric refresh interval measured directly (a longer 1 s scrape
+  window across several refreshes); a scrape of `waiting` while requests
+  are known to queue for a connection.
+- A per-process CPU split between PostgREST and Postgres; node CPU in
+  DC07 (not computed, see above).
+- DC07 on a size with more vCPU, or with requests that hold a connection
+  longer than a point read, where waiting for a connection is certain;
+  DC07 from a client whose load stays level across arms.
+- For DC06: a whole-instance stall; a pool smaller than the workers, so a
+  request is cancelled while queued; the authenticated role's 8 s timeout;
+  RPC or write requests under cancellation.
+- Repeats of any row.
+
+### Cost
+
+Project time about 21 minutes (07:49:11 to 08:09:57 UTC, the artifact's
+start and finish stamps), Small throughout, deleted by DC99 (DELETE 200,
+gone from the listing at once). `make clean` afterwards listed 0
+`pvlab-dc-` projects (console, not in the artifact).
+
 ## 2026-10-23 - DC04, request rate instead of request duration (one run)
 
 Harness: `make run ONLY=DC04,DC99` with `PVLAB_DC_REGION=ap-northeast-2`
@@ -58,6 +255,15 @@ row reads 0 waiting with every slot available while 12.8 % of requests
 failed on the client; the pool series appear to update less often than the
 3 s scrape (a reading, not separated). Treat the pool columns as coarse.
 
+2026-10-23, after DC05: `pgrst_db_pool_waiting` counts requests queued for
+a connection plus requests holding one (PostgREST v14.18 source), and the
+pool columns are snapshots that change at most about every 40 s. The 139
+waiting / 11 available pair was one snapshot: the 256 step's waiting median
+was 7, and the 512 step showed 139 / 11 on all 12 scrapes. If that snapshot
+is internally consistent, 139 includes at most 30 holders, so at least 109
+requests were queued while 11 open connections sat idle. Node CPU 73.9 % is
+the change between two payload refreshes, not the whole step.
+
 ### DC04c - 4XL (16 vCPU)
 
 | concurrency | req/s | p50 / p99 ms | success | waiting max (available then, of max) | node CPU % | `authenticator` mid-step | statuses | client errors |
@@ -78,6 +284,11 @@ HTTP 403 (6,804 at 1024, every answer at 1536), with node CPU falling to
 0.1 %. The 403 body was not recorded, so which layer sent it is not
 established. These two rows describe this client and the edge in front of
 the project, not PostgREST.
+
+2026-10-23, after DC05: "nothing waiting" above means a waiting max of 1
+(median 1, 10 of 70 available) at 256 and 512, read from snapshots (DC05).
+Node CPU read 11.5 % at both 512 and 1024, which fits one stale refresh
+window spanning the two steps.
 
 ### DC04d - db_pool arms on 4XL (not usable)
 

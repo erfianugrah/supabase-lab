@@ -88,6 +88,31 @@ grant execute on function public.dc_sleep(double precision), public.dc_sleep_lon
   to anon, authenticated, service_role;
 notify pgrst, 'reload schema';`;
 
+/** A 100,000-row table for point reads (DC04-DC06), readable by the API roles. */
+const ITEMS_SQL = `
+create table if not exists public.dc_items (id int primary key, payload text not null);
+insert into public.dc_items select g, md5(g::text) from generate_series(1, 100000) g on conflict do nothing;
+grant select on public.dc_items to anon, authenticated, service_role;
+notify pgrst, 'reload schema';`;
+
+let itemsReady: Promise<void> | null = null;
+
+/** Create dc_items once per process and wait until the Data API serves it. */
+export function ensureItems(ctx: Ctx, p: DcProject): Promise<void> {
+  if (!itemsReady)
+    itemsReady = (async () => {
+      const setup = await sql(ctx, p.ref, ITEMS_SQL, 120_000);
+      if (setup.error) throw new Error(`items setup: ${setup.error}`);
+      for (let i = 0; i < 30; i++) {
+        const r = await fetch(`https://${p.host}/rest/v1/dc_items?id=eq.1`, { headers: { apikey: p.keys.anon, Authorization: `Bearer ${p.keys.anon}` } });
+        if (r.status === 200) return;
+        await sleep(2_000);
+      }
+      throw new Error("dc_items never answered 200 through the Data API");
+    })();
+  return itemsReady;
+}
+
 async function statusOf(ctx: Ctx, ref: string): Promise<string> {
   const p = await mgmt(ctx, "GET", `/projects/${ref}`).catch(() => undefined);
   return String((p?.json as { status?: string } | undefined)?.status ?? "");

@@ -40,58 +40,14 @@
 import { spawn } from "node:child_process";
 import { loadavg } from "node:os";
 import type { Ctx, TestModule, TestResult } from "../../../harness/src/types.js";
-import { ensureProject, errText, patchPostgrest, postgrestConfig, redact, resize, skipWithoutPro, sleep, sql, waitRestart, type DcProject } from "../lib/dc.js";
+import { scrapeMetrics as scrape, type PoolScrape as Scrape } from "../lib/metrics.js";
+import { ensureItems, ensureProject, errText, patchPostgrest, postgrestConfig, redact, REGION, resize, skipWithoutPro, sleep, sql, waitRestart, type DcProject } from "../lib/dc.js";
 
 const STEPS = (process.env.PVLAB_DC04_STEPS || "16,32,64,128,256,512,1024").split(",").map(Number);
 const BIG_STEPS = (process.env.PVLAB_DC04_BIG_STEPS || "64,128,256,512,1024,1536,2048").split(",").map(Number);
 const STEP_S = Number(process.env.PVLAB_DC04_STEP_S || 40);
 const BIG = process.env.PVLAB_DC04_BIG || "ci_4xlarge";
 const POOLS = (process.env.PVLAB_DC04_POOLS || "20,150,250").split(",").filter(Boolean).map(Number);
-
-const ITEMS_SQL = `
-create table if not exists public.dc_items (id int primary key, payload text not null);
-insert into public.dc_items select g, md5(g::text) from generate_series(1, 100000) g on conflict do nothing;
-grant select on public.dc_items to anon, authenticated, service_role;
-notify pgrst, 'reload schema';`;
-
-interface Scrape {
-  t: number;
-  waiting: number;
-  available: number;
-  max: number;
-  timeouts: number;
-  busy: number;
-  idle: number;
-}
-
-async function scrape(p: DcProject): Promise<{ s: Scrape | null; names: string[]; status: number }> {
-  const auth = Buffer.from(`service_role:${p.keys.service}`).toString("base64");
-  try {
-    const res = await fetch(`https://${p.host}/customer/v1/privileged/metrics`, { headers: { Authorization: `Basic ${auth}` }, signal: AbortSignal.timeout(8_000) });
-    if (!res.ok) return { s: null, names: [], status: res.status };
-    const text = await res.text();
-    const s: Scrape = { t: Date.now(), waiting: -1, available: -1, max: -1, timeouts: -1, busy: 0, idle: 0 };
-    const names = new Set<string>();
-    const add = (k: "waiting" | "available" | "max" | "timeouts", v: number) => (s[k] = (s[k] < 0 ? 0 : s[k]) + v);
-    for (const line of text.split("\n")) {
-      if (!line || line.startsWith("#")) continue;
-      const name = line.split(/[{ ]/)[0] ?? "";
-      const v = Number(line.slice(line.lastIndexOf(" ") + 1));
-      if (name.startsWith("pgrst_")) names.add(name);
-      if (name === "pgrst_db_pool_waiting") add("waiting", v);
-      else if (name === "pgrst_db_pool_available") add("available", v);
-      else if (name === "pgrst_db_pool_max") add("max", v);
-      else if (name === "pgrst_db_pool_timeouts_total") add("timeouts", v);
-      else if (name === "node_cpu_seconds_total") {
-        if (line.includes('mode="idle"')) s.idle += v;
-        else if (!line.includes('mode="steal"') && !line.includes('mode="guest')) s.busy += v;
-      }
-    }
-    return { s, names: [...names].sort(), status: res.status };
-  } catch (e) {
-    return { s: null, names: [], status: 0 };
-  }
-}
 
 interface Oha {
   rps: number;
@@ -173,7 +129,7 @@ interface StepRow {
 
 const med = (xs: number[]) => (xs.length ? [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)]! : -1);
 
-async function step(ctx: Ctx, p: DcProject, c: number): Promise<StepRow> {
+export async function step(ctx: Ctx, p: DcProject, c: number): Promise<StepRow> {
   const url = `https://${p.host}/rest/v1/dc_items?id=eq.4242&select=id,payload`;
   const headers = { apikey: p.keys.anon, Authorization: `Bearer ${p.keys.anon}` };
   const samples: Scrape[] = [];
@@ -216,10 +172,10 @@ async function step(ctx: Ctx, p: DcProject, c: number): Promise<StepRow> {
   };
 }
 
-/** The field signature: requests waiting for the pool while a good share of the pool is free and nothing timed out. */
+/** The pattern in question: requests waiting for the pool while a good share of the pool is free and nothing timed out. */
 const signature = (r: StepRow) => r.waitingMax >= 20 && r.availableAtWaitingMax >= Math.max(5, r.poolMax * 0.2) && r.timeoutsDelta === 0;
 
-function stepResult(id: string, label: string, r: StepRow): TestResult {
+export function stepResult(id: string, label: string, r: StepRow): TestResult {
   return {
     id,
     title: `${label}: c=${r.c}`,
@@ -280,13 +236,7 @@ const mod: TestModule = {
     try {
       const p = await ensureProject(ctx);
       ctx.log(`DC04: project ready in ${Math.round(p.createMs / 1000)} s (${p.pgVersion})`);
-      const setup = await sql(ctx, p.ref, ITEMS_SQL, 120_000);
-      if (setup.error) throw new Error(`items setup: ${setup.error}`);
-      for (let i = 0; i < 30; i++) {
-        const r = await fetch(`https://${p.host}/rest/v1/dc_items?id=eq.1`, { headers: { apikey: p.keys.anon, Authorization: `Bearer ${p.keys.anon}` } });
-        if (r.status === 200) break;
-        await sleep(2_000);
-      }
+      await ensureItems(ctx, p);
 
       const m = await scrape(p);
       const cfg = await postgrestConfig(ctx, p.ref);
@@ -296,7 +246,7 @@ const mod: TestModule = {
         title: "Metrics endpoint: PostgREST series exposed",
         status: m.s && m.s.waiting >= 0 ? "info" : "fail",
         detail: `HTTP ${m.status}; ${m.names.length} pgrst_* series; pool max ${m.s?.max ?? -1}; db_pool ${cfg.dbPool}; max_connections ${mc.rows?.[0]?.m ?? "?"}; ${mc.rows?.[0]?.app ?? "?"}`,
-        measurements: { metrics_status: m.status, pgrst_series: m.names.join(","), pool_max: m.s?.max ?? -1, db_pool: cfg.dbPool, max_connections: String(mc.rows?.[0]?.m ?? ""), postgrest_app: String(mc.rows?.[0]?.app ?? ""), pg_version: p.pgVersion },
+        measurements: { metrics_status: m.status, pgrst_series: m.names.join(","), pool_max: m.s?.max ?? -1, db_pool: cfg.dbPool, max_connections: String(mc.rows?.[0]?.m ?? ""), postgrest_app: String(mc.rows?.[0]?.app ?? ""), pg_version: p.pgVersion, project_region_requested: REGION },
       });
 
       await sweep(ctx, p, "DC04b", `start size (${process.env.PVLAB_DC_SIZE || "small"})`, STEPS, out);
