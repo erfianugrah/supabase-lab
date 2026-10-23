@@ -3800,7 +3800,7 @@ projects (feature battery, two conversion probes), all `small`,
   cannot call them), so the blog's "tracked" is untested for the dashboard;
   `migration_version`; the dashboard merge-request screen.
 
-## experiments/replica-routing - key facts (validated 2026-10-10, Pro org)
+## experiments/replica-routing - key facts (validated 2026-10-10, Pro org; RR02 2026-10-23, two runs)
 
 - **The API load balancer's host is `<ref>-all.supabase.co` and the Management
   API does not return it** (RR01e, 2026-10-10): the Dashboard route
@@ -3848,6 +3848,31 @@ projects (feature battery, two conversion probes), all `small`,
 - **Resetting a project's database password** (`PATCH /database/password`)
   left the Tokyo session pooler refusing it for over 60 s in 2 exploratory
   runs; a fresh project's pooler accepted its create-time password at once.
+- **The load balancer does not move reads off a stale replica** (RR02h,
+  2026-10-23, two runs, same Tokyo primary / Singapore replica shape): with
+  replica replay stopped by a replica query against a primary UPDATE+VACUUM,
+  it sent 586 of 586 reads (174.6 s stop, run 1) and 98 of 98 (28.8 s stop,
+  run 2) to the replica, ages up to 176,772 ms, 0 errors, 0 to the primary.
+  Staleness is `stale_ms` from `rpc/rr_node` against a 250 ms heartbeat
+  writer. A 1,500,000-row bulk insert did not lag the replica past 2,000 ms
+  and filled the Small disk after 19.7 s (RR02g, run 1 only).
+- **Nor off an unreachable one** (RR02i/j): `POST /restart` restarts both
+  nodes, primary first; while only the replica was down (about 35 s per run)
+  every load balancer read failed and none went to the primary. After
+  `read-replicas/remove` of the only replica, the `-all` host kept resolving
+  and answered errors from about 1 s after the remove call, then `HTTP 400 Load balancer does not seem
+  to be configured properly.` until the 1,200 s watch ended (run 2), while
+  the primary's own host answered every read. The Management API has no per-replica
+  restart (OpenAPI document, as of 2026-10-23), so a replica-only outage with the primary untouched was not run.
+- **Non-REST through the load balancer** (RR02f/k, one run): GraphQL is
+  refused, 400 for POST and GET; Auth, Storage, Realtime (join, Postgres
+  Changes, broadcast echo) and Edge Functions answer as on the primary.
+  `edge_logs` names the primary for Auth and carries no redirect identifier
+  for Storage or Realtime. The replica's own host serves REST GETs only.
+- **`max_standby_streaming_delay` through `PUT config/database/postgres`**
+  (RR02d): HTTP 200 and config `600s` both runs, but the replica's
+  `pg_settings` read `600000ms` in run 1 and `30000ms (default)` in run 2 at
+  the same point; read it back on the replica before relying on it.
 
 ## experiments/scoped-pats - key facts (SP01-SP10, validated 2026-10-10)
 

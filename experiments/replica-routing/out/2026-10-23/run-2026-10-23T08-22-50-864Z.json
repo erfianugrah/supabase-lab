@@ -1,0 +1,237 @@
+{
+  "startedAt": "2026-10-23T08:22:50.864Z",
+  "finishedAt": "2026-10-23T08:56:19.327Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "replica-routing",
+  "labCommit": "661afdf",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "RR02a",
+      "title": "create primary (Small, ap-northeast-1)",
+      "status": "pass",
+      "detail": "create HTTP 201; ACTIVE_HEALTHY after 11s",
+      "measurements": {
+        "create_http": 201,
+        "healthy_after_s": 11,
+        "size_requested": "small",
+        "region": "ap-northeast-1"
+      },
+      "durationMs": 2008448
+    },
+    {
+      "id": "RR02b",
+      "title": "pitr_7, schema (rr_marker, rr_node), pg_graphql, pvlab_probe seed, probe Edge Function",
+      "status": "pass",
+      "detail": "pitr_7 200; schema HTTP 201; pg_graphql HTTP 201; pvlab_probe serving after 9; function deploy HTTP 201",
+      "measurements": {
+        "pitr_http": 200,
+        "schema_http": 201,
+        "pg_graphql_http": 201,
+        "probe_seed_s": 9,
+        "fn_deploy_http": 201
+      },
+      "durationMs": 2008448
+    },
+    {
+      "id": "RR02c",
+      "title": "read-replicas/setup ap-southeast-1; replica host; load balancer host",
+      "status": "pass",
+      "detail": "setup 0s HTTP 204 ; first session connection after 197s; replica host rr_node HTTP 200; load balancer <ref>-all.supabase.co (candidates all:resolves)",
+      "measurements": {
+        "setup_http": 204,
+        "setup_attempts": 1,
+        "served_after_s": 197,
+        "replica_rest_http": 200
+      },
+      "evidence": "0s HTTP 204 ",
+      "durationMs": 2008448
+    },
+    {
+      "id": "RR02d",
+      "title": "PUT config/database/postgres max_standby_streaming_delay=600s, read back on both nodes",
+      "status": "info",
+      "detail": "config before (unset); PUT HTTP 200 ; config after 600s; project ACTIVE_HEALTHY; replica pg_settings max_standby_streaming_delay 30000ms (default)",
+      "measurements": {
+        "put_http": 200,
+        "config_before": "(unset)",
+        "config_after": "600s",
+        "replica_rest_back": "0s after the health wait",
+        "primary_hot_standby_feedback": "off (default)",
+        "primary_max_standby_streaming_delay": "600000ms (configuration file)",
+        "primary_statement_timeout": "120000ms (configuration file)",
+        "replica_hot_standby_feedback": "off (default)",
+        "replica_max_standby_streaming_delay": "30000ms (default)",
+        "replica_statement_timeout": "120000ms (configuration file)"
+      },
+      "durationMs": 2008448
+    },
+    {
+      "id": "RR02e",
+      "title": "baseline: rr_node through the load balancer, the replica host and the primary host (30 rounds, heartbeat every 250 ms)",
+      "status": "info",
+      "detail": "lb served replica 30, primary 0, errors 0; max stale ms: lb-replica 379, replica host 371, primary host 319",
+      "measurements": {
+        "n_per_source": 30,
+        "lb_replica": 30,
+        "lb_primary": 0,
+        "lb_errors": 0,
+        "lb_max_stale_ms": 379,
+        "replica_max_stale_ms": 371,
+        "primary_max_stale_ms": 319
+      },
+      "durationMs": 2008448
+    },
+    {
+      "id": "RR02h",
+      "title": "lag by stopped replay: replica repeatable-read query (pg_sleep 180) against primary UPDATE+VACUUM, max_standby_streaming_delay 600s requested",
+      "status": "info",
+      "detail": "replica host stale > 2000 ms for 28.8 s (max 30842 ms); load balancer in that window: replica 98 (stale 98), primary 0, errors 0; max stale served by the load balancer 30842 ms",
+      "measurements": {
+        "conflict_at_s": 18.6,
+        "replica_query_released_s": 50,
+        "replica_query_cancelled": "40001 canceling statement due to conflict with recovery",
+        "stale_threshold_ms": 2000,
+        "replica_lag_window_s": 28.8,
+        "replica_lag_start_s": 21.1,
+        "replica_max_stale_ms": 30842,
+        "lb_reads_total": 1033,
+        "lb_reads_in_window": 98,
+        "lb_replica_in_window": 98,
+        "lb_primary_in_window": 0,
+        "lb_errors_in_window": 0,
+        "lb_replica_stale_in_window": 98,
+        "lb_max_stale_served_ms": 30842,
+        "lb_first_primary_in_window_s": "never",
+        "lb_primary_total": 0,
+        "lb_errors_total": 0,
+        "lb_rest_read_failures": 0,
+        "lb_rest_read_samples": 1039,
+        "heartbeat_rows": 908,
+        "heartbeat_errors": 0
+      },
+      "evidence": "marks: +18.6s primary update+vacuum starts | +19.4s primary update+vacuum done | +50s replica query cancelled: 40001 canceling statement due to conflict with recovery | +50s replica transaction closed\nlb transitions: +0s start->replica\nheartbeat last error: none\n5 s buckets (R replica-served, P primary-served, E failed, max = largest stale_ms):\n+0s lb R18 P0 E0 max 380ms | replica R18 P0 E0 max 372ms | primary R0 P14 E0 max 318ms\n+5s lb R17 P0 E0 max 370ms | replica R17 P0 E0 max 383ms | primary R0 P13 E0 max 220ms\n+10s lb R17 P0 E0 max 371ms | replica R18 P0 E0 max 355ms | primary R0 P13 E0 max 332ms\n+15s lb R17 P0 E0 max 1007ms | replica R17 P0 E0 max 1007ms | primary R0 P14 E0 max 324ms\n+20s lb R17 P0 E0 max 5721ms | replica R17 P0 E0 max 5714ms | primary R0 P13 E0 max 327ms\n+25s lb R18 P0 E0 max 10850ms | replica R18 P0 E0 max 10885ms | primary R0 P14 E0 max 316ms\n+30s lb R17 P0 E0 max 15932ms | replica R16 P0 E0 max 15860ms | primary R0 P14 E0 max 324ms\n+35s lb R18 P0 E0 max 20971ms | replica R17 P0 E0 max 20837ms | primary R0 P13 E0 max 277ms\n+40s lb R16 P0 E0 max 25920ms | replica R17 P0 E0 max 25929ms | primary R0 P12 E0 max 315ms\n+45s lb R16 P0 E0 max 30842ms | replica R16 P0 E0 max 30842ms | primary R0 P13 E0 max 325ms\n+50s lb R18 P0 E0 max 375ms | replica R17 P0 E0 max 355ms | primary R0 P13 E0 max 332ms\n+55s lb R17 P0 E0 max 380ms | replica R18 P0 E0 max 352ms | primary R0 P14 E0 max 332ms\n+60s lb R18 P0 E0 max 351ms | replica R18 P0 E0 max 358ms | primary R0 P14 E0 max 312ms\n+65s lb R18 P0 E0 max 380ms | replica R18 P0 E0 max 366ms | primary R0 P13 E0 max 322ms\n+70s lb R17 P0 E0 max 379ms | replica R17 P0 E0 max 374ms | primary R0 P13 E0 max 319ms\n+75s lb R17 P0 E0 max 383ms | replica R17 P0 E0 max 384ms | primary R0 P14 E0 max 309ms\n+80s lb R18 P0 E0 max 384ms | replica R16 P0 E0 max 365ms | primary R0 P13 E0 max 326ms\n+85s lb R14 P0 E0 max 378ms | replica R18 P0 E0 max 367ms | primary R0 P13 E0 max 248ms\n+90s lb R16 P0 E0 max 368ms | replica R17 P0 E0 max 378ms | primary R0 P13 E0 max 322ms\n+95s lb R17 P0 E0 max 376ms | replica R18 P0 E0 max 373ms | primary R0 P14 E0 max 330ms\n+100s lb R18 P0 E0 max 362ms | replica R17 P0 E0 max 361ms | primary R0 P14 E0 max 319ms\n+105s lb R17 P0 E0 max 376ms | replica R18 P0 E0 max 384ms | primary R0 P13 E0 max 331ms\n+110s lb R15 P0 E0 max 331ms | replica R17 P0 E0 max 368ms | primary R0 P14 E0 max 335ms\n+115s lb R16 P0 E0 max 396ms | replica R17 P0 E0 max 384ms | primary R0 P14 E0 max 325ms\n+120s lb R17 P0 E0 max 375ms | replica R16 P0 E0 max 386ms | primary R0 P13 E0 max 350ms\n+125s lb R17 P0 E0 max 405ms | replica R17 P0 E0 max 364ms | primary R0 P13 E0 max 328ms\n+130s lb R16 P0 E0 max 378ms | replica R16 P0 E0 max 404ms | primary R0 P13 E0 max 314ms\n+135s lb R17 P0 E0 max 682ms | replica R15 P0 E0 max 501ms | primary R0 P14 E0 max 357ms\n+140s lb R18 P0 E0 max 386ms | replica R15 P0 E0 max 390ms | primary R0 P13 E0 max 328ms\n+145s lb R17 P0 E0 max 366ms | replica R17 P0 E0 max 372ms | primary R0 P14 E0 max 320ms\n+150s lb R17 P0 E0 max 370ms | replica R18 P0 E0 max 363ms | primary R0 P12 E0 max 300ms\n+155s lb R18 P0 E0 max 375ms | replica R17 P0 E0 max 382ms | primary R0 P13 E0 max 319ms\n+160s lb R18 P0 E0 max 375ms | replica R18 P0 E0 max 376ms | primary R0 P12 E0 max 275ms\n+165s lb R17 P0 E0 max 380ms | replica R18 P0 E0 max 381ms | primary R0 P13 E0 max 321ms\n+170s lb R18 P0 E0 max 380ms | replica R17 P0 E0 max 370ms | primary R0 P14 E0 max 316ms\n+175s lb R18 P0 E0 max 376ms | replica R18 P0 E0 max 381ms | primary R0 P14 E0 max 320ms\n+180s lb R17 P0 E0 max 365ms | replica R18 P0 E0 max 373ms | primary R0 P12 E0 max 325ms\n+185s lb R18 P0 E0 max 378ms | replica R16 P0 E0 max 370ms | primary R0 P14 E0 max 329ms\n+190s lb R18 P0 E0 max 377ms | replica R18 P0 E0 max 350ms | primary R0 P13 E0 max 306ms\n+195s lb R17 P0 E0 max 348ms | replica R17 P0 E0 max 364ms | primary R0 P14 E0 max 313ms\n+200s lb R18 P0 E0 max 377ms | replica R18 P0 E0 max 379ms | primary R0 P14 E0 max 321ms\n+205s lb R17 P0 E0 max 388ms | replica R17 P0 E0 max 386ms | primary R0 P14 E0 max 289ms\n+210s lb R18 P0 E0 max 381ms | replica R18 P0 E0 max 354ms | primary R0 P13 E0 max 326ms\n+215s lb R18 P0 E0 max 379ms | replica R17 P0 E0 max 383ms | primary R0 P13 E0 max 320ms\n+220s lb R15 P0 E0 max 385ms | replica R18 P0 E0 max 366ms | primary R0 P14 E0 max 326ms\n+225s lb R17 P0 E0 max 379ms | replica R15 P0 E0 max 356ms | primary R0 P14 E0 max 322ms\n+230s lb R18 P0 E0 max 374ms | replica R17 P0 E0 max 373ms | primary R0 P13 E0 max 321ms\n+235s lb R18 P0 E0 max 361ms | replica R18 P0 E0 max 369ms | primary R0 P13 E0 max 306ms\n+240s lb R17 P0 E0 max 382ms | replica R17 P0 E0 max 384ms | primary R0 P14 E0 max 300ms\n+245s lb R18 P0 E0 max 368ms | replica R18 P0 E0 max 383ms | primary R0 P13 E0 max 307ms\n+250s lb R17 P0 E0 max 381ms | replica R18 P0 E0 max 383ms | primary R0 P13 E0 max 283ms\n+255s lb R18 P0 E0 max 773ms | replica R17 P0 E0 max 827ms | primary R0 P14 E0 max 322ms\n+260s lb R17 P0 E0 max 367ms | replica R18 P0 E0 max 384ms | primary R0 P14 E0 max 323ms\n+265s lb R18 P0 E0 max 379ms | replica R18 P0 E0 max 384ms | primary R0 P14 E0 max 320ms\n+270s lb R17 P0 E0 max 372ms | replica R17 P0 E0 max 377ms | primary R0 P13 E0 max 324ms\n+275s lb R17 P0 E0 max 374ms | replica R17 P0 E0 max 356ms | primary R0 P14 E0 max 325ms\n+280s lb R18 P0 E0 max 378ms | replica R17 P0 E0 max 382ms | primary R0 P13 E0 max 312ms\n+285s lb R16 P0 E0 max 386ms | replica R17 P0 E0 max 377ms | primary R0 P13 E0 max 328ms\n+290s lb R18 P0 E0 max 381ms | replica R18 P0 E0 max 373ms | primary R0 P14 E0 max 319ms\n+295s lb R17 P0 E0 max 375ms | replica R18 P0 E0 max 366ms | primary R0 P14 E0 max 326ms\n+300s lb R1 P0 E0 max 298ms",
+      "durationMs": 2008448
+    },
+    {
+      "id": "RR02i",
+      "title": "POST /projects/{ref}/restart while reading through the load balancer",
+      "status": "info",
+      "detail": "load balancer: replica 386, primary 0, errors 29 (HTTP 521 <!DOCTYPE html> <!--[if lt IE 7]> <html class=\"no-js ie6 old; timeout; HTTP 503 PGRST002); transitions +0s start->replica, +70.5s replica->HTTP 521 <!DOCTYPE html> <!--[if lt IE 7]> <html class=\"no-js ie6 old, +79.9s HTTP 521 <!DOCTYPE html> <!--[if lt IE 7]> <html class=\"no-js ie6 old->timeout, +118.1s timeout->HTTP 503 PGRST002, +120.8s HTTP 503 PGRST002->replica, +132s replica->HTTP 521 <!DOCTYPE html> <!--[if lt IE 7]> <html class=\"no-js ie6 old, +133.1s HTTP 521 <!DOCTYPE html> <!--[if lt IE 7]> <html class=\"no-js ie6 old->replica",
+      "measurements": {
+        "restart_http": 200,
+        "healthy_at_s": 92,
+        "lb_samples": 415,
+        "lb_failures": 29,
+        "lb_first_fail_s": 70.4,
+        "lb_recovered_s": 133.1,
+        "lb_window_s": 62.7,
+        "replica_samples": 417,
+        "replica_failures": 31,
+        "replica_first_fail_s": 70.3,
+        "replica_recovered_s": 133.2,
+        "replica_window_s": 63,
+        "primary_samples": 339,
+        "primary_failures": 86,
+        "primary_first_fail_s": 17.6,
+        "primary_recovered_s": 97.1,
+        "primary_window_s": 79.5,
+        "lb_rest_read_samples": 415,
+        "lb_rest_read_failures": 31,
+        "lb_rest_read_first_fail_s": 70.2,
+        "lb_rest_read_recovered_s": 133.3,
+        "lb_rest_read_window_s": 63.1,
+        "lb_replica_total": 386,
+        "lb_primary_total": 0,
+        "lb_errors_total": 29,
+        "lb_first_error_s": 70.5,
+        "lb_last_error_s": 132.8,
+        "lb_last_replica_s": 163.3,
+        "lb_first_primary_s": "never",
+        "lb_transitions": 7,
+        "primary_pm_changed": "true",
+        "replica_pm_changed": "true",
+        "heartbeat_rows": 303,
+        "heartbeat_errors": 21
+      },
+      "evidence": "marks: +15s POST /restart | +15.2s restart HTTP 200  | +92.1s project ACTIVE_HEALTHY\nlb transitions: +0s start->replica, +70.5s replica->HTTP 521 <!DOCTYPE html> <!--[if lt IE 7]> <html class=\"no-js ie6 old, +79.9s HTTP 521 <!DOCTYPE html> <!--[if lt IE 7]> <html class=\"no-js ie6 old->timeout, +118.1s timeout->HTTP 503 PGRST002, +120.8s HTTP 503 PGRST002->replica, +132s replica->HTTP 521 <!DOCTYPE html> <!--[if lt IE 7]> <html class=\"no-js ie6 old, +133.1s HTTP 521 <!DOCTYPE html> <!--[if lt IE 7]> <html class=\"no-js ie6 old->replica\nlb: healthyAtStart true, modes HTTP 521 <!DOCTYPE html> <!--[if lt IE 7]> <html class=\"no-js ie6 old; timeout; HTTP 503 PGRST002\nreplica: healthyAtStart true, modes HTTP 521 <!DOCTYPE html> <!--[if lt IE 7]> <html class=\"no-js ie6 old; timeout; HTTP 503 PGRST002; HTTP 525 <!DOCTYPE html> <!--[if lt IE 7]> <html class=\"no-js ie6 old\nprimary: healthyAtStart true, modes HTTP 521 <!DOCTYPE html> <!--[if lt IE 7]> <html class=\"no-js ie6 old; timeout\nlb_rest_read: healthyAtStart true, modes HTTP 525; HTTP 521; timeout; HTTP 503 PGRST002\nreplica host errors: HTTP 521 <!DOCTYPE html> <!--[if lt IE 7]> <html class=\"no-js ie6 old; timeout; HTTP 503 PGRST002; HTTP 525 <!DOCTYPE html> <!--[if lt IE 7]> <html class=\"no-js ie6 old; primary host errors: HTTP 521 <!DOCTYPE html> <!--[if lt IE 7]> <html class=\"no-js ie6 old; timeout\nheartbeat last error: Failed to connect to database: {:error, :econnrefused}\n5 s buckets (R replica-served, P primary-served, E failed, max = largest stale_ms):\n+0s lb R18 P0 E0 max 353ms | replica R18 P0 E0 max 353ms | primary R0 P14 E0 max 302ms\n+5s lb R15 P0 E0 max 358ms | replica R17 P0 E0 max 376ms | primary R0 P13 E0 max 319ms\n+10s lb R16 P0 E0 max 378ms | replica R17 P0 E0 max 350ms | primary R0 P14 E0 max 302ms\n+15s lb R17 P0 E0 max 2183ms | replica R18 P0 E0 max 2298ms | primary R0 P7 E6 max 326ms\n+20s lb R18 P0 E0 max 7222ms | replica R18 P0 E0 max 7362ms | primary R0 P0 E13\n+25s lb R18 P0 E0 max 12408ms | replica R17 P0 E0 max 12213ms | primary R0 P0 E14\n+30s lb R17 P0 E0 max 17259ms | replica R18 P0 E0 max 17270ms | primary R0 P0 E13\n+35s lb R18 P0 E0 max 22355ms | replica R18 P0 E0 max 22353ms | primary R0 P0 E14\n+40s lb R17 P0 E0 max 27252ms | replica R17 P0 E0 max 27254ms | primary R0 P0 E10\n+45s lb R15 P0 E0 max 32255ms | replica R18 P0 E0 max 32249ms | primary R0 P0 E1\n+50s lb R18 P0 E0 max 37336ms | replica R18 P0 E0 max 37330ms | primary R0 P0 E1\n+55s lb R18 P0 E0 max 42392ms | replica R17 P0 E0 max 42335ms | primary R0 P0 E1\n+60s lb R18 P0 E0 max 47396ms | replica R18 P0 E0 max 47403ms | primary R0 P0 E1\n+65s lb R17 P0 E0 max 52273ms | replica R17 P0 E0 max 52163ms | primary R0 P0 E1\n+70s lb R1 P0 E15 max 52578ms | replica R1 P0 E16 max 52441ms\n+75s lb R0 P0 E1 | replica R0 P0 E1 | primary R0 P0 E1\n+80s primary R0 P1 E5 max 100ms\n+85s lb R0 P0 E1 | replica R0 P0 E1 | primary R0 P13 E0 max 315ms\n+90s lb R0 P0 E1 | replica R0 P0 E1 | primary R0 P13 E0 max 327ms\n+95s lb R0 P0 E1 | replica R0 P0 E1 | primary R0 P8 E5 max 323ms\n+100s lb R0 P0 E1 | replica R0 P0 E1 | primary R0 P12 E0 max 317ms\n+105s lb R0 P0 E1 | replica R0 P0 E1 | primary R0 P14 E0 max 301ms\n+110s lb R0 P0 E1 | replica R0 P0 E1 | primary R0 P14 E0 max 329ms\n+115s lb R0 P0 E3 | replica R0 P0 E3 | primary R0 P13 E0 max 316ms\n+120s lb R15 P0 E0 max 356ms | replica R13 P0 E0 max 365ms | primary R0 P14 E0 max 311ms\n+125s lb R17 P0 E0 max 359ms | replica R16 P0 E0 max 365ms | primary R0 P14 E0 max 324ms\n+130s lb R13 P0 E4 max 329ms | replica R12 P0 E5 max 350ms | primary R0 P14 E0 max 328ms\n+135s lb R17 P0 E0 max 342ms | replica R17 P0 E0 max 363ms | primary R0 P13 E0 max 297ms\n+140s lb R18 P0 E0 max 366ms | replica R18 P0 E0 max 360ms | primary R0 P13 E0 max 320ms\n+145s lb R17 P0 E0 max 336ms | replica R17 P0 E0 max 343ms | primary R0 P14 E0 max 325ms\n+150s lb R18 P0 E0 max 354ms | replica R16 P0 E0 max 357ms | primary R0 P13 E0 max 291ms\n+155s lb R18 P0 E0 max 359ms | replica R17 P0 E0 max 355ms | primary R0 P13 E0 max 312ms\n+160s lb R12 P0 E0 max 355ms | replica R13 P0 E0 max 334ms | primary R0 P9 E0 max 306ms",
+      "durationMs": 2008448
+    },
+    {
+      "id": "RR02j",
+      "title": "read-replicas/remove while reading through the load balancer",
+      "status": "info",
+      "detail": "load balancer: replica 55, primary 0, errors 4103 (HTTP 521 <!DOCTYPE html> <!--[if lt IE 7]> <html class=\"no-js ie6 old; timeout; HTTP 400 Load balancer does not seem to be configured properly.); transitions +0s start->replica, +16.2s replica->HTTP 521 <!DOCTYPE html> <!--[if lt IE 7]> <html class=\"no-js ie6 old, +23.1s HTTP 521 <!DOCTYPE html> <!--[if lt IE 7]> <html class=\"no-js ie6 old->timeout, +70.7s timeout->HTTP 400 Load balancer does not seem to be configured properly.",
+      "measurements": {
+        "remove_http": 204,
+        "pooler_entry_gone_s": 15.2,
+        "lb_samples": 4158,
+        "lb_failures": 4103,
+        "lb_first_fail_s": 16.2,
+        "lb_recovered_s": "not recovered",
+        "lb_window_s": "n/a",
+        "replica_samples": 4182,
+        "replica_failures": 4125,
+        "replica_first_fail_s": 16.3,
+        "replica_recovered_s": "not recovered",
+        "replica_window_s": "n/a",
+        "primary_samples": 3236,
+        "primary_failures": 0,
+        "primary_first_fail_s": "never",
+        "primary_recovered_s": "n/a",
+        "primary_window_s": "n/a",
+        "lb_rest_read_samples": 4134,
+        "lb_rest_read_failures": 4078,
+        "lb_rest_read_first_fail_s": 16.2,
+        "lb_rest_read_recovered_s": "not recovered",
+        "lb_rest_read_window_s": "n/a",
+        "lb_replica_total": 55,
+        "lb_primary_total": 0,
+        "lb_errors_total": 4103,
+        "lb_first_error_s": 16.2,
+        "lb_last_error_s": 1199.8,
+        "lb_last_replica_s": 15.9,
+        "lb_first_primary_s": "never",
+        "lb_transitions": 4,
+        "primary_pm_changed": "false",
+        "replica_pm_changed": "false",
+        "heartbeat_rows": 3683,
+        "heartbeat_errors": 0
+      },
+      "evidence": "marks: +15s POST read-replicas/remove | +15.1s remove HTTP 204  | +15.2s READ_REPLICA gone from pooler config | +75.2s lb host resolves | +135.2s lb host resolves | +195.2s lb host resolves | +255.3s lb host resolves | +315.3s lb host resolves | +375.3s lb host resolves | +435.3s lb host resolves | +495.3s lb host resolves | +555.3s lb host resolves | +615.3s lb host resolves | +675.3s lb host resolves | +735.3s lb host resolves | +795.3s lb host resolves | +855.3s lb host resolves | +915.3s lb host resolves | +975.3s lb host resolves | +1035.3s lb host resolves | +1095.3s lb host resolves | +1155.4s lb host resolves | +1215.4s lb host resolves\nlb transitions: +0s start->replica, +16.2s replica->HTTP 521 <!DOCTYPE html> <!--[if lt IE 7]> <html class=\"no-js ie6 old, +23.1s HTTP 521 <!DOCTYPE html> <!--[if lt IE 7]> <html class=\"no-js ie6 old->timeout, +70.7s timeout->HTTP 400 Load balancer does not seem to be configured properly.\nlb: healthyAtStart true, modes HTTP 521 <!DOCTYPE html> <!--[if lt IE 7]> <html class=\"no-js ie6 old; timeout; HTTP 400 Load balancer does not seem to be configured properly.\nreplica: healthyAtStart true, modes HTTP 521 <!DOCTYPE html> <!--[if lt IE 7]> <html class=\"no-js ie6 old; timeout; HTTP 530 <!doctype html> <!--[if lt IE 7]> <html class=\"no-js ie6 old; Unable to connect. Is the computer able to access the url?; Was there a typo in the url or port?\nprimary: healthyAtStart true, modes none\nlb_rest_read: healthyAtStart true, modes HTTP 521; timeout; HTTP 400\nreplica host errors: HTTP 521 <!DOCTYPE html> <!--[if lt IE 7]> <html class=\"no-js ie6 old; timeout; HTTP 530 <!doctype html> <!--[if lt IE 7]> <html class=\"no-js ie6 old; Unable to connect. Is the computer able to access the url?; Was there a typo in the url or port?; primary host errors: none\nheartbeat last error: none\n5 s buckets (R replica-served, P primary-served, E failed, max = largest stale_ms):\n+0s lb R17 P0 E0 max 333ms | replica R18 P0 E0 max 362ms | primary R0 P14 E0 max 304ms\n+5s lb R17 P0 E0 max 355ms | replica R18 P0 E0 max 364ms | primary R0 P13 E0 max 290ms\n+10s lb R17 P0 E0 max 339ms | replica R17 P0 E0 max 358ms | primary R0 P13 E0 max 315ms\n+15s lb R4 P0 E6 max 340ms | replica R4 P0 E5 max 204ms | primary R0 P13 E0 max 327ms\n+20s lb R0 P0 E1 | replica R0 P0 E1 | primary R0 P14 E0 max 311ms\n+25s lb R0 P0 E1 | replica R0 P0 E1 | primary R0 P14 E0 max 329ms\n+30s lb R0 P0 E1 | replica R0 P0 E1 | primary R0 P13 E0 max 315ms\n+35s lb R0 P0 E1 | replica R0 P0 E1 | primary R0 P13 E0 max 309ms\n+40s lb R0 P0 E1 | replica R0 P0 E1 | primary R0 P13 E0 max 310ms\n+45s lb R0 P0 E1 | replica R0 P0 E1 | primary R0 P14 E0 max 319ms\n+50s lb R0 P0 E1 | replica R0 P0 E1 | primary R0 P13 E0 max 316ms\n+55s lb R0 P0 E1 | replica R0 P0 E1 | primary R0 P14 E0 max 310ms\n+60s replica R0 P0 E1 | primary R0 P12 E0 max 312ms\n+65s lb R0 P0 E1 | primary R0 P14 E0 max 328ms\n+70s lb R0 P0 E17 | replica R0 P0 E1 | primary R0 P13 E0 max 327ms\n+75s lb R0 P0 E19 | replica R0 P0 E1 | primary R0 P13 E0 max 315ms\n+80s lb R0 P0 E18 | replica R0 P0 E1 | primary R0 P13 E0 max 308ms\n+85s lb R0 P0 E18 | replica R0 P0 E1 | primary R0 P14 E0 max 328ms\n+90s lb R0 P0 E19 | replica R0 P0 E1 | primary R0 P13 E0 max 330ms\n+95s lb R0 P0 E18 | replica R0 P0 E1 | primary R0 P12 E0 max 323ms\n+100s lb R0 P0 E19 | replica R0 P0 E1 | primary R0 P14 E0 max 322ms\n+105s lb R0 P0 E18 | replica R0 P0 E4 | primary R0 P13 E0 max 315ms\n+110s lb R0 P0 E16 | replica R0 P0 E1 | primary R0 P13 E0 max 304ms\n+115s lb R0 P0 E18 | replica R0 P0 E6 | primary R0 P14 E0 max 324ms\n+120s lb R0 P0 E17 | replica R0 P0 E18 | primary R0 P13 E0 max 333ms\n+125s lb R0 P0 E15 | replica R0 P0 E17 | primary R0 P14 E0 max 313ms\n+130s lb R0 P0 E17 | replica R0 P0 E18 | primary R0 P14 E0 max 319ms\n+135s lb R0 P0 E17 | replica R0 P0 E17 | primary R0 P13 E0 max 316ms\n+140s lb R0 P0 E19 | replica R0 P0 E16 | primary R0 P12 E0 max 303ms\n+145s lb R0 P0 E17 | replica R0 P0 E16 | primary R0 P13 E0 max 313ms\n+150s lb R0 P0 E18 | replica R0 P0 E17 | primary R0 P13 E0 max 325ms\n+155s lb R0 P0 E18 | replica R0 P0 E17 | primary R0 P14 E0 max 318ms\n+160s lb R0 P0 E18 | replica R0 P0 E18 | primary R0 P13 E0 max 317ms\n+165s lb R0 P0 E17 | replica R0 P0 E18 | primary R0 P14 E0 max 298ms\n+170s lb R0 P0 E18 | replica R0 P0 E17 | primary R0 P13 E0 max 324ms\n+175s lb R0 P0 E19 | replica R0 P0 E18 | primary R0 P14 E0 max 328ms\n+180s lb R0 P0 E18 | replica R0 P0 E17 | primary R0 P14 E0 max 322ms\n+185s lb R0 P0 E18 | replica R0 P0 E18 | primary R0 P13 E0 max 296ms\n+190s lb R0 P0 E18 | replica R0 P0 E16 | primary R0 P14 E0 max 318ms\n+195s lb R0 P0 E19 | replica R0 P0 E17 | primary R0 P14 E0 max 303ms\n+200s lb R0 P0 E18 | replica R0 P0 E18 | primary R0 P13 E0 max 312ms\n+205s lb R0 P0 E19 | replica R0 P0 E17 | primary R0 P14 E0 max 314ms\n+210s lb R0 P0 E18 | replica R0 P0 E16 | primary R0 P13 E0 max 300ms\n+215s lb R0 P0 E19 | replica R0 P0 E17 | primary R0 P14 E0 max 324ms\n+220s lb R0 P0 E18 | replica R0 P0 E18 | primary R0 P12 E0 max 319ms\n+225s lb R0 P0 E18 | replica R0 P0 E17 | primary R0 P13 E0 max 312ms\n+230s lb R0 P0 E18 | replica R0 P0 E16 | primary R0 P14 E0 max 310ms\n+235s lb R0 P0 E18 | replica R0 P0 E18 | primary R0 P13 E0 max 294ms\n+240s lb R0 P0 E16 | replica R0 P0 E17 | primary R0 P14 E0 max 305ms\n+245s lb R0 P0 E17 | replica R0 P0 E17 | primary R0 P12 E0 max 306ms\n+250s lb R0 P0 E18 | replica R0 P0 E17 | primary R0 P14 E0 max 331ms\n+255s lb R0 P0 E18 | replica R0 P0 E18 | primary R0 P14 E0 max 323ms\n+260s lb R0 P0 E18 | replica R0 P0 E17 | primary R0 P13 E0 max 318ms\n+265s lb R0 P0 E19 | replica R0 P0 E17 | primary R0 P13 E0 max 324ms\n+270s lb R0 P0 E17 | replica R0 P0 E17 | primary R0 P14 E0 max 293ms\n+275s lb R0 P0 E18 | replica R0 P0 E16 | primary R0 P13 E0 max 326ms\n+280s lb R0 P0 E18 | replica R0 P0 E17 | primary R0 P13 E0 max 301ms\n+285s lb R0 P0 E18 | replica R0 P0 E17 | primary R0 P12 E0 max 268ms\n+290s lb R0 P0 E18 | replica R0 P0 E16 | primary R0 P13 E0 max 302ms\n+295s lb R0 P0 E15 | replica R0 P0 E16 | primary R0 P13 E0 max 323ms\n+300s lb R0 P0 E17 | replica R0 P0 E16 | primary R0 P11 E0 max 321ms\n+305s lb R0 P0 E18 | replica R0 P0 E10 | primary R0 P12 E0 max 326ms\n+310s lb R0 P0 E14 | replica R0 P0 E17 | primary R0 P11 E0 max 311ms\n+315s lb R0 P0 E18 | replica R0 P0 E17 | primary R0 P13 E0 max 304ms\n+320s lb R0 P0 E17 | replica R0 P0 E17 | primary R0 P12 E0 max 318ms\n+325s lb R0 P0 E16 | replica R0 P0 E12 | primary R0 P13 E0 max 330ms\n+330s lb R0 P0 E16 | replica R0 P0 E16 | primary R0 P13 E0 max 297ms\n+335s lb R0 P0 E17 | replica R0 P0 E15 | primary R0 P12 E0 max 300ms\n+340s lb R0 P0 E18 | replica R0 P0 E15 | primary R0 P14 E0 max 305ms\n+345s lb R0 P0 E18 | replica R0 P0 E15 | primary R0 P13 E0 max 325ms\n+350s lb R0 P0 E18 | replica R0 P0 E16 | primary R0 P14 E0 max 322ms\n+355s lb R0 P0 E18 | replica R0 P0 E17 | primary R0 P13 E0 max 324ms\n+360s lb R0 P0 E18 | replica R0 P0 E15 | primary R0 P14 E0 max 318ms\n+365s lb R0 P0 E18 | replica R0 P0 E16 | primary R0 P13 E0 max 323ms\n+370s lb R0 P0 E17 | replica R0 P0 E18 | primary R0 P14 E0 max 327ms\n+375s lb R0 P0 E18 | replica R0 P0 E17 | primary R0 P13 E0 max 305ms\n+380s lb R0 P0 E17 | replica R0 P0 E18 | primary R0 P13 E0 max 328ms\n+385s lb R0 P0 E19 | replica R0 P0 E18 | primary R0 P13 E0 max 312ms\n+390s lb R0 P0 E18 | replica R0 P0 E18 | primary R0 P14 E0 max 314ms\n+395s lb R0 P0 E18 | replica R0 P0 E18 | primary R0 P13 E0 max 300ms\n+400s lb R0 P0 E18 | replica R0 P0 E18 | primary R0 P14 E0 max 314ms\n+405s lb R0 P0 E19 | replica R0 P0 E18 | primary R0 P11 E0 max 332ms\n+410s lb R0 P0 E18 | replica R0 P0 E17 | primary R0 P14 E0 max 312ms\n+415s lb R0 P0 E16 | replica R0 P0 E19 | primary R0 P13 E0 max 326ms\n+420s lb R0 P0 E19 | replica R0 P0 E20 | primary R0 P14 E0 max 314ms\n+425s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P14 E0 max 303ms\n+430s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P12 E0 max 325ms\n+435s lb R0 P0 E19 | replica R0 P0 E20 | primary R0 P14 E0 max 307ms\n+440s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P14 E0 max 314ms\n+445s lb R0 P0 E19 | replica R0 P0 E19 | primary R0 P13 E0 max 318ms\n+450s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P14 E0 max 312ms\n+455s lb R0 P0 E19 | replica R0 P0 E20 | primary R0 P14 E0 max 330ms\n+460s lb R0 P0 E17 | replica R0 P0 E20 | primary R0 P14 E0 max 321ms\n+465s lb R0 P0 E19 | replica R0 P0 E20 | primary R0 P12 E0 max 297ms\n+470s lb R0 P0 E18 | replica R0 P0 E19 | primary R0 P13 E0 max 314ms\n+475s lb R0 P0 E19 | replica R0 P0 E20 | primary R0 P14 E0 max 292ms\n+480s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P14 E0 max 285ms\n+485s lb R0 P0 E19 | replica R0 P0 E20 | primary R0 P13 E0 max 303ms\n+490s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P14 E0 max 315ms\n+495s lb R0 P0 E19 | replica R0 P0 E19 | primary R0 P13 E0 max 303ms\n+500s lb R0 P0 E19 | replica R0 P0 E20 | primary R0 P14 E0 max 303ms\n+505s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P13 E0 max 328ms\n+510s lb R0 P0 E19 | replica R0 P0 E20 | primary R0 P14 E0 max 308ms\n+515s lb R0 P0 E19 | replica R0 P0 E20 | primary R0 P14 E0 max 322ms\n+520s lb R0 P0 E19 | replica R0 P0 E20 | primary R0 P14 E0 max 320ms\n+525s lb R0 P0 E18 | replica R0 P0 E19 | primary R0 P14 E0 max 313ms\n+530s lb R0 P0 E19 | replica R0 P0 E20 | primary R0 P13 E0 max 191ms\n+535s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P12 E0 max 318ms\n+540s lb R0 P0 E19 | replica R0 P0 E20 | primary R0 P14 E0 max 317ms\n+545s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P14 E0 max 310ms\n+550s lb R0 P0 E19 | replica R0 P0 E19 | primary R0 P14 E0 max 320ms\n+555s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P14 E0 max 326ms\n+560s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P14 E0 max 329ms\n+565s lb R0 P0 E19 | replica R0 P0 E20 | primary R0 P14 E0 max 317ms\n+570s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P13 E0 max 312ms\n+575s lb R0 P0 E19 | replica R0 P0 E19 | primary R0 P14 E0 max 332ms\n+580s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P14 E0 max 320ms\n+585s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P14 E0 max 308ms\n+590s lb R0 P0 E17 | replica R0 P0 E20 | primary R0 P13 E0 max 301ms\n+595s lb R0 P0 E19 | replica R0 P0 E20 | primary R0 P14 E0 max 332ms\n+600s lb R0 P0 E18 | replica R0 P0 E19 | primary R0 P14 E0 max 318ms\n+605s lb R0 P0 E19 | replica R0 P0 E20 | primary R0 P13 E0 max 313ms\n+610s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P14 E0 max 326ms\n+615s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P13 E0 max 301ms\n+620s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P14 E0 max 319ms\n+625s lb R0 P0 E18 | replica R0 P0 E19 | primary R0 P13 E0 max 329ms\n+630s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P14 E0 max 294ms\n+635s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P13 E0 max 332ms\n+640s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P12 E0 max 330ms\n+645s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P14 E0 max 299ms\n+650s lb R0 P0 E16 | replica R0 P0 E19 | primary R0 P13 E0 max 319ms\n+655s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P14 E0 max 318ms\n+660s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P13 E0 max 326ms\n+665s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P14 E0 max 319ms\n+670s lb R0 P0 E18 | replica R0 P0 E19 | primary R0 P11 E0 max 287ms\n+675s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P14 E0 max 310ms\n+680s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P9 E0 max 234ms\n+685s lb R0 P0 E16 | replica R0 P0 E20 | primary R0 P14 E0 max 321ms\n+690s lb R0 P0 E19 | replica R0 P0 E20 | primary R0 P12 E0 max 327ms\n+695s lb R0 P0 E18 | replica R0 P0 E19 | primary R0 P14 E0 max 314ms\n+700s lb R0 P0 E16 | replica R0 P0 E20 | primary R0 P13 E0 max 325ms\n+705s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P14 E0 max 317ms\n+710s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P13 E0 max 326ms\n+715s lb R0 P0 E16 | replica R0 P0 E20 | primary R0 P13 E0 max 355ms\n+720s lb R0 P0 E18 | replica R0 P0 E19 | primary R0 P14 E0 max 330ms\n+725s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P13 E0 max 315ms\n+730s lb R0 P0 E19 | replica R0 P0 E20 | primary R0 P14 E0 max 313ms\n+735s lb R0 P0 E16 | replica R0 P0 E18 | primary R0 P13 E0 max 381ms\n+740s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P13 E0 max 392ms\n+745s lb R0 P0 E19 | replica R0 P0 E20 | primary R0 P14 E0 max 276ms\n+750s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P13 E0 max 305ms\n+755s lb R0 P0 E16 | replica R0 P0 E19 | primary R0 P14 E0 max 329ms\n+760s lb R0 P0 E19 | replica R0 P0 E20 | primary R0 P14 E0 max 326ms\n+765s lb R0 P0 E16 | replica R0 P0 E20 | primary R0 P14 E0 max 312ms\n+770s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P14 E0 max 323ms\n+775s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P14 E0 max 317ms\n+780s lb R0 P0 E19 | replica R0 P0 E19 | primary R0 P14 E0 max 324ms\n+785s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P13 E0 max 191ms\n+790s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P14 E0 max 327ms\n+795s lb R0 P0 E19 | replica R0 P0 E20 | primary R0 P14 E0 max 324ms\n+800s lb R0 P0 E19 | replica R0 P0 E20 | primary R0 P14 E0 max 327ms\n+805s lb R0 P0 E18 | replica R0 P0 E19 | primary R0 P14 E0 max 260ms\n+810s lb R0 P0 E19 | replica R0 P0 E20 | primary R0 P13 E0 max 321ms\n+815s lb R0 P0 E19 | replica R0 P0 E20 | primary R0 P14 E0 max 299ms\n+820s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P14 E0 max 326ms\n+825s lb R0 P0 E19 | replica R0 P0 E20 | primary R0 P14 E0 max 306ms\n+830s lb R0 P0 E18 | replica R0 P0 E19 | primary R0 P14 E0 max 330ms\n+835s lb R0 P0 E19 | replica R0 P0 E20 | primary R0 P14 E0 max 303ms\n+840s lb R0 P0 E19 | replica R0 P0 E20 | primary R0 P14 E0 max 325ms\n+845s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P13 E0 max 321ms\n+850s lb R0 P0 E19 | replica R0 P0 E19 | primary R0 P14 E0 max 315ms\n+855s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P15 E0 max 317ms\n+860s lb R0 P0 E19 | replica R0 P0 E20 | primary R0 P13 E0 max 309ms\n+865s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P14 E0 max 310ms\n+870s lb R0 P0 E19 | replica R0 P0 E20 | primary R0 P14 E0 max 320ms\n+875s lb R0 P0 E19 | replica R0 P0 E19 | primary R0 P14 E0 max 327ms\n+880s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P14 E0 max 317ms\n+885s lb R0 P0 E19 | replica R0 P0 E20 | primary R0 P14 E0 max 321ms\n+890s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P14 E0 max 331ms\n+895s lb R0 P0 E19 | replica R0 P0 E19 | primary R0 P14 E0 max 329ms\n+900s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P13 E0 max 327ms\n+905s lb R0 P0 E19 | replica R0 P0 E20 | primary R0 P14 E0 max 314ms\n+910s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P14 E0 max 316ms\n+915s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P13 E0 max 339ms\n+920s lb R0 P0 E17 | replica R0 P0 E19 | primary R0 P13 E0 max 333ms\n+925s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P13 E0 max 330ms\n+930s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P14 E0 max 329ms\n+935s lb R0 P0 E19 | replica R0 P0 E20 | primary R0 P14 E0 max 317ms\n+940s lb R0 P0 E19 | replica R0 P0 E20 | primary R0 P14 E0 max 317ms\n+945s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P14 E0 max 324ms\n+950s lb R0 P0 E18 | replica R0 P0 E19 | primary R0 P14 E0 max 324ms\n+955s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P14 E0 max 318ms\n+960s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P14 E0 max 319ms\n+965s lb R0 P0 E19 | replica R0 P0 E20 | primary R0 P14 E0 max 321ms\n+970s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P14 E0 max 330ms\n+975s lb R0 P0 E19 | replica R0 P0 E19 | primary R0 P14 E0 max 328ms\n+980s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P14 E0 max 309ms\n+985s lb R0 P0 E19 | replica R0 P0 E20 | primary R0 P14 E0 max 315ms\n+990s lb R0 P0 E19 | replica R0 P0 E20 | primary R0 P14 E0 max 324ms\n+995s lb R0 P0 E18 | replica R0 P0 E19 | primary R0 P14 E0 max 308ms\n+1000s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P14 E0 max 305ms\n+1005s lb R0 P0 E19 | replica R0 P0 E20 | primary R0 P14 E0 max 313ms\n+1010s lb R0 P0 E19 | replica R0 P0 E20 | primary R0 P14 E0 max 325ms\n+1015s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P14 E0 max 296ms\n+1020s lb R0 P0 E19 | replica R0 P0 E19 | primary R0 P13 E0 max 312ms\n+1025s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P15 E0 max 324ms\n+1030s lb R0 P0 E19 | replica R0 P0 E20 | primary R0 P14 E0 max 330ms\n+1035s lb R0 P0 E19 | replica R0 P0 E20 | primary R0 P13 E0 max 322ms\n+1040s lb R0 P0 E18 | replica R0 P0 E19 | primary R0 P14 E0 max 318ms\n+1045s lb R0 P0 E19 | replica R0 P0 E20 | primary R0 P14 E0 max 324ms\n+1050s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P14 E0 max 316ms\n+1055s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P14 E0 max 306ms\n+1060s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P14 E0 max 326ms\n+1065s lb R0 P0 E19 | replica R0 P0 E19 | primary R0 P13 E0 max 320ms\n+1070s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P14 E0 max 302ms\n+1075s lb R0 P0 E19 | replica R0 P0 E20 | primary R0 P14 E0 max 332ms\n+1080s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P14 E0 max 306ms\n+1085s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P14 E0 max 317ms\n+1090s lb R0 P0 E19 | replica R0 P0 E19 | primary R0 P13 E0 max 320ms\n+1095s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P14 E0 max 300ms\n+1100s lb R0 P0 E19 | replica R0 P0 E20 | primary R0 P14 E0 max 317ms\n+1105s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P13 E0 max 323ms\n+1110s lb R0 P0 E19 | replica R0 P0 E19 | primary R0 P14 E0 max 308ms\n+1115s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P13 E0 max 323ms\n+1120s lb R0 P0 E19 | replica R0 P0 E20 | primary R0 P14 E0 max 302ms\n+1125s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P14 E0 max 329ms\n+1130s lb R0 P0 E18 | replica R0 P0 E19 | primary R0 P13 E0 max 316ms\n+1135s lb R0 P0 E19 | replica R0 P0 E20 | primary R0 P13 E0 max 304ms\n+1140s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P13 E0 max 300ms\n+1145s lb R0 P0 E19 | replica R0 P0 E20 | primary R0 P14 E0 max 322ms\n+1150s lb R0 P0 E18 | replica R0 P0 E19 | primary R0 P14 E0 max 320ms\n+1155s lb R0 P0 E16 | replica R0 P0 E20 | primary R0 P14 E0 max 311ms\n+1160s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P14 E0 max 319ms\n+1165s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P14 E0 max 323ms\n+1170s lb R0 P0 E19 | replica R0 P0 E20 | primary R0 P14 E0 max 323ms\n+1175s lb R0 P0 E18 | replica R0 P0 E19 | primary R0 P14 E0 max 314ms\n+1180s lb R0 P0 E19 | replica R0 P0 E20 | primary R0 P13 E0 max 325ms\n+1185s lb R0 P0 E18 | replica R0 P0 E20 | primary R0 P14 E0 max 324ms\n+1190s lb R0 P0 E19 | replica R0 P0 E20 | primary R0 P13 E0 max 304ms\n+1195s lb R0 P0 E18 | replica R0 P0 E19 | primary R0 P14 E0 max 306ms",
+      "durationMs": 2008448
+    },
+    {
+      "id": "RR02k",
+      "title": "edge_logs on the load balancer host: redirect identifier per path family, method and status",
+      "status": "info",
+      "detail": "11206 rows in 12 groups after 47 s",
+      "measurements": {
+        "groups": 12,
+        "rows": 11206,
+        "rest_rr_node_to_replica": 1549,
+        "rest_rr_node_to_none": 4077
+      },
+      "evidence": "rest rr_node GET 400 -> none n=4077\nrest other GET 400 -> none n=4053\nrest rr_node GET 200 -> replica n=1504\nrest other GET 200 -> replica n=1480\nrest other GET 521 -> replica n=25\nrest rr_node GET 521 -> replica n=25\nrest other GET 522 -> replica n=17\nrest rr_node GET 522 -> replica n=16\nrest other GET 503 -> replica n=4\nrest rr_node GET 503 -> replica n=4\nrest other GET 525 -> replica n=1",
+      "durationMs": 2008448
+    },
+    {
+      "id": "RR02p",
+      "title": "teardown: replica removed, project deleted",
+      "status": "pass",
+      "detail": "replica remove at teardown HTTP n/a (removed in RR02j); project DELETE HTTP 200; run took 33 min",
+      "measurements": {
+        "project_delete_http": 200,
+        "run_min": 33
+      },
+      "durationMs": 2008448
+    }
+  ]
+}
