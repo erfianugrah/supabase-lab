@@ -16,26 +16,34 @@ import { sampleDuring } from "../../../harness/src/sampler";
 import { buildProbes, verdict, setComputeSize, INTERVAL_MS, SETTLE_MS } from "../lib/setup";
 
 const MAX_WAIT_MS = 900_000;
+/**
+ * Target size. Default is the original small -> micro pair; PD_RESIZE_DOWN overrides it
+ * (since 2026-10-23, #204) so the same module can time another pair, e.g.
+ * ci_large / ci_medium on a project created at Medium.
+ */
+const TARGET = process.env.PD_RESIZE_DOWN || "ci_micro";
 
 const mod: TestModule = {
   id: "D04",
-  title: "Resize down (small -> micro): outage per connection path",
+  title: `Resize down (${TARGET === "ci_micro" ? "small -> micro" : "-> " + TARGET}): outage per connection path`,
   where: "local",
   requires: ["pat", "anon-key"],
   destructive: true,
   async run(ctx): Promise<TestResult> {
     const { probes, note } = await buildProbes(ctx);
     ctx.log(note);
+    let retries = 0;
 
     const windows = await sampleDuring(
       probes,
       { intervalMs: INTERVAL_MS, maxWaitMs: MAX_WAIT_MS, settleMs: SETTLE_MS, log: ctx.log },
       async () => {
-        await setComputeSize(ctx, "ci_micro");
+        retries = await setComputeSize(ctx, TARGET);
       },
     );
 
-    return verdict("D04", mod.title, windows) as TestResult;
+    const v = verdict("D04", mod.title, windows);
+    return { ...v, measurements: { ...v.measurements, target: TARGET, addon_429_retries: retries } } as TestResult;
   },
 };
 export default mod;

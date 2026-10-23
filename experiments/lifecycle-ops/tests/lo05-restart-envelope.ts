@@ -15,6 +15,9 @@
  *          every path to answer on consecutive samples. During each:
  *          sampleDuring over REST, Auth, Storage, pooler (6543), direct (5432)
  *          at 500 ms, plus a 10 s status poll for the control-plane view.
+ *          Since 2026-10-23 (#204) also realtime_ws, and the data-path probes
+ *          rest_read and realtime_join (harness/src/real-probes.ts); the
+ *          REST probe of the earlier runs is the one now named rest_http.
  *          Report per path: runs that failed, p50 and max of first-failure
  *          and outage window across the five runs.
  *   LO05c  what the API says to a second restart sent while the first is still
@@ -26,9 +29,10 @@
  * start, every failed path recovered). The numbers are data, not pass bands.
  */
 import type { Ctx, TestModule, TestResult } from "../../../harness/src/types";
-import { sampleDuring, type PathWindow, type Probe } from "../../../harness/src/sampler";
+import { sampleDuring, withDeadline, type PathWindow, type Probe } from "../../../harness/src/sampler";
 import { mgmt } from "../../../harness/src/mgmt";
-import { restProbe, authProbe, storageProbe, poolerProbe } from "../../platform-downtime/lib/probes";
+import { restProbe, authProbe, storageProbe, poolerProbe, realtimeProbe } from "../../platform-downtime/lib/probes";
+import { realtimeJoinProbe, restReadProbe, seedProbeTable } from "../../../harness/src/real-probes";
 import { AUTH_PATH, resolvePooler } from "../../platform-downtime/lib/setup";
 import { directProbe, p50 } from "../lib/probes";
 import { gate } from "../lib/gate";
@@ -58,7 +62,7 @@ const WINDOW_WAIT_S = 690;
 
 async function allAnswer(probes: Probe[]): Promise<string[]> {
   const bad: string[] = [];
-  for (const p of probes) if (!(await p.run().catch(() => ({ ok: false }))).ok) bad.push(p.name);
+  for (const p of probes) if (!(await withDeadline(p.run()).catch(() => ({ ok: false }))).ok) bad.push(p.name);
   return bad;
 }
 
@@ -149,15 +153,33 @@ const mod: TestModule = {
         poolerProbe(pooler.host, pooler.port, pooler.user, dbPass),
         directProbe(pctx.phzHost, dbPass),
       ];
+      // Since 2026-10-23 (#204): data-path probes beside the HTTP-tier ones.
+      // `rest_http` (the probe above, formerly `rest`) counts PostgREST's 401
+      // as up; `rest_read` needs a row. Realtime was not sampled before; both
+      // kinds are sampled now (`realtime_ws` handshake, `realtime_join`
+      // delivery). A seed failure costs these columns, not the run.
+      let dataNote = "data-path probes included";
+      try {
+        const s = await seedProbeTable(pctx, pctx.apiHost, pctx.anonKey as string);
+        probes.push(
+          realtimeProbe(pctx.apiHost, pctx.anonKey as string),
+          restReadProbe(pctx.apiHost, pctx.anonKey as string),
+          realtimeJoinProbe(pctx.apiHost, pctx.anonKey as string),
+        );
+        dataNote = `data-path probes ready after ${s}s`;
+      } catch (e) {
+        dataNote = `data-path probes SKIPPED: ${e instanceof Error ? e.message : String(e)}`;
+      }
       let ready = await waitReady(probes);
       let directNote = "direct path included";
       if (ready.s < 0 && ready.last.length === 1 && ready.last[0] === "direct") {
         // One path the vantage cannot reach should cost one column, not the run.
-        const why = await probes[4]?.run();
+        const why = await probes.find((p) => p.name === "direct")?.run();
         directNote = `direct EXCLUDED, never answered: ${why && !why.ok ? why.error : "unknown"}`;
-        probes = probes.slice(0, 4);
+        probes = probes.filter((p) => p.name !== "direct");
         ready = await waitReady(probes);
       }
+      directNote = `${directNote}; ${dataNote}`;
       results.push({
         id: "LO05a",
         title: "LO05a: gate, create, readiness",

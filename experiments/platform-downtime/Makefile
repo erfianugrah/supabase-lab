@@ -36,7 +36,7 @@ PW := $(shell grep -E '^db_password' $(ROOT)/secrets.tfvars 2>/dev/null | cut -d
 ONLY ?= D01,D02
 RUNNER_FLAGS ?=
 
-.PHONY: init fmt validate apply probe probe-destructive publish-evidence destroy
+.PHONY: init fmt validate apply probe probe-destructive selfprov publish-evidence destroy
 
 init:
 	tofu init
@@ -76,6 +76,17 @@ probe:
 # bare `make probe` can never take it down by accident.
 probe-destructive:
 	@$(MAKE) probe RUNNER_FLAGS=--destructive
+
+# Self-provisioned run, no tofu state (2026-10-23, #204): creates a pd-*
+# project on the Pro org, runs PD_ONLY (default D01,D02,D03,D04) PD_PASSES
+# times (default 2) against it, deletes it. PD_SIZE=medium with
+# PD_RESIZE_UP=ci_large PD_RESIZE_DOWN=ci_medium times a Medium <-> Large pair.
+# Needs SUPABASE_ACCESS_TOKEN and PVLAB_ORG_PRO in the environment.
+selfprov:
+	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "export SUPABASE_ACCESS_TOKEN"; exit 1)
+	@test -n "$$PVLAB_ORG_PRO" || (echo "export PVLAB_ORG_PRO=<pro org slug>"; exit 1)
+	@cd $(ROOT) && bun harness/scripts/gen-registry.ts >/dev/null
+	@cd $(ROOT) && PD_OUT=experiments/platform-downtime/evidence/$(TS) bun experiments/platform-downtime/lib/selfprov.ts
 
 # Redacted copy + facts table into out/<date>/ - what RUNLOG and docs cite.
 publish-evidence:

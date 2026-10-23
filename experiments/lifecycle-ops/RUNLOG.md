@@ -221,6 +221,14 @@ p50 with one 151 s run. The earlier 158 s pooler figure is near this run's
 single 151 s, not near its other four. Different day, different project; not a
 controlled comparison.
 
+> **Correction 2026-10-23 (#204):** "REST never failed in 5 of 5" measured the
+> HTTP tier only. The REST probe was platform-downtime's anon `GET /rest/v1/`,
+> which the API gateway answers with 401 before PostgREST or the database is
+> reached, and any status below 500 counted as up. Re-run on 2026-10-23 with a
+> row read beside it (section at the end of this file): the row read failed in
+> 5 of 5 restarts, p50 150 s, max 181 s, while the old probe (now `rest_http`)
+> failed in 0 of 5.
+
 Readiness (LO05a): the project read `ACTIVE_HEALTHY` on the first poll, 2 s
 after the POST (the create call itself took under 2 s), and all five paths
 answered 5 s later.
@@ -283,6 +291,63 @@ Management API disagree.
 | After a create whose response you may not have seen, list by name before retrying; a 400 "already exists" on an identical re-send means the first one worked | create wrapper | LO04 (n=1) |
 | Keep the project name stable across retries of one logical create | create wrapper | LO04 (reasoned from the 400) |
 | Treat a 400 from a create with a bad region as non-retryable and move down the region list; 5xx and timeouts are not in this data | create wrapper | LO03 (client-invalid requests only) |
-| Budget about 1 minute per restart on Auth, Storage, pooler and direct, with the pooler able to run 2.5 times that; expect REST to keep answering | maintenance planning | LO05b (n=5, one project) |
+| Budget a restart as an outage on every path, REST reads and Realtime included: about 1 minute on Auth, Storage, pooler and direct on 2026-10-10 with the pooler able to run 2.5 times that; corrected 2026-10-23 (#204), when REST reads (`rest_read`) failed in 5 of 5 restarts, p50 150 s, beside Auth p50 149 s, and the largest window on any path was 182 s. The 2026-10-10 "expect REST to keep answering" came from an HTTP-tier probe | maintenance planning | LO05b (n=5 each, one project per date) |
 | Do not read the control-plane status as the end of an outage | health checks | LO05b (status `ACTIVE_HEALTHY` at 41 s, pooler down to 151 s) |
 | Do not send a restart to a project minutes old; read the 400 as "wait" | automation | LO05f (two projects, boundary unresolved) |
+
+## 2026-10-23 - LO05 re-run with data-path probes (#204)
+
+Why: the 2026-10-10 LO05 "REST never failed" came from an HTTP-tier probe
+(an anon `GET /rest/v1/` that the API gateway answers with 401 before
+PostgREST or the database is reached, any status below 500 counted as up),
+and Realtime was not sampled. LO05
+now samples, beside the five paths it had, `realtime_ws` (WebSocket handshake),
+and the data-path probes `rest_read` (anon row read, only HTTP 200 with the
+seeded row counts) and `realtime_join` (Postgres Changes join confirmed and the
+probe's own broadcast delivered), from `harness/src/real-probes.ts`. The REST
+probe of the earlier run is the one now named `rest_http`.
+
+Run: one Micro project, `ap-southeast-1`, Pro org, 5 sequential restarts at
+500 ms sampling, artifact
+`out/2026-10-23/run-2026-10-23T02-47-19-611Z.json` (the direct probe's
+connect error carried the project's IPv6 address; published as `<addr>`).
+
+| path | runs failed | window p50 | window max | first failure p50 |
+| --- | --- | --- | --- | --- |
+| rest_http | 0 of 5 | - | - | - |
+| realtime_ws | 0 of 5 | - | - | - |
+| rest_read | 5 of 5 | 150 s | 181 s | 2 s |
+| realtime_join | 5 of 5 | 146 s | 179 s | 2 s |
+| auth | 5 of 5 | 149 s | 182 s | 2 s |
+| storage | 5 of 5 | 151 s | 178 s | 2 s |
+| pooler | 5 of 5 | 147 s | 177 s | 2 s |
+| direct | 5 of 5 | 145 s | 178 s | 2 s |
+
+Per run (window seconds, run 1 to 5): rest_read 181, 154, 46, 46, 150;
+realtime_join 179, 153, 54, 58, 146; auth 182, 152, 45, 46, 149; pooler 177,
+151, 43, 44, 147. Across the six paths that failed, the windows were
+within 6 s of each other in runs 1, 2 and 5 and within 15 s in runs 3 and 4.
+`rest_read` failed with `HTTP 521`, `timeout`, `HTTP 503 PGRST002` and
+`HTTP 525`; `realtime_join` with `pg_changes: {:error, "Too many database
+timeouts"}` or a timeout waiting for the subscription. The control-plane status
+read `ACTIVE_HEALTHY` again at 172, 142, 41, 41 and 141 s.
+
+Reading: a restart takes REST reads and Realtime subscriptions down for about
+as long as Auth, Storage and the database sockets: `rest_read` 46 to 181 s,
+all paths 43 to 182 s. The 2026-10-10 LO05 windows (Auth 54 s p50) and these
+(149 s p50) differ by more than a factor of two on the same module, region and
+size; runs 3 and 4 here (43 to 58 s across all paths) look like the earlier
+run's typical window, runs 1, 2 and 5 (145 to 182 s) do not. Not explained.
+
+LO05f: a restart sent 489 s after the first `ACTIVE_HEALTHY` read was accepted
+(HTTP 200), inside the ten minutes the earlier refusal message named; the
+boundary stays unresolved. LO05c: a second restart sent while the first read
+`RESTARTING` answered 200 again.
+
+An earlier attempt the same morning (01:31 UTC project) stalled after its
+third restart: no output for over 50 minutes with the project healthy. It was
+killed, its project deleted by name, and it wrote no artifact; its console
+lines are not cited. The sampler now caps each probe call at 30 s and LO05's
+readiness loop uses the same cap. The stall happened before the cap existed,
+a deadline may not fix that state, and the cause is not established; this run
+did not stall.

@@ -66,6 +66,27 @@ platform behaviour or writing it into docs
   SUSTAINED success: a pooler queues before it refuses, so one lucky sample
   mid-outage is not recovery. A run where nothing fails deliberately burns the
   full `maxWaitMs` - a null result has to be earned by waiting, not assumed.
+  Since 2026-10-23 each `probe.run()` is capped at `sampleDeadlineMs` (default
+  30 s) and a sample past it fails with `probe did not answer within N ms`:
+  a fetch with `AbortSignal.timeout(5000)` came back after 262 s during a
+  resize. Two long runs that day stalled with the event loop idle (0 % CPU,
+  main thread in `kevent64`, every probe silent at once); both stalls
+  happened before the cap existed, a deadline may not fix that state, and
+  the cause is not established. If a run goes silent, `sample <pid>` shows
+  whether it is that state.
+- Probe the data, not the tier: `harness/src/real-probes.ts` (#204,
+  2026-10-23). `rest_read` is up only on HTTP 200 with the seeded row;
+  `realtime_join` only when a Postgres Changes join is confirmed and the
+  probe's own broadcast comes back (Bun's built-in WebSocket; the `ws`
+  package under Bun closed after the subscription and never saw the echo).
+  `seedProbeTable` creates `pvlab_probe`, its grant, policy and publication
+  entry and waits for three consecutive passes. An anon `GET /rest/v1/` is
+  answered with 401 by the API gateway before PostgREST or the database is
+  reached, and a WebSocket handshake never touches the database: probes that
+  count those as up measured the HTTP tier. The "REST/Realtime never failed"
+  lines built on them in platform-downtime, lifecycle-ops (LO05),
+  medium-serverless (MS02, MS07) and tls-surface (TL16) carry dated
+  corrections of 2026-10-23.
 - `pvlab --diff prev.json,cur.json` compares two run artifacts at the
   (test id, measurement key) level and writes `diff.md`. Offline by
   construction - dispatched before `buildCtx`, so it needs no PAT and touches no
@@ -557,30 +578,62 @@ each user's auth rows". Findings and artifacts in RUNLOG.md; out/2026-09-25/.
   the second 5 s poll, 5190 ms after polling began, which itself began after
   S01b, S01x and S01c (S01d). Neither figure is a promotion-to-effect latency.
 
-## experiments/platform-downtime - key facts (validated 2026-08-04)
+## experiments/platform-downtime - key facts (validated 2026-08-04; REST/Realtime re-measured 2026-10-23, #204)
 
-- What a platform OPERATION costs a client, per connection path. All windows
-  below sampled at 500 ms, all n=1, one Micro project in ap-southeast-1.
-- **REST and Realtime never failed under ANY of the four operations** measured
-  (restart, restriction flip, resize up, resize down) - zero failed samples at
-  500 ms. One operation could be luck; four is a pattern.
-- **The paths do not move together.** On restart: Auth 75 s (`HTTP 521`),
-  Storage 78 s (`HTTP 500`), pooler 158 s, REST and Realtime untouched. An app
-  whose read path is PostgREST may not notice a restart; one signing users in
-  during the same window fails for over a minute. This refines T14, which
-  measured one path at 5 s resolution and reported a single number.
+- What a platform OPERATION costs a client, per connection path. The
+  2026-08-04 windows were sampled at 500 ms, n=1, one Micro project in
+  ap-southeast-1.
+- **CORRECTED 2026-10-23: REST reads and Realtime subscriptions DO go down
+  under a restart and a resize.** The 2026-08-04 "REST and Realtime never
+  failed under any of the four operations" came from HTTP-tier probes: an anon
+  `GET /rest/v1/` that the API gateway answers with 401 before PostgREST or
+  the database is reached (any status below 500 counted as up), and a
+  WebSocket handshake. Re-measured with a row read (`rest_read`) and a joined
+  Postgres Changes channel with a delivered broadcast (`realtime_join`, both
+  `harness/src/real-probes.ts`). Micro, one project, n=2 (`rest_read` /
+  `realtime_join`): restart 194 and 247 s / 191 and 242 s; Micro to Small 171
+  and 218 s / 168 and 214 s; Small to Micro 54 s / 67 s (n=1). Medium, two
+  projects, n=1 per project (`rest_read`): Medium to Large 113 and 299 s,
+  Large to Medium 217 and 101 s. The data paths fail about as long as Auth and
+  Storage in each run; the HTTP-tier probes (kept as `rest_http`,
+  `realtime_ws`) had at most one failed sample per run. Only the restriction
+  flip leaves the data paths alone (0 failed samples, two runs). Artifacts
+  `out/2026-10-23/`, RUNLOG section of that date.
+- **The paths do not move together on the database-socket side
+  (2026-08-04).** On restart: Auth 75 s (`HTTP 521`), Storage 78 s
+  (`HTTP 500`), pooler 158 s; the "REST and Realtime untouched" half of that
+  line is withdrawn (above). On 2026-10-23 the pooler window was the longest
+  by 15 to 96 s in six of ten platform-downtime operations (RUNLOG project
+  labels, A Micro, B and C Medium: A pass 1 D01, D03,
+  D04; A pass 2 D01, D04; C D04) and within 2 s of the longest other path in
+  the other four; in LO05 its p50 (147 s) was below Storage's (151 s). This
+  refines T14, which measured one path at 5 s resolution and reported a
+  single number.
+- `selfprov` (`make selfprov`, `lib/selfprov.ts`) runs the D modules on a
+  throwaway `pd-` project instead of tofu state; `PD_SIZE`, `PD_ONLY`,
+  `PD_PASSES`, `PD_RESIZE_UP`, `PD_RESIZE_DOWN`. `setComputeSize` retries
+  `429 still processing addon changes` every 60 s and D03/D04 report
+  `addon_429_retries` (the retries sit inside the sampled window and delay
+  `first_fail_s`).
 - **The Auth probe is `GET /auth/v1/health` with an anon key** (`lib/setup.ts`
   `AUTH_PATH`, `lib/probes.ts`), not an authenticated operation. D01's 75 s and
-  D03's 131 s are that endpoint; compute-disk D09 sampled the same endpoint on
-  2026-08-19 and saw 0 s across four resizes, so the two runs disagree on one
-  surface and no run has probed an authenticated Auth call across a resize.
+  D03's 131 s are that endpoint (and so are the 2026-10-23 Auth figures above); compute-disk D09 sampled the same endpoint on
+  2026-08-19 and saw 0 s across four resizes, so the 2026-08-04 and 2026-10-23
+  runs here disagree with the 2026-08-19 D09 run on one surface, and no run
+  has probed an authenticated Auth call across a resize.
   Write-ups must not call these figures an "authenticated Auth path".
-- **A resize costs about twice a restart** - Auth 131 s resizing up against
-  75 s restarting, pooler 207 s against 158 s. Budget a maintenance window off
-  the restart number and you will under-budget.
-- Resize asymmetry is half real: on the HTTP tier growing costs about a third
-  more than shrinking (Auth 131 s up, 99 s down); on the pooler the two are
-  within 5 % (207 s / 196 s).
+- **A resize cost about twice a restart on 2026-08-04** - Auth 131 s resizing
+  up against 75 s restarting, pooler 207 s against 158 s (n=1). Not
+  reproduced on 2026-10-23 on one Micro project: restart 247 and 192 s for
+  Auth against 171 and 218 s resizing up, 191 and 54 s down. Between the two
+  runs of one operation the Auth window varied by 1.3x (restart, Micro to
+  Small) to 3.5x (Small to Micro), so budget from the largest observed figure
+  for the operation, not from a ratio.
+- Resize asymmetry was half real on 2026-08-04: on the HTTP tier growing cost
+  about a third more than shrinking (Auth 131 s up, 99 s down); on the pooler
+  the two were within 5 % (207 s / 196 s). Not reproduced on 2026-10-23
+  (Micro, Auth 171 and 218 s up, 191 and 54 s down; pooler 189 and 216 s up,
+  249 and 150 s down).
 - Compute size is an ADDON mutation, `PATCH /v1/projects/{ref}/billing/addons`
   with `{addon_variant, addon_type: "compute_instance"}` - there is no resize
   endpoint. Variants `ci_micro`..`ci_48xlarge`; that enum is the API surface,
@@ -1039,6 +1092,18 @@ result-id -> module-id mapping.
   (17.0s), d large->small 61s (0s), d small->micro 73s (0s); Auth never
   had a contiguous outage. Adjacent resize PATCHes rate-limited: 429
   `still processing addon changes, try again in 1-2 minutes`.
+  D09's REST probe IS a data read (`rest/v1/dpython_probe?limit=1`, only 200
+  counts), unlike platform-downtime's pre-2026-10-23 probe, but its figures
+  are a different metric: the longest contiguous outage that a later success
+  closed, per phase. The compute-disk RUNLOG (2026-10-13 section) records
+  that `PhaseStatsAccumulator` drops a run of failures still open when a
+  phase ends, and that only the first of that run's four resize PATCHes was
+  applied (the other three hit the addon rate limit). platform-downtime's
+  2026-10-23 data-path re-measure of Micro to Small saw `rest_read` and Auth
+  windows of 171 and 218 s (first failure to sustained recovery). Candidates
+  for the gap: the dropped open outage, the refused resizes, D09's 2 s fetch
+  timeout, or a platform change between 2026-08-19 and 2026-10-23; none was
+  tested. Treat D09's near-zero REST and Auth figures as unconfirmed.
 
 - **The autoscale cap cannot be set through the API, and the disk write hides
   that.** No write verb exists on `/config/disk/autoscale` (`PATCH`/`PUT`/
@@ -1956,7 +2021,10 @@ Redacted artifacts: `out/2026-09-30/`. Details: RUNLOG.md.
 - **Enabling the IPv4 add-on left `db.<ref>.supabase.co` with no record for
   more than 10 minutes from this resolver** (AAAA withdrawn, A not yet
   visible, `getaddrinfo ENOTFOUND` for 217 samples at 500 ms), then an A at
-  TTL 30. Shared pooler and REST: 0 failed samples through it (MS02). One
+  TTL 30. Shared pooler and REST: 0 failed samples through it (MS02; the REST
+  probe there is MS02's anon `GET /rest/v1/`, answered with 401 by the API
+  gateway before PostgREST or the database is reached, so it says the HTTP
+  tier answered; correction 2026-10-23, #204, not re-run). One
   observation (600 s window, A seen about 11 min after the PATCH); pooler-checkout
   on 2026-10-10 saw the A record 80 s after the PATCH in both runs, so quote
   both and do not promise either.
@@ -2012,8 +2080,9 @@ Redacted artifacts: `out/2026-09-30/`. Details: RUNLOG.md.
   `READ_REPLICA` entry appeared in the pooler config after 216 s and answered
   `pg_is_in_recovery() = true` after 219 s; removal 204, gone on the first
   poll. The docs only say "across multiple regions".
-- **A Medium <-> Large resize costs 30-55 s per Postgres, Auth and Storage
-  path and nothing on REST or Realtime** (MS07, n=1 each way): up Auth 35 s
+- **A Medium <-> Large resize cost 30-55 s per Postgres, Auth and Storage
+  path on 2026-09-30 (MS07, n=1 each way); its "nothing on REST or Realtime"
+  is withdrawn (correction below):** up Auth 35 s
   `HTTP 521`, Storage 34 s, shared 6543 30 s, shared 5432 36 s, dedicated 6543
   34 s, direct 35 s; down 42 / 44 / 39 / 39 / 55 / 41 s. Same shape as
   platform-downtime's Micro <-> Small, at a fraction of those windows (Auth
@@ -2021,6 +2090,19 @@ Redacted artifacts: `out/2026-09-30/`. Details: RUNLOG.md.
   way down, answering `server login has been failing, cached error: connect
   failed (server_login_retry)` for ~14 s after Postgres was up. An addon PATCH
   right after another one answers 429 and `applyAddon` waits it out (185 s).
+  **Correction 2026-10-23 (#204):** the "nothing on REST or Realtime" half
+  was measured with HTTP-tier probes (an anon `GET /rest/v1/` that the API
+  gateway answers with 401 before PostgREST or the database is reached, any
+  status below 500 counted as up; a WebSocket handshake), now named
+  `rest_http` and `realtime_ws` in `lib/setup.ts` with `rest_read` and
+  `realtime_join` added beside them. MS07 itself was not re-run (Team org,
+  IPv4 add-on and dedicated-pooler setup). platform-downtime re-measured a
+  Medium to Large pair on two Pro-org projects in ap-southeast-1 with the
+  data-path probes: REST reads down 113 and 299 s up, 217 and 101 s down,
+  Realtime joins 107 and 298 s up, 217 and 98 s down. Its Auth windows (115
+  and 299 s up, 216 and 101 s down) and pooler windows (113 and 298 s up,
+  217 and 200 s down) are also well above MS07's 30-55 s, on a different org,
+  region and day; the difference is not explained.
 - **A custom hostname's `_acme-challenge` TXT is not in the initialize
   response**; it arrives on a later GET/reverify poll (3-23 s across four
   runs), after the `_cf-custom-hostname` ownership TXT. Re-read the record
@@ -2853,12 +2935,24 @@ when present, so a new module is invisible until it is regenerated).
 - `ACTIVE_HEALTHY` after a create came back at the first poll twice and at 145 s
   once (LO03, n=3, 10 s poll); the project that read healthy at the first poll
   served REST, Auth, Storage, pooler and direct within 5 s (LO05a).
-- Restart envelope, one Micro project, `ap-southeast-1`, n=5 (LO05): REST never
-  failed; Auth 54 s, Storage 58 s, pooler 54 s, direct 50 s at p50 with maxes
-  60, 59, 151 and 56 s; first failure 2 to 3 s after the POST; the control-plane
-  status flipped back to `ACTIVE_HEALTHY` at 40 to 71 s, before the pooler
-  recovered in one run. Windows were about 30 s in runs 1 and 2 and 50 to 60 s
-  in runs 3 to 5. D01 (2026-08-04, n=1) had 75, 78 and 158 s.
+- Restart envelope, one Micro project, `ap-southeast-1`, n=5 (LO05,
+  2026-10-10): Auth 54 s, Storage 58 s, pooler 54 s, direct 50 s at p50 with
+  maxes 60, 59, 151 and 56 s; first failure 2 to 3 s after the POST; the
+  control-plane status flipped back to `ACTIVE_HEALTHY` at 40 to 71 s, before
+  the pooler recovered in one run. Windows were about 30 s in runs 1 and 2 and
+  50 to 60 s in runs 3 to 5. D01 (2026-08-04, n=1) had 75, 78 and 158 s.
+  LO05's 2026-10-10 "REST never failed" came from the HTTP-tier probe (an anon
+  `GET /rest/v1/` that the API gateway answers with 401 before PostgREST or
+  the database is reached) and was withdrawn on 2026-10-23.
+- **LO05 re-run 2026-10-23 with data-path probes** (n=5, same module, region
+  and size, `out/2026-10-23/`): REST row reads (`rest_read`) and Realtime
+  joins (`realtime_join`) failed in 5 of 5 restarts, p50 150 s and 146 s, max
+  181 s and 179 s, moving with Auth (p50 149 s), Storage (151 s), pooler
+  (147 s) and direct (145 s); the HTTP-tier `rest_http` and `realtime_ws`
+  failed in 0 of 5. Across all paths the windows were 43 to 58 s in runs 3
+  and 4 and 145 to 182 s in runs 1, 2 and 5, well above the 2026-10-10 run;
+  not explained. A restart 489 s after `ACTIVE_HEALTHY` was accepted (LO05f).
+  An earlier attempt that morning stalled after three restarts (no artifact).
 - `POST /restart` right after a create answered HTTP 400 `Project restarts are
   only allowed ten minutes after the creation process has completed...`
   (about 70 s after the POST, handed-over project), yet a restart 300 s after

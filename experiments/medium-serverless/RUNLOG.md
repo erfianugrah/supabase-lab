@@ -374,6 +374,19 @@ dedicated PgBouncer was the last path back on the way down: after Postgres
 returned it kept answering `server login has been failing ... server_login_retry`
 for about 14 s, its cached login failure. n=1 per direction.
 
+> **Correction 2026-10-23 (#204):** "left REST and Realtime untouched" was
+> measured with HTTP-tier probes only: the `REST /rest/v1/` row is an anon
+> `GET /rest/v1/`, which the API gateway answers with 401 before PostgREST or
+> the database is reached (any status below 500 counted as up), and the
+> Realtime row is a WebSocket handshake. Measured with the HTTP-only probe,
+> not re-run here. platform-downtime re-measured a Medium to Large pair with
+> a row read and a joined channel on 2026-10-23 (its RUNLOG section of that
+> date), on two Pro-org projects in ap-southeast-1: REST reads down 113 and
+> 299 s resizing up, 217 and 101 s down. Its Auth and Storage windows (101
+> to 299 s) also disagree with this run's 30-55 s; different org, region and
+> day, not explained. `lib/setup.ts` now names the old probes `rest_http` and
+> `realtime_ws` and adds `rest_read` and `realtime_join` to `allProbes`.
+
 ### MS13 - custom hostname, second run on a fresh name (run-2026-09-30T06-29-59)
 
 - MS13a: `cd_default` HTTP 200; initialize HTTP 201, `2_initiated`, again 0

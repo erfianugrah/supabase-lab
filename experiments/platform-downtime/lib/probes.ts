@@ -1,6 +1,16 @@
 /**
  * One probe per connection path.
  *
+ * CORRECTION 2026-10-23 (work-supabase-lab#204): `rest_http` and `realtime_ws`
+ * below are HTTP-tier liveness probes, not data-path probes. An anon
+ * `GET /rest/v1/` is answered with 401 by the API gateway before PostgREST or
+ * the database is reached, and the Realtime probe stops at the WebSocket
+ * handshake. Every "REST and Realtime
+ * never failed" figure this experiment published before that date was measured
+ * with them (then named `rest` and `realtime`). The data-path probes are
+ * `rest_read` and `realtime_join` in harness/src/real-probes.ts; setup.ts runs
+ * both kinds side by side so the difference is visible in one artifact.
+ *
  * "Healthy" means the service ANSWERED, not that it answered 200. Measured on
  * a fresh project 2026-08-04: /rest/v1/ gives anon a 401, /storage/v1/bucket
  * gives 400 with only an apikey and 200 with a bearer as well, /auth/v1/health
@@ -35,7 +45,7 @@ function httpProbe(name: string, url: string, headers: Record<string, string>): 
 }
 
 export function restProbe(apiHost: string, anonKey: string): Probe {
-  return httpProbe("rest", `https://${apiHost}/rest/v1/`, { apikey: anonKey });
+  return httpProbe("rest_http", `https://${apiHost}/rest/v1/`, { apikey: anonKey });
 }
 
 export function authProbe(apiHost: string, anonKey: string, path: string): Probe {
@@ -107,7 +117,7 @@ export function poolerProbe(host: string, port: number, user: string, password: 
 export function realtimeProbe(apiHost: string, anonKey: string): Probe {
   const url = `wss://${apiHost}/realtime/v1/websocket?apikey=${anonKey}&vsn=1.0.0`;
   return {
-    name: "realtime",
+    name: "realtime_ws",
     async run() {
       return await new Promise<ProbeOutcome>((resolve) => {
         const ws = new WebSocket(url, { handshakeTimeout: TIMEOUT_MS });

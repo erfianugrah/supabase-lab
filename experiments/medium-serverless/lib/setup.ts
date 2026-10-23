@@ -12,6 +12,7 @@
 import { Client } from "pg";
 import WebSocket from "ws";
 import { mgmt } from "../../../harness/src/mgmt";
+import { realtimeJoinProbe, restReadProbe, seedProbeTable } from "../../../harness/src/real-probes";
 import type { Probe, ProbeOutcome } from "../../../harness/src/sampler";
 import type { Ctx } from "../../../harness/src/types";
 
@@ -199,8 +200,13 @@ function httpProbe(name: string, url: string, headers: Record<string, string>): 
   };
 }
 
+/**
+ * HTTP-tier liveness only (named `rest` before 2026-10-23, #204): the API
+ * gateway answers anon on this path with 401 before PostgREST or the database
+ * is reached, and httpProbe counts it as up. `rest_read` (harness/src/real-probes.ts) is the data path.
+ */
 export function restProbe(ctx: Ctx): Probe {
-  return httpProbe("rest", `https://${ctx.apiHost}/rest/v1/`, { apikey: ctx.anonKey ?? "" });
+  return httpProbe("rest_http", `https://${ctx.apiHost}/rest/v1/`, { apikey: ctx.anonKey ?? "" });
 }
 export function authProbe(ctx: Ctx): Probe {
   return httpProbe("auth", `https://${ctx.apiHost}/auth/v1/health`, { apikey: ctx.anonKey ?? "" });
@@ -220,7 +226,7 @@ export function storageProbe(ctx: Ctx): Probe {
 export function realtimeProbe(ctx: Ctx): Probe {
   const url = `wss://${ctx.apiHost}/realtime/v1/websocket?apikey=${ctx.anonKey ?? ""}&vsn=1.0.0`;
   return {
-    name: "realtime",
+    name: "realtime_ws",
     async run() {
       return await new Promise<ProbeOutcome>((resolve) => {
         const ws = new WebSocket(url, { handshakeTimeout: HTTP_TIMEOUT_MS });
@@ -239,10 +245,22 @@ export function realtimeProbe(ctx: Ctx): Probe {
   };
 }
 
-/** Every path a Vercel-shaped client could be on, plus the HTTP tier. */
+/**
+ * Every path a Vercel-shaped client could be on, plus the HTTP tier. Since
+ * 2026-10-23 (#204) the data-path probes `rest_read` and `realtime_join` run
+ * beside the HTTP-tier `rest_http` and `realtime_ws`; MS07's published
+ * "REST and Realtime untouched" was measured with the HTTP-tier pair only.
+ */
 export async function allProbes(ctx: Ctx): Promise<{ probes: Probe[]; note: string }> {
   const probes: Probe[] = [restProbe(ctx), authProbe(ctx), storageProbe(ctx), realtimeProbe(ctx)];
   const notes: string[] = [];
+  try {
+    const s = await seedProbeTable(ctx, ctx.apiHost, ctx.anonKey ?? "");
+    probes.push(restReadProbe(ctx.apiHost, ctx.anonKey ?? ""), realtimeJoinProbe(ctx.apiHost, ctx.anonKey ?? ""));
+    notes.push(`data-path probes ready after ${s}s`);
+  } catch (e) {
+    notes.push(`data-path probes skipped: ${errText(e)}`);
+  }
   const pooler = await primaryPooler(ctx);
   if (pooler && ctx.dbPassword) {
     const s = sharedTargets(pooler);
