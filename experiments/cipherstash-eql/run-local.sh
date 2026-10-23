@@ -10,6 +10,10 @@
 # Nothing here needs a CipherStash account: the ciphertext comes from
 # FakeDataKeySource (keys in process memory). Leaves containers running for
 # inspection; `./run-local.sh down` removes them.
+#
+# The DB password and the JWT secret never go on a command line (ps-visible):
+# docker gets `-e NAME` with NAME in its environment, psql gets PGPASSWORD and
+# reads the ALTER ROLE from stdin, bun reads the secret from process.env.
 set -euo pipefail
 
 PG_IMAGE=${PG_IMAGE:-supabase/postgres:17.11.0.004}
@@ -18,7 +22,7 @@ EQL_VERSION=${EQL_VERSION:-eql-3.0.6}
 NET=eql-probe-net
 HERE=$(cd "$(dirname "$0")" && pwd)
 OUTDIR=${OUTDIR:-$HERE/out/$(date +%F)}
-PGPASS=probe
+PGPASS=${PGPASS:-probe}
 JWT_SECRET=$(openssl rand -hex 32)
 
 if [[ ${1:-} == down ]]; then
@@ -30,14 +34,14 @@ fi
 mkdir -p "$OUTDIR"
 
 docker network inspect $NET >/dev/null 2>&1 || docker network create $NET >/dev/null
-docker inspect eql-probe >/dev/null 2>&1 || docker run -d --name eql-probe --network $NET \
-  -e POSTGRES_PASSWORD=$PGPASS -p 54329:5432 "$PG_IMAGE" >/dev/null
+docker inspect eql-probe >/dev/null 2>&1 || POSTGRES_PASSWORD=$PGPASS docker run -d --name eql-probe --network $NET \
+  -e POSTGRES_PASSWORD -p 54329:5432 "$PG_IMAGE" >/dev/null
 docker network connect $NET eql-probe 2>/dev/null || true
 for _ in $(seq 1 60); do docker exec eql-probe pg_isready -h localhost -U postgres >/dev/null 2>&1 && break; sleep 2; done
 
 export PGPASSWORD=$PGPASS
 psql_pg() { psql -h localhost -p 54329 -U postgres -d postgres -v ON_ERROR_STOP=1 "$@"; }
-psql -h localhost -p 54329 -U supabase_admin -d postgres -qc "ALTER ROLE authenticator PASSWORD '$PGPASS'"
+printf "ALTER ROLE authenticator PASSWORD '%s';\n" "$PGPASS" | psql -h localhost -p 54329 -U supabase_admin -d postgres -q -v ON_ERROR_STOP=1
 # The bare image's auth.uid() reads only request.jwt.claim.sub, which PostgREST
 # 14 no longer sets; GoTrue's migrations (managed, and the compose stack)
 # replace it with this one, which also reads request.jwt.claims.
@@ -72,21 +76,21 @@ rm -f "$sql"
 # The exposed schema has to exist before PostgREST starts, or it sits in reconnect backoff.
 psql_pg -qc "CREATE SCHEMA IF NOT EXISTS app"
 docker inspect eql-pgrst >/dev/null 2>&1 && docker rm -f eql-pgrst >/dev/null
-docker run -d --name eql-pgrst --network $NET -p 54330:3000 \
-  -e PGRST_DB_URI="postgres://authenticator:$PGPASS@eql-probe:5432/postgres" \
-  -e PGRST_DB_SCHEMAS=app -e PGRST_DB_ANON_ROLE=anon \
-  -e PGRST_JWT_SECRET="$JWT_SECRET" "$PGRST_IMAGE" >/dev/null
+PGRST_DB_URI="postgres://authenticator:$PGPASS@eql-probe:5432/postgres" PGRST_JWT_SECRET=$JWT_SECRET \
+  docker run -d --name eql-pgrst --network $NET -p 54330:3000 \
+  -e PGRST_DB_URI -e PGRST_DB_SCHEMAS=app -e PGRST_DB_ANON_ROLE=anon \
+  -e PGRST_JWT_SECRET "$PGRST_IMAGE" >/dev/null
 for _ in $(seq 1 30); do curl -sf localhost:54330/ >/dev/null 2>&1 && break; sleep 1; done
 curl -sf localhost:54330/ >/dev/null || { echo 'PostgREST not ready'; docker logs eql-pgrst | tail -5; exit 1; }
 
 mkjwt() {
-  bun -e '
-    const [secret, sub] = process.argv.slice(1);
+  JWT_SECRET=$JWT_SECRET bun -e '
+    const secret = process.env.JWT_SECRET, [sub] = process.argv.slice(1);
     const b64 = (o) => Buffer.from(JSON.stringify(o)).toString("base64url");
     const h = b64({ alg: "HS256", typ: "JWT" });
     const p = b64({ sub, role: "authenticated", aud: "authenticated", exp: Math.floor(Date.now() / 1000) + 3600 });
     const s = require("crypto").createHmac("sha256", secret).update(`${h}.${p}`).digest("base64url");
-    console.log(`${h}.${p}.${s}`);' "$JWT_SECRET" "$1"
+    console.log(`${h}.${p}.${s}`);' "$1"
 }
 UID_A=$(uuidgen | tr A-Z a-z); UID_B=$(uuidgen | tr A-Z a-z)
 
