@@ -4645,7 +4645,7 @@ the two targets apart from plan costs and the encoded path length.
   vantage, concurrency, writes without grants, edge_logs retention, the
   wrapper inside an Edge Function (WebAssembly build).
 
-## experiments/partitioned-tenancy - key facts (validated 2026-10-22, three runs; PT05-PT06 2026-10-23, one run; default compute (Micro, not read back), ap-southeast-1, Pro org)
+## experiments/partitioned-tenancy - key facts (validated 2026-10-22, three runs; PT05-PT06 2026-10-23, one run; PT01 restore fix 2026-10-23, two runs and a probe; default compute (Micro, not read back), ap-southeast-1, Pro org)
 
 Self-provisioning (`pvlab-pt-*`, deleted by PT99), run from source with bun.
 An append-only multi-tenant table (`tenant_id`, `created_at`, `payload`)
@@ -4752,6 +4752,30 @@ and PT02g rows are probe artefacts (named in the RUNLOG); other run 1 / run
   project ref with the anon key on the storage host, the anon key on the
   gateway host, and the service_role key on the storage host each answered
   `HV000: request failed: service error`.
+- **PT01z puts back exactly what PT01a recorded** (fix 2026-10-23,
+  `lib/acl.ts`, unit tests `lib/acl.test.ts`). It used to run a blanket
+  `grant all on tables, sequences` to anon, authenticated, service_role,
+  which on a project in the revoked state (DD01c's revoke statements, the
+  lab's wording of the opt-in enforced 2026-10-30) brings the legacy grant
+  back and hands it to PT02-PT06. PT01a now records every
+  `pg_default_acl` row for postgres in `public` (`r`, `S`, `f`); PT01z
+  revokes all from each grantee in the current or recorded rows, re-grants
+  the recorded letters in order, and passes only on the same text.
+  `PVLAB_PT_PREREVOKE=1` applies DD01c's revoke statements before PT01a,
+  standing in for the 2026-10-30 default, which is not measured here.
+  Measured 2026-10-23 (`out/2026-10-23/`, n = 1 each): default run, 16 statements
+  restored the legacy tables and sequences rows exactly; pre-revoked run, 0
+  statements, the revoked rows (`anon=Dxtm` on tables, `anon=w` on
+  sequences) kept, pass; `lib/acl-probe.ts` ran the old statements on the
+  revoked state (both rows back to legacy) and the restore returned them to
+  the revoked rows exactly. The DD01c revoke leaves the functions row
+  (`anon=X`) as it was. Under the pre-revoked state the sampled partition
+  (`pt_audit_2026_10`, PT01c `partition_acl_sample`) was created with
+  `anon=Dxtm`, the other two were not read; all three still answered anon
+  `404 PGRST205`, parent reads were unchanged (the
+  #219 grant on the parent), and the advisors flagged 0 partitions against 3
+  `rls_disabled_in_public` on the default run (PT01e, one run each). PT02-PT06
+  were not run under the revoked state.
 - Not run: archiving to another database, the S3 FDW with dashboard-issued
   keys, Parquet, objects above the 52428800-byte file size limit, exposing
   `archive` later, ATTACH cost, sub-partitioning, LIST by tenant, pruning

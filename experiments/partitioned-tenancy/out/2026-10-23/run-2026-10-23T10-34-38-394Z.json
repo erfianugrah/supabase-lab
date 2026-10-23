@@ -1,0 +1,207 @@
+{
+  "startedAt": "2026-10-23T10:34:38.394Z",
+  "finishedAt": "2026-10-23T10:37:00.378Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "partitioned-tenancy",
+  "labCommit": "77cdea0",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "PT01a",
+      "title": "PT01a: default privileges (postgres, schema public) on the fresh project",
+      "status": "info",
+      "detail": "pg_default_acl f={postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres}; r={postgres=arwdDxtm/postgres,anon=arwdDxtm/postgres,authenticated=arwdDxtm/postgres,service_role=arwdDxtm/postgres}; S={postgres=rwU/postgres,anon=rwU/postgres,authenticated=rwU/postgres,service_role=rwU/postgres}",
+      "measurements": {
+        "prerevoke": 0,
+        "default_acl_tables": "{postgres=arwdDxtm/postgres,anon=arwdDxtm/postgres,authenticated=arwdDxtm/postgres,service_role=arwdDxtm/postgres}",
+        "default_acl_sequences": "{postgres=rwU/postgres,anon=rwU/postgres,authenticated=rwU/postgres,service_role=rwU/postgres}",
+        "default_acl_functions": "{postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+        "default_acl_types": "f,r,S",
+        "anon_in_default_acl": 1
+      },
+      "durationMs": 140446
+    },
+    {
+      "id": "PT01b",
+      "title": "PT01b: reads through the partitioned parent (policy on parent only)",
+      "status": "pass",
+      "detail": "anon 200 rows=0; tenant1 200 rows=5 tenants=1; tenant2 200 rows=7 tenants=2; schema cache 0s",
+      "measurements": {
+        "parent_anon_status": 200,
+        "parent_anon_rows": 0,
+        "parent_t1_rows": 5,
+        "parent_t1_tenants": "1",
+        "parent_t2_rows": 7,
+        "parent_t2_tenants": "2",
+        "schema_cache_wait_s": 0
+      },
+      "durationMs": 140446
+    },
+    {
+      "id": "PT01c",
+      "title": "PT01c: each partition read directly through the Data API",
+      "status": "info",
+      "detail": "pt_audit_2026_09: rls=false anon 404 rows=-1 [] t1 404 rows=-1 []; pt_audit_2026_10: rls=false anon 404 rows=-1 [] t1 404 rows=-1 []; pt_audit_2026_11: rls=false anon 404 rows=-1 [] t1 404 rows=-1 []",
+      "measurements": {
+        "p2026_09_relrowsecurity": "false",
+        "p2026_09_policies": 0,
+        "p2026_09_anon_status": 404,
+        "p2026_09_anon_code": "PGRST205",
+        "p2026_09_anon_rows": -1,
+        "p2026_09_anon_tenants": "",
+        "p2026_09_t1_rows": -1,
+        "p2026_09_t1_tenants": "",
+        "p2026_10_relrowsecurity": "false",
+        "p2026_10_policies": 0,
+        "p2026_10_anon_status": 404,
+        "p2026_10_anon_code": "PGRST205",
+        "p2026_10_anon_rows": -1,
+        "p2026_10_anon_tenants": "",
+        "p2026_10_t1_rows": -1,
+        "p2026_10_t1_tenants": "",
+        "p2026_11_relrowsecurity": "false",
+        "p2026_11_policies": 0,
+        "p2026_11_anon_status": 404,
+        "p2026_11_anon_code": "PGRST205",
+        "p2026_11_anon_rows": -1,
+        "p2026_11_anon_tenants": "",
+        "p2026_11_t1_rows": -1,
+        "p2026_11_t1_tenants": "",
+        "partition_acl_sample": "{postgres=arwdDxtm/postgres,anon=arwdDxtm/postgres,authenticated=arwdDxtm/postgres,service_role=arwdDxtm/postgres}"
+      },
+      "durationMs": 140446
+    },
+    {
+      "id": "PT01d",
+      "title": "PT01d: partitions in the OpenAPI document (service_role)",
+      "status": "info",
+      "detail": "HTTP 200; parent listed=true; partitions listed 0/3",
+      "measurements": {
+        "openapi_status": 200,
+        "openapi_parent_listed": 1,
+        "openapi_partitions_listed": 0
+      },
+      "durationMs": 140446
+    },
+    {
+      "id": "PT01e",
+      "title": "PT01e: security advisors on the unmitigated layout",
+      "status": "info",
+      "detail": "HTTP 200; lint names: auth_leaked_password_protection,rls_disabled_in_public; tables flagged: pt_audit_2026_09,pt_audit_2026_10,pt_audit_2026_11; pt_audit=none pt_audit_2026_09=rls_disabled_in_public pt_audit_2026_10=rls_disabled_in_public pt_audit_2026_11=rls_disabled_in_public",
+      "measurements": {
+        "advisors_status": 200,
+        "advisors_lint_names": "auth_leaked_password_protection,rls_disabled_in_public",
+        "advisors_parent": "none",
+        "advisors_partitions_flagged": 3,
+        "advisors_partition_lints": "rls_disabled_in_public"
+      },
+      "durationMs": 140446
+    },
+    {
+      "id": "PT01f",
+      "title": "PT01f: tenant 1 writes a tenant-2 row via the parent, via a partition; anon via a partition",
+      "status": "info",
+      "detail": "parent 403 42501 landed=0; partition(t1) 404 PGRST205 landed=0; partition(anon) 404 PGRST205 landed=0",
+      "measurements": {
+        "write_parent_status": 403,
+        "write_parent_landed": 0,
+        "write_partition_t1_status": 404,
+        "write_partition_t1_landed": 0,
+        "write_partition_anon_status": 404,
+        "write_partition_anon_landed": 0
+      },
+      "durationMs": 140446
+    },
+    {
+      "id": "PT01g",
+      "title": "PT01g: RLS enabled on one partition with no policy",
+      "status": "pass",
+      "detail": "pt_audit_2026_09 direct: anon 404 PGRST205 rows=-1, t1 404 PGRST205 rows=-1; parent: t1 rows=5 t2 rows=7",
+      "measurements": {
+        "rlsonpart_direct_anon_status": 404,
+        "rlsonpart_direct_anon_rows": -1,
+        "rlsonpart_direct_t1_rows": -1,
+        "rlsonpart_parent_t1_rows": 5,
+        "rlsonpart_parent_t2_rows": 7
+      },
+      "durationMs": 140446
+    },
+    {
+      "id": "PT01h",
+      "title": "PT01h: privileges revoked on one partition (anon, authenticated)",
+      "status": "pass",
+      "detail": "pt_audit_2026_11 direct: anon 404 PGRST205, t1 404 PGRST205; parent: t1 rows=5 t2 rows=7; t1 insert routed into the revoked partition via parent 201 ",
+      "measurements": {
+        "revoked_direct_anon_status": 404,
+        "revoked_direct_anon_code": "PGRST205",
+        "revoked_direct_t1_status": 404,
+        "revoked_parent_t1_rows": 5,
+        "revoked_parent_t2_rows": 7,
+        "revoked_parent_insert_status": 201
+      },
+      "durationMs": 140446
+    },
+    {
+      "id": "PT01i",
+      "title": "PT01i: new partition after the default-privilege revoke",
+      "status": "info",
+      "detail": "acl={postgres=arwdDxtm/postgres,anon=Dxtm/postgres,authenticated=Dxtm/postgres,service_role=Dxtm/postgres}; direct: anon 404 PGRST205 rows=-1, t1 404 PGRST205 rows=-1; parent t1 rows=7 (expected 7); schema cache -1s",
+      "measurements": {
+        "newpart_acl": "{postgres=arwdDxtm/postgres,anon=Dxtm/postgres,authenticated=Dxtm/postgres,service_role=Dxtm/postgres}",
+        "newpart_direct_anon_status": 404,
+        "newpart_direct_anon_code": "PGRST205",
+        "newpart_direct_t1_status": 404,
+        "newpart_parent_t1_rows": 7
+      },
+      "durationMs": 140446
+    },
+    {
+      "id": "PT01j",
+      "title": "PT01j: security advisors after the mitigations",
+      "status": "info",
+      "detail": "HTTP 200; pt_audit=none pt_audit_2026_09=rls_enabled_no_policy pt_audit_2026_10=rls_disabled_in_public pt_audit_2026_11=none pt_audit_2026_12=none",
+      "measurements": {
+        "advisors_after_pt_audit": "none",
+        "advisors_after_pt_audit_2026_09": "rls_enabled_no_policy",
+        "advisors_after_pt_audit_2026_10": "rls_disabled_in_public",
+        "advisors_after_pt_audit_2026_11": "none",
+        "advisors_after_pt_audit_2026_12": "none"
+      },
+      "durationMs": 140446
+    },
+    {
+      "id": "PT01z",
+      "title": "PT01z: default privileges restored to what PT01a recorded",
+      "status": "pass",
+      "detail": "before restore: f={postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres}; r={postgres=arwdDxtm/postgres,anon=Dxtm/postgres,authenticated=Dxtm/postgres,service_role=Dxtm/postgres}; S={postgres=rwU/postgres,anon=w/postgres,authenticated=w/postgres,service_role=w/postgres}; restored: f={postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres}; r={postgres=arwdDxtm/postgres,anon=arwdDxtm/postgres,authenticated=arwdDxtm/postgres,service_role=arwdDxtm/postgres}; S={postgres=rwU/postgres,anon=rwU/postgres,authenticated=rwU/postgres,service_role=rwU/postgres}; recorded by PT01a: f={postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres}; r={postgres=arwdDxtm/postgres,anon=arwdDxtm/postgres,authenticated=arwdDxtm/postgres,service_role=arwdDxtm/postgres}; S={postgres=rwU/postgres,anon=rwU/postgres,authenticated=rwU/postgres,service_role=rwU/postgres}",
+      "measurements": {
+        "before_restore_tables": "{postgres=arwdDxtm/postgres,anon=Dxtm/postgres,authenticated=Dxtm/postgres,service_role=Dxtm/postgres}",
+        "before_restore_sequences": "{postgres=rwU/postgres,anon=w/postgres,authenticated=w/postgres,service_role=w/postgres}",
+        "restore_statements": 16,
+        "restored_tables": "{postgres=arwdDxtm/postgres,anon=arwdDxtm/postgres,authenticated=arwdDxtm/postgres,service_role=arwdDxtm/postgres}",
+        "restored_sequences": "{postgres=rwU/postgres,anon=rwU/postgres,authenticated=rwU/postgres,service_role=rwU/postgres}",
+        "restored_exact": 1,
+        "restored_same_items": 1
+      },
+      "durationMs": 140446
+    },
+    {
+      "id": "PT99",
+      "title": "PT99: project deleted and gone from the listing",
+      "status": "pass",
+      "detail": "DELETE 200; absent from GET /projects after 0s",
+      "measurements": {
+        "delete_status": 200,
+        "gone_from_listing_s": 0
+      },
+      "durationMs": 1536
+    }
+  ]
+}

@@ -16,7 +16,12 @@
  * select using / insert with check tenant_id = (select app_metadata
  * tenant_id). Seed: tenant 1 = 5 rows, tenant 2 = 7 rows across partitions.
  *
- *   PT01a  pg_default_acl for postgres in public on the fresh project.
+ *   PT01a  pg_default_acl for postgres in public on the fresh project, every
+ *          object type; the rows are kept for PT01z. With
+ *          PVLAB_PT_PREREVOKE=1 DD01c's revoke statements (the lab's
+ *          wording of the opt-in) run first and PT01a also records the
+ *          fresh reading: a stand-in for the 2026-10-30 default, which is
+ *          not measured here.
  *   PT01b  via the parent: anon, tenant 1, tenant 2 - rows and tenants seen.
  *          Expected (Postgres docs on partitioned-table RLS: only the
  *          queried table's policies apply): 0 / 5 (t1) / 7 (t2).
@@ -35,6 +40,10 @@
  *          statements), a NEW partition with 2 tenant-1 rows: direct reads
  *          and parent reads.
  *   PT01j  advisors re-read after the mitigations.
+ *   PT01z  put back exactly the rows PT01a recorded (lib/acl.ts: revoke
+ *          every grantee, re-grant the recorded letters), re-read, compare.
+ *          A blanket `grant all` here would hand PT02-PT06 the legacy grant
+ *          on a project whose default is the revoked state.
  *
  * Pass/fail is used only where an expectation is stated (PT01b isolation via
  * the parent); exposure rows are `info` - there is no "correct" value, the
@@ -64,6 +73,7 @@ import {
   tenantUser,
   type PtProject,
 } from "../lib/project.js";
+import { asRows, compareDefaultAcl, defaultAclSql, renderRows, restoreDefaultAclSql } from "../lib/acl.js";
 
 const PARTS = ["pt_audit_2026_09", "pt_audit_2026_10", "pt_audit_2026_11"] as const;
 
@@ -146,19 +156,28 @@ const mod: TestModule = {
     const red = (s: string) => brief(currentProject(), s, 300);
     try {
       // ---- PT01a ----
-      const acl = await sqlOk(
-        ctx,
-        p.ref,
-        `select coalesce((select defaclacl::text from pg_default_acl where defaclnamespace = 'public'::regnamespace
-           and defaclrole = 'postgres'::regrole and defaclobjtype = 'r'), 'absent') as acl`,
-      );
-      const tablesAcl = String(acl[0]?.acl ?? "");
+      const preRevoke = process.env.PVLAB_PT_PREREVOKE === "1";
+      const fresh = asRows(await sqlOk(ctx, p.ref, defaultAclSql()));
+      if (preRevoke) await sqlOk(ctx, p.ref, REVOKE_DEFAULTS);
+      const recorded = preRevoke ? asRows(await sqlOk(ctx, p.ref, defaultAclSql())) : fresh;
+      const aclOf = (rows: typeof recorded, t: string) => rows.find((r) => r.objtype === t)?.acl ?? "absent";
+      const tablesAcl = aclOf(recorded, "r");
       results.push({
         id: "PT01a",
-        title: "PT01a: default table privileges (postgres, schema public) on the fresh project",
+        title: preRevoke
+          ? "PT01a: default privileges (postgres, schema public) after the DD01c revoke applied first (PVLAB_PT_PREREVOKE=1)"
+          : "PT01a: default privileges (postgres, schema public) on the fresh project",
         status: "info",
-        detail: `pg_default_acl tables = ${tablesAcl}`,
-        measurements: { default_acl_tables: tablesAcl, anon_in_default_acl: /[{,]anon=/.test(tablesAcl) ? 1 : 0 },
+        detail: `pg_default_acl ${renderRows(recorded)}${preRevoke ? `; fresh project before the revoke: ${renderRows(fresh)}` : ""}`,
+        measurements: {
+          prerevoke: preRevoke ? 1 : 0,
+          default_acl_tables: tablesAcl,
+          default_acl_sequences: aclOf(recorded, "S"),
+          default_acl_functions: aclOf(recorded, "f"),
+          default_acl_types: recorded.map((r) => r.objtype).join(",") || "none",
+          anon_in_default_acl: /[{,]anon=/.test(tablesAcl) ? 1 : 0,
+          ...(preRevoke ? { fresh_default_acl_tables: aclOf(fresh, "r"), fresh_default_acl_sequences: aclOf(fresh, "S") } : {}),
+        },
       });
 
       await sqlOk(ctx, p.ref, SETUP);
@@ -378,24 +397,26 @@ const mod: TestModule = {
         measurements: Object.fromEntries(["pt_audit", ...PARTS, "pt_audit_2026_12"].map((t) => [`advisors_after_${t}`, s2.byTable(t)])),
       });
 
-      // Put the default privileges back so PT02-PT04 start from the fresh-project state PT01a read.
-      await sqlOk(
-        ctx,
-        p.ref,
-        `alter default privileges for role postgres in schema public grant all on tables to anon, authenticated, service_role;
-         alter default privileges for role postgres in schema public grant all on sequences to anon, authenticated, service_role;`,
-      );
-      const back = await sqlOk(
-        ctx,
-        p.ref,
-        `select coalesce((select defaclacl::text from pg_default_acl where defaclnamespace = 'public'::regnamespace
-           and defaclrole = 'postgres'::regrole and defaclobjtype = 'r'), 'absent') as acl`,
-      );
+      // Put back exactly what PT01a recorded (legacy grant or revoked state), so PT02-PT06 start from it.
+      const before = asRows(await sqlOk(ctx, p.ref, defaultAclSql()));
+      const restore = restoreDefaultAclSql(recorded, before);
+      if (restore) await sqlOk(ctx, p.ref, restore);
+      const back = asRows(await sqlOk(ctx, p.ref, defaultAclSql()));
+      const cmp = compareDefaultAcl(recorded, back);
       results.push({
         id: "PT01z",
-        title: "PT01z: default privileges restored for the later modules",
-        status: String(back[0]?.acl) === tablesAcl ? "pass" : "fail",
-        detail: `restored=${String(back[0]?.acl)} original=${tablesAcl}`,
+        title: "PT01z: default privileges restored to what PT01a recorded",
+        status: cmp.exact ? "pass" : "fail",
+        detail: `before restore: ${renderRows(before)}; restored: ${renderRows(back)}; recorded by PT01a: ${renderRows(recorded)}${cmp.diff.length ? `; differs: ${cmp.diff.join(" | ")}` : ""}`,
+        measurements: {
+          before_restore_tables: aclOf(before, "r"),
+          before_restore_sequences: aclOf(before, "S"),
+          restore_statements: restore ? restore.split("\n").length : 0,
+          restored_tables: aclOf(back, "r"),
+          restored_sequences: aclOf(back, "S"),
+          restored_exact: cmp.exact ? 1 : 0,
+          restored_same_items: cmp.same ? 1 : 0,
+        },
       });
     } catch (e) {
       results.push({ id: "PT01", title: "PT01", status: "fail", detail: red(e instanceof Error ? e.message : String(e)) });
