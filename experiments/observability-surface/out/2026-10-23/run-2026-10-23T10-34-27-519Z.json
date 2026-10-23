@@ -1,0 +1,642 @@
+{
+  "startedAt": "2026-10-23T10:34:27.519Z",
+  "finishedAt": "2026-10-23T10:44:40.975Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "observability-surface",
+  "labCommit": "77cdea0",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "OB03d-volume",
+      "title": "OB03d: known volume sent and ingested",
+      "status": "info",
+      "measurements": {
+        "compute": "micro",
+        "burst_sent": 1200,
+        "burst_status_200": 1200,
+        "burst_seconds": 4.9,
+        "edge_logs_rows_with_marker_1h": 1200,
+        "wait_s": 33,
+        "minutes_since_burst_end_at_first_cell": 0.5
+      },
+      "durationMs": 613453
+    },
+    {
+      "id": "OB03d-mcp-init",
+      "title": "OB03d: hosted MCP server reachable (project-scoped, read_only=true)",
+      "status": "info",
+      "measurements": {
+        "http": 200,
+        "server_version": "0.14.0",
+        "protocol": "2025-06-18"
+      },
+      "durationMs": 613453
+    },
+    {
+      "id": "OB03d-w-1h",
+      "title": "OB03d: window 1 h ending now",
+      "status": "info",
+      "measurements": {
+        "expect": "all marker rows",
+        "r1_http": 200,
+        "r1_rows": 1,
+        "r1_n": "1200",
+        "r1_error": "none",
+        "r1_s_after_burst": 33,
+        "r2_http": 200,
+        "r2_rows": 1,
+        "r2_n": "1200",
+        "r2_error": "none",
+        "r2_s_after_burst": 281
+      },
+      "durationMs": 613453
+    },
+    {
+      "id": "OB03d-w-24h",
+      "title": "OB03d: window 24 h ending now",
+      "status": "info",
+      "measurements": {
+        "expect": "all marker rows",
+        "r1_http": 200,
+        "r1_rows": 1,
+        "r1_n": "1200",
+        "r1_error": "none",
+        "r1_s_after_burst": 38,
+        "r2_http": 200,
+        "r2_rows": 1,
+        "r2_n": "1200",
+        "r2_error": "none",
+        "r2_s_after_burst": 287
+      },
+      "durationMs": 613453
+    },
+    {
+      "id": "OB03d-w-24h1m",
+      "title": "OB03d: window 24 h + 1 min ending now",
+      "status": "info",
+      "measurements": {
+        "expect": "OpenAPI: validation error",
+        "r1_http": 200,
+        "r1_rows": 1,
+        "r1_n": "0",
+        "r1_error": "none",
+        "r1_s_after_burst": 44,
+        "r2_http": 200,
+        "r2_rows": 1,
+        "r2_n": "1200",
+        "r2_error": "none",
+        "r2_s_after_burst": 292
+      },
+      "durationMs": 613453
+    },
+    {
+      "id": "OB03d-w-25h",
+      "title": "OB03d: window 25 h ending now",
+      "status": "info",
+      "measurements": {
+        "expect": "OpenAPI: validation error",
+        "r1_http": 200,
+        "r1_rows": 1,
+        "r1_n": "0",
+        "r1_error": "none",
+        "r1_s_after_burst": 49,
+        "r2_http": 200,
+        "r2_rows": 1,
+        "r2_n": "0",
+        "r2_error": "none",
+        "r2_s_after_burst": 297
+      },
+      "durationMs": 613453
+    },
+    {
+      "id": "OB03d-w-48h",
+      "title": "OB03d: window 48 h ending now",
+      "status": "info",
+      "measurements": {
+        "expect": "OpenAPI: validation error",
+        "r1_http": 200,
+        "r1_rows": 1,
+        "r1_n": "0",
+        "r1_error": "none",
+        "r1_s_after_burst": 54,
+        "r2_http": 200,
+        "r2_rows": 1,
+        "r2_n": "0",
+        "r2_error": "none",
+        "r2_s_after_burst": 302
+      },
+      "durationMs": 613453
+    },
+    {
+      "id": "OB03d-w-48h-fwd",
+      "title": "OB03d: window 48 h starting 1 h ago (end 47 h ahead)",
+      "status": "info",
+      "measurements": {
+        "expect": "OpenAPI: validation error; start-anchored cap would return all, end-anchored 0",
+        "r1_http": 200,
+        "r1_rows": 1,
+        "r1_n": "1200",
+        "r1_error": "none",
+        "r1_s_after_burst": 59,
+        "r2_http": 200,
+        "r2_rows": 1,
+        "r2_n": "1200",
+        "r2_error": "none",
+        "r2_s_after_burst": 307
+      },
+      "durationMs": 613453
+    },
+    {
+      "id": "OB03d-w-23h-fwd",
+      "title": "OB03d: control: 23.5 h starting 30 min ago (end in the future)",
+      "status": "info",
+      "measurements": {
+        "expect": "all marker rows if a future end is accepted",
+        "r1_http": 200,
+        "r1_rows": 1,
+        "r1_n": "1200",
+        "r1_error": "none",
+        "r1_s_after_burst": 64,
+        "r2_http": 200,
+        "r2_rows": 1,
+        "r2_n": "1200",
+        "r2_error": "none",
+        "r2_s_after_burst": 312
+      },
+      "durationMs": 613453
+    },
+    {
+      "id": "OB03d-w-start-only",
+      "title": "OB03d: start 1 h ago, no end",
+      "status": "info",
+      "measurements": {
+        "expect": "OpenAPI: 'Either ... must be provided'",
+        "r1_http": 200,
+        "r1_rows": 1,
+        "r1_n": "0",
+        "r1_error": "none",
+        "r1_s_after_burst": 70,
+        "r2_http": 200,
+        "r2_rows": 1,
+        "r2_n": "0",
+        "r2_error": "none",
+        "r2_s_after_burst": 319
+      },
+      "durationMs": 613453
+    },
+    {
+      "id": "OB03d-w-end-only",
+      "title": "OB03d: end now, no start",
+      "status": "info",
+      "measurements": {
+        "expect": "OpenAPI: 'Either ... must be provided'",
+        "r1_http": 200,
+        "r1_rows": 1,
+        "r1_n": "0",
+        "r1_error": "none",
+        "r1_s_after_burst": 76,
+        "r2_http": 200,
+        "r2_rows": 1,
+        "r2_n": "0",
+        "r2_error": "none",
+        "r2_throttle_retries": 3,
+        "r2_s_after_burst": 325
+      },
+      "durationMs": 613453
+    },
+    {
+      "id": "OB03d-w-none",
+      "title": "OB03d: no start, no end (markers several minutes old)",
+      "status": "info",
+      "measurements": {
+        "expect": "OpenAPI: last 1 minute, so 0",
+        "r1_http": 200,
+        "r1_rows": 0,
+        "r1_error": "Backend error! Retry your query. Please contact support if this continues.",
+        "r1_s_after_burst": 82,
+        "r2_http": 200,
+        "r2_rows": 0,
+        "r2_error": "Backend error! Retry your query. Please contact support if this continues.",
+        "r2_s_after_burst": 390
+      },
+      "durationMs": 613453
+    },
+    {
+      "id": "OB03d-q-count",
+      "title": "OB03d: count() 1 h",
+      "status": "info",
+      "measurements": {
+        "expect": "all marker rows",
+        "r1_http": 200,
+        "r1_rows": 1,
+        "r1_n": "1200",
+        "r1_error": "none",
+        "r1_s_after_burst": 87,
+        "r2_http": 200,
+        "r2_rows": 1,
+        "r2_n": "1200",
+        "r2_error": "none",
+        "r2_s_after_burst": 394
+      },
+      "durationMs": 613453
+    },
+    {
+      "id": "OB03d-q-countstar",
+      "title": "OB03d: count(*) 1 h",
+      "status": "info",
+      "measurements": {
+        "expect": "docs: rejected",
+        "r1_http": 200,
+        "r1_rows": 1,
+        "r1_n": "1200",
+        "r1_error": "none",
+        "r1_s_after_burst": 92,
+        "r2_http": 200,
+        "r2_rows": 1,
+        "r2_n": "1200",
+        "r2_error": "none",
+        "r2_s_after_burst": 400
+      },
+      "durationMs": 613453
+    },
+    {
+      "id": "OB03d-q-star",
+      "title": "OB03d: select * 1 h",
+      "status": "info",
+      "measurements": {
+        "expect": "docs: rejected",
+        "r1_http": 200,
+        "r1_rows": 0,
+        "r1_error": "restricted wildcard (*) in a result column",
+        "r1_s_after_burst": 99,
+        "r2_http": 200,
+        "r2_rows": 0,
+        "r2_error": "restricted wildcard (*) in a result column",
+        "r2_s_after_burst": 406
+      },
+      "durationMs": 613453
+    },
+    {
+      "id": "OB03d-q-oldtable",
+      "title": "OB03d: per-source table edge_logs",
+      "status": "info",
+      "measurements": {
+        "expect": "error (unified table only)",
+        "r1_http": 200,
+        "r1_rows": 0,
+        "r1_error": "Table \"edge_logs\" does not exist.",
+        "r1_s_after_burst": 103,
+        "r2_http": 200,
+        "r2_rows": 0,
+        "r2_error": "Table \"edge_logs\" does not exist.",
+        "r2_s_after_burst": 411
+      },
+      "durationMs": 613453
+    },
+    {
+      "id": "OB03d-q-lim100",
+      "title": "OB03d: rows, LIMIT 100",
+      "status": "info",
+      "measurements": {
+        "expect": "100",
+        "r1_http": 200,
+        "r1_rows": 100,
+        "r1_error": "none",
+        "r1_keys": "id,timestamp",
+        "r1_s_after_burst": 108,
+        "r2_http": 200,
+        "r2_rows": 100,
+        "r2_error": "none",
+        "r2_keys": "id,timestamp",
+        "r2_s_after_burst": 416
+      },
+      "durationMs": 613453
+    },
+    {
+      "id": "OB03d-q-lim1000",
+      "title": "OB03d: rows, LIMIT 1000",
+      "status": "info",
+      "measurements": {
+        "expect": "1000",
+        "r1_http": 200,
+        "r1_rows": 1000,
+        "r1_error": "none",
+        "r1_keys": "id,timestamp",
+        "r1_s_after_burst": 113,
+        "r2_http": 200,
+        "r2_rows": 1000,
+        "r2_error": "none",
+        "r2_keys": "id,timestamp",
+        "r2_s_after_burst": 422
+      },
+      "durationMs": 613453
+    },
+    {
+      "id": "OB03d-q-lim1001",
+      "title": "OB03d: rows, LIMIT 1001",
+      "status": "info",
+      "measurements": {
+        "expect": "no documented cap",
+        "r1_http": 200,
+        "r1_rows": 1000,
+        "r1_error": "none",
+        "r1_keys": "id,timestamp",
+        "r1_throttle_retries": 3,
+        "r1_s_after_burst": 118,
+        "r2_http": 200,
+        "r2_rows": 1000,
+        "r2_error": "none",
+        "r2_keys": "id,timestamp",
+        "r2_s_after_burst": 427
+      },
+      "durationMs": 613453
+    },
+    {
+      "id": "OB03d-q-lim2000",
+      "title": "OB03d: rows, LIMIT 2000 (above the marker count)",
+      "status": "info",
+      "measurements": {
+        "expect": "all marker rows if uncapped",
+        "r1_http": 200,
+        "r1_rows": 1000,
+        "r1_error": "none",
+        "r1_keys": "id,timestamp",
+        "r1_s_after_burst": 184,
+        "r2_http": 200,
+        "r2_rows": 1000,
+        "r2_error": "none",
+        "r2_keys": "id,timestamp",
+        "r2_s_after_burst": 432
+      },
+      "durationMs": 613453
+    },
+    {
+      "id": "OB03d-q-nolimit",
+      "title": "OB03d: rows, no LIMIT",
+      "status": "info",
+      "measurements": {
+        "expect": "no documented default",
+        "r1_http": 200,
+        "r1_rows": 1000,
+        "r1_error": "none",
+        "r1_keys": "id,timestamp",
+        "r1_s_after_burst": 189,
+        "r2_http": 200,
+        "r2_rows": 1000,
+        "r2_error": "none",
+        "r2_keys": "id,timestamp",
+        "r2_throttle_retries": 3,
+        "r2_s_after_burst": 437
+      },
+      "durationMs": 613453
+    },
+    {
+      "id": "OB03d-q-x10-5000",
+      "title": "OB03d: marker rows x10 (arrayJoin), LIMIT 5000",
+      "status": "info",
+      "measurements": {
+        "expect": "5000 if uncapped",
+        "r1_http": 200,
+        "r1_rows": 1000,
+        "r1_error": "none",
+        "r1_keys": "id,k",
+        "r1_s_after_burst": 194,
+        "r2_http": 200,
+        "r2_rows": 1000,
+        "r2_error": "none",
+        "r2_keys": "id,k",
+        "r2_s_after_burst": 504
+      },
+      "durationMs": 613453
+    },
+    {
+      "id": "OB03d-q-x10-20000",
+      "title": "OB03d: marker rows x10 (arrayJoin), LIMIT 20000",
+      "status": "info",
+      "measurements": {
+        "expect": "10x marker rows if uncapped",
+        "r1_http": 200,
+        "r1_rows": 1000,
+        "r1_error": "none",
+        "r1_keys": "id,k",
+        "r1_s_after_burst": 199,
+        "r2_http": 200,
+        "r2_rows": 1000,
+        "r2_error": "none",
+        "r2_keys": "id,k",
+        "r2_s_after_burst": 510
+      },
+      "durationMs": 613453
+    },
+    {
+      "id": "OB03d-q-x10-nolimit",
+      "title": "OB03d: marker rows x10 (arrayJoin), no LIMIT",
+      "status": "info",
+      "measurements": {
+        "expect": "no documented default",
+        "r1_http": 200,
+        "r1_rows": 1000,
+        "r1_error": "none",
+        "r1_keys": "id,k",
+        "r1_s_after_burst": 205,
+        "r2_http": 200,
+        "r2_rows": 1000,
+        "r2_error": "none",
+        "r2_keys": "id,k",
+        "r2_s_after_burst": 515
+      },
+      "durationMs": 613453
+    },
+    {
+      "id": "OB03d-nosql",
+      "title": "OB03d: no sql parameter, 1 h",
+      "status": "info",
+      "measurements": {
+        "expect": "docs: API Gateway events only",
+        "r1_http": 200,
+        "r1_rows": 100,
+        "r1_error": "none",
+        "r1_keys": "event_message,id,log_attributes,project,severity_text,source,timestamp",
+        "r1_s_after_burst": 210,
+        "r2_http": 200,
+        "r2_rows": 100,
+        "r2_error": "none",
+        "r2_keys": "event_message,id,log_attributes,project,severity_text,source,timestamp",
+        "r2_s_after_burst": 522
+      },
+      "durationMs": 613454
+    },
+    {
+      "id": "OB03d-logs-all",
+      "title": "OB03d: removed logs.all route, 1 h",
+      "status": "info",
+      "measurements": {
+        "expect": "OpenAPI: 410 Gone",
+        "r1_http": 410,
+        "r1_rows": 0,
+        "r1_error": "{\"message\":\"The logs.all endpoint has been removed. Use GET /v1/projects/{ref}/analytics/endpoints/logs instead. See https://supabase.com/changelog/48235-migration-of-supabase-management-api-logs-all-analytics-endpoint-to-logs-endpoint\"}",
+        "r1_s_after_burst": 216,
+        "r2_http": 410,
+        "r2_rows": 0,
+        "r2_error": "{\"message\":\"The logs.all endpoint has been removed. Use GET /v1/projects/{ref}/analytics/endpoints/logs instead. See https://supabase.com/changelog/48235-migration-of-supabase-management-api-logs-all-analytics-endpoint-to-logs-endpoint\"}",
+        "r2_s_after_burst": 527
+      },
+      "durationMs": 613454
+    },
+    {
+      "id": "OB03d-mcp-1h",
+      "title": "OB03d: MCP query_logs count(), explicit 1 h",
+      "status": "info",
+      "measurements": {
+        "expect": "same as q-count",
+        "r1_http": 200,
+        "r1_rows": 0,
+        "r1_error": "boundaries. <untrusted-data-<uuid>> {\"result\":[{\"n\":1200}]}",
+        "r1_isError": "false",
+        "r1_untrusted_wrapper": "true",
+        "r1_s_after_burst": 220,
+        "r2_http": 200,
+        "r2_rows": 0,
+        "r2_error": "boundaries. <untrusted-data-<uuid>> {\"result\":[{\"n\":1200}]}",
+        "r2_isError": "false",
+        "r2_untrusted_wrapper": "true",
+        "r2_s_after_burst": 531
+      },
+      "durationMs": 613454
+    },
+    {
+      "id": "OB03d-mcp-none",
+      "title": "OB03d: MCP query_logs count(), no window",
+      "status": "info",
+      "measurements": {
+        "expect": "tool schema: last 24 h, so all marker rows",
+        "r1_http": 200,
+        "r1_rows": 0,
+        "r1_error": "boundaries. <untrusted-data-<uuid>> {\"result\":[{\"n\":1200}]}",
+        "r1_isError": "false",
+        "r1_untrusted_wrapper": "true",
+        "r1_s_after_burst": 225,
+        "r2_http": 200,
+        "r2_rows": 0,
+        "r2_error": "boundaries. <untrusted-data-<uuid>> {\"result\":[{\"n\":1200}]}",
+        "r2_isError": "false",
+        "r2_untrusted_wrapper": "true",
+        "r2_s_after_burst": 537
+      },
+      "durationMs": 613454
+    },
+    {
+      "id": "OB03d-mcp-48h",
+      "title": "OB03d: MCP query_logs count(), 48 h ending now",
+      "status": "info",
+      "measurements": {
+        "expect": "tool schema: capped at 24 h",
+        "r1_http": 200,
+        "r1_rows": 0,
+        "r1_error": "{\"name\":\"Error\",\"message\":\"The log window can be at most 24 hours.\"}",
+        "r1_isError": "true",
+        "r1_untrusted_wrapper": "false",
+        "r1_s_after_burst": 230,
+        "r2_http": 200,
+        "r2_rows": 0,
+        "r2_error": "{\"name\":\"Error\",\"message\":\"The log window can be at most 24 hours.\"}",
+        "r2_isError": "true",
+        "r2_untrusted_wrapper": "false",
+        "r2_s_after_burst": 543
+      },
+      "durationMs": 613454
+    },
+    {
+      "id": "OB03d-mcp-countstar",
+      "title": "OB03d: MCP query_logs count(*), 1 h",
+      "status": "info",
+      "measurements": {
+        "expect": "same as q-countstar",
+        "r1_http": 200,
+        "r1_rows": 0,
+        "r1_error": "boundaries. <untrusted-data-<uuid>> {\"result\":[{\"n\":1200}]}",
+        "r1_isError": "false",
+        "r1_untrusted_wrapper": "true",
+        "r1_s_after_burst": 235,
+        "r2_http": 200,
+        "r2_rows": 0,
+        "r2_error": "boundaries. <untrusted-data-<uuid>> {\"result\":[{\"n\":1200}]}",
+        "r2_isError": "false",
+        "r2_untrusted_wrapper": "true",
+        "r2_s_after_burst": 547
+      },
+      "durationMs": 613454
+    },
+    {
+      "id": "OB03d-mcp-star",
+      "title": "OB03d: MCP query_logs select *, 1 h",
+      "status": "info",
+      "measurements": {
+        "expect": "same as q-star",
+        "r1_http": 200,
+        "r1_rows": 0,
+        "r1_error": "boundaries. <untrusted-data-<uuid>> {\"error\":\"restricted wildcard (*) in a result column\"}",
+        "r1_isError": "false",
+        "r1_untrusted_wrapper": "true",
+        "r1_s_after_burst": 240,
+        "r2_http": 200,
+        "r2_rows": 0,
+        "r2_error": "boundaries. <untrusted-data-<uuid>> {\"error\":\"restricted wildcard (*) in a result column\"}",
+        "r2_isError": "false",
+        "r2_untrusted_wrapper": "true",
+        "r2_s_after_burst": 553
+      },
+      "durationMs": 613454
+    },
+    {
+      "id": "OB03d-mcp-lim2000",
+      "title": "OB03d: MCP query_logs rows, LIMIT 2000, 1 h",
+      "status": "info",
+      "measurements": {
+        "expect": "same as q-lim2000",
+        "r1_http": 200,
+        "r1_rows": 0,
+        "r1_error": "boundaries. <untrusted-data-<uuid>> {\"result\":[{\"id\":\"<uuid>\",\"timestamp\":\"2026-10-23T10:34:40.110000\"},{\"id\":\"<uuid>\",\"timestamp\":\"2026-10-23T10:34:40.078000\"},{\"id\":\"<uuid>\",\"timestamp\":\"2026-10-23T10:34:40.084000\"},{\"id\":\"<uuid>\",\"timest",
+        "r1_isError": "false",
+        "r1_untrusted_wrapper": "true",
+        "r1_s_after_burst": 245,
+        "r2_http": 200,
+        "r2_rows": 0,
+        "r2_error": "boundaries. <untrusted-data-<uuid>> {\"result\":[{\"id\":\"<uuid>\",\"timestamp\":\"2026-10-23T10:34:44.173000\"},{\"id\":\"<uuid>\",\"timestamp\":\"2026-10-23T10:34:44.257000\"},{\"id\":\"<uuid>\",\"timestamp\":\"2026-10-23T10:34:44.354000\"},{\"id\":\"<uuid>\",\"timest",
+        "r2_isError": "false",
+        "r2_untrusted_wrapper": "true",
+        "r2_s_after_burst": 558
+      },
+      "durationMs": 613454
+    },
+    {
+      "id": "OB03d-fresh",
+      "title": "OB03d: no-window query on markers sent 20 s earlier, against a 1 h window",
+      "status": "info",
+      "measurements": {
+        "sent_per_rep": 5,
+        "wait_s": 20,
+        "r1_nowindow_http": 200,
+        "r1_nowindow_n": "-",
+        "r1_nowindow_error": "Backend error! Retry your query. Please contact support if this continues.",
+        "r1_1h_http": 200,
+        "r1_1h_n": "5",
+        "r1_1h_error": "none",
+        "r2_nowindow_http": 200,
+        "r2_nowindow_n": "-",
+        "r2_nowindow_error": "Backend error! Retry your query. Please contact support if this continues.",
+        "r2_1h_http": 200,
+        "r2_1h_n": "5",
+        "r2_1h_error": "none"
+      },
+      "durationMs": 613454
+    }
+  ]
+}

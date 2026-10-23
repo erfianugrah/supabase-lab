@@ -1,6 +1,6 @@
 # RUNLOG - observability-surface
 
-All runs 2026-10-10. Vantage: one macOS machine in Singapore (Bun 1.3.14; Node v26.11.1
+All runs 2026-10-10 except OB03d (2026-10-23, its own section). Vantage: one macOS machine in Singapore (Bun 1.3.14; Node v26.11.1
 for the esbuild bundles; `supabase` CLI 2.120.0), projects in
 ap-southeast-1 on a Pro-plan organization, Management API from the same
 machine. Raw run artifacts are `evidence/run1/` to `evidence/run3/`
@@ -12,7 +12,7 @@ Every project this experiment created was deleted by the module that made it
 (checked with `GET /v1/projects` after the last run: none named `ob-surface-`
 remained).
 
-Published artifacts (redacted, a `.facts.md` beside each, `out/2026-10-10/`):
+Published artifacts (redacted, a `.facts.md` beside each, `out/2026-10-10/`; OB03d in `out/2026-10-23/`):
 
 | run | module | artifact |
 |---|---|---|
@@ -26,6 +26,8 @@ Published artifacts (redacted, a `.facts.md` beside each, `out/2026-10-10/`):
 | run2 | OB05 | `run-2026-10-10T00-59-15-215Z.json` |
 | run3 | OB01 | `run-2026-10-10T01-10-20-267Z.json` |
 | run3 | OB02 | `run-2026-10-10T01-23-47-158Z.json` |
+| ob03d-run1 | OB03d | `run-2026-10-23T10-34-27-519Z.json` |
+| ob03d-run2 | OB03d | `run-2026-10-23T10-45-54-614Z.json` |
 
 Reading guide. "Docs say" lines come from public pages read on 2026-10-10 and
 are not measurements. "Measured" lines name the module row, `n`, and the run.
@@ -276,6 +278,165 @@ Not measured: logs per GB, query-quota billing, the Dashboard Logs Explorer,
 load above one request a minute (other than the 300-request burst), other
 regions. Rate limit: no throttling was met at 4 logs queries a minute alone;
 OB02 ran alongside without a 429 seen by this module.
+
+## OB03d - logs endpoint and MCP `query_logs` edge cases (2026-10-23)
+
+Docs say (all read 2026-10-23):
+
+- v1 OpenAPI document (https://api.supabase.com/api/v1-json), operation
+  `v1-get-project-logs`, `GET /v1/projects/{ref}/analytics/endpoints/logs`:
+  "Either the `iso_timestamp_start` and `iso_timestamp_end` parameters must be
+  provided. If both are not provided, only the last 1 minute of logs will be
+  queried. The timestamp range must be no more than 24 hours and is rounded to
+  the nearest minute. If the range is more than 24 hours, a validation error
+  will be thrown." The documented 200 response schema has both `result` and
+  `error`. `logs.all` is marked deprecated: "This endpoint has been removed
+  and always responds with `410 Gone`."
+- https://supabase.com/docs/guides/observability/advanced-log-filtering :
+  "The logs query surface rejects `select *` and `count(*)`; list columns and
+  use `count()`." "Without `sql`, this endpoint queries API Gateway events
+  only." "Inspect both the HTTP status and the response for query errors
+  before interpreting the results."
+- The hosted MCP server's `query_logs` input schema (captured in
+  `docs/research/raw/2026-10-23-operate-with-confidence/mcp-tools-list-read-only.json`;
+  this run's server reported 0.14.0):
+  `iso_timestamp_start` "Defaults to 24 hours before the end of the window.
+  The API caps the requested range at 24 hours."; `iso_timestamp_end`
+  "Defaults to the current time."
+- Row cap: no public page found states one for the endpoint or the tool (docs
+  mirror searched for row limits; the only figure is the Logs UI download, "a
+  result limit of 100, 500, or 1,000 rows", in
+  https://supabase.com/docs/guides/observability/logs ).
+
+Design: one Micro project per run (compute read back as `micro`), Pro-plan
+org, ap-southeast-1. 1200 REST GETs carrying a run marker in the URL (so in
+`edge_logs.event_message`), then every cell asked once per repetition, the
+repetitions interleaved (all cells, then all again), one logs query about
+every 5 s. Each reading records the HTTP status, the body's `error` field, the
+row count or `n`, and its age: seconds between the end of the 1200-request
+burst and the query (`rN_s_after_burst`). Windows end "now" unless stated.
+Back-off on throttling: 20 s, recorded per reading (`throttle_retries`; 9 retries
+over 3 readings in ob03d-run1, 15 over 5 in ob03d-run2; the module does not record whether each was a
+429 or a throttler error body).
+
+Runs: ob03d-run1 10:34-10:44 UTC (2 repetitions), ob03d-run2 10:45-11:02 UTC
+(3 repetitions). Run1 ran an earlier revision of the module: no 24 h + 2 min
+and + 10 min cells, no body-key or row-source columns, the fresh-marker probe
+had only the no-window and 1 h queries, and its MCP parser cut at the
+preamble's mention of the boundary tag, so its MCP rows show `rows` 0 with the
+payload in the `error` column (the count cells read `{"result":[{"n":1200}]}`
+there; the LIMIT 2000 row count is lost). Both runs: 1200 of 1200 requests
+answered 200 (burst 4.9 s and 5.5 s) and the 1 h count returned 1200 marker
+rows 33 s after the burst. Each run's project was deleted by the module
+(DELETE answered 200; `GET /v1/projects/{ref}` answered 404 for both refs
+after run2).
+
+Measured, windows (`count()` of the 1200 marker rows; age in seconds -> n):
+
+| window | ob03d-run1 | ob03d-run2 | HTTP / error |
+|---|---|---|---|
+| 1 h | 33 -> 1200, 281 -> 1200 | 33, 302, 633 -> 1200 | 200, none |
+| 24 h | 38, 287 -> 1200 | 40, 307, 638 -> 1200 | 200, none |
+| 24 h + 1 min | 44 -> 0, 292 -> 1200 | 45 -> 0, 312 -> 1200, 644 -> 1200 | 200, none |
+| 24 h + 2 min | not in run1 | 49 -> 0, 318 -> 1200, 648 -> 1200 | 200, none |
+| 24 h + 10 min | not in run1 | 56 -> 0, 323 -> 0, 655 -> 1200 | 200, none |
+| 25 h | 49, 297 -> 0 | 61, 328, 661 -> 0 | 200, none |
+| 48 h | 54, 302 -> 0 | 66, 333, 666 -> 0 | 200, none |
+| 48 h from 1 h ago (end 47 h ahead) | 59, 307 -> 1200 | 70, 398, 731 -> 1200 | 200, none |
+| 23.5 h from 30 min ago (end 23 h ahead) | 64, 312 -> 1200 | 75, 403, 737 -> 1200 | 200, none |
+| start 1 h ago, no end | 70, 319 -> 0 | 81, 409, 742 -> 0 | 200, none |
+| end now, no start | 76, 325 -> 0 | 86, 414, 748 -> 0 | 200, none |
+| neither | 82, 390 -> no result | 91, 419, 753 -> no result | 200, `Backend error! Retry your query. Please contact support if this continues.` |
+
+No over-long window produced an error, and in run2 every such body had the
+single key `result`: no warning or truncation field. The 24 h + 1/2/10 min
+rows each flip from 0 to 1200 once the markers are older than the overshoot,
+and 25 h and 48 h ending now (overshoot 1 h and 24 h, markers at most 666 s
+old) never returned them. Every reading fits a window kept as [start, start +
+24 h]: an over-long range ending now silently drops its most recent part,
+while the same 48 h range starting 1 h ago returned every marker. A cap that
+keeps the last 24 h would have returned 1200 in every over-long row. Whether
+the cap applies before or after the documented rounding to the nearest minute
+was not separated (no overshoot under 1 min was asked).
+
+Measured, fresh markers (5 marked REST GETs, query 20 s later, once per
+repetition):
+
+| query | ob03d-run1 | ob03d-run2 |
+|---|---|---|
+| neither bound | backend error, backend error | backend error x3 |
+| end now, no start | not in run1 | 5, 5, 0 |
+| start 30 s before the send, no end | not in run1 | 5, 0, 3 |
+| 1 h window (control) | 5, 5 | 5, 5, 3 |
+
+The third run2 repetition's control saw 3 of 5, so that column's zero and
+three are partly ingestion lag. The no-window query never returned the
+documented "last 1 minute" (10 of 10 readings across both tables are the
+backend error, HTTP 200). End only saw 20 s old markers (2 of 3) and never 70
+s or older ones (0 of 5), which fits a short window ending at `end`; start
+only saw fresh markers in 2 of 3 readings and the old markers in 0 of 5. The
+length of either one-bound window was not pinned (inference from two marker
+ages).
+
+Measured, SQL (1 h window; 5 readings each, 2 in run1 and 3 in run2):
+
+| query | result | HTTP / error |
+|---|---|---|
+| `count()` | n 1200 | 200, none |
+| `count(*)` | n 1200 | 200, none |
+| `select * ... limit 1` | no `result` key | 200, `restricted wildcard (*) in a result column` |
+| `from edge_logs` (per-source table) | no `result` key | 200, `Table "edge_logs" does not exist.` |
+| rows, LIMIT 100 | 100 rows | 200, none |
+| rows, LIMIT 1000 | 1000 rows | 200, none |
+| rows, LIMIT 1001 / 2000 / none | 1000 rows each | 200, none |
+| 1200 marker rows x 10 by `arrayJoin(range(10))`, LIMIT 5000 / 20000 / none | 1000 rows each | 200, none |
+| no `sql` parameter | 100 rows | 200, none |
+| `logs.all`, same window | - | 410, `The logs.all endpoint has been removed. Use GET /v1/projects/{ref}/analytics/endpoints/logs instead. See https://supabase.com/changelog/48235-migration-of-supabase-management-api-logs-all-analytics-endpoint-to-logs-endpoint` |
+
+`count(*)` was accepted in all 5 readings, against the docs line. Errors
+arrive as HTTP 200 with the body's only key `error` (run2), which the
+documented response schema allows. The result is cut at 1000 rows whatever
+the LIMIT, with no field saying so. Without `sql` the 100 rows came from
+several sources, not only API Gateway: run2 readings `auth_logs, edge_logs,
+pgbouncer_logs, realtime_logs`; `auth_logs, pgbouncer_logs, postgrest_logs`;
+`edge_logs, pgbouncer_logs` (columns `event_message, id, log_attributes,
+project, severity_text, source, timestamp`; run1 did not record sources).
+
+Measured, hosted MCP server (`https://mcp.supabase.com/mcp?project_ref=<ref>&read_only=true`,
+the PAT as Bearer, `serverInfo` version 0.14.0, protocol 2025-06-18, no client
+capabilities; same SQL; HTTP 200 on every call):
+
+| `query_logs` call | ob03d-run1 | ob03d-run2 | endpoint, same cell |
+|---|---|---|---|
+| `count()`, explicit 1 h | 1200, 1200 | 1200 x3 | 1200 |
+| `count()`, no window | 1200, 1200 | 1200 x3 | backend error |
+| `count()`, 48 h ending now | refused x2 | refused x3 | n 0, no error |
+| `count(*)`, 1 h | 1200, 1200 | 1200 x3 | 1200 |
+| `select *`, 1 h | error text x2 | error text x3 | same error text |
+| rows, LIMIT 2000, 1 h | count lost (parser) | 1000 x3 | 1000 |
+
+"Refused" is a tool result with `isError: true` and
+`{"name":"Error","message":"The log window can be at most 24 hours."}`, not
+wrapped. Every other result came back with `isError: false` inside the
+`untrusted-data-<uuid>` boundary, including the `select *` error: an MCP
+client receives that query failure as a successful tool result. So on the same
+SQL the tool and the endpoint agree on counts, row cap, `count(*)` and the
+`select *` error, and differ on the two window edges: the tool answers a no-window
+call (all 1200 markers; its schema says 24 h) where the endpoint errors, and refuses a 48 h range where the endpoint
+answers a silent 0.
+
+Reading for a caller of the endpoint: pass both bounds; keep the range at or
+under 24 h, because a longer one ending now drops its newest part without an
+error; check `error` in every 200 body; treat 1000 rows as a cap and page by
+time when a result has exactly 1000; read sources from the `source` column
+rather than trusting the no-`sql` default.
+
+Not measured: a project with rows older than 24 h (the over-long windows here
+had an empty first part), rounding below one minute of overshoot, the
+one-bound window lengths, other regions and plans, the Explorer UI, the MCP
+server's stateless protocol shape (2026-07-28), `query_logs` with only one
+bound, and whether the 1000-row cap is per query or per response size (the
+rows were small: two columns).
 
 ## OB05 - notebooks pull/push
 
