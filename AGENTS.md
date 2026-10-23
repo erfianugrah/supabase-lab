@@ -2872,7 +2872,7 @@ when present, so a new module is invisible until it is regenerated).
 - Retire FAILURE-MATRIX 10.1 `[doc]` for the measured halves (create and
   restart lifecycle surfaces); capacity-driven failures remain `[doc]`.
 
-## experiments/restore-paths - key facts (2026-10-10 and 2026-10-20, ap-southeast-1, one IPv4-only vantage)
+## experiments/restore-paths - key facts (2026-10-10, 2026-10-20 and 2026-10-22/23, ap-southeast-1, one IPv4-only vantage)
 
 Which restore paths a Pro org can drive through the Management API, and what
 each does to the db password, Storage and the per-path outage. Self-provisioning
@@ -2902,6 +2902,51 @@ because `harness/dist/pvlab` is a linux-x64 build.
   30 to 41 s, n=5), 81 s for a 574 MB database (n=1). Per path: REST, Auth and
   Realtime showed no failed 1 s sample; Storage failed for 12 s (8 of 9) with
   `The operation timed out`; the pooler 5 to 13 s on 10 MB, 41 s at 574 MB.
+  **Correction 2026-10-23:** that `rest` probe is anon `GET /rest/v1/`, a `401`
+  that never reads the database, so "REST no failed sample" is the HTTP tier
+  answering. A Data API read (`rest_read`, service_role, up on `200` only)
+  answered `503 PGRST002` for 15 and 14 s in two small-database restores
+  (RP06 R24, R25) and for 192 to 544 s in the 7 RP07 restores that carried
+  the probe (R18, R19, R22, R23; R15 had none).
+  Use `restReadProbe` from `lib/rp.ts` for any "is the Data API up" claim.
+- **The PITR range's upper bound is the archiver's last archive time
+  (2026-10-22/23, RP06).** The `restore-pitr` refusal's `<latest>`,
+  `GET database/backups` `physical_backup_data.latest_physical_backup_date_unix`
+  and `pg_stat_archiver.last_archived_time` agreed to within 2 s at min / p50
+  / max (R14 summaries), and the bound minus the archiver time read 0 and -1 s
+  directly (R24, R25); the backups field is not a physical-backup date.
+  `archive_timeout=120`. With one INSERT per ~200 ms the bound's lag ran 1 to
+  107 s in a 120 s sawtooth (80 samples, one 227 s first sample); idle it grew
+  to 752 s over 20 min (51 of 75 samples past 120 s).
+- **A restore to the quoted latest instant is a restore to an LSN and drops
+  the tail before it (RP06).** `postgres_logs`: `starting point-in-time
+  recovery to WAL location (LSN) ...` (RP06 R24, RP07 R23) and `recovery
+  stopping after WAL location (LSN) ...` (RP07 R22, R23). Acked rows written
+  before the target but missing: 2 of 1189, 4 of 1170, 3 of 764, 4 of 939
+  (R20, R21, R24, R25); their ages before the target were 0.02 to 0.42 s
+  (R24) and 0.18 to 0.79 s (R25), not recorded in R20, R21. Nothing after
+  the target is kept, so a restore issued at time T loses the writes between
+  the target and T, the bound's age at T (87 and 111 s in R24, R25). The API
+  answers `201` and the project returns healthy either way.
+- **PITR restore time against size on Small (RP07, 2026-10-22/23).** Back to
+  `ACTIVE_HEALTHY` in 221 to 322 s at 3111 to 3210 MB (n=4) and 475 to 787 s
+  at 10441 to 10482 MB (n=5); `redo done ... elapsed` in `postgres_logs`
+  166.13 s (R23, 3 GB), 278.96 s (R23, 10 GB), 512.03 s (R22, 10 GB). Pooler
+  down 176 to 531 s, Storage 12 to 18 s. Disk pre-grown to 40 GB (`POST
+  /config/disk`, applied after 302 s in R15, R18, R19, R22 and 301 s in
+  R23); each restore ran on a project under an hour old, base backup
+  unknown, so the restore-after-a-fresh-base-backup case is unmeasured.
+- **One 10 GB restore came back short with no error (RP07 R15).** 31,000,000
+  of 37,000,000 rows and no post-fill marker after a `201` and a healthy
+  project; the four later 10 GB restores (R18, R19, R22, R23) kept every row
+  with the archiver caught up (`segments_behind=1`: only the segment being
+  written unarchived). Untested reading: if the archiver falls behind, the
+  quoted bound runs ahead of the archived WAL and a restore stops short;
+  nothing recorded in R15 shows a backlog (fill rate, bound wait and WAL size
+  match the clean runs). Before relying on a restore to "latest", compare
+  `pg_stat_archiver.last_archived_wal` with
+  `pg_walfile_name(pg_current_wal_lsn())` (`walPosition` in `lib/rp.ts`); a
+  gap of 1 is caught up.
 - **The current password works after a PITR restore; the replaced one is
   refused** (9 of 9 clean restores, targets before and after a rotation). The
   stored verifier is a third value each time, so credentials are set again
@@ -2909,7 +2954,9 @@ because `harness/dist/pvlab` is a linux-x64 build.
   changelog). The current password was refused for about one 5 s poll between
   "database answers" and "password works" in 6 of 7 restores observed at that
   resolution: a short stale window, not a measured duration. A restore target
-  hours or days old was not run.
+  hours or days old was not run. RP07 R18's 3 GB restore (2026-10-22) ended
+  with the current password refused (`cred_final_current` `refused`; pooler
+  down 322 s against 221 s to healthy); not followed up.
 - **Storage did not 500 after any restore or unpause** (list, download with
   bytes equal, upload all `200`). A PITR restore to before an object's upload
   makes the download `404` and the listing omit it, and the same path is
@@ -2955,8 +3002,18 @@ because `harness/dist/pvlab` is a linux-x64 build.
   field); B3, applied without one, kept its table (n=1). A failing apply is one transaction: `400`
   with the Postgres error, no table, no history row (n=2).
 - Pending: clone (Dashboard session needed), `backups/restore` on an older
-  project, a restore target hours old, a database over 1 GB, direct 5432, a
-  failing stored rollback on a branch.
+  project, a restore target hours old, a restore right after a fresh base
+  backup (sizes past 1 GB were run 2026-10-22/23, RP07, each on a project
+  under an hour old, base backup unknown), restore-to-latest with the archiver measurably behind
+  (the R15 case), other compute sizes, direct 5432, a failing stored rollback
+  on a branch.
+- Gotchas from RP06/RP07: two runs launched together got the same
+  `startedAt` and `Date.now()` to the millisecond, so artifact names and
+  `rp-<ms>` project names collided (`400` "Project with name ... already
+  exists"); names now carry a random suffix and published copies a run
+  suffix. A thrown fetch to api.supabase.com (`The socket connection was
+  closed unexpectedly`) killed R16, R17 and R14's RP06d; module reads go
+  through `again()`.
 
 ## experiments/pooler-checkout - key facts (validated 2026-10-10, Micro, ap-southeast-1 and us-east-1, Pro org, Supavisor aws-0 hosts)
 

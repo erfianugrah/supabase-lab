@@ -22,6 +22,8 @@ is built for linux-x64.
 | RP03 | Free-plan pause and unpause (two cycles): timing, password change while paused, password after unpause, Storage |
 | RP04 | Daily (physical) backup restore without PITR on a Team-org Micro project (`RP04_ORG_ROLE=pro` for Pro): retention entitlement, first backup listed, whether `backups/restore` runs; if it does, per-path outage, password and Storage as in RP02 |
 | RP05 | What `DELETE database/migrations?gte=` and the stored `rollback` SQL do to schema, data and history, on the production project and on a git-less preview branch; plus a failing apply |
+| RP06 | PITR recovery point on Small: lag of the platform's latest recoverable instant under a light writer and idle (`RP06_PHASE_MIN`, default 20; 0 skips to the restore), then a restore to that instant with the writer running and a count of acknowledged rows kept and lost |
+| RP07 | PITR restore time against database size past 1 GB (`RP07_SIZES_GB`, default 3,10; `RP07_COMPUTE`, default small; disk grown once to `RP07_DISK_GB`, default 40): fill, archive catch-up, restore to the latest instant, per-path outage including a Data API read, rows kept, Postgres recovery log lines. `RP07_WAIT_ARCHIVER=1` also waits for `pg_stat_archiver` to pass the fill-end segment |
 
 ## Run
 
@@ -32,6 +34,8 @@ make pitr      # RP02, ~10 minutes; RP02_SEED_MB=500 make pitr for a bigger data
 make pause     # RP03, ~15 minutes, Free org (2 active projects allowed)
 make daily     # RP04, ~4 minutes while backups/restore refuses, up to ~30 if a restore runs; PVLAB_ORG_TEAM
 make rollback  # RP05, ~1-2 minutes including the preview branch; PVLAB_ORG_PRO
+make rpo       # RP06, ~50 minutes (RP06_PHASE_MIN=0: ~10 minutes, restore only); PVLAB_ORG_PRO
+make size      # RP07, 36.6 to 46.5 minutes per run on Small (2026-10-22/23); PVLAB_ORG_PRO
 ```
 
 Output lands in `evidence/<timestamp>/` (gitignored: reports carry project
@@ -39,7 +43,7 @@ refs and hostnames).
 
 ## Measured
 
-See RUNLOG.md (2026-10-10). Short form, from one vantage (an IPv4-only
+See RUNLOG.md (2026-10-10, 2026-10-20, 2026-10-22/23). Short form, from one vantage (an IPv4-only
 workstation), ap-southeast-1 projects:
 
 | finding | value | module |
@@ -48,7 +52,10 @@ workstation), ap-southeast-1 projects:
 | Pro: in-place physical-backup restore (`backups/restore`) | `400`, "This endpoint is unavailable at the moment" (also `restore-point`) | RP01 |
 | Pro: `restore-pitr` without the add-on | `400`, "PITR is not enabled for this project." | RP01 |
 | Pro: restore to a new project (clone) | no path in the OpenAPI document; the Dashboard's route answers a PAT `401 Unsupported access token`; not run | RP01 |
-| PITR restore, Small, 10 MB database | status back to healthy in 30 s (30 to 41 s for the controls); Storage path fails for 12 s; pooler 5 to 13 s; REST, Auth, Realtime no failed 1 s sample | RP02 |
+| PITR restore, Small, 10 MB database | status back to healthy in 30 s (30 to 41 s for the controls); Storage path fails for 12 s; pooler 5 to 13 s; REST (anon `GET /rest/v1/`, which never reads the database; see the 2026-10-23 correction in RUNLOG.md), Auth, Realtime no failed 1 s sample | RP02 |
+| PITR range upper bound | equals `pg_stat_archiver.last_archived_time`; lag 1 to 107 s under one INSERT per ~200 ms (120 s `archive_timeout` sawtooth), up to 752 s idle over 20 min | RP06 |
+| Restore to the quoted latest instant under a writer | restores to an LSN; 2 to 4 acked rows written before the target missing in each of 4 runs (R20, R21, R24, R25), 0.02 to 0.79 s before it where ages were recorded (R24, R25); nothing after the target kept; back to healthy in 30 to 41 s with a Data API read `503 PGRST002` for 15 and 14 s (R24, R25) | RP06 |
+| PITR restore, Small, 3111 to 3210 MB / 10441 to 10482 MB | healthy in 221 to 322 s (n=4) / 475 to 787 s (n=5); Data API read `503 PGRST002` for 192 to 544 s in the 7 restores that carried the probe (R15 had none); one 10 GB restore of five kept 31,000,000 of 37,000,000 rows with no error | RP07 |
 | PITR target just past "now" | refused with the allowed range until the platform's upper bound moves; accepted on a 60 s or 121 s retry | RP02 |
 | Password after a PITR restore | the current password works, the replaced one is refused; the verifier is set again (a value matching neither earlier one); the current password was refused for about one 5 s poll in 6 of 7 restores observed with the new poller | RP02 |
 | Storage after a restore | list, download (bytes equal) and upload `200`; no `500`; an object written after the target reads `404` after a restore to before it | RP02, RP03 |
