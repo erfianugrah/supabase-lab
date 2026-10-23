@@ -132,3 +132,41 @@ export async function adminCreateUser(ctx: Ctx, serviceKey: string, email: strin
 export function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
+
+export interface Issuer {
+  idp: Idp;
+  iss: string;
+  tpaId: string;
+  regStatus: number;
+  regBody: string;
+  jwksStatus: number;
+  /** seconds from registration to the first PostgREST 200 for a token from this issuer, or -1 */
+  restAcceptedAfterS: number;
+  restLast: string;
+}
+
+/**
+ * Publish a fresh issuer's JWKS from an Edge Function, register it, and poll a
+ * PostgREST read (`probePath`, a table the token may read) until the gateway
+ * resolves the new kid - the TPA01 sequence as one call for later modules.
+ * `tpaId` is empty when registration failed; the caller deletes it in finally.
+ */
+export async function setupIssuer(ctx: Ctx, slug: string, apikey: string, probePath: string, budgetMs = 180_000): Promise<Issuer> {
+  const idp = await generateIdp();
+  const pub = await publishJwks(ctx, slug, idp.publicJwk);
+  const base: Issuer = { idp, iss: pub.url, tpaId: "", regStatus: 0, regBody: "", jwksStatus: pub.status, restAcceptedAfterS: -1, restLast: "" };
+  if (!pub.ok) return base;
+  const reg = await registerTpa(ctx, pub.url);
+  Object.assign(base, { tpaId: reg.id, regStatus: reg.status, regBody: reg.body });
+  if (!reg.id) return base;
+  const t0 = Date.now();
+  const token = await mint(idp, { sub: crypto.randomUUID(), iss: pub.url });
+  let r = await apiGet(ctx, probePath, apikey, token);
+  while (Date.now() - t0 < budgetMs && r.status !== 200) {
+    await sleep(5_000);
+    r = await apiGet(ctx, probePath, apikey, token);
+  }
+  base.restLast = `${r.status} ${r.text.slice(0, 160)}`;
+  if (r.status === 200) base.restAcceptedAfterS = Math.round((Date.now() - t0) / 1000);
+  return base;
+}
