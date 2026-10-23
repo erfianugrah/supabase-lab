@@ -53,6 +53,8 @@ destroy:
 #   PVLAB_REFS_FILE         optional: append each created ref here (keep it outside git)
 # Include X99 in XF_ONLY or the projects are left running; `make fanout-clean`
 # lists leftovers by prefix, `make fanout-clean DELETE=1` deletes them.
+# X08 (aud mismatch) and X09 (the hub's OAuth 2.1 server) use the same pair:
+#   make fanout XF_ONLY=X08,X09,X99
 XF_ONLY ?= X04,X05,X06,X07,X99
 
 fanout:

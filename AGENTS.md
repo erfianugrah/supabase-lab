@@ -541,7 +541,7 @@ Affects every experiment here, since they all create projects.
   non-JWT as a bearer and gets `PGRST301 "Expected 3 parts in JWT; got 1"`, which
   reads like an auth finding and is not.
 
-## experiments/cross-project-auth - key facts (validated 2026-08-03; fan-out X04-X07 2026-10-23, two runs, Micro x2, ap-southeast-1, Pro org)
+## experiments/cross-project-auth - key facts (validated 2026-08-03; fan-out X04-X07 2026-10-23, two runs, Micro x2, ap-southeast-1, Pro org; X08-X09 2026-10-23, three runs)
 
 Two projects, no AWS. Can one project's identity be trusted by another, so a
 tenant keeps its token across a move? See RUNLOG.md.
@@ -606,6 +606,38 @@ tenant keeps its token across a move? See RUNLOG.md.
   timeouts and one `503 PGRST002`; "settled" kept every read partial, none
   failed whole. `POST .../pause` on a Pro-plan project answers `400
   "Project is not free-tier"`.
+- `aud` was not checked by any of the seven cells probed (PostgREST,
+  Storage, Realtime on both projects, A's `/auth/v1/user`), every request
+  carrying the legacy anon JWT as `apikey`; `sb_publishable_` not run (X08,
+  `out/2026-10-23/` runs 10-38/10-39/10-41, n = 1 token per row per run).
+  Hub tokens with `aud`
+  `"spoke-api"`, `["spoke-api"]` and `["authenticated","spoke-api"]` (set by a
+  custom access token hook on A) were accepted by PostgREST, Storage and
+  Realtime on BOTH projects and by A's `/auth/v1/user`, the same as the
+  default `"authenticated"` control. A hook that removes `aud` makes A refuse
+  to issue (`500 unexpected_failure` "output claims do not conform to the
+  expected schema: ... aud is required"). The admin API's `aud` field sets
+  the user's audience, and that user's password grant then answers `400
+  invalid_credentials`. Separating tokens on a spoke is an RLS job (`aud` or
+  `client_id`), not run here.
+- Storage and Realtime on the spoke accept the hub's tokens through the
+  `oidc_issuer_url` integration (first probe, every run): the gap left by
+  the 2026-08-03 PostgREST-only probe is closed.
+- The hub's OAuth 2.1 server (X09) enables through `PATCH
+  /v1/projects/{ref}/config/auth {oauth_server_enabled: true}` (200; the
+  docs' Cloud steps name only the dashboard). Discovery answers `404
+  feature_disabled` right after the PATCH and 200 on the next poll, 5119 to
+  5263 ms after the PATCH (live within about 5 s; the 5 s poll cannot say
+  sooner).
+  Its access token keeps `iss`, ES256 key and `aud "authenticated"`, adds
+  `client_id` and `scope`, and `amr` reads `oauth_provider/authorization_code`.
+  The spoke
+  accepted it on all three surfaces, also with the hook setting
+  `aud "spoke-api"` for OAuth tokens. The OAuth refresh answered 200 at the
+  hub; at B it answered `404 feature_disabled` because B's OAuth server was
+  off, so B's own verdict was not tested. A second authorization by a user
+  who already consented returns the code from `GET
+  /oauth/authorizations/{id}` with no consent step (n = 2, runs 3 and 4).
 
 ## experiments/tenant-consolidation - key facts (validated 2026-08-04)
 

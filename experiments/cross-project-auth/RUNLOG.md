@@ -105,16 +105,19 @@ that fail in the same direction for different reasons is the point.
 - Whether enabling the OAuth 2.1 Server on the hub changes the token shape
   (`client_id` / audience handling) and therefore whether the spoke still
   accepts it. The discovery document already advertises
-  `authorization_code`, so the surface exists; untested.
+  `authorization_code`, so the surface exists; untested. (Run 2026-10-23
+  by X09, below.)
 - Whether an `aud` mismatch is enforced. Both projects accepted the token
   with GoTrue's default `authenticated` audience; nothing here varies it.
+  (Run 2026-10-23 by X08, below.)
 - Refresh. The spoke trusts the hub's signing key, so it can VERIFY a token,
   but a refresh goes to the hub's `/token` endpoint. A promoted tenant still
   depends on the hub being alive at refresh time - which is the thing a
   "fully independent project" claim would need to address, and it is not
   tested here.
 - Anything about Storage or Realtime accepting a foreign-issuer token. Only
-  PostgREST was probed.
+  PostgREST was probed. (Run 2026-10-23 by X08/X09, below, with the hub
+  project as the issuer.)
 
 ## Cost / teardown
 
@@ -385,3 +388,200 @@ failure mode; restart was used as the real outage.
 - Why the function's leg to its own project is slower than the same read from
   the client.
 - Token refresh still goes to A (X03); A down was not tested here, only B.
+
+## 2026-10-23 - audience mismatch and the hub's OAuth 2.1 server at the spoke (X08, X09, X99; three runs)
+
+The questions, from *What this does NOT answer* above: does any verifier on
+the spoke check `aud`, and does a token issued by the hub's OAuth 2.1 server
+(which adds `client_id` and `scope`) still get accepted by the spoke? And,
+since only PostgREST had been probed: do the spoke's Storage and Realtime
+accept the hub's tokens at all?
+
+Setup: the `lib/fanout.ts` pair (two projects created through `POST
+/v1/projects` in a Pro-plan org, ap-southeast-1, no compute size requested;
+not read back in these runs). A is the hub and issues every token; B
+registers A as a third-party issuer with `oidc_issuer_url` = A's `/auth/v1`
+(X08 creates the integration, HTTP 201 in all three runs). Users are created
+on A through the admin API with `app_metadata.tenant_id = "tenant-a"`.
+`lib/audprobe.ts` adds, on both projects: a private bucket `xaud` with one
+object `tenant-a/probe.txt` written with the service_role key, a
+`storage.objects` select policy on the tenant claim, and a `realtime.messages`
+select policy that admits topic `tenant:<tenant claim>`. The data table and
+its policy are X04's (`fan_items`, tenant-a has 576 rows on A and 664 on B).
+
+The probe matrix presents one token to seven cells. Every request carries
+that project's legacy anon JWT as `apikey`; the token under test is the
+bearer, or the `access_token` of the Realtime join.
+
+| Cell | Request | Accepted means |
+|---|---|---|
+| `a_rest`, `b_rest` | `GET /rest/v1/fan_items` | 200 with only tenant-a rows (576 on A, 664 on B) |
+| `a_storage`, `b_storage` | `GET /storage/v1/object/authenticated/xaud/tenant-a/probe.txt` | 200 and the body written at setup |
+| `a_realtime`, `b_realtime` | `phx_join` of private topic `tenant:tenant-a` | `phx_reply` status `ok` |
+| `a_auth_user` | `GET /auth/v1/user` on A (A's own GoTrue) | 200 |
+
+To vary `aud`, A gets a custom access token hook (`public.xaud_hook`,
+enabled with `PATCH /v1/projects/{ref}/config/auth`
+`hook_custom_access_token_enabled` / `hook_custom_access_token_uri`): it sets
+`aud` to the user's `app_metadata.aud_override` (any JSON value, or removes
+the claim for `"__drop__"`), and for a token carrying `client_id` with no
+override it uses the single row of `public.xaud_oauth_aud` when one exists.
+The custom access token hook docs (as read 2026-10-23) list `aud` as a
+required claim, typed `string` in the hook's JSON schema.
+
+Harness: `make fanout XF_ONLY=X08,X09,X99`, lab commit 77cdea0 plus the
+uncommitted tree that adds these modules. Published (redacted) under
+`out/2026-10-23/`:
+
+- run 2 `run-2026-10-23T10-38-25-783Z.json`, 10:38:25 to 10:39:20 UTC:
+  5 pass, 8 info. X09e here hit a flow defect (below), fixed before run 3.
+- run 3 `run-2026-10-23T10-39-59-520Z.json`, 10:39:59 to 10:40:57 UTC:
+  5 pass, 8 info.
+- run 4 `run-2026-10-23T10-41-16-105Z.json`, 10:41:16 to 10:42:11 UTC:
+  5 pass, 8 info.
+
+Run 1 (10:36:42 UTC) is not published: A's fixture SQL answered 400, and its
+error text was not kept, so A's Storage and Realtime cells refused every
+token for a reason unrelated to the token. X09 then registered its OAuth
+client right after the config PATCH, before Auth applied it, and stopped at
+`404 feature_disabled`. Both were harness defects. The fixture SQL now runs
+after the warm-up, retries and records its first error. X09 now polls
+discovery before it registers a client. In run 1, B's X08 cells accepted
+every token, as in runs 2-4 (console output, not published).
+Each run's X99 deleted its pair (DELETE 200 and 200, absent from `GET
+/projects` at the first check).
+
+Runs 3 and 4 produced identical measurement cells for X08b-X08g and
+X09b-X09e. Run 2 matched them except X09e. Quoted from run 4 unless a run
+is named.
+
+### X08 - aud other than "authenticated"
+
+| Row | Token `aud` (as issued by A) | All seven cells |
+|---|---|---|
+| X08b control (hook in the path, no override) | `"authenticated"` | accepted |
+| X08d | `"spoke-api"` | accepted |
+| X08e | `["spoke-api"]` | accepted |
+| X08f | `["authenticated","spoke-api"]` | accepted |
+| X08g hook removes `aud` | no token issued | - |
+
+- Every token in X08b and X08d-X08f read 576 tenant-a rows on A and 664 on
+  B (`200 rows=576 tenants=tenant-a`, `200 rows=664 tenants=tenant-a`),
+  downloaded the object on both projects (`200 body matches`), joined the
+  private topic on both (`join ok`), and got `200` from A's
+  `/auth/v1/user` (whose body reports the USER record's `aud`,
+  `authenticated`, not the token's). Three runs, n = 1 token per row per run.
+- No verifier on either project refused a token for its `aud`: PostgREST,
+  Storage and Realtime on the spoke (B, verifying A's token through the
+  third-party integration), the same three on the issuer (A), and A's GoTrue
+  on `/auth/v1/user`. That includes an array `aud` that does not contain
+  `authenticated`, which the hook docs' schema does not describe.
+- Apart from `aud`, the claim set was the same in every row: `alg=ES256`,
+  `kid` present, `iss=https://<ref-a>.supabase.co/auth/v1`,
+  `role=authenticated`, no `client_id`, `amr=password`, `aal1`, 3600 s
+  (`exp - iat`); claim names `aal, amr, app_metadata, aud, email, exp, iat,
+  is_anonymous, iss, phone, role, session_id, sub, user_metadata`.
+- X08g: with the hook removing `aud`, A refused to issue a token. The
+  password grant answered `500 {"code":500,"error_code":"unexpected_failure",
+  "msg":"output claims do not conform to the expected schema: \n- (root):
+  aud is required\n", ...}` on both attempts, in all three runs. A token with
+  no `aud` cannot come out of the hub; how the spoke treats one (a foreign
+  signer would have to mint it) was not tested.
+- X08c, the admin API's own `aud` field: `POST /auth/v1/admin/users` with
+  `aud: "spoke-api"` answered 200 and the returned user's `aud` was
+  `spoke-api`; the password grant for that user (anon key, right password)
+  then answered `400 {"code":400,"error_code":"invalid_credentials",
+  "msg":"Invalid login credentials"}` in all three runs. So the admin field
+  sets the user's audience and that user cannot sign in through the default
+  password grant; it does not produce a token with another `aud`. Why the
+  grant refuses (an audience-scoped user lookup is the likely reading) was
+  not probed.
+- The hook took effect between the first and second password grant after the
+  config PATCH (HTTP 200): the first fresh token still carried
+  `"authenticated"`; the override showed at 3376, 3288 and 3311 ms (runs 2,
+  3, 4), on a 3 s poll.
+- Storage and Realtime on B accepted the hub's default token on the first
+  probe in every run: the acceptance poll recorded no refusal on any surface.
+  It started after fixture setup, seconds after the trust was created, so
+  its times (REST 98 / 164 / 113 ms, Storage 682 / 1002 / 440 ms, Realtime
+  971 / 1912 / 645 ms, runs 2 / 3 / 4, each from the poll's start with the
+  surfaces probed in turn) are probe round trips, not propagation delays.
+
+Reading: on these projects the audience is not part of acceptance on any of
+the surfaces probed. A hub cannot narrow where its tokens are accepted by
+choosing an `aud`; a spoke that wants to tell tokens apart can do it
+in RLS (`auth.jwt() ->> 'aud'` or `client_id`, the pattern the OAuth server
+docs show). That last step was not run here.
+
+### X09 - the hub's OAuth 2.1 server
+
+| Step | Runs 2, 3, 4 |
+|---|---|
+| Before: `oauth_server_enabled` read back | `false` |
+| Before: `GET /.well-known/oauth-authorization-server/auth/v1` | `404 {"code":404,"error_code":"feature_disabled","msg":"OAuth server is disabled"}` |
+| `PATCH /v1/projects/{ref}/config/auth` `{oauth_server_enabled: true, oauth_server_authorization_path: "/oauth/consent"}` | 200; read back `oauth_server_enabled=true`, `oauth_server_allow_dynamic_registration=false` |
+| Discovery right after the PATCH | the same `404 feature_disabled` |
+| First discovery 200 | 5149 / 5263 / 5119 ms after the PATCH returned (second poll, 5 s apart) |
+| Discovery after | issuer `https://<ref-a>.supabase.co/auth/v1`; grants `authorization_code, refresh_token`; scopes `openid, profile, email, phone, offline_access` |
+
+The getting-started guide's Cloud instructions (as read 2026-10-23) name
+only the dashboard (Authentication > OAuth Server); the Management API auth config PATCH
+enabled it with no dashboard step, as byo-oauth O03 and governed-starter-kit
+K06 had already used it. The 2026-08-03 run 1 above read A's OIDC document
+at `/auth/v1/.well-known/openid-configuration`, a different URL from the one
+probed here; it is not the 404 above.
+
+X09b: a confidential client registered through `POST
+/auth/v1/admin/oauth/clients` (201). The code flow ran headless as tenant-a's
+user on A: authorize with PKCE (302), `GET /oauth/authorizations/{id}` (200,
+the pending request), consent approve (200), token with client_secret_basic
+(200, `token_type` bearer, a refresh token, no non-empty `scope` field in the
+token response). The access token's claims:
+
+`alg=ES256; kid=present; iss=https://<ref-a>.supabase.co/auth/v1;
+aud="authenticated"; role=authenticated; client_id=present; scope=openid
+email; tenant_id=tenant-a; amr=oauth_provider/authorization_code; aal=aal1;
+ttl_s=3600; claim_names=aal,amr,app_metadata,aud,client_id,email,exp,iat,
+is_anonymous,iss,phone,role,scope,session_id,sub,user_metadata`
+
+The issuer, key and `aud` are those of a password-grant token; the
+additions are `client_id` and `scope`, and `amr` names the OAuth grant.
+
+| Row | Token | All seven cells |
+|---|---|---|
+| X09c | OAuth access token as issued (`aud "authenticated"`) | accepted (3 runs) |
+| X09e | second flow, same user and client, with the hook setting `aud` to `"spoke-api"` for tokens that carry `client_id` | accepted (runs 3, 4); claims as X09b except `aud="spoke-api"` |
+
+- The spoke accepted the OAuth server's token on PostgREST (664 tenant-a
+  rows), Storage and Realtime exactly as it accepts a password-grant token.
+  Neither `client_id`, `scope` nor (X09e) a non-default `aud` changed any
+  cell. The `scope` did not limit the Data API either, as governed-starter-kit
+  K06 measured on one project.
+- X09d, refresh: the OAuth refresh token presented to B's
+  `/auth/v1/oauth/token` answered `404 {"code":404,"error_code":
+  "feature_disabled","msg":"OAuth server is disabled"}`. That 404 is B's
+  OAuth server being off. It says nothing about B refusing A's refresh token
+  on its merits. The same refresh token at A answered 200 with a new access
+  token (`aud "authenticated"`, `client_id` present). In this setup refresh
+  went to the issuing project, as X03 measured for a password session.
+- X09e's second flow: the `GET /oauth/authorizations/{id}` for a user who
+  had already approved this client answered 200 with the redirect and code
+  directly, with no pending request to approve (runs 3 and 4). Run 2's harness
+  still POSTed consent and got `400 {"code":400,"error_code":
+  "validation_failed","msg":"authorization request is no longer pending"}`,
+  so run 2 has no X09e token.
+
+### What this does not answer
+
+- RLS keyed on `aud` or `client_id` on the spoke: the obvious way to make the
+  spoke tell tokens apart, not run here (K06 measured `client_id` RLS on one
+  project).
+- A token with no `aud`, or an `iss` other than the registered issuer, at the
+  spoke: A will not mint the first (X08g) and the second needs a foreign
+  signer (third-party-auth's in-process issuer could).
+- `sb_publishable_` keys as `apikey`: every request used the legacy anon JWT.
+- Dynamic client registration, public clients, and consent through a real
+  page: the client was confidential and registered through the admin API.
+- B with its own OAuth server enabled, so whether B's `/oauth/token` would
+  refuse A's refresh token on its own terms was not separated from the
+  `feature_disabled` answer.

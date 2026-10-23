@@ -67,6 +67,19 @@ const CASES: { name: string; input: string; expected: string }[] = [
     input: "-- user: oauth:0a1b2c3d-4e5f-6a7b-8c9d-0e1f2a3b4c5d",
     expected: "-- user: oauth:<id>",
   },
+  // GoTrue error bodies carry a per-request error_id (cross-project-auth
+  // X08g, 2026-10-23). In the raw artifact it usually sits inside a string
+  // field, so its quotes are escaped.
+  {
+    name: "GoTrue error_id, plain JSON",
+    input: '{"code":500,"error_code":"unexpected_failure","error_id":"0a1b2c3d-4e5f-7a7b-8c9d-0e1f2a3b4c5d"}',
+    expected: '{"code":500,"error_code":"unexpected_failure","error_id":"<error-id>"}',
+  },
+  {
+    name: "GoTrue error_id, escaped inside a JSON string",
+    input: '"grant_body": "{\\"code\\":500,\\"error_id\\":\\"0a1b2c3d-4e5f-7a7b-8c9d-0e1f2a3b4c5d\\"}"',
+    expected: '"grant_body": "{\\"code\\":500,\\"error_id\\":\\"<error-id>\\"}"',
+  },
   // Stack traces and captured stderr name the operator's home directory
   // (auth-providers AU03, pooler-checkout PC03, 2026-10-10); caught by the
   // 2026-10-13 backlog plan's dry-run before either was published.
