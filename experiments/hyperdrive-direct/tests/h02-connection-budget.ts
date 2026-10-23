@@ -333,6 +333,7 @@ const mod: TestModule = {
         let err = "";
         for (let i = 0; i < 6; i++) {
           try {
+            // argv-secret-ok: wrangler hyperdrive create has no env path for the origin password; per-run random passwords of the project and roles this module creates and deletes (same exception as H01)
             const out = await wrangler(["hyperdrive", "create", name, "--connection-string", conn, "--caching-disabled", ...extra], workdir);
             const id = out.match(/[0-9a-f]{32}/)?.[0] ?? "";
             if (id) {
