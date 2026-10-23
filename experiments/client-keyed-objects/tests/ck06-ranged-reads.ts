@@ -85,6 +85,8 @@ const mod: TestModule = {
         const m: Record<string, string | number> = { ranges: rs.length, reads: rows.length, plaintext_bytes_asked: rs.reduce((n, [s, e]) => n + (e - s), 0) };
         let bad = 0;
         const errs = new Map<string, number>();
+        // First message per error key: a bare "Thrown" (2026-10-23 region-b) says nothing about the cause.
+        const errMsgs = new Map<string, string>();
         for (const p of PATHS) {
           const pr = rows.filter((r) => r.path === p);
           const ok = pr.filter((r) => r.ok);
@@ -104,11 +106,14 @@ const mod: TestModule = {
             const d = (r as { detail?: { status?: number; code?: string } }).detail;
             const k = `${p}:${r.code}${d?.status ? ` ${d.status}` : ""}${d?.code ? ` ${d.code}` : ""}`;
             errs.set(k, (errs.get(k) ?? 0) + 1);
+            const msg = (r as { message?: string }).message;
+            if (msg && !errMsgs.has(k)) errMsgs.set(k, `range ${r.s}-${r.e}: ${msg.slice(0, 160)}`);
           }
           bad += pr.length - eq.length + (ok.length - exact.length);
         }
         m.iat_future_retries = Number(res.result.iatFutureRetries ?? 0);
         if (errs.size) m.errors = [...errs].map(([k, v]) => `${k} x${v}`).join("; ");
+        if (errMsgs.size) m.error_messages = scrub(l, [...errMsgs].map(([k, v]) => `${k}: ${v}`).join("; "));
         out.push(row("CK06", t, this.title, bad || rows.length !== rs.length ? "fail" : "pass", bad ? `problems: ${scrub(l, String(m.errors ?? "body length or content mismatch"))}` : `${rows.length} reads equal the fixture slice; every body was exactly the covering chunks`, m));
       } catch (e) {
         out.push(row("CK06", t, this.title, "fail", `threw: ${scrub(l, errMsg(e))}`));

@@ -5,10 +5,10 @@
  *   bun scripts/ck.ts onprem-prepare <name> <file|s3>   copy docker/ out of the pinned clone into work/stacks/<name>
  *   bun scripts/ck.ts onprem-up <name>                  docker compose -p ck-<name> up -d --wait (own ports, own project)
  *   bun scripts/ck.ts onprem-down <name>                down -v, remove bind-mounted data, keep nothing
- *   bun scripts/ck.ts run-init <target...>              work/run/run.json + fixtures
+ *   bun scripts/ck.ts run-init <target...>              work/run/run.json + fixtures (CK_BIG_MIB sizes the large one, default 2048)
  *   bun scripts/ck.ts setup <target...>                 migrations, per-target config, seed users/tenants, key service config
  *   bun scripts/ck.ts keysvc-up | keysvc-down           the operator's key service container
- *   bun scripts/ck.ts managed-up | managed-down         provision / delete the two managed projects (ck- prefix)
+ *   bun scripts/ck.ts managed-up | managed-down         provision / delete the two managed projects (ck- prefix; CK_MANAGED=region-b for one)
  *   bun scripts/ck.ts sweep                             list ck- projects left behind
  *
  * Nothing secret is printed. Generated keys, passwords and KEKs live under
@@ -33,10 +33,14 @@ export const PREFIX = "ck-";
 /** Storage server version the managed platform reported on 2026-10-10 (storage-surface SS01a); CK13 re-reads it live. */
 const STORAGE_IMAGE = "public.ecr.aws/supabase/storage-api:v1.80.2";
 const PORTS = { gw: 8100, pg: 5532, txn: 6643 };
-const MANAGED = [
+const MANAGED_ALL = [
   { name: "region-a", region: "ap-southeast-1" },
   { name: "region-b", region: "eu-central-1" },
 ];
+// CK_MANAGED=region-b provisions one region only (a re-run of a single cell).
+const MANAGED = process.env.CK_MANAGED ? MANAGED_ALL.filter((m) => process.env.CK_MANAGED!.split(/[\s,]+/).includes(m.name)) : MANAGED_ALL;
+// CK_BIG_MIB sizes the large fixture (CK04-CK06); default 2048 (2 GiB).
+const BIG_MIB = Number(process.env.CK_BIG_MIB ?? 2048);
 const HOOK_URI = "pg-functions://postgres/app/custom_access_token_hook";
 const JWT_EXP = 300;
 const FILE_LIMIT = 5 * 1024 * 1024 * 1024;
@@ -199,6 +203,7 @@ async function orgSlug(): Promise<string> {
 
 async function managedUp() {
   if (!ctx.pat) die("SUPABASE_ACCESS_TOKEN not set");
+  if (!MANAGED.length) die(`CK_MANAGED matched no target (${MANAGED_ALL.map((m) => m.name).join(", ")})`);
   const org = await orgSlug();
   const t0 = Date.now();
   const made: { name: string; region: string; ref: string; dbPass: string }[] = [];
@@ -475,7 +480,7 @@ async function setup(names: string[]) {
 }
 
 async function runInit(names: string[]) {
-  const fx = await runClient({ cmd: "fixtures", dir: join(WORK, "fixtures") }, { timeoutMs: 600_000 });
+  const fx = await runClient({ cmd: "fixtures", dir: join(WORK, "fixtures"), bigMiB: BIG_MIB }, { timeoutMs: 600_000 });
   if (!fx.result.big) die(`fixtures: ${JSON.stringify(fx.result).slice(0, 300)}`);
   rmSync(join(RUN, "state"), { recursive: true, force: true });
   const run: Omit<RunInfo, "dir"> = {

@@ -9,14 +9,17 @@ import type { TestResult } from "../../../harness/src/types";
 import { credsFor, directory, type HarnessTarget, type Loaded, loadState, MARKER, row, runClient, saveState, scrub } from "./ckrun";
 
 const MiB = 1024 * 1024;
+/** Plaintext chunk size (client/src/envelope.ts CHUNK): 256 chunks for 2 GiB. */
+const CHUNK = 8 * MiB;
 const r1 = (x: number) => Math.round(x * 10) / 10;
 
 export async function interruptResume(l: Loaded, t: HarnessTarget, id: string, method: "s3-multipart" | "tus", stateKey: string): Promise<TestResult> {
-  const title = `2 GiB via ${method}: interrupt at 40 %, resume from a new process, verify`;
+  const fx = l.run.fixtures.big;
+  const gib = Math.round((fx.size / 1024 ** 3) * 100) / 100;
+  const title = `${gib} GiB via ${method}: interrupt at 40 %, resume from a new process, verify`;
   const st = loadState(l.run, t.name);
   const dir = directory(l);
-  const fx = l.run.fixtures.big;
-  const m: Record<string, string | number> = { plaintext_bytes: fx.size };
+  const m: Record<string, string | number> = { plaintext_bytes: fx.size, expected_chunk_rows: Math.ceil(fx.size / CHUNK) };
   const base = { directory: dir, tenant: st.tenants.primary };
   // 1. upload, killed at 40 %
   const first = await runClient({ ...base, cmd: "upload", creds: credsFor(l, "editor"), record: st.records.primary, file: fx.path, method }, { killAt: 0.4 });
@@ -59,7 +62,7 @@ export async function interruptResume(l: Loaded, t: HarnessTarget, id: string, m
     r.plaintextSha256 === fx.sha256 &&
     read.result.ok === true &&
     read.result.sha256 === fx.sha256 &&
-    Number(r.chunkRows) === 256 &&
+    Number(r.chunkRows) === Math.ceil(fx.size / CHUNK) &&
     Number(r.resumedEtagMismatches ?? 0) === 0;
   return row(
     id,
