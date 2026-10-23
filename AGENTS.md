@@ -4219,9 +4219,23 @@ partitions, other durability policies, a contended pool.
   4), 3 to 5 (width 10), 1 to 3 (width 24) listed; `-parallelism=1` left 0.
 - The secrets resource listed 0/3 after a width-24 apply (run3 and run4 first
   apply, run2 and run4 fresh apply) and 3/3 at width 1.
+- TF06 (2026-10-23, tofu 1.13.2, 5 rounds in 2 runs, `out/2026-10-23/`):
+  the loss observed. Through a recording proxy the provider sent 24 deploy
+  POSTs, 1 per slug, 24 in flight, 201:24, every body naming its slug with a
+  distinct id, and nothing else; TF_LOG DEBUG/TRACE holds no HTTP lines.
+  Polled every 250 ms, the listing showed 1 to 3 slugs at a time, later
+  deploys replacing earlier ones (17 slugs listed then unlisted, no delete
+  sent), settling at 2 or 3 of 24 within 0.15 s of the last 201 and
+  unchanged at +299 s. Same with the module posting the deploys itself. All
+  24 answer 200 in all five rounds and serve their own code (24/24 own body
+  tag in t2's 3 rounds; t1 checked status only). The re-plan GETs each slug
+  and plans the 404s as adds (22 GET 404 = 22 add). The evidence supports
+  concurrent deploys replacing each other's control-plane records (read
+  from outside; the store behind it is not visible). A re-plan in a spent rate-limit minute exits 1 after 3 GET
+  retries capped at 10 s.
 - Not measured: other provider versions, Terraform, other regions or sizes,
-  whether unlisted functions list later, how long a destroyed function keeps
-  answering.
+  whether unlisted functions list later than +299 s, how long a destroyed
+  function keeps answering.
 
 ## experiments/client-keyed-objects - key facts (validated 2026-10-12, local self-hosted stack + two Pro-org micro projects, ap-southeast-1 and eu-central-1)
 

@@ -1,12 +1,14 @@
 ROOT := $(abspath ../..)
 TS := $(shell date +%Y%m%d-%H%M%S)
 RUNNER ?= bun $(ROOT)/harness/src/run.ts
+ONLY ?= TF01
 
 # Self-provisioning: TF01 creates one throwaway Pro-org project named
 # tf-*, drives tofu against it, and deletes it. No tofu state of its own
 # lives here; tf/ is the module the test copies to a scratch dir.
 #
 #   SUPABASE_ACCESS_TOKEN=... PVLAB_ORG_PRO=<pro-org-slug> make probe
+#   ... make probe ONLY=TF06   # the loss trace: proxy wire log + per-slug reads
 #
 # PVLAB_REF=<ref> reuses an existing project instead (kept, only lab-prefixed
 # functions and secrets are removed).
@@ -19,7 +21,7 @@ probe: gen
 	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "SUPABASE_ACCESS_TOKEN not set"; exit 1)
 	@mkdir -p evidence/$(TS)
 	@$(RUNNER) --where local --experiment terraform-edge-functions \
-		--only TF01 --destructive --out evidence/$(TS)
+		--only $(ONLY) --destructive --out evidence/$(TS)
 	@echo "== evidence/$(TS) =="
 
 # Refresh the committed provider lock file for every platform the lab uses.
