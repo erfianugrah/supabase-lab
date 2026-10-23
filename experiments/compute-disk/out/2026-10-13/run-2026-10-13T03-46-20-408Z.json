@@ -1,0 +1,42 @@
+{
+  "startedAt": "2026-10-13T03:46:20.408Z",
+  "finishedAt": "2026-10-13T03:50:19.030Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "compute-disk",
+  "labCommit": "8ec7f86",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "D09",
+      "title": "D09: upgrade/downgrade durations + sampled downtime",
+      "status": "pass",
+      "detail": "upgrade micro->small: 39s, rest max outage 0.0s, auth 0.0s | upgrade small->large: 61s, rest max outage 15.1s, auth 0.0s | downgrade large->small: 61s, rest max outage 0.0s, auth 0.0s | downgrade small->micro: 63s, rest max outage 0.0s, auth 0.0s",
+      "measurements": {
+        "upgrade_micro_small_s": 39,
+        "upgrade_micro_small_rest_max_outage_s": 0,
+        "upgrade_micro_small_auth_max_outage_s": 0,
+        "upgrade_micro_small_rest_uptime_pct": 37,
+        "upgrade_small_large_s": 61,
+        "upgrade_small_large_rest_max_outage_s": 15.063,
+        "upgrade_small_large_auth_max_outage_s": 0,
+        "upgrade_small_large_rest_uptime_pct": 89.7,
+        "downgrade_large_small_s": 61,
+        "downgrade_large_small_rest_max_outage_s": 0,
+        "downgrade_large_small_auth_max_outage_s": 0,
+        "downgrade_large_small_rest_uptime_pct": 100,
+        "downgrade_small_micro_s": 63,
+        "downgrade_small_micro_rest_max_outage_s": 0,
+        "downgrade_small_micro_auth_max_outage_s": 0,
+        "downgrade_small_micro_rest_uptime_pct": 100
+      },
+      "durationMs": 238620
+    }
+  ]
+}

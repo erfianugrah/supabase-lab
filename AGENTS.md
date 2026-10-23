@@ -1124,7 +1124,7 @@ its experiment dir and planRun honours `--experiment` as a REAL filter -
 before 2026-08-18 it was a label only, and `--only I04` ran both twins.
 Always pass `--experiment <dir>` in probes.
 
-## experiments/compute-disk - key facts (validated 2026-08-19; autoscale write surface re-probed 2026-09-23; paid-plan fill D10/D11 2026-10-01)
+## experiments/compute-disk - key facts (validated 2026-08-19; autoscale write surface re-probed 2026-09-23; paid-plan fill D10/D11 2026-10-01; D09 rewritten and re-run 2026-10-23)
 
 Self-provisioning (no tofu), Pro/Team/Free orgs, modules D01-D11 (D11 is a
 curl replay recorded in the RUNLOG, no test file). D10 is not mapped in
@@ -1163,23 +1163,32 @@ result-id -> module-id mapping.
   no API enforcement (D08).
 - micro->small resize settled 107s; pg_limits per size (D01): micro 60/10/10,
   small 90/10/10 (connections/wal_senders/rep_slots).
-- D09 measured upgrade AND downgrade windows with 250ms sampling: u
-  micro->small 105s (REST max contiguous outage 1.0s), u small->large 61s
-  (17.0s), d large->small 61s (0s), d small->micro 73s (0s); Auth never
-  had a contiguous outage. Adjacent resize PATCHes rate-limited: 429
-  `still processing addon changes, try again in 1-2 minutes`.
-  D09's REST probe IS a data read (`rest/v1/dpython_probe?limit=1`, only 200
-  counts), unlike platform-downtime's pre-2026-10-23 probe, but its figures
-  are a different metric: the longest contiguous outage that a later success
-  closed, per phase. The compute-disk RUNLOG (2026-10-13 section) records
-  that `PhaseStatsAccumulator` drops a run of failures still open when a
-  phase ends, and that only the first of that run's four resize PATCHes was
-  applied (the other three hit the addon rate limit). platform-downtime's
-  2026-10-23 data-path re-measure of Micro to Small saw `rest_read` and Auth
-  windows of 171 and 218 s (first failure to sustained recovery). Candidates
-  for the gap: the dropped open outage, the refused resizes, D09's 2 s fetch
-  timeout, or a platform change between 2026-08-19 and 2026-10-23; none was
-  tested. Treat D09's near-zero REST and Auth figures as unconfirmed.
+- D09 (rewritten and re-run 2026-10-23, #175; n=1 per op, local vantage,
+  Pro, ap-southeast-1): every resize took `rest_read`, `auth_health` (anon
+  key) and `realtime_join` down together. Longest `rest_read` outage
+  231.465 s Micro -> Small, 223.28 s Small -> Large, 152.466 s Large -> Small,
+  254.886 s Small -> Micro; `ACTIVE_HEALTHY` read 218/216/136/245 s after the
+  PATCH, about 18 to 35 s BEFORE REST recovered, so a status poll is not a
+  recovery signal (`out/2026-10-23/`). Adjacent resize PATCHes are
+  rate-limited: 429 `We are still processing addon changes, please try
+  again in N minute(s)`; the module now retries after N minutes and starts a phase only
+  at an accepted PATCH.
+  The 2026-08-19 figures (Micro -> Small 105 s / 1.0 s, Small -> Large
+  61 s / 17.0 s, Large -> Small 61 s / 0 s, Small -> Micro 73 s / 0 s, Auth
+  0 s) are withdrawn (sample counts and PATCH statuses from console output,
+  not committed). The old module closed an outage only on a later success
+  in the same phase and stopped sampling at `ACTIVE_HEALTHY`, so outages still
+  open were dropped and reappeared, shortened, in the next phase; the two
+  61 s ops were refused PATCHes (the module's 60 s status wait), so no Large
+  resize ran on 2026-08-19 or 2026-10-13; the Auth probe sent no apikey and
+  the endpoint answers `401` without one (2026-10-23). Inferred from the
+  aggregates (RUNLOG 2026-10-23, assuming each refused phase opened on a
+  failing sample): Micro -> Small REST was at least 26.5 s (2026-08-19) and
+  22.063 to 50.313 s (2026-10-13), with the 17.0 s and 15.063 s as its tail;
+  without that assumption, at least 9.5 s and 7.0 s. The 2026-08-19 Small -> Micro "0 s" was at least 9.5 s and
+  still open when sampling stopped. `lib/outage.ts` attributes an outage to
+  the phase it started in; `lib/outage.test.ts` reproduces the 2026-10-13
+  case.
 
 - **The autoscale cap cannot be set through the API, and the disk write hides
   that.** No write verb exists on `/config/disk/autoscale` (`PATCH`/`PUT`/

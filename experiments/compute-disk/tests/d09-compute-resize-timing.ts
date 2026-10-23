@@ -1,111 +1,116 @@
 /**
- * D09 - resize/uprgade/downgrade durations + client-visible downtime, local.
+ * D09 - resize up/down durations + client-visible downtime, local vantage.
  *
- * platform-downtime measured per-path windows at 500ms on micro->small from
- * the AWS runner. This module brings the same measurement to a local run:
- * micro -> small -> large -> small -> micro, with REST (anon table read) and
- * Auth (/auth/v1/health) sampled at 250ms around each PATCH. Four resize
- * durations and per-path outage windows; results total as one D09 row.
+ * One throwaway Pro project, Micro -> Small -> Large -> Small -> Micro, with
+ * three paths sampled continuously for the whole run:
+ *
+ *   rest_read      anon row read (harness/src/real-probes.ts), every 250 ms
+ *   auth_health    GET /auth/v1/health with the anon key, every 250 ms
+ *   realtime_join  joined channel + Postgres Changes + own broadcast, every 1 s
+ *
+ * Rewritten 2026-10-23 (work-supabase-lab#175). The first version (2026-08-19,
+ * re-run 2026-10-13) had three defects that shaped its published figures:
+ *
+ *  - Outage accounting: each phase had its own accumulator that closed an
+ *    outage only on a later success in the same phase, so a run of failures
+ *    still open at the phase end was dropped and the next phase opened it
+ *    again as a shorter outage of its own. lib/outage.ts now keeps one
+ *    timeline per path and attributes each outage, at full length, to the
+ *    phase it started in (lib/outage.test.ts reproduces the 2026-10-13 case).
+ *  - Refused resizes: a PATCH answered `429 We are still processing addon
+ *    changes, please try again in N minute(s)` was still timed - the module
+ *    waited 60 s for the project to leave ACTIVE_HEALTHY and recorded that
+ *    wait as a resize. Now the PATCH is retried after the stated wait and a
+ *    phase starts only when a PATCH is accepted; `<op>_addon_429_retries`
+ *    counts the refusals.
+ *  - The Auth sample sent no apikey; this version sends the anon key, and
+ *    records once what the endpoint answers without one
+ *    (`auth_health_noapikey_status`).
+ *
+ * A phase runs from its accepted PATCH to the next accepted PATCH (the last one
+ * to the end of sampling). Before the next PATCH the module waits for
+ * ACTIVE_HEALTHY and then for every path to stay up for SETTLE_MS, so an
+ * outage normally closes inside its own phase; if it does not, the timeline
+ * still attributes it to the phase it started in and the later phase reports
+ * it as `carried_in_s`.
  */
-import type { Ctx, TestModule, TestResult } from "../../../harness/src/types.js";
-import { mgmt } from "../../../harness/src/mgmt.js";
+import type { Ctx, TestModule, TestResult } from "../../../harness/src/types";
+import { mgmt } from "../../../harness/src/mgmt";
+import { fetchKeys } from "../../../harness/src/platform";
+import { realtimeJoinProbe, restReadProbe, seedProbeTable } from "../../../harness/src/real-probes";
+import { withDeadline, type Probe, type ProbeOutcome } from "../../../harness/src/sampler";
+import { OutageTimeline } from "../lib/outage";
 
-let PRO_ORG = ""; // from PVLAB_ORG_PRO via ctx.orgs.pro; set in run()
 const REGION = "ap-southeast-1";
-const SAMPLE_INTERVAL_MS = 250;
-const MAX_OP_MS = 15 * 60_000;
+const MAX_HEALTHY_MS = 15 * 60_000;
+const LEAVE_HEALTHY_MS = 120_000;
+const SETTLE_MS = 15_000;
+const MAX_SETTLE_MS = 10 * 60_000;
+const MAX_429_RETRIES = 8;
+const POLL_MS = 3_000;
+const BASELINE_MS = 10_000;
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const sleep = (ms: number) => Bun.sleep(ms);
 
-interface ApiKeyRow { name?: string; type?: string; api_key?: string }
-
-interface PhaseStats {
-  op: string;
-  durationS: number;
-  restSoFar: { ok: number; tot: number; maxOutageS: number };
-  authSoFar: { ok: number; tot: number; maxOutageS: number };
+/** "please try again in 3 minute(s)" -> 3; anything else -> 1. */
+function retryMinutes(body: string): number {
+  const m = body.match(/try again in (\d+) minute/);
+  const n = m ? Number(m[1]) : 1;
+  return Math.min(Math.max(n, 1), 5);
 }
 
-class PathSampler {
-  private restUrl: string;
-  private anon: string;
-  private accRest = new PhaseStatsAccumulator();
-  private accAuth = new PhaseStatsAccumulator();
-  private active = false;
-
-  constructor(ref: string, anon: string) {
-    this.restUrl = `https://${ref}.supabase.co/rest/v1/dpython_probe?limit=1`;
-    this.anon = anon;
-  }
-
-  async run(): Promise<void> {
-    this.active = true;
-    const authUrl = `https://${this.restUrl.split("/")[2]}/auth/v1/health`;
-    while (this.active) {
-      const cut = Date.now();
-      const [rest, auth] = await Promise.all([
-        fetch(this.restUrl, { headers: { apikey: this.anon }, signal: AbortSignal.timeout(2_000) })
-          .then((r) => r.status)
-          .catch(() => -1),
-        fetch(authUrl, { signal: AbortSignal.timeout(2_000) })
-          .then((r) => r.status)
-          .catch(() => -1),
-      ]);
-      this.accRest.add(rest === 200, cut);
-      this.accAuth.add(auth === 200, cut);
-      const spent = Date.now() - cut;
-      if (spent < SAMPLE_INTERVAL_MS) await sleep(SAMPLE_INTERVAL_MS - spent);
-    }
-  }
-
-  stop(): { restOk: number; restTot: number; restMaxOutageS: number; authOk: number; authTot: number; authMaxOutageS: number } {
-    this.active = false;
-    return {
-      restOk: this.accRest.ok,
-      restTot: this.accRest.total,
-      restMaxOutageS: this.accRest.maxOutageS,
-      authOk: this.accAuth.ok,
-      authTot: this.accAuth.total,
-      authMaxOutageS: this.accAuth.maxOutageS,
-    };
-  }
-}
-
-class PhaseStatsAccumulator {
-  ok = 0;
-  total = 0;
-  maxOutageS = 0;
-  private runStart = -1;
-  private expected: boolean[] = [];
-
-  constructor() {
-    void this.expected;
-    this.expected = [];
-  }
-
-  add(okFlag: boolean, at: number): void {
-    this.total += 1;
-    if (okFlag) {
-      this.ok += 1;
-      if (this.runStart >= 0) {
-        const s = (at - this.runStart) / 1000;
-        if (s > this.maxOutageS) this.maxOutageS = s;
-        this.runStart = -1;
+function authHealthProbe(apiHost: string, anon: string): Probe {
+  const url = `https://${apiHost}/auth/v1/health`;
+  return {
+    name: "auth_health",
+    async run(): Promise<ProbeOutcome> {
+      try {
+        const r = await fetch(url, { headers: { apikey: anon }, signal: AbortSignal.timeout(5_000) });
+        await r.text();
+        return r.status === 200 ? { ok: true } : { ok: false, error: `HTTP ${r.status}` };
+      } catch (e) {
+        const n = e instanceof Error ? e.name : "";
+        return { ok: false, error: n === "TimeoutError" ? "timeout" : (e instanceof Error ? e.message : String(e)).slice(0, 80) };
       }
-    } else if (this.runStart < 0) {
-      this.runStart = at;
-    }
-  }
+    },
+  };
+}
+
+interface Path {
+  probe: Probe;
+  intervalMs: number;
+  tl: OutageTimeline;
+  modes: string[];
 }
 
 async function statusOf(ctx: Ctx, ref: string): Promise<string> {
-  const p = await mgmt(ctx, "GET", `/projects/${ref}`);
-  return ((p.json as { status?: string } | undefined)?.status ?? "") as string;
+  const p = await mgmt(ctx, "GET", `/projects/${ref}`).catch(() => null);
+  return ((p?.json as { status?: string } | undefined)?.status ?? "") as string;
 }
 
-async function sql(ctx: Ctx, ref: string, query: string): Promise<number> {
-  const r = await mgmt(ctx, "POST", `/projects/${ref}/database/query`, { query });
-  return r.status;
+async function computeVariant(ctx: Ctx, ref: string): Promise<string> {
+  const r = await mgmt(ctx, "GET", `/projects/${ref}/billing/addons`).catch(() => null);
+  if (!r || r.status !== 200) return `unread (HTTP ${r?.status ?? "error"})`;
+  const sel = ((r.json ?? {}) as { selected_addons?: { type: string; variant?: { id?: string } }[] }).selected_addons ?? [];
+  return sel.find((a) => a.type === "compute_instance")?.variant?.id ?? "none (micro)";
+}
+
+const OPS = [
+  ["upgrade micro->small", "ci_small"],
+  ["upgrade small->large", "ci_large"],
+  ["downgrade large->small", "ci_small"],
+  ["downgrade small->micro", "ci_micro"],
+] as const;
+
+interface OpRecord {
+  op: string;
+  patchStatus: number;
+  retries: number;
+  acceptedAt: number;
+  leftHealthyS: number;
+  healthyS: number;
+  dataSettledS: number;
+  variantAfter: string;
 }
 
 const mod: TestModule = {
@@ -115,125 +120,185 @@ const mod: TestModule = {
   requires: ["pat"],
   destructive: true,
   async run(ctx: Ctx): Promise<TestResult[]> {
-    PRO_ORG = ctx.orgs.pro ?? "";
-    if (!PRO_ORG) return [{ id: "D09", title: this.title, status: "skip", detail: "PVLAB_ORG_PRO not set" }];
+    const org = ctx.orgs.pro ?? "";
+    if (!org) return [{ id: "D09", title: this.title, status: "skip", detail: "PVLAB_ORG_PRO not set" }];
     let ref = "";
-    const results: TestResult[] = [];
-    const phases: PhaseStats[] = [];
+    let stop = false;
+    const loops: Promise<void>[] = [];
     try {
-      const t0 = Date.now();
       const create = await mgmt(ctx, "POST", "/projects", {
-        organization_slug: PRO_ORG,
-        name: `d09-resize-${t0}`,
+        organization_slug: org,
+        name: `d09-resize-${Date.now()}`,
         db_pass: `${crypto.randomUUID()}Aa1!`,
         region: REGION,
       });
       ref = ((create.json as { ref?: string } | undefined)?.ref ?? "") as string;
-      if (create.status !== 201 || !ref) {
-        results.push({ id: "D09", title: "D09", status: "fail", detail: `create: HTTP ${create.status}` });
-        return results;
-      }
-      let status = "";
+      if (create.status !== 201 || !ref) return [{ id: "D09", title: "D09", status: "fail", detail: `create: HTTP ${create.status}` }];
+      ctx.log(`project created: ${ref}`);
       const deadline = Date.now() + 20 * 60_000;
+      let status = "";
       while (Date.now() < deadline && status !== "ACTIVE_HEALTHY") {
         await sleep(10_000);
         status = await statusOf(ctx, ref);
       }
       if (status !== "ACTIVE_HEALTHY") throw new Error(`not healthy: ${status}`);
 
-      // warm the DB (first SQL still races ACTIVE_HEALTHY)
-      for (let i = 0; i < 12; i += 1) {
-        const q0 = await sql(ctx, ref, "create table if not exists public.dpython_probe(id int primary key); grant select, insert, update, delete on table public.dpython_probe to anon, authenticated, service_role;");
-        if (q0 < 300) break;
-        await sleep(5_000);
+      const apiHost = `${ref}.supabase.co`;
+      const pctx: Ctx = { ...ctx, ref, apiHost };
+      let anon = "";
+      for (let i = 0; i < 12 && !anon; i += 1) {
+        anon = await fetchKeys(pctx).then((k) => k.anon).catch(() => "");
+        if (!anon) await sleep(5_000);
       }
-      await sql(ctx, ref, "insert into public.dpython_probe values (1) on conflict do nothing;");
-      const keysRes = await mgmt(ctx, "GET", `/projects/${ref}/api-keys?reveal=true`);
-      const keys = Array.isArray(keysRes.json) ? (keysRes.json as ApiKeyRow[]) : [];
-      const anon = keys.find((k) => k.name === "anon" || k.type === "publishable")?.api_key ?? "";
       if (!anon) throw new Error("no anon key");
+      const seedS = await seedProbeTable(pctx, apiHost, anon, { maxMs: 300_000 });
+      const noKey = await fetch(`https://${apiHost}/auth/v1/health`, { signal: AbortSignal.timeout(5_000) })
+        .then((r) => r.status)
+        .catch(() => -1);
+      ctx.log(`probes ready after ${seedS}s; /auth/v1/health without apikey: HTTP ${noKey}`);
 
-      const ops = [
-        ["upgrade micro->small", "ci_small"],
-        ["upgrade small->large", "ci_large"],
-        ["downgrade large->small", "ci_small"],
-        ["downgrade small->micro", "ci_micro"],
-      ] as const;
-
-      for (const [op, variant] of ops) {
-        const sampler = new PathSampler(ref, anon);
-        const samplerTask = sampler.run().catch(() => null);
-        const tOp = Date.now();
-        const patch = await mgmt(ctx, "PATCH", `/projects/${ref}/billing/addons`, {
-          addon_type: "compute_instance",
-          addon_variant: variant,
-        });
-        // wait for NOT-healthy for up to MAX_OP_MS (transition), then
-        // for healthy again. A resize that never leaves ACTIVE_HEALTHY
-        // settles as a bad-null result, not a 0-second duration.
-        const transDeadline = Date.now() + 60_000;
-        let transitioned = "";
-        let rezStatus = await statusOf(ctx, ref);
-        while (Date.now() < transDeadline && (rezStatus === "" || rezStatus === "ACTIVE_HEALTHY")) {
-          if (rezStatus !== "ACTIVE_HEALTHY") transitioned = rezStatus;
-          await sleep(2_000);
-          rezStatus = await statusOf(ctx, ref);
-          if (transitioned) break;
-        }
-        // now back to ACTIVE_HEALTHY
-        const opDeadline = Date.now() + MAX_OP_MS;
-        while (Date.now() < opDeadline && rezStatus !== "ACTIVE_HEALTHY") {
-          await sleep(3_000);
-          rezStatus = await statusOf(ctx, ref);
-        }
-        const durationS = Math.round((Date.now() - tOp) / 1000);
-        const stop = sampler.stop();
-        samplerTask.catch(() => null);
-        void samplerTask;
-        phases.push({
-          op,
-          durationS: rezStatus === "ACTIVE_HEALTHY" ? durationS : -1,
-          restSoFar: { ok: stop.restOk, tot: stop.restTot, maxOutageS: stop.restMaxOutageS },
-          authSoFar: { ok: stop.authOk, tot: stop.authTot, maxOutageS: stop.authMaxOutageS },
-        });
-        ctx.log(
-          `${op}: ${durationS}s` +
-            ` rest outages ${stop.restMaxOutageS.toFixed(1)}s (${stop.restOk}/${stop.restTot} ok)` +
-            ` auth ${stop.authMaxOutageS.toFixed(1)}s`,
+      const paths: Path[] = [
+        { probe: restReadProbe(apiHost, anon), intervalMs: 250, tl: new OutageTimeline(), modes: [] },
+        { probe: authHealthProbe(apiHost, anon), intervalMs: 250, tl: new OutageTimeline(), modes: [] },
+        { probe: realtimeJoinProbe(apiHost, anon), intervalMs: 1_000, tl: new OutageTimeline(), modes: [] },
+      ];
+      const t0 = Date.now();
+      for (const p of paths) p.tl.beginPhase("baseline", t0);
+      for (const p of paths) {
+        loops.push(
+          (async () => {
+            while (!stop) {
+              const cut = Date.now();
+              const o = await withDeadline(p.probe.run(), 30_000).catch((e) => ({ ok: false, error: String(e) }) as ProbeOutcome);
+              p.tl.add(o.ok, cut);
+              if (!o.ok) {
+                const m = (o.error ?? "unknown").slice(0, 80);
+                if (!p.modes.includes(m)) p.modes.push(m);
+              }
+              const spent = Date.now() - cut;
+              if (spent < p.intervalMs) await sleep(p.intervalMs - spent);
+            }
+          })(),
         );
-        if (patch.status >= 300) {
-          ctx.log(`${op}: PATCH rejected HTTP ${patch.status}: ${patch.text.slice(0, 200)}`);
-          continue; // try the next op rather than dying on a transient
-        }
       }
+      await sleep(BASELINE_MS);
 
-      const meas: Record<string, number | string> = {};
-      const lines: string[] = [];
-      for (const p of phases) {
-        const key = p.op.replace(/[^a-z0-9]+/g, "_").toLowerCase();
-        meas[`${key}_s`] = p.durationS;
-        meas[`${key}_rest_max_outage_s`] = p.restSoFar.maxOutageS;
-        meas[`${key}_auth_max_outage_s`] = p.authSoFar.maxOutageS;
-        meas[`${key}_rest_uptime_pct`] =
-          p.restSoFar.tot > 0 ? Math.round((p.restSoFar.ok / p.restSoFar.tot) * 1000) / 10 : -1;
-        lines.push(`${p.op}: ${p.durationS}s, rest max outage ${p.restSoFar.maxOutageS.toFixed(1)}s, auth ${p.authSoFar.maxOutageS.toFixed(1)}s`);
+      const settled = (sinceMs: number) =>
+        paths.every((p) => {
+          const lf = p.tl.lastFailMs();
+          return Date.now() - Math.max(lf ?? 0, sinceMs) >= SETTLE_MS;
+        });
+
+      const ops: OpRecord[] = [];
+      for (const [op, variant] of OPS) {
+        let retries = 0;
+        let sentAt = Date.now();
+        let patch = await mgmt(ctx, "PATCH", `/projects/${ref}/billing/addons`, { addon_type: "compute_instance", addon_variant: variant });
+        while (patch.status === 429 && retries < MAX_429_RETRIES) {
+          retries += 1;
+          const mins = retryMinutes(patch.text);
+          ctx.log(`${op}: HTTP 429 (${patch.text.slice(0, 120)}), retry ${retries} in ${mins} min`);
+          await sleep(mins * 60_000);
+          sentAt = Date.now();
+          patch = await mgmt(ctx, "PATCH", `/projects/${ref}/billing/addons`, { addon_type: "compute_instance", addon_variant: variant });
+        }
+        for (const p of paths) p.tl.beginPhase(op, sentAt);
+        const rec: OpRecord = { op, patchStatus: patch.status, retries, acceptedAt: sentAt, leftHealthyS: -1, healthyS: -1, dataSettledS: -1, variantAfter: "" };
+        ops.push(rec);
+        if (patch.status >= 300) {
+          ctx.log(`${op}: PATCH refused HTTP ${patch.status}: ${patch.text.slice(0, 200)}`);
+          rec.variantAfter = await computeVariant(ctx, ref);
+          continue;
+        }
+        // Leave ACTIVE_HEALTHY (or not), then come back.
+        let st = await statusOf(ctx, ref);
+        const leaveBy = Date.now() + LEAVE_HEALTHY_MS;
+        while (Date.now() < leaveBy && (st === "" || st === "ACTIVE_HEALTHY")) {
+          await sleep(POLL_MS);
+          st = await statusOf(ctx, ref);
+        }
+        if (st !== "" && st !== "ACTIVE_HEALTHY") rec.leftHealthyS = Math.round((Date.now() - sentAt) / 1000);
+        const healthyBy = Date.now() + MAX_HEALTHY_MS;
+        while (Date.now() < healthyBy && st !== "ACTIVE_HEALTHY") {
+          await sleep(POLL_MS);
+          st = await statusOf(ctx, ref);
+        }
+        if (st === "ACTIVE_HEALTHY") rec.healthyS = Math.round((Date.now() - sentAt) / 1000);
+        const settleBy = Date.now() + MAX_SETTLE_MS;
+        while (Date.now() < settleBy && !settled(sentAt)) await sleep(1_000);
+        if (settled(sentAt)) {
+          // Every path up for SETTLE_MS: report the last failing sample on any path, from the PATCH (0 = none failed).
+          const lastFail = Math.max(...paths.map((p) => p.tl.lastFailMs() ?? 0));
+          rec.dataSettledS = lastFail > sentAt ? Math.round((lastFail - sentAt) / 1000) : 0;
+        }
+        rec.variantAfter = await computeVariant(ctx, ref);
+        ctx.log(`${op}: accepted after ${retries} 429s; left healthy ${rec.leftHealthyS}s, healthy ${rec.healthyS}s, last failure on any path ${rec.dataSettledS}s, compute ${rec.variantAfter}`);
       }
-      results.push({
-        id: "D09",
-        title: "D09: upgrade/downgrade durations + sampled downtime",
-        status: phases.some((p) => p.durationS > 0) ? "pass" : "fail",
-        detail: lines.join(" | "),
-        measurements: meas,
-      });
+      const endMs = Date.now();
+      stop = true;
+      await Promise.all(loops);
+
+      const meas: Record<string, number | string> = {
+        rest_read_interval_ms: 250,
+        auth_health_interval_ms: 250,
+        realtime_join_interval_ms: 1_000,
+        settle_ms: SETTLE_MS,
+        auth_health_noapikey_status: noKey,
+        seed_s: seedS,
+      };
+      const lines: string[] = [];
+      const stats = paths.map((p) => ({ name: p.probe.name, phases: p.tl.stats(endMs), modes: p.modes }));
+      for (const s of stats) {
+        const base = s.phases[0];
+        meas[`baseline_${s.name}_failed_samples`] = `${base?.failures ?? 0}/${base?.samples ?? 0}`;
+        meas[`${s.name}_modes`] = s.modes.slice(0, 6).join("; ") || "none";
+      }
+      let allOk = true;
+      for (const [i, r] of ops.entries()) {
+        const key = r.op.replace(/[^a-z0-9]+/g, "_").toLowerCase();
+        meas[`${key}_patch_status`] = r.patchStatus;
+        meas[`${key}_addon_429_retries`] = r.retries;
+        meas[`${key}_left_healthy_s`] = r.leftHealthyS;
+        meas[`${key}_s`] = r.healthyS;
+        meas[`${key}_last_fail_any_path_s`] = r.dataSettledS;
+        meas[`${key}_compute_after`] = r.variantAfter;
+        const parts: string[] = [];
+        for (const s of stats) {
+          const ph = s.phases[i + 1];
+          if (!ph) continue;
+          meas[`${key}_${s.name}_max_outage_s`] = ph.maxOutageS;
+          meas[`${key}_${s.name}_outage_open_at_end`] = ph.maxOutageOpen ? "yes" : "no";
+          meas[`${key}_${s.name}_outages`] = ph.outages;
+          meas[`${key}_${s.name}_total_outage_s`] = ph.totalOutageS;
+          meas[`${key}_${s.name}_failed_samples`] = `${ph.failures}/${ph.samples}`;
+          meas[`${key}_${s.name}_first_fail_s`] = ph.firstFailS ?? "n/a";
+          meas[`${key}_${s.name}_recovered_s`] = ph.lastRecoveryS ?? "n/a";
+          meas[`${key}_${s.name}_carried_in_s`] = ph.carriedInS;
+          parts.push(`${s.name} ${ph.maxOutageS}s${ph.maxOutageOpen ? " (open)" : ""}`);
+        }
+        if (r.patchStatus >= 300 || r.healthyS < 0 || r.dataSettledS < 0) allOk = false;
+        lines.push(`${r.op}: PATCH ${r.patchStatus} after ${r.retries} 429s, healthy ${r.healthyS}s, max outage ${parts.join(", ")}`);
+      }
+      return [
+        {
+          id: "D09",
+          title: "D09: upgrade/downgrade durations + sampled downtime (data-path probes)",
+          status: allOk ? "pass" : "fail",
+          detail: lines.join(" | "),
+          measurements: meas,
+        },
+      ];
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      if (!results.some((r) => r.id === "D09")) {
-        results.push({ id: "D09", title: "D09", status: "fail", detail: `threw: ${msg}` });
-      }
+      return [{ id: "D09", title: "D09", status: "fail", detail: `threw: ${msg}` }];
     } finally {
-      if (ref) await mgmt(ctx, "DELETE", `/projects/${ref}`).catch(() => null);
+      stop = true;
+      await Promise.all(loops).catch(() => null);
+      if (ref) {
+        const d = await mgmt(ctx, "DELETE", `/projects/${ref}`).catch(() => null);
+        ctx.log(`delete project: HTTP ${d?.status ?? "error"}`);
+      }
     }
-    return results;
   },
 };
 export default mod;
