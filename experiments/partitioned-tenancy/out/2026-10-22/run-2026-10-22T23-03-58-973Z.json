@@ -1,0 +1,152 @@
+{
+  "startedAt": "2026-10-22T23:03:58.973Z",
+  "finishedAt": "2026-10-22T23:05:17.246Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "partitioned-tenancy",
+  "labCommit": "b6bd1d2",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "PT04z",
+      "title": "PT04z: database state before the DETACH windows",
+      "status": "info",
+      "detail": "default_transaction_read_only=off; database size 369 MB",
+      "measurements": {
+        "read_only_before": "off",
+        "db_size_before": "369 MB"
+      },
+      "durationMs": 77069
+    },
+    {
+      "id": "PT04a",
+      "title": "PT04a: DETACH CONCURRENTLY, 1M-row partition, no other transaction (run 1)",
+      "status": "info",
+      "detail": "DDL 13 ms; overlapping DDL: reads 2 (non-2xx 0 -, max 54 ms, median 41.5), writes 2 (non-2xx 0 -, max 44 ms, median 35.5); whole window: reads 191 median 30 ms, writes 201 median 28 ms",
+      "measurements": {
+        "ddl_ms": 13,
+        "ddl_error": "",
+        "during_reads": 2,
+        "during_reads_non2xx": 0,
+        "during_reads_codes": "-",
+        "during_reads_max_ms": 54,
+        "during_reads_median_ms": 41.5,
+        "during_writes": 2,
+        "during_writes_non2xx": 0,
+        "during_writes_codes": "-",
+        "during_writes_max_ms": 44,
+        "window_reads_median_ms": 30,
+        "window_writes_median_ms": 28,
+        "window_reads_non2xx": 0,
+        "window_writes_non2xx": 0
+      },
+      "durationMs": 77069
+    },
+    {
+      "id": "PT04b",
+      "title": "PT04b: DETACH CONCURRENTLY, 1M-row partition, no other transaction (run 2)",
+      "status": "info",
+      "detail": "DDL 13 ms; overlapping DDL: reads 1 (non-2xx 0 -, max 38 ms, median 38), writes 2 (non-2xx 0 -, max 35 ms, median 32); whole window: reads 197 median 30 ms, writes 208 median 28 ms",
+      "measurements": {
+        "ddl_ms": 13,
+        "ddl_error": "",
+        "during_reads": 1,
+        "during_reads_non2xx": 0,
+        "during_reads_codes": "-",
+        "during_reads_max_ms": 38,
+        "during_reads_median_ms": 38,
+        "during_writes": 2,
+        "during_writes_non2xx": 0,
+        "during_writes_codes": "-",
+        "during_writes_max_ms": 35,
+        "window_reads_median_ms": 30,
+        "window_writes_median_ms": 28,
+        "window_reads_non2xx": 0,
+        "window_writes_non2xx": 0
+      },
+      "durationMs": 77069
+    },
+    {
+      "id": "PT04c",
+      "title": "PT04c: DETACH CONCURRENTLY while a 15 s transaction that read the parent is open",
+      "status": "info",
+      "detail": "DDL 12011 ms; holder opened before the window; overlapping DDL: reads 408 (non-2xx 0 -, max 93 ms, median 28.5), writes 437 (non-2xx 0 -, max 52 ms, median 27); whole window: reads 607 median 29 ms, writes 646 median 27 ms",
+      "measurements": {
+        "ddl_ms": 12011,
+        "ddl_error": "",
+        "during_reads": 408,
+        "during_reads_non2xx": 0,
+        "during_reads_codes": "-",
+        "during_reads_max_ms": 93,
+        "during_reads_median_ms": 28.5,
+        "during_writes": 437,
+        "during_writes_non2xx": 0,
+        "during_writes_codes": "-",
+        "during_writes_max_ms": 52,
+        "window_reads_median_ms": 29,
+        "window_writes_median_ms": 27,
+        "window_reads_non2xx": 0,
+        "window_writes_non2xx": 0
+      },
+      "durationMs": 77069
+    },
+    {
+      "id": "PT04d",
+      "title": "PT04d: plain DETACH while a 15 s transaction that read the parent is open",
+      "status": "info",
+      "detail": "DDL 12011 ms; holder opened before the window; overlapping DDL: reads 3 (non-2xx 1 500/57014, max 8048 ms, median 3968), writes 2 (non-2xx 1 500/57014, max 8042 ms, median 6013); whole window: reads 205 median 29 ms, writes 225 median 26 ms",
+      "measurements": {
+        "ddl_ms": 12011,
+        "ddl_error": "",
+        "during_reads": 3,
+        "during_reads_non2xx": 1,
+        "during_reads_codes": "500/57014",
+        "during_reads_max_ms": 8048,
+        "during_reads_median_ms": 3968,
+        "during_writes": 2,
+        "during_writes_non2xx": 1,
+        "during_writes_codes": "500/57014",
+        "during_writes_max_ms": 8042,
+        "window_reads_median_ms": 29,
+        "window_writes_median_ms": 26,
+        "window_reads_non2xx": 1,
+        "window_writes_non2xx": 1
+      },
+      "durationMs": 77069
+    },
+    {
+      "id": "PT04e",
+      "title": "PT04e: the detached tables standalone",
+      "status": "info",
+      "detail": "2026_05: attached=false rls=false anon_select=true rows=200000; 2026_06: attached=false rls=false anon_select=true rows=200000; 2026_07: attached=false rls=false anon_select=true rows=1000000; 2026_08: attached=false rls=false anon_select=true rows=1000000; parent rows before 2026-09 = 0; anon Data API read of a detached table 200 rows=1000 (limit 1000) tenants=50",
+      "measurements": {
+        "detached_attached": 0,
+        "detached_rls_on": 0,
+        "detached_anon_select": 4,
+        "detached_rows_2026_07": 1000000,
+        "parent_rows_before_sep": 0,
+        "detached_anon_status": 200,
+        "detached_anon_rows_limit1000": 1000,
+        "detached_anon_distinct_tenants": 50
+      },
+      "durationMs": 77069
+    },
+    {
+      "id": "PT99",
+      "title": "PT99: project deleted and gone from the listing",
+      "status": "pass",
+      "detail": "DELETE 200; absent from GET /projects after 0s",
+      "measurements": {
+        "delete_status": 200,
+        "gone_from_listing_s": 0
+      },
+      "durationMs": 1203
+    }
+  ]
+}
