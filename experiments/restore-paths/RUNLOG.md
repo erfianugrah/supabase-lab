@@ -572,3 +572,169 @@ RP02 saw once PITR is on); other compute sizes; a heavy writer's effect on the b
 restore-to-latest with the archiver measurably behind (the case R15
 suggests); the Dashboard's restore button, which may pick its target
 differently.
+
+## 2026-10-23 - RP09 (logical slots across resize, read replica and restart; restore-point and undo)
+
+Question: does a logical replication slot survive the platform operations the
+docs say nothing about, and does its position hold. The docs require slots to
+be dropped before a restore ("If your project uses subscriptions or
+replication slots, you need to drop them before the restoration",
+https://supabase.com/docs/guides/platform/backups) and before a major
+upgrade ("Logical replication slots must be dropped",
+https://supabase.com/docs/guides/platform/upgrading); they do not mention a
+restart, a compute resize or creating a read replica. The compute guide
+(https://supabase.com/docs/guides/platform/compute-and-disk, "Postgres
+replication slots, WAL senders, and connections") lists 5 replication slots
+and 5 WAL senders for Micro, Small and Medium and warns that a downgrade with
+more slots than the new size allows stops the server starting. Docs read
+2026-10-23 through the docs mirror.
+
+Hypothesis: the slot survives each operation that keeps the disk, and a
+clean shutdown persists its position. Competing: an operation that replaces
+the instance or stops Postgres uncleanly loses the slot or rewinds
+`confirmed_flush_lsn`, and a consumer sees duplicates (or, through the SQL
+interface, gaps).
+
+Shape (`tests/rp09-slots-platform-ops.ts`, `lib/slots.ts`): one Pro project
+per run, created on Small (the read-replica minimum,
+https://supabase.com/docs/guides/platform/read-replicas/getting-started),
+ap-southeast-1, Postgres 17.11. One table, one row per transaction from a
+writer through the session pooler every ~200 ms, and three slots on it:
+
+- `pgo_sql`: `pgoutput`, read with `pg_logical_slot_get_binary_changes`
+  (proto_version 1) through the session pooler every ~1 s;
+- `w2j_sql`: `wal2json`, `pg_logical_slot_get_changes` (format-version 2),
+  same cadence;
+- `w2j_stream`: `wal2json` streamed by `pg_recvlogical --start --no-loop`
+  over the direct host (`db.<ref>`, IPv6), respawned by the module after
+  each disconnect, so the slot reads `active` while it runs.
+
+An observer read `pg_replication_slots`, `pg_current_wal_lsn()` and
+`pg_postmaster_start_time()` every ~2 s through the pooler. After a consumer
+lost its connection it waited for an observer read taken after the server
+answered again before consuming, so "first read after" is the slot's
+position before any consumer moved it. Sequence per run, with a 60 s
+baseline first and 90 s of settling after each step: resize Small to
+Medium, Medium to Small, read replica create in the same region (wait until
+it serves a query), replica remove, restart, then the restore-point and undo
+routes. A duplicate counts as rewind-class when the redelivered
+transaction ended at or before the position the consumer had already
+confirmed; a gap is a writer-acknowledged id never received, counted after
+the writer stopped and the consumers drained.
+
+Vantage: the same macOS workstation, which had an IPv6 route on 2026-10-23
+(the direct host answered); earlier sections of this log describe the
+vantage as IPv4-only.
+
+| run | start (UTC) | what | artifact |
+|---|---|---|---|
+| S1 | 2026-10-23 07:58 | full sequence; module under its working id RP08 (slots `rp08_*`) | `out/2026-10-23/run-2026-10-23T07-58-01-360Z.json` |
+| S2 | 2026-10-23 08:17 | as S1, after two fixes (below); still RP08 | `out/2026-10-23/run-2026-10-23T08-17-52-950Z.json` |
+| S3 | 2026-10-23 08:37 | as S2, renamed RP09 (another restore-paths module took RP08 the same day) | `out/2026-10-23/run-2026-10-23T08-37-26-434Z.json` |
+
+Run ids S1 to S3 are a separate series from R1 to R25 above. RP08 is the
+PITR archiver-lag module (`rp08-pitr-archiver-lag.ts`), whose artifacts may
+also land in `out/2026-10-23/`, so read the RP08 rows in
+`run-2026-10-23T07-58-01-360Z` and `run-2026-10-23T08-17-52-950Z` as RP09. All three
+recorded lab commit `661afdf` and ran from the working tree. Fixes between
+S1 and S2: the `wal2json` SQL consumer did not pass `include-lsn`, so its
+confirmed position stayed `0/0` and S1's `w2j_sql_consumer_confirmed_at_loss`
+and `w2j_sql_rewind_bytes` columns are void (its duplicate and gap counts are
+not affected: they count ids); and the hold before a stream respawn timed out
+at 120 s, shorter than S1's resize outages, so in S1 RP08b and RP08c the
+stream had reconnected before the first observer read (its "first read
+after", `0/70004D8` and `0/B0004F8`, is ahead of what it confirmed at the
+loss, `0/4021088` and `0/8003E10`). Every project was deleted in `finally`
+(`DELETE HTTP 200` in RP08i/RP09i of each artifact), and a `GET
+/v1/projects` at 08:54 UTC listed none of the four projects this card
+created (the three runs plus a Micro feasibility project; author's check, no
+snapshot saved).
+
+### Settings (RP08a / RP09a, identical in S1 to S3)
+
+`wal_level` `logical`, `max_replication_slots` 10, `max_wal_senders` 10,
+`max_slot_wal_keep_size` `2GB`, `wal_sender_timeout` `1min`,
+`sync_replication_slots` `off`, `hot_standby_feedback` `off`, and the
+`postgres` role has `rolreplication` true: the slots were created as
+`postgres` through the Management API SQL endpoint and read through the
+session pooler. `max_replication_slots`
+read 10 before and after every step, on Small and on Medium (the compute
+table says 5 for both). A Micro project the same morning (feasibility probe,
+no artifact) read `max_replication_slots` 10 and `max_slot_wal_keep_size`
+`512MB`. Creating a slot with the `wal2json` plugin succeeded without the
+module creating any extension.
+
+### Per operation (S1, S2, S3)
+
+| step | status sequence | back to healthy (s), S1 / S2 / S3 | Postgres restarted | slots present after | duplicates, gaps |
+|---|---|---|---|---|---|
+| resize Small to Medium | `RESIZING>ACTIVE_HEALTHY` | 61 / 37 / 36 | yes (3 of 3) | 3 of 3 in each run | 0, 0 on all three consumers |
+| resize Medium to Small | `RESIZING>ACTIVE_HEALTHY` | 67 / 101 / 36 | yes (3 of 3) | 3 of 3 | 0, 0 |
+| read replica create | `ACTIVE_HEALTHY` throughout | served a query at 199 / 198 / 139 | no (0 of 3) | 3 of 3 | 0, 0 |
+| read replica remove | `ACTIVE_HEALTHY` throughout | gone from the pooler config at 0 / 16 / 0 | no (0 of 3) | 3 of 3 | 0, 0 |
+| restart | `ACTIVE_HEALTHY>RESTARTING>ACTIVE_HEALTHY` | 62 / 56 / 61 | yes (3 of 3) | 3 of 3 | 0, 0 |
+
+"Postgres restarted" is `pg_postmaster_start_time()` differing between the
+read before the step and the read at its end. Totals after the drain
+(RP08g / RP09g): the writer acknowledged 3421, 3767 and 3143 rows, and each
+of the three consumers received every one of them exactly once in each run
+(`distinct` equal to `writer_acked_total`, `duplicates_total` 0,
+`gaps_total` 0).
+
+Slot position across the steps that restarted Postgres (resize up, resize
+down, restart): the slot's `confirmed_flush_lsn` at the first read after the
+outage equalled the position the consumer had confirmed when it lost the
+connection in every case where both were recorded: `pgo_sql` 9 of 9 (3 steps
+x 3 runs), `w2j_sql` 6 of 6 (S2, S3), `w2j_stream` 7 of 9 (S1's two resizes
+are the stream case above). Examples, consumer at loss = slot after:
+S2 resize up `0/40162D0` (both SQL slots) and `0/40164F8` (stream); S3
+restart `0/F0181E8` and `0/F018358`. Nothing rewound, so nothing was
+redelivered. `restart_lsn` moved forward in each step; WAL retained by the
+slots at each step's end read was 896 to 16,711,576 bytes (S2 resize up, S1
+resize up) and `wal_status` read `reserved` throughout.
+
+The streaming slot was `active` again at the end of every step, because the
+module respawned `pg_recvlogical`; a consumer that does not reconnect leaves
+the slot inactive and retaining WAL. `pg_recvlogical` exited with `error:
+disconnected` exactly three times per run, at the two resizes and the
+restart (four spawns in each artifact; exit times in the RP08g/RP09g
+evidence, and the stream's stall columns are non-zero only for those three
+steps); the replica create and remove did not drop the walsender
+connection.
+
+Read replica: the replica answered `pg_is_in_recovery()` true,
+`max_replication_slots` 10, `hot_standby_feedback` `off`, and listed no
+replication slots (`slots=(none)`) in all three runs; the logical slots
+stay on the primary (`sync_replication_slots` is `off`). The primary listed
+the same 3 slots before and after the replica was created and while it
+served, so no physical slot for the replica appeared in
+`pg_replication_slots` (reading: the replica does not hold a slot on the
+primary; not separated from one being hidden from the `postgres` role).
+
+Writer and consumer pauses per step (`writer_max_stall_s`,
+`*_max_stall_s`) ran 49 to 155 s against 36 to 101 s to healthy. They are not
+outage figures: every client reconnected through the session pooler about
+once a second, and the pooler answered `(ECIRCUITBREAKER) too many
+authentication failures, new connections are temporarily blocked` in all
+three runs (writer errors in the RP08g/RP09g evidence), the hazard RP02
+describes. The consumers' hold for the observer read adds to them as well.
+LO05 and compute-disk D09 measure restart and resize outages.
+
+### Restore point and undo on Pro (RP08h / RP09h)
+
+On each of the three Small Pro projects, with the three slots present:
+`GET database/backups/restore-point`, `POST database/backups/restore-point
+{"name": "rp08-mark"}` (`rp09-mark` in S3), `GET ...restore-point?name=` and
+`POST database/backups/undo {"name": ...}` all answered `400` `{"message":"This
+endpoint is unavailable at the moment"}`. Undo was sent with a name the POST
+had not created, since the POST was refused. Same answer as RP01 on
+2026-10-10 and RP04 (Team) on 2026-10-20. Not run on an Enterprise org: none
+was available to the lab, so whether the routes work there is open.
+
+Not measured: an unclean stop (a crash, an OOM kill), where the slot's
+on-disk position can lag what the consumer was told; PITR restore and major
+upgrade (documented as requiring the slots dropped); resizes other than
+Small and Medium; a downgrade with more slots than the target size's limit
+(the limit read 10 here, so the docs' 5 was not reachable with 3 slots); a
+consumer that stays down long enough for `max_slot_wal_keep_size` to
+invalidate the slot; replica lag; the replica in another region.

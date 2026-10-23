@@ -12,7 +12,7 @@ TS := $(shell date +%Y%m%d-%H%M%S)
 OUT ?= evidence/$(TS)
 PVLAB := cd $(ROOT) && bun harness/src/run.ts --tests experiments/restore-paths/tests --where local --experiment restore-paths --destructive
 
-.PHONY: gen surface pitr pause daily rollback rpo size all
+.PHONY: gen surface pitr pause daily rollback rpo size slots all
 
 # The registry is generated and gitignored; regenerate after adding a module.
 gen:
@@ -47,6 +47,12 @@ rpo: gen
 # disk grown once to RP07_DISK_GB, default 40). 36.6 to 46.5 minutes in the 2026-10-22/23 runs (R15, R18, R19, R22, R23).
 size: gen
 	$(PVLAB) --only RP07 --out experiments/restore-paths/$(OUT)
+
+# RP09: logical slots (pgoutput, wal2json via SQL, wal2json streamed with pg_recvlogical over direct IPv6)
+# across resize Small->Medium->Small, read-replica create/remove and restart; then restore-point/undo.
+# Needs pg_recvlogical on PATH and an IPv6 route. About 18 minutes (S1, S2); RP09_SETTLE_S (default 90) per op.
+slots: gen
+	$(PVLAB) --only RP09 --out experiments/restore-paths/$(OUT)
 
 all: surface pitr pause daily rollback
 

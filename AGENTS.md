@@ -3284,7 +3284,7 @@ when present, so a new module is invisible until it is regenerated).
 - Retire FAILURE-MATRIX 10.1 `[doc]` for the measured halves (create and
   restart lifecycle surfaces); capacity-driven failures remain `[doc]`.
 
-## experiments/restore-paths - key facts (2026-10-10, 2026-10-20 and 2026-10-22/23, ap-southeast-1, one IPv4-only vantage)
+## experiments/restore-paths - key facts (2026-10-10, 2026-10-20 and 2026-10-22/23, ap-southeast-1, one vantage, IPv4-only until RP09 on 2026-10-23)
 
 Which restore paths a Pro org can drive through the Management API, and what
 each does to the db password, Storage and the per-path outage. Self-provisioning
@@ -3413,6 +3413,39 @@ because `harness/dist/pvlab` is a linux-x64 build.
   `rollback` (B2's `drop column`, from the apply body's optional `rollback`
   field); B3, applied without one, kept its table (n=1). A failing apply is one transaction: `400`
   with the Postgres error, no table, no history row (n=2).
+- **Logical slots survive resize, read-replica create/remove and restart,
+  with no rewind (RP09, 2026-10-23, S1 to S3, Small, Postgres 17.11).** Three
+  slots on one table (`pgoutput` and `wal2json` read through the SQL
+  interface over the session pooler, `wal2json` streamed by `pg_recvlogical`
+  over direct IPv6), a writer at ~5 rows/s: resize Small to Medium and back
+  (`RESIZING`, healthy in 36 to 101 s) and restart (56 to 62 s) restarted
+  Postgres in 3 of 3 runs; every slot was present afterwards and its
+  `confirmed_flush_lsn` at the first read after the outage equalled what the
+  consumer had confirmed at the loss (`pgo_sql` 9 of 9, `w2j_sql` 6 of 6,
+  stream 7 of 9; the rest of S1 was not separable, RUNLOG). 3421, 3767 and 3143
+  acked rows reached each consumer exactly once (0 duplicates, 0 gaps). The
+  replica create (served at 139 to 199 s) and remove left the primary's postmaster start time unchanged and
+  did not drop the walsender. The replica listed no slots and the primary's
+  `pg_replication_slots`, read as `postgres`, listed no new slot. The
+  streamed slot was `active` again at each step's end because the module
+  respawned `pg_recvlogical`. Platform-initiated stops only (shutdown mode
+  not read); a crash is unmeasured.
+- **Slot limits read 10, not the docs' 5 (RP09a, S1 to S3).**
+  `max_replication_slots` and `max_wal_senders` 10 on Small and on Medium
+  (the compute guide's table says 5), `max_slot_wal_keep_size` `2GB` on
+  Small (`512MB` on Micro, feasibility read, no artifact),
+  `sync_replication_slots` `off`, `postgres` has `rolreplication`.
+- **`restore-point` and `undo` still "unavailable" on Pro (RP09h,
+  2026-10-23, n=3).** `GET`/`POST database/backups/restore-point` and `POST
+  database/backups/undo` answered `400` "This endpoint is unavailable at the
+  moment" on three Small Pro projects. Enterprise: not run (no Enterprise org).
+- Gotcha from RP09: clients reconnecting through the session pooler about
+  once a second during a restart or resize trip `(ECIRCUITBREAKER)`, so their
+  pauses (49 to 155 s) overstate the outage. RP09 artifacts S1 and S2 carry
+  the working id RP08; RP08 is the PITR archiver-lag module
+  (`rp08-pitr-archiver-lag.ts`), whose artifacts may also land in
+  `out/2026-10-23/`, so read RP08 rows in `run-2026-10-23T07-58-01-360Z` and
+  `run-2026-10-23T08-17-52-950Z` as RP09.
 - Pending: clone (Dashboard session needed), `backups/restore` on an older
   project, a restore target hours old, a restore right after a fresh base
   backup (sizes past 1 GB were run 2026-10-22/23, RP07, each on a project
