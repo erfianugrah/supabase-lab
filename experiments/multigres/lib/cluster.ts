@@ -103,6 +103,7 @@ export function parsePs(ps: string): Proc[] {
 export async function psql(container: string, port: number, sql: string): Promise<string | null> {
   const r = await run(
     [
+      // argv-secret-ok: PG_PASSWORD is the local rig's fixed "postgres", not a credential
       "docker", "exec", "-e", `PGPASSWORD=${PG_PASSWORD}`, container,
       "psql", "-h", "127.0.0.1", "-p", String(port), "-U", "postgres", "-d", "postgres",
       "-tAc", sql,

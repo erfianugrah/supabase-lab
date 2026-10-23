@@ -40,8 +40,8 @@ interface Step {
   ms?: number;
 }
 
-async function docker(args: string[], timeoutMs = 300_000): Promise<{ code: number; out: string }> {
-  const p = Bun.spawn(["docker", ...args], { stdout: "pipe", stderr: "pipe" });
+async function docker(args: string[], timeoutMs = 300_000, env?: Record<string, string>): Promise<{ code: number; out: string }> {
+  const p = Bun.spawn(["docker", ...args], { stdout: "pipe", stderr: "pipe", env: env ? { ...process.env, ...env } : undefined });
   const timer = setTimeout(() => p.kill(), timeoutMs);
   const [o, e] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text()]);
   const code = await p.exited;
@@ -64,7 +64,9 @@ class Browser {
     const spec = Buffer.from(
       JSON.stringify({ origin, url: `https://${rig.ctx.apiHost}`, publishable: rig.keys.publishable, secret: rig.keys.secret, steps }),
     ).toString("base64");
-    const r = await docker(["run", "--rm", "--ipc=host", "-e", `SPEC_B64=${spec}`, "-v", `${this.dir}:/w`, "-w", "/w", IMAGE, "node", "passkey-driver.mjs"]);
+    // The spec holds the secret key and a user password: `-e SPEC_B64` takes it
+    // from the docker client's env, so it is not in docker's argv (ps-visible).
+    const r = await docker(["run", "--rm", "--ipc=host", "-e", "SPEC_B64", "-v", `${this.dir}:/w`, "-w", "/w", IMAGE, "node", "passkey-driver.mjs"], 300_000, { SPEC_B64: spec });
     const line = r.out.split("\n").find((l) => l.startsWith("RESULT:"));
     if (!line) throw new Error(`driver produced no result (exit ${r.code}): ${r.out.slice(-400)}`);
     return JSON.parse(line.slice(7)) as { version: string; steps: Step[] };

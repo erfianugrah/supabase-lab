@@ -157,7 +157,13 @@ platform behaviour or writing it into docs
   `printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -H @-`
   for auth headers. `make -n <target>` then prints no credential (it still
   EXECUTES any line that contains `$(MAKE)`). `harness/src/makefile-secrets.test.ts`
-  enforces this on every Makefile.
+  enforces this on every Makefile, and `harness/src/argv-secrets.test.ts` on
+  the TS modules that spawn psql/pgbench/pg_dump/supabase/docker: build the DSN
+  without the password and pass `{ ...process.env, PGPASSWORD }` (the CLI's
+  `--db-url` resolves a missing password from PGPASSWORD, in libpq order), `-e NAME`
+  for docker, a 0600 file for `aws ssm send-command --parameters file://`. A
+  CLI with no env path (`projects create --db-password`, `wrangler hyperdrive
+  create`) takes an `argv-secret-ok: <reason>` comment.
 - Secrets reach the runner only at invocation time, inside the SSM
   `send-command` payload (`suite.sh` reads them from `secrets.tfvars`).
   Nothing secret is baked into user_data or the AMI, and the runner holds

@@ -17,7 +17,10 @@ async function sh(cmd: string, ctx: Ctx, extraEnv: Record<string, string> = {}) 
     .env({
       ...process.env,
       SUPABASE_ACCESS_TOKEN: ctx.pat ?? "",
+      // The CLI reads SUPABASE_DB_PASSWORD (link) and libpq-style PGPASSWORD
+      // (a --db-url without a password); neither goes on a command line.
       SUPABASE_DB_PASSWORD: ctx.dbPassword,
+      PGPASSWORD: ctx.dbPassword,
       ...extraEnv,
     })
     .quiet()
@@ -44,7 +47,7 @@ const mod: TestModule = {
     );
 
     // T08: default link - expected to resolve to the public shared pooler.
-    const link = await sh(`supabase link --project-ref ${ctx.ref} -p "$SUPABASE_DB_PASSWORD"`, ctx);
+    const link = await sh(`supabase link --project-ref ${ctx.ref}`, ctx);
     const linkedHost =
       (await $`bash -lc "grep -ho 'pooler[^ \"]*' ${DIR}/supabase/.temp/* 2>/dev/null | head -1"`
         .quiet()
@@ -61,7 +64,7 @@ const mod: TestModule = {
     });
 
     // T09: the documented fix - link direct, then push over the endpoint.
-    const skipPooler = await sh(`supabase link --project-ref ${ctx.ref} --skip-pooler -p "$SUPABASE_DB_PASSWORD"`, ctx);
+    const skipPooler = await sh(`supabase link --project-ref ${ctx.ref} --skip-pooler`, ctx);
     const push = skipPooler.ok ? await sh("printf 'y\\n' | supabase db push --include-all", ctx) : null;
     results.push({
       id: "T09",
@@ -73,7 +76,7 @@ const mod: TestModule = {
     });
 
     // T10: no link at all - explicit db-url through the PHZ.
-    const url = `postgresql://postgres:${encodeURIComponent(ctx.dbPassword)}@${ctx.phzHost}:5432/postgres?sslmode=require`;
+    const url = `postgresql://postgres@${ctx.phzHost}:5432/postgres?sslmode=require`;
     const dbUrl = await sh(`printf 'y\\n' | supabase db push --db-url '${url}' --include-all`, ctx);
     results.push({
       id: "T10",

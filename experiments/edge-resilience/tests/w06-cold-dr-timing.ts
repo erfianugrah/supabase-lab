@@ -55,11 +55,12 @@ const mod: TestModule = {
         };
       }
 
-      // Step 2: pg_dump the table.
+      // Step 2: pg_dump the table. The password goes in env only: execSync
+      // runs `sh -c <string>`, and that string is visible in ps.
       const dumpStart = Date.now();
       try {
         execSync(
-          `PGPASSWORD="${ctx.dbPassword}" pg_dump --host=${poolerHost} --port=5432 --username="${dbUser}" --dbname=postgres --table=public.w_dr --file="${dumpFile}"`,
+          `pg_dump --host=${poolerHost} --port=5432 --username="${dbUser}" --dbname=postgres --table=public.w_dr --file="${dumpFile}"`,
           { env: { ...process.env, PGPASSWORD: ctx.dbPassword }, stdio: "ignore" }
         );
       } catch (e: any) {
@@ -94,7 +95,7 @@ const mod: TestModule = {
       const restoreStart = Date.now();
       try {
         execSync(
-          `PGPASSWORD="${ctx.dbPassword}" psql --host=${poolerHost} --port=5432 --username="${dbUser}" --dbname=postgres -f "${dumpFile}"`,
+          `psql --host=${poolerHost} --port=5432 --username="${dbUser}" --dbname=postgres -f "${dumpFile}"`,
           { env: { ...process.env, PGPASSWORD: ctx.dbPassword }, stdio: "ignore" }
         );
       } catch (e: any) {

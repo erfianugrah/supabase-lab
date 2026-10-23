@@ -15,12 +15,15 @@
 import { $ } from "bun";
 import type { Ctx } from "../../../harness/src/types";
 
+/** No password in the URL: it would sit in psql's argv. psql reads PGPASSWORD. */
 export function poolerUrl(ctx: Ctx): string {
   const host = ctx.endpoints.pooler;
   if (!host) throw new Error("no pooler host - set PVLAB_ENDPOINT_POOLER");
   const user = `postgres.${ctx.ref}`;
-  return `postgresql://${user}:${encodeURIComponent(ctx.dbPassword)}@${host}:6543/postgres?connect_timeout=15`;
+  return `postgresql://${user}@${host}:6543/postgres?connect_timeout=15`;
 }
+
+const pgEnv = (ctx: Ctx) => ({ ...process.env, PGPASSWORD: ctx.dbPassword });
 
 export interface QueryResult {
   ok: boolean;
@@ -65,6 +68,7 @@ export interface QueryResult {
 /** One statement. Rows come back as arrays of column strings. */
 export async function q(ctx: Ctx, sql: string, timeoutS = 600): Promise<QueryResult> {
   const p = await $`psql ${poolerUrl(ctx)} -qAt -F${"\t"} -v ON_ERROR_STOP=1 -c ${`set statement_timeout='${timeoutS}s'`} -c ${sql}`
+    .env(pgEnv(ctx))
     .quiet()
     .nothrow();
   const raw = (p.stdout.toString() + p.stderr.toString()).trim();
@@ -85,6 +89,7 @@ export async function scalar(ctx: Ctx, sql: string, timeoutS = 600): Promise<str
 /** Run a file of statements. Returns raw output; ON_ERROR_STOP is on. */
 export async function file(ctx: Ctx, path: string, timeoutS = 1800): Promise<QueryResult> {
   const p = await $`psql ${poolerUrl(ctx)} -qAt -F${"\t"} -v ON_ERROR_STOP=1 -c ${`set statement_timeout='${timeoutS}s'`} -f ${path}`
+    .env(pgEnv(ctx))
     .quiet()
     .nothrow();
   const raw = (p.stdout.toString() + p.stderr.toString()).trim();

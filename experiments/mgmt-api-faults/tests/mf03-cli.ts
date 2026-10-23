@@ -106,6 +106,7 @@ const mod: TestModule = {
         // The fake ref is never created; every request is answered by the proxy.
         const FAKE = "abcdefghijklmnopqrst";
         const verbs: Array<{ label: string; method: string; path: string; args: string[] }> = [
+          // argv-secret-ok: `projects create` takes the password only as --db-password (no env or stdin path, CLI 2.121.0); a per-run random password for a project this module deletes
           { label: "POST_projects_create", method: "POST", path: "^/v1/projects$", args: ["projects", "create", `${NAME_PREFIX}cli-c`, "--org-id", org, "--db-password", dbPassword(), "--region", "ap-southeast-1", "--yes"] },
           { label: "POST_secrets_set", method: "POST", path: `^/v1/projects/${FAKE}/secrets$`, args: ["secrets", "set", "MF=1", "--project-ref", FAKE] },
           { label: "PUT_ssl_enforcement", method: "PUT", path: `^/v1/projects/${FAKE}/ssl-enforcement$`, args: ["ssl-enforcement", "update", "--enable-db-ssl-enforcement", "--project-ref", FAKE, "--experimental"] },
@@ -144,6 +145,7 @@ const mod: TestModule = {
         await px.reset();
         const name = `${NAME_PREFIX}cli-d-${Date.now()}`;
         await px.setRules([{ id: "post-after", method: "POST", path: "^/v1/projects$", mode: "error-after", status: 500, times: 1 }]);
+        // argv-secret-ok: `projects create` takes the password only as --db-password (no env or stdin path, CLI 2.121.0); a per-run random password for a project this module deletes
         const cd = await cli(["projects", "create", name, "--org-id", org, "--db-password", dbPassword(), "--region", "ap-southeast-1", "--yes"]);
         const ld = await px.log();
         const posts = ld.filter((r) => r.method === "POST");
