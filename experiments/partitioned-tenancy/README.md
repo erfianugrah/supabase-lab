@@ -22,7 +22,7 @@ projects).
 
 | id | claim measured |
 |---|---|
-| PT01 | tenant policy on a range-partitioned parent: reads through the parent per tenant; each partition read directly at `/rest/v1/<partition>` by anon and a tenant; partitions in the OpenAPI document; security advisors; tenant writes via parent and via a partition; two mitigations (RLS on a partition, revoke on a partition); a new partition after the default-privilege revoke |
+| PT01 | tenant policy on a range-partitioned parent: reads through the parent per tenant; each partition read directly at `/rest/v1/<partition>` by anon and a tenant; partitions in the OpenAPI document; security advisors; tenant writes via parent and via a partition; two mitigations (RLS on a partition, revoke on a partition); a new partition after the default-privilege revoke; PT01z restores the default privileges PT01a recorded (legacy or revoked) for the later modules |
 | PT02 | pg_partman per the Supabase docs: availability and version, `pg_partman_bgw`, `create_parent` on an RLS parent, what children carry (RLS, policies, anon grant), `run_maintenance_proc` via the query endpoint and via a session, the template table and `inherit_privileges`, a pg_cron schedule, retention with and without `retention_keep_table` |
 | PT03 | pruning under a tenant policy, 2,000,000 rows: range by month with a time filter; hash by tenant with the wrapped and bare policy forms (run-time vs executor-startup pruning); postgres-role baselines |
 | PT04 | `DETACH PARTITION ... CONCURRENTLY` of 1,000,000-row partitions under a Data API reader and writer (n = 2); concurrent and plain DETACH while another transaction is open; the detached tables standalone |
@@ -38,6 +38,7 @@ export PVLAB_ORG_PRO=<pro-org-slug> PVLAB_ORG_SLUGS=<pro-org-slug>
 export PVLAB_PT_PREFIX=pvlab-pt-            # project-name prefix, default shown
 make run                                    # PT01-PT06 then PT99, artifacts in evidence/<ts>/
 make run ONLY=PT01,PT99                     # one module plus teardown
+PVLAB_PT_PREREVOKE=1 make run ONLY=PT01,PT99 # PT01 after DD01c's revoke statements (stand-in for the 2026-10-30 default)
 make clean                                  # list leftover prefixed projects; DELETE=1 deletes
 make publish-evidence RUN=evidence/<ts>/run-<stamp>.json
 ```

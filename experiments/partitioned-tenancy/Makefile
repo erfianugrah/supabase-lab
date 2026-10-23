@@ -6,6 +6,10 @@ TS := $(shell date +%Y%m%d-%H%M%S)
 #   SUPABASE_ACCESS_TOKEN   Management API token (never written to a file here)
 #   PVLAB_ORG_PRO           slug of a Pro-plan organization
 #   PVLAB_PT_PREFIX         project-name prefix (default pvlab-pt-)
+#   PVLAB_PT_PREREVOKE=1    PT01 applies data-api-defaults DD01c's revoke
+#                           statements (the lab's wording of the opt-in)
+#                           before PT01a, standing in for the 2026-10-30
+#                           default, which is not measured here
 # Include PT99 in ONLY or the project is left running; `make clean` lists
 # leftovers by prefix, `make clean DELETE=1` deletes them.
 # Runs from source with bun: harness/dist/pvlab is a linux-x64 build.

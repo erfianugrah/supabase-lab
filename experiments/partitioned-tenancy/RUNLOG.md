@@ -323,3 +323,82 @@ The project existed for under a minute: created inside PT05's 20535 ms,
 deleted in PT99's 1380 ms, 57780 ms of module time in all. Afterwards `make
 clean` printed 0 projects with the `pvlab-pt-` prefix (console output, not
 in `out/`).
+
+## 2026-10-23 - PT01z restores what PT01a recorded (vantage: this lab's Mac, over the public internet)
+
+Why: PT01z put the default privileges back with an unconditional `alter
+default privileges ... grant all on tables, sequences to anon,
+authenticated, service_role` and passed only if the tables row then matched
+PT01a's reading. On a project whose default privileges are in the revoked
+state (data-api-defaults DD01c's revoke statements, the lab's wording of the
+opt-in; the platform enforces the change on existing projects 2026-10-30),
+PT01a reads the revoked rows, the blanket grant brings back the legacy ones,
+PT01z fails, and PT02-PT06 then run under the legacy grant while the write-up calls it
+the default. The fix: PT01a records every `pg_default_acl` row for postgres
+in `public` (tables `r`, sequences `S`, functions `f`); PT01z revokes all
+from each grantee named in the current or recorded rows and grants back the
+recorded letters in the recorded order (`lib/acl.ts`, unit tests in
+`lib/acl.test.ts`), then passes only if every row reads back as the same
+text. New knob `PVLAB_PT_PREREVOKE=1`: PT01 applies DD01c's revoke
+statements (the lab's wording of the opt-in) before PT01a, standing in for
+the 2026-10-30 default, which is not measured here.
+
+Harness: `make run ONLY=PT01,PT99`, `--destructive`, two fresh projects in
+parallel, plus one standalone probe. The artifacts carry lab commit 77cdea0;
+the uncommitted tree held this fix. Postgres version on the probe's project:
+`PostgreSQL 17.11` (not written by the two harness runs). Published
+(redacted) under `out/2026-10-23/`:
+
+- default run `run-2026-10-23T10-34-38-394Z.json` - PT01, PT99 as before;
+  10:34:38 to 10:37:00 UTC. 5 pass, 0 fail, 7 info.
+- pre-revoked run `run-2026-10-23T10-34-36-550Z.json` - PT01, PT99 with
+  `PVLAB_PT_PREREVOKE=1`; 10:34:36 to 10:36:58 UTC. 5 pass, 0 fail, 7 info.
+- `acl-probe-2026-10-23T10-37-53Z.json` - `lib/acl-probe.ts` on a third
+  project, 10:37:53 to 10:38:01 UTC: fresh rows, the DD01c revoke, then the
+  old PT01z statements, then the restore. Not a harness artifact (plain
+  JSON, no `facts.md`).
+
+Results (n = 1 per run):
+
+- Fresh project (both PT01a readings and the probe's): tables
+  `{postgres=arwdDxtm/postgres,anon=arwdDxtm/postgres,authenticated=arwdDxtm/postgres,service_role=arwdDxtm/postgres}`,
+  sequences `{postgres=rwU/postgres,anon=rwU/postgres,authenticated=rwU/postgres,service_role=rwU/postgres}`,
+  functions `{postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres}`.
+- After the DD01c revoke (pre-revoked run PT01a; probe): tables
+  `{postgres=arwdDxtm/postgres,anon=Dxtm/postgres,authenticated=Dxtm/postgres,service_role=Dxtm/postgres}`,
+  sequences `{postgres=rwU/postgres,anon=w/postgres,authenticated=w/postgres,service_role=w/postgres}`;
+  the functions row is unchanged (the revoke names tables and sequences
+  only).
+- Default run PT01z: before the restore the rows were in the revoked state
+  (PT01i's revoke); 16 statements; tables and sequences read back as the
+  legacy rows PT01a recorded, exact text (`restored_exact` 1). Pass.
+- Pre-revoked run PT01z: before the restore the rows already equalled what
+  PT01a recorded (PT01i's revoke repeats the one applied before PT01a), 0
+  statements, rows read back as the revoked state, exact. Pass. The old
+  PT01z would have granted all here and failed against the revoked reading
+  (reasoned from its statements; the probe below measured what they do to
+  the revoked rows).
+- Probe: the old PT01z statements on the revoked state turned tables and
+  sequences back into the legacy rows (`old_pt01z_vs_recorded`: 2 rows
+  differ). The restore (16 statements, listed in the artifact) brought both
+  back to the revoked rows, exact text (`restore_vs_recorded.exact` true).
+- Side readings from the pre-revoked run (one run, not repeated): the
+  sampled partition (`pt_audit_2026_10`, PT01c `partition_acl_sample`) was
+  created with `anon=Dxtm`, the other two were not read; all three still
+  answered anon `404 PGRST205` and tenant 1 `404` directly; reads through the parent were
+  unchanged (anon 0, tenant 1 5 rows, tenant 2 7 rows, PT01b pass) because
+  the #219 grant on the parent `pt_audit` is in the setup; the security
+  advisors flagged no partition (PT01e: `advisors_partitions_flagged` 0,
+  lint names `auth_leaked_password_protection` only) where the default run
+  flagged 3 with `rls_disabled_in_public`. After the mitigations (PT01j) the
+  pre-revoked run showed `rls_enabled_no_policy` on the RLS partition and no
+  lint on the other partitions.
+
+Not run: PT02-PT06 under the pre-revoked state (they now start from whatever
+PT01a recorded, which is the point of the fix, but no module after PT01 ran
+here); a project read on or after the 2026-10-30 enforcement.
+
+Teardown: PT99 `DELETE 200`, absent from `GET /projects` on the first read
+in both runs; the probe's teardown `DELETE 200`, gone on the first read.
+Afterwards `GET /projects` listed 0 projects with the `pvlab-pt-` prefix
+(console output, not in `out/`).

@@ -1,0 +1,97 @@
+{
+  "probe": "partitioned-tenancy acl-probe",
+  "started": "2026-10-23T10:37:53.732Z",
+  "pg_version": "PostgreSQL 17.11",
+  "fresh": [
+    {
+      "objtype": "f",
+      "acl": "{postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres}"
+    },
+    {
+      "objtype": "r",
+      "acl": "{postgres=arwdDxtm/postgres,anon=arwdDxtm/postgres,authenticated=arwdDxtm/postgres,service_role=arwdDxtm/postgres}"
+    },
+    {
+      "objtype": "S",
+      "acl": "{postgres=rwU/postgres,anon=rwU/postgres,authenticated=rwU/postgres,service_role=rwU/postgres}"
+    }
+  ],
+  "recorded_after_dd01c_revoke": [
+    {
+      "objtype": "f",
+      "acl": "{postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres}"
+    },
+    {
+      "objtype": "r",
+      "acl": "{postgres=arwdDxtm/postgres,anon=Dxtm/postgres,authenticated=Dxtm/postgres,service_role=Dxtm/postgres}"
+    },
+    {
+      "objtype": "S",
+      "acl": "{postgres=rwU/postgres,anon=w/postgres,authenticated=w/postgres,service_role=w/postgres}"
+    }
+  ],
+  "after_old_pt01z_grant_all": [
+    {
+      "objtype": "f",
+      "acl": "{postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres}"
+    },
+    {
+      "objtype": "r",
+      "acl": "{postgres=arwdDxtm/postgres,anon=arwdDxtm/postgres,authenticated=arwdDxtm/postgres,service_role=arwdDxtm/postgres}"
+    },
+    {
+      "objtype": "S",
+      "acl": "{postgres=rwU/postgres,anon=rwU/postgres,authenticated=rwU/postgres,service_role=rwU/postgres}"
+    }
+  ],
+  "old_pt01z_vs_recorded": {
+    "exact": false,
+    "same": false,
+    "diff": [
+      "S: recorded {postgres=rwU/postgres,anon=w/postgres,authenticated=w/postgres,service_role=w/postgres} now {postgres=rwU/postgres,anon=rwU/postgres,authenticated=rwU/postgres,service_role=rwU/postgres}",
+      "r: recorded {postgres=arwdDxtm/postgres,anon=Dxtm/postgres,authenticated=Dxtm/postgres,service_role=Dxtm/postgres} now {postgres=arwdDxtm/postgres,anon=arwdDxtm/postgres,authenticated=arwdDxtm/postgres,service_role=arwdDxtm/postgres}"
+    ]
+  },
+  "restore_sql": [
+    "alter default privileges for role \"postgres\" in schema \"public\" revoke all on sequences from \"postgres\";",
+    "alter default privileges for role \"postgres\" in schema \"public\" revoke all on sequences from \"anon\";",
+    "alter default privileges for role \"postgres\" in schema \"public\" revoke all on sequences from \"authenticated\";",
+    "alter default privileges for role \"postgres\" in schema \"public\" revoke all on sequences from \"service_role\";",
+    "alter default privileges for role \"postgres\" in schema \"public\" grant select, update, usage on sequences to \"postgres\";",
+    "alter default privileges for role \"postgres\" in schema \"public\" grant update on sequences to \"anon\";",
+    "alter default privileges for role \"postgres\" in schema \"public\" grant update on sequences to \"authenticated\";",
+    "alter default privileges for role \"postgres\" in schema \"public\" grant update on sequences to \"service_role\";",
+    "alter default privileges for role \"postgres\" in schema \"public\" revoke all on tables from \"postgres\";",
+    "alter default privileges for role \"postgres\" in schema \"public\" revoke all on tables from \"anon\";",
+    "alter default privileges for role \"postgres\" in schema \"public\" revoke all on tables from \"authenticated\";",
+    "alter default privileges for role \"postgres\" in schema \"public\" revoke all on tables from \"service_role\";",
+    "alter default privileges for role \"postgres\" in schema \"public\" grant insert, select, update, delete, truncate, references, trigger, maintain on tables to \"postgres\";",
+    "alter default privileges for role \"postgres\" in schema \"public\" grant truncate, references, trigger, maintain on tables to \"anon\";",
+    "alter default privileges for role \"postgres\" in schema \"public\" grant truncate, references, trigger, maintain on tables to \"authenticated\";",
+    "alter default privileges for role \"postgres\" in schema \"public\" grant truncate, references, trigger, maintain on tables to \"service_role\";"
+  ],
+  "after_restore": [
+    {
+      "objtype": "f",
+      "acl": "{postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres}"
+    },
+    {
+      "objtype": "r",
+      "acl": "{postgres=arwdDxtm/postgres,anon=Dxtm/postgres,authenticated=Dxtm/postgres,service_role=Dxtm/postgres}"
+    },
+    {
+      "objtype": "S",
+      "acl": "{postgres=rwU/postgres,anon=w/postgres,authenticated=w/postgres,service_role=w/postgres}"
+    }
+  ],
+  "restore_vs_recorded": {
+    "exact": true,
+    "same": true,
+    "diff": []
+  },
+  "teardown": {
+    "delete_status": 200,
+    "gone_s": 0
+  },
+  "finished": "2026-10-23T10:38:01.943Z"
+}
