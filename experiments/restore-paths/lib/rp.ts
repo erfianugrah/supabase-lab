@@ -347,7 +347,17 @@ export function watchCredentials(s: Subject, newPw: string, oldPw: string): Cred
     }
   })();
   return {
-    probe: { name: "pooler", run: async () => latest },
+    // After stop() the loop no longer logs in, so `latest` would freeze; a
+    // frozen failure kept the sampler's watchdog waiting out maxWaitMs (RP08
+    // R27, 2026-10-23 UTC). Once stopped, the probe logs in itself.
+    probe: {
+      name: "pooler",
+      run: async () => {
+        if (running) return latest;
+        const n = await poolerLogin(s, newPw);
+        return n.ok || (n.answered && !n.blocked) ? { ok: true } : { ok: false, error: n.error };
+      },
+    },
     async stop() {
       running = false;
       await loop;
