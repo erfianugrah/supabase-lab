@@ -9,6 +9,11 @@ without that. All of it is **n=1** - one run per operation, on one Micro project
 in `ap-southeast-1`, from a single vantage. These are observations, not a
 distribution.
 
+The 2026-10-23 section at the end of this file re-measures REST and Realtime
+with data-path probes (n=2 per operation on Micro, plus Medium to Large) and
+withdraws the "REST and Realtime never failed" readings below; with them, the
+paths moved together under a restart and a resize.
+
 ## 2026-08-04 - D01 restart, D02 restriction flip
 
 Project: Micro, `ap-southeast-1`, created and destroyed the same session.
@@ -22,6 +27,17 @@ Project: Micro, `ap-southeast-1`, created and destroyed the same session.
 | auth | 2 s | 75 s | `HTTP 521` |
 | storage | 2 s | 78 s | `HTTP 500` |
 | pooler | 2 s | **158 s** | `Failed to connect to database: {:error, :timeout}` |
+
+> **Correction 2026-10-23 (#204):** the `rest` and `realtime` rows above
+> measured the HTTP tier only. `rest` was an anon `GET /rest/v1/`, which the
+> API gateway answers with 401 before PostgREST or the database is reached,
+> and any status below 500 counted as up; `realtime` stopped at the WebSocket
+> handshake. Re-measured with a row read (`rest_read`) and a joined channel
+> with a delivered broadcast (`realtime_join`) on 2026-10-23 (section at the
+> end of this file): a restart took the REST data path down for 194 and 247 s
+> and Realtime joins for 191 and 242 s (Micro, n=2), while the HTTP-tier
+> probes again had no failed sample. The paragraph below is the 2026-08-04
+> reading and is wrong for data reads.
 
 **REST and Realtime served continuously through a full project restart**, at
 500 ms resolution. That is the result worth carrying: an application whose read
@@ -48,6 +64,13 @@ differs by path.
 | --- | --- | --- | --- |
 | rest, auth, storage, realtime | - | **never failed** | - |
 | pooler | 1 s | see caveat | `(EADDRNOTALLOWED) address not in tenant allow_list` |
+
+> **Correction note 2026-10-23 (#204):** the rest and realtime entries in the
+> row above were HTTP-tier probes (Auth and Storage stand). Re-run with the
+> data-path probes on 2026-10-23 (end of
+> this file), the conclusion holds for data reads too: `rest_read` and
+> `realtime_join` had 0 failed samples in both D02 runs while the pooler was
+> refused for 60 and 61 s.
 
 **A network restriction is a database-socket control and the HTTP tier does not
 notice it.** Four HTTP paths, zero failed samples, twice. Locking the database
@@ -88,6 +111,13 @@ one - micro is the absence of a compute addon, and the GET afterwards reports
 | storage | 2 s / 127 s | 2 s / 100 s |
 | pooler | 3 s / 207 s | 3 s / 196 s |
 
+> **Correction 2026-10-23 (#204):** `rest` and `realtime` above are
+> HTTP-tier probes (anon `GET /rest/v1/` counted 401 as up; WebSocket
+> handshake only). Re-measured on 2026-10-23 with a row read and a joined
+> channel (end of this file): Micro to Small took `rest_read` down for 171 and
+> 218 s and `realtime_join` for 168 and 214 s; Small to Micro 54 s
+> (`rest_read`) and 67 s (`realtime_join`) in the one run that sampled them.
+
 **The asymmetry hypothesis is half right.** On the HTTP tier, growing costs
 about a third more than shrinking (131 s against 99 s for Auth). On the pooler
 the two are within 5 % of each other (207 s against 196 s), so whatever
@@ -111,6 +141,13 @@ Four operations, five paths, 500 ms resolution, n=1 each.
 **REST and Realtime never failed under any of the four.** One operation could
 be luck; four is a pattern worth relying on, at this resolution and from this
 vantage.
+
+> **Correction 2026-10-23 (#204):** withdrawn for data reads. The `rest` and
+> `realtime` columns came from HTTP-tier probes (see the D01 correction). With
+> a row read and a joined channel, restart and both resize directions took the
+> REST and Realtime data paths down for about as long as Auth and Storage; only
+> the restriction flip left them untouched. Figures in the 2026-10-23 section
+> at the end of this file.
 
 **The pooler reports a different error for every operation**, which makes the
 mode diagnostic of what is happening rather than merely that something is:
@@ -299,6 +336,9 @@ entry. Published: `out/2026-10-13/run-<stamp>.facts.md` for each run
 | 3 | yes | no | not-logged | no | no | not-logged | 45 / 45 / 43 |
 
 REST and Realtime had no failed sample in any run (500 ms interval).
+(Correction 2026-10-23, #204: HTTP-tier probes, anon `GET /rest/v1/` and a
+WebSocket handshake; the data paths were not sampled in these three runs and
+were not re-run for this module. See the 2026-10-23 section.)
 `pg_stat_checkpointer.stats_reset` read `2026-10-02T17:53:10.203Z` before and
 after all three restarts, on a project created that day, so it also survived
 the project's first boot (the D05 side observation of 2026-10-01 again).
@@ -339,3 +379,126 @@ and why no line after `shutting down` or before `starting up` reaches
 `postgres_logs` (log shipping stopped across the restart, or lines dropped)
 was not separated. Integration-provisioned projects were not run. The status
 page had an open region-less Realtime latency incident during the runs.
+
+## 2026-10-23 - data-path re-measure: REST and Realtime were probed at the HTTP tier (#204)
+
+**Why.** Every REST and Realtime row in this file before 2026-10-23 came from
+two probes that never reach the data. `rest` sent an anon `GET /rest/v1/` and
+counted any status below 500 as up; the API gateway answers that request with
+401 (`Invalid API key`, hint `Only the service_role API key can be used for
+this endpoint.`) before PostgREST or the database is reached, so it reads as
+up whether or not the database is there (http-tier-lockdown saw the same 401
+keep answering while PostgREST was wedged). `realtime` counted a completed WebSocket handshake as up,
+which never joins a channel or touches the project's database. Both are kept,
+renamed `rest_http` and `realtime_ws`, and two data-path probes run beside them
+(`harness/src/real-probes.ts`):
+
+- `rest_read`: anon `GET /rest/v1/pvlab_probe?id=eq.1&select=id`, up only on
+  HTTP 200 with exactly `[{"id":1}]`.
+- `realtime_join`: a new socket, `phx_join` with a Postgres Changes
+  subscription on `pvlab_probe` and broadcast self-echo; up only when the join
+  is acknowledged, the `postgres_changes` system message says `ok`, and the
+  probe's own broadcast (fresh nonce) comes back.
+
+`buildProbes` seeds the table, grant, RLS policy and `supabase_realtime`
+publication entry and waits for three consecutive passes before sampling.
+Each module also reports `<path>_failed_samples` beside the window.
+
+**How.** `make selfprov` (new, `lib/selfprov.ts`): a throwaway `pd-` project on
+the Pro org in `ap-southeast-1`, the modules run against it `PD_PASSES` times,
+deleted in `finally`. Sampling at 500 ms as before, but a failing request often
+takes its full timeout (5 s for the HTTP probes and `realtime_ws`, 10 s for
+`realtime_join`), so a path's samples are coarser than 500 ms while it is
+down; read the windows to the second, not finer. Medium to Large used
+`PD_RESIZE_UP=ci_large PD_RESIZE_DOWN=ci_medium` on a project created at
+Medium. Projects A and B, and then A and C, ran at the same time from one
+machine (artifact start and finish times), alongside a lifecycle-ops LO05
+project.
+
+Artifacts, all in `out/2026-10-23/`:
+
+| artifact | project | modules |
+| --- | --- | --- |
+| `run-2026-10-23T01-43-22-996Z` | Micro A, pass 1 | D01-D04 (D04 without data-path probes, see below) |
+| `run-2026-10-23T02-07-03-305Z` | Micro A, pass 2 | D01-D04 |
+| `run-2026-10-23T01-43-23-054Z` | Medium B, pass 1 | D03 to Large; D04 threw on HTTP 429 |
+| `run-2026-10-23T01-47-38-287Z` | Medium B, pass 2 | D03 a no-op (already Large), D04 to Medium |
+| `run-2026-10-23T01-55-35-451Z` | Medium C | D03 to Large, D04 to Medium |
+
+**Results, outage window in seconds (pass 1 / pass 2 on Micro A):**
+
+| operation | rest_http | rest_read | realtime_ws | realtime_join | auth | storage | pooler |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| D01 restart | 0 of 651, 0 of 422 failed | 247 / 194 | 0 of 606, 0 of 376 failed | 242 / 191 | 247 / 192 | 250 / 195 | 329 / 216 |
+| D02 restriction flip | 0 of 130, 0 of 128 failed | 0 of 128, 0 of 125 failed | 0 of 120, 0 of 111 failed | 0 of 115, 0 of 103 failed | 0 of 128, 0 of 125 failed | 0 of 123, 0 of 120 failed | 60 / 61 |
+| D03 Micro to Small | 0 of 383, 0 of 429 failed | 171 / 218 | 0 of 356, 0 of 383 failed | 168 / 214 | 171 / 218 | 174 / 218 | 189 / 216 |
+| D04 Small to Micro | 1 of 403 failed, 0 of 302 | not sampled / 54 | 0 of 351, 0 of 268 failed | not sampled / 67 | 191 / 54 | 196 / 51 | 249 / 150 |
+
+**Medium to Large and back (projects B and C):**
+
+| operation | rest_http | rest_read | realtime_ws | realtime_join | auth | storage | pooler |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| D03 Medium to Large, B | 0 of 237 failed | 113 | 0 of 220 failed | 107 | 115 | 113 | 113 |
+| D03 Medium to Large, C | 1 of 88 failed | 299 | 0 of 82 failed | 298 | 299 | 299 | 298 |
+| D04 Large to Medium, B | 0 of 670 failed | 217 | 0 of 623 failed | 217 | 216 | 217 | 217 |
+| D04 Large to Medium, C | 0 of 383 failed | 101 | 0 of 336 failed | 98 | 101 | 104 | 200 |
+
+Modes: `rest_read` failed with `HTTP 521` (and `HTTP 525` in B's D04);
+`realtime_join` with `pg_changes: {:error, "Too many database timeouts"}` or a
+`pg_changes: {:error, :rpc_error, ...}` Postgrex error. The join itself was
+acknowledged; it was the Postgres Changes subscription that failed, which the
+handshake probe cannot see.
+
+Reading:
+
+- **REST reads and Realtime subscriptions go down for about as long as Auth
+  and Storage** under a restart and under a resize in either direction, on
+  Micro and on Medium. The HTTP-tier probes had at most one failed sample per
+  run through the same windows, which is what every "REST and Realtime never failed" line in this
+  file measured.
+- **A network restriction still leaves the data paths alone** (D02, 0 failed
+  `rest_read` and `realtime_join` samples in both runs): REST and Realtime
+  reach Postgres from inside the platform, as the 2026-08-04 reading said.
+- The pooler window was the longest by 15 to 96 s in six of the ten
+  operations above that had an outage (A pass 1 D01, D03, D04; A pass 2 D01,
+  D04; C D04) and within 2 s of the longest other path in the other four (A
+  pass 2 D03, B D03, B D04, C D03). In C's D04 the run's console output (not
+  the published artifact) shows Supavisor's circuit breaker (`(ECIRCUITBREAKER)
+  too many authentication failures`) answering the correct password until
+  about +240 s; the restore-paths key facts describe the same hazard.
+- The two `rest_http` failures were single samples that ended in `The
+  operation timed out.`; their windows in the artifacts (41 s and 262 s) are
+  how long that one request took to come back, not a sustained outage.
+
+Gaps and anomalies:
+
+- **Micro A pass 1 D04 has no data-path columns.** Its seed step never saw
+  three consecutive passes in 180 s (the run's console note, not in the
+  published artifact, shows both probes passing on the last check), probably
+  the project still settling from D03; the module ran with the HTTP-tier
+  probes only. So Small to Micro on the data path is n=1 (54 s and 67 s).
+- **B pass 1 D04 threw** on `429 We are still processing addon changes`
+  because it followed D03 at once. `setComputeSize` now retries a 429 every
+  60 s and the module reports `addon_429_retries`; B pass 2's D04 needed 2
+  retries, so its `first_fail_s` of 123 s includes 120 s of retries (the
+  window is unaffected). **B pass 2's D03 was a no-op**: the project was
+  already Large because pass 1's D04 never ran, so its near-zero row is not a
+  resize measurement.
+- **An extra Micro D03/D04 pass on a fourth project (Micro, not in the
+  tables) stalled** about 265 s into D03, from the run's console log and a
+  process sample (no artifact): every probe stopped logging at once and the
+  process sat at 0 % CPU with the main thread idle in `kevent64` for
+  13 minutes. Killed, project deleted. An LO05 run (lifecycle-ops) stalled the
+  same way. Both stalls happened before the sampler capped each `probe.run()`
+  at 30 s (`sampleDeadlineMs`); a deadline may not fix an idle event loop,
+  and the cause is not established.
+- One region, one vantage, n=2 per cell at most, consecutive operations on
+  the same project. Between the two runs of one operation the Auth window
+  varied by 1.3x (restart: 247 and 192 s; Micro to Small: 171 and 218 s) to
+  3.5x (Small to Micro: 191 and 54 s); on Medium, 113 and 299 s (Medium to
+  Large) and 216 and 101 s (Large to Medium).
+- The D01 restart windows here (191 to 250 s for Auth, Storage and the data
+  paths) are well above the 2026-08-04 D01 (75 to 78 s) and the 2026-10-10
+  LO05 p50s (54 to 58 s). Not explained: different day, different project.
+- D05 (password reset) was not re-run; its "REST and Realtime had no failed
+  sample" line above stays an HTTP-tier observation.

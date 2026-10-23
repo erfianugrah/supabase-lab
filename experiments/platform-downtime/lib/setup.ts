@@ -11,6 +11,7 @@ import type { PathWindow, Probe } from "../../../harness/src/sampler";
 import { mgmt } from "../../../harness/src/mgmt";
 import { logsQuery, sql } from "../../../harness/src/platform";
 import { restProbe, authProbe, storageProbe, realtimeProbe, poolerProbe } from "./probes";
+import { realtimeJoinProbe, restReadProbe, seedProbeTable } from "../../../harness/src/real-probes";
 import { bootLogged, classifyShutdownLog, type ShutdownReading } from "./signal";
 
 /** Verified 200 on a fresh project 2026-08-04; /auth/v1/settings also answers. */
@@ -42,6 +43,15 @@ export async function resolvePooler(ctx: Ctx): Promise<PoolerTarget | null> {
   return { host, port, user };
 }
 
+/**
+ * Since 2026-10-23 (#204) both kinds of REST and Realtime probe run side by
+ * side: `rest_http`/`realtime_ws` (the HTTP-tier probes every earlier run
+ * used) and `rest_read`/`realtime_join` (a row read and a joined channel with a
+ * delivered broadcast, harness/src/real-probes.ts). The seed step creates the
+ * probe table and waits until the data-path probes pass, so a module starts
+ * from a known-good state; if it cannot, the data-path probes are left out
+ * and the note says why, rather than voiding the whole run.
+ */
 export async function buildProbes(ctx: Ctx): Promise<{ probes: Probe[]; note: string }> {
   const anon = ctx.anonKey as string;
   const probes: Probe[] = [
@@ -50,6 +60,14 @@ export async function buildProbes(ctx: Ctx): Promise<{ probes: Probe[]; note: st
     storageProbe(ctx.apiHost, anon),
     realtimeProbe(ctx.apiHost, anon),
   ];
+  let seedNote: string;
+  try {
+    const s = await seedProbeTable(ctx, ctx.apiHost, anon);
+    probes.push(restReadProbe(ctx.apiHost, anon), realtimeJoinProbe(ctx.apiHost, anon));
+    seedNote = `data-path probes ready after ${s}s`;
+  } catch (e) {
+    seedNote = `data-path probes SKIPPED: ${e instanceof Error ? e.message : String(e)}`;
+  }
 
   // BOTH conditions. Resolving the target proves the surface exists; the
   // password is what makes a connection meaningful. Without it the probe fails
@@ -59,11 +77,11 @@ export async function buildProbes(ctx: Ctx): Promise<{ probes: Probe[]; note: st
   const pooler = await resolvePooler(ctx);
   if (pooler && ctx.dbPassword) {
     probes.push(poolerProbe(pooler.host, pooler.port, pooler.user, ctx.dbPassword));
-    return { probes, note: `pooler ${pooler.host}:${pooler.port}` };
+    return { probes, note: `${seedNote}; pooler ${pooler.host}:${pooler.port}` };
   }
   return {
     probes,
-    note: pooler ? "pooler skipped: no DB_PASSWORD" : "pooler skipped: config not readable",
+    note: `${seedNote}; ${pooler ? "pooler skipped: no DB_PASSWORD" : "pooler skipped: config not readable"}`,
   };
 }
 
@@ -75,15 +93,30 @@ export async function buildProbes(ctx: Ctx): Promise<{ probes: Probe[]; note: st
  * which is not the same as what a given project is entitled to buy - the GET
  * sibling returns the latter, and it is what F02 reads for the catalogue.
  */
-export async function setComputeSize(ctx: Ctx, variant: string): Promise<void> {
-  const r = await mgmt(ctx, "PATCH", `/projects/${ctx.ref}/billing/addons`, {
-    addon_variant: variant,
-    addon_type: "compute_instance",
-  });
-  if (r.status === undefined || r.status >= 300) {
-    throw new Error(`resize to ${variant} failed: HTTP ${r.status} ${(r.text ?? "").slice(0, 200)}`);
+export async function setComputeSize(ctx: Ctx, variant: string): Promise<number> {
+  // 429 "still processing addon changes, try again in 1 minute(s)" when a
+  // resize follows the previous one too closely (compute-disk D09, and a
+  // Medium -> Large D03 followed at once by D04 on 2026-10-23). Retried here
+  // so the pair can run back to back; the caller reports the retries because
+  // they sit inside the sampled window and delay first_fail_s.
+  let retries = 0;
+  for (;;) {
+    const r = await mgmt(ctx, "PATCH", `/projects/${ctx.ref}/billing/addons`, {
+      addon_variant: variant,
+      addon_type: "compute_instance",
+    });
+    if (r.status === 429 && retries < 10) {
+      retries += 1;
+      ctx.log(`compute -> ${variant}: HTTP 429, retry ${retries} in 60 s`);
+      await Bun.sleep(60_000);
+      continue;
+    }
+    if (r.status === undefined || r.status >= 300) {
+      throw new Error(`resize to ${variant} failed: HTTP ${r.status} ${(r.text ?? "").slice(0, 200)}`);
+    }
+    ctx.log(`compute -> ${variant}: HTTP ${r.status}`);
+    return retries;
   }
-  ctx.log(`compute -> ${variant}: HTTP ${r.status}`);
 }
 
 /**
@@ -108,6 +141,9 @@ export function flatten(windows: PathWindow[]): Record<string, number | string> 
       w.firstFailMs === null ? "n/a" : Math.round(w.firstFailMs / 1000);
     m[`${w.name}_window_s`] = w.windowMs === null ? "n/a" : Math.round(w.windowMs / 1000);
     m[`${w.name}_mode`] = w.modes[0] ?? "none";
+    // Since #204: a path can fail briefly and recover inside the settle rule,
+    // so the count of failed samples is reported next to the window.
+    m[`${w.name}_failed_samples`] = `${w.failures} of ${w.samples}`;
   }
   return m;
 }

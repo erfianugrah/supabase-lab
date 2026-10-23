@@ -46,7 +46,27 @@ export interface SampleOptions {
   maxWaitMs: number;
   /** Sustained success required before recovery is believed. */
   settleMs: number;
+  /**
+   * Hard cap on one probe.run(), default 30 s. A probe's own timeouts are not
+   * enough: on 2026-10-23 a fetch with AbortSignal.timeout(5000) took 262 s
+   * to return during a resize. A sample past the cap counts as failed with a
+   * fixed mode; the abandoned promise is left to settle on its own. Two runs
+   * that day also stalled with the event loop idle (an LO05 run silent for
+   * over 50 minutes); both stalls happened before this cap existed, a
+   * deadline may not fix that state, and the cause is not established.
+   */
+  sampleDeadlineMs?: number;
   log?: (msg: string) => void;
+}
+
+const DEFAULT_SAMPLE_DEADLINE_MS = 30_000;
+
+export function withDeadline(p: Promise<ProbeOutcome>, ms: number = DEFAULT_SAMPLE_DEADLINE_MS): Promise<ProbeOutcome> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<ProbeOutcome>((resolve) => {
+    timer = setTimeout(() => resolve({ ok: false, error: `probe did not answer within ${ms} ms` }), ms);
+  });
+  return Promise.race([p, deadline]).finally(() => clearTimeout(timer));
 }
 
 interface PathState {
@@ -107,7 +127,7 @@ export async function sampleDuring(
       const at = Date.now() - t0;
       let outcome: ProbeOutcome;
       try {
-        outcome = await state.probe.run();
+        outcome = await withDeadline(state.probe.run(), opts.sampleDeadlineMs ?? DEFAULT_SAMPLE_DEADLINE_MS);
       } catch (e) {
         outcome = { ok: false, error: e instanceof Error ? e.message : String(e) };
       }

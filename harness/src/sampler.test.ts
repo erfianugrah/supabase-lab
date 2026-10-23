@@ -92,3 +92,21 @@ test("the operation runs while sampling, and its error propagates", async () => 
     }),
   ).rejects.toThrow("restart API returned 500");
 });
+
+test("a probe whose run() never settles is cut off at the sample deadline and recorded as a failure", async () => {
+  let i = -1;
+  const hangs: Probe = {
+    name: "hangs",
+    run() {
+      i += 1;
+      // Sample 0 healthy, sample 1 never settles, then healthy again.
+      return i === 1 ? new Promise(() => {}) : Promise.resolve({ ok: true });
+    },
+  };
+  const t0 = Date.now();
+  const w = one(await sampleDuring([hangs], { ...OPTS, maxWaitMs: 1000, sampleDeadlineMs: 50 }, async () => {}));
+  expect(Date.now() - t0).toBeLessThan(3000);
+  expect(w.failures).toBe(1);
+  expect(w.modes[0]).toBe("probe did not answer within 50 ms");
+  expect(w.recoveredMs).not.toBeNull();
+});
