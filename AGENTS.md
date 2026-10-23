@@ -304,14 +304,21 @@ client can poll. See RUNLOG.md; artifacts in `out/2026-09-24/`.
   enabled, so `/graphql/v1` returned 200 with an errors envelope and is not a
   health signal.
 
-## experiments/data-api-capacity - key facts (validated 2026-10-22/23, Pro org, ap-southeast-1, Small then Large)
+## experiments/data-api-capacity - key facts (validated 2026-10-22/23, Pro org; DC01-03 ap-southeast-1 Small then Large, DC04 ap-northeast-2 Small then 4XL, DC05-07 ap-northeast-2 Small)
 
 The Data API's connection pool, what a full pool looks like to a client, the
-pool settings' PATCH, and statement timeouts per role. Four runs; run 4
-(`out/2026-10-23/`) is the reference, runs 1-2 published for their repeats.
-All figures are run 4 unless a run is named. See RUNLOG.md for why runs 1-3
-differ. PostgREST 14.18 and Postgres 17.11 were read from the console, not
-from the published artifacts.
+pool settings' PATCH, statement timeouts per role, throughput under request
+rate, the pool metrics and pool size under load. DC01-DC03: four runs; run 4
+(`out/2026-10-23/run-2026-10-23T00-37-06-485Z.json`) is the reference, runs
+1-2 published for their repeats; their figures are run 4 unless a run is
+named (RUNLOG.md says why runs 1-3 differ). DC04 and DC05-DC07: one run each
+(`run-2026-10-23T07-13-34-754Z`, `run-2026-10-23T07-49-11-858Z`), from a
+Mac in Singapore, so every latency includes the Singapore-Seoul round trip.
+PostgREST 14.18 and Postgres 17.11: console for DC01-DC03, DC04a's artifact;
+not recorded for DC05-DC07 (DC04a, same day and region, read 14.18). The
+artifacts' top-level `region` is the harness default; the project region
+came from `PVLAB_DC_REGION` (recorded as `project_region_requested` in DC04a
+and DC05a from the next run on).
 
 - **Pool with `db_pool` unset: Small 30, Large 50** (mid-burst count of
   `authenticator` backends in `PgSleep`; Small 30/30 in runs 1, 2 and 4,
@@ -378,6 +385,62 @@ from the published artifacts.
   two reads agree. Resize waits for `max_connections` to read the target,
   then watches 300 s (run 2 "settled" at 41 s, then a Management API read
   timed out and Data API calls failed on the client).
+- **Request rate on Small stops at about 850 to 1,020 req/s** (DC04b,
+  DC07; closed-loop `oha`, one indexed point read, anon key): DC04b 825
+  req/s at c=128, 925 at 256, 918 at 512, 1020 at 1024 with 12.8 %
+  client-side failures; latency doubled per step from 256. One metrics
+  snapshot in the 256 step read 139 waiting with 11 of 30 available (step
+  median 7; the 512 step showed the same snapshot on all 12 scrapes):
+  waiting counts queued plus holding, so at least 109 queued while 11 open
+  connections sat idle, if the snapshot is internally consistent.
+  `authenticator` backends idle, timeouts flat. Which process used the CPU
+  was not measured.
+- **4XL scaled to 3,158 req/s at c=512** (DC04c) with a waiting max of 1
+  (10 of 70 available) in the snapshots. Above that the single Mac was the
+  limit: "Network is unreachable (os error 51)" on thousands of requests
+  and edge 403s from c=1024, so DC04c's top rows and DC04d's `db_pool` arms
+  measure the client and the edge, not PostgREST. 4XL defaults:
+  `max_connections` 480, pool 70 (`db_pool` null).
+- **What the pool series count (PostgREST v14.18 source, source-read;
+  Supabase's build assumed to match the tag):** `pgrst_db_pool_waiting`
+  rises when a request asks the pool and falls when its session returns,
+  so queued plus holding, despite its help text ("Requests waiting to
+  acquire a pool connection";
+  https://github.com/PostgREST/postgrest/blob/v14.18/src/PostgREST/AppState.hs).
+  `pgrst_db_pool_available` is connections opened minus in use
+  (https://github.com/PostgREST/postgrest/blob/v14.18/src/PostgREST/Metrics.hs).
+  DC05's three snapshots agree: available 15 with 10 held (16 idle
+  `authenticator` backends), 0 with 25 held (1 idle), 1 at rest (2 idle);
+  in those three one idle backend was not counted (fits PostgREST's
+  listener, not identified). Waiting read 25 with 25 held and 10 with 10
+  held on a pool of 30 (holders only); DC07 read 31 on a pool of 15.
+- **The metrics endpoint's pool series are stale snapshots** (DC05): 1 s
+  scrapes for 100 s changed once (at 62 s) while `pg_stat_activity`
+  changed five times; no refresh landed in 22-58 s or 81-99 s, so a fixed
+  period would be at least about 40 s, with no upper bound measured.
+  `cf-cache-status=DYNAMIC` with a current `date` on the first scrape, so
+  the staleness is behind the edge. The new pool max after a `db_pool`
+  PATCH appeared 1.4 s and 28.9 s after it (restart line 1.2 s and 1 s);
+  the 1.4 s case fits a restart that refreshes the payload, not separated.
+  Either fits DC04d reading each arm's previous pool.
+- **Statement-timeout cancellations did not leave pooled connections
+  aborted** (DC06, one run per arm): a 12.6 s `access exclusive` lock on
+  the table under 20 looping anon GETs (anon timeout 3 s per DC03a) gave
+  60 x 500 57014 during the lock and 9920 x 200 from 4 s to 75 s after,
+  0 x 25P02, 0 `idle in transaction (aborted)` backends in any 5 s sample;
+  the 2.7 s control had no errors. The pool (30) exceeded the workers, so
+  no request was cancelled while queued for a connection; a whole-instance
+  stall was not made.
+- **Pool size made no separable difference on Small** (DC07, one step per
+  cell, one indexed point read, anon key): `db_pool` 15 / 30 / 60 gave
+  814 / 834 / 836 req/s at c=128, 853 / 902 / 909 at 256, 863 / 878 / 868
+  at 512. The same configuration measured twice (DC04b and DC07 at pool
+  30) differed by 9 to 40 req/s, and the pool 15 arm ran with the Mac's
+  load1 at 8.8 to 12.9 against 3.6 to 4.9. Every answer was a 200; at 512
+  the client lost 238 to 516 requests per step (success 0.985 to 0.993,
+  mostly os error 51). `authenticator` backends mostly idle at every size;
+  node CPU not computed. Consistent with issue #5336's small-core rows
+  (https://github.com/PostgREST/postgrest/issues/5336).
 
 ## Provisioning: ACTIVE_HEALTHY is not readiness (validated 2026-08-03)
 
