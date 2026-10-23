@@ -162,3 +162,166 @@ listing was saved). The generated secrets were in `work/stack/.env`; result
 strings go through `scrub`, and the operator's scan of the evidence, the
 published artifact and the sources for every secret-looking `.env` value found
 none (unrecorded: no scan output was saved).
+
+## Run 2 - 2026-10-23, SD09-SD12 (the gaps Run 1 listed as not measured)
+
+Same pin (`8617532ae1a41571d5d557cd24c6f5f2565d9230`), same Docker Desktop
+host (Apple silicon; the engine reported 10 CPUs and MemTotal 8214851584
+bytes, operator read, not in the artifacts; version 29.9.2 and storage driver
+overlay2 are in the SD12 artifacts), lab base commit `661afdf` with the experiment
+changes uncommitted while they ran. Another lab agent ran this rig's default
+stack (project `supabase`, the fixed container names, host ports 8000, 5432,
+6543) on the same engine for most of the session (operator read), so every stack here is a SLOT
+stack: own compose project, own host ports, no fixed container names (Makefile
+comment). SD01-SD04 were re-run on the first SLOT stack as a regression check
+of that change: 14 pass, 1 info (SD02d), 0 fail
+(`out/2026-10-23/run-2026-10-23T08-44-06-658Z.json`).
+
+### SD09 and SD10 - Realtime and Edge Functions with the `sb_` keys
+
+Artifact: `out/2026-10-23/run-2026-10-23T09-46-42-669Z.{json,facts.md}`, slot
+stack `sd-a` started from scratch with `make stack pull up SLOT=a ...` (host
+port 8210 and the `up` wall time are operator reads, not in the artifact); one
+run of each module, n = 1. This run replaces the 08:42 UTC run, withdrawn
+because SD10c's environment labels had a `name=sb_secret` shape that secret
+scanners flag; the module now writes `default:secret`, and every other
+measurement of the two runs was identical (operator diff, no artifact for the
+withdrawn run). Development runs of SD09 at 08:38 and 08:40 UTC are not
+published either (the supabase-js private-channel case moved from the client's
+`accessToken` option to a password sign-in, and a publishable-socket plus
+`sb_secret_` access_token case was added).
+
+| Module | What was measured | Result |
+| --- | --- | --- |
+| SD09a | Raw Phoenix socket on a public channel, per credential | publishable key as the `apikey` query parameter, secret key as the query parameter, publishable key as an `apikey` header, legacy anon JWT: handshake 101, join ok, own broadcast received. No key and a made-up `sb_publishable_` key: `HTTP/1.1 401 Unauthorized`, body `Unauthorized`, at the handshake |
+| SD09b | Private channel, RLS on `realtime.messages` with one policy for `authenticated` on topic `sd09-private` | publishable key: join refused, `{"reason":"Unauthorized: You do not have permissions to read from this Channel topic: sd09-private"}`. Secret key: join ok, broadcast received. Publishable key plus a user's access token in the join payload: join ok, broadcast received. An `sb_` key in the join payload's access_token changed nothing in either direction: publishable socket with access_token `sb_publishable_` or `sb_secret_` refused as above; secret socket with access_token `sb_publishable_` or `sb_secret_` admitted |
+| SD09c | supabase-js 2.112.3 | public channel with either key: `SUBSCRIBED; broadcast received`. Private channel: publishable key `CHANNEL_ERROR: Unauthorized: ...`; secret key `SUBSCRIBED; broadcast received`; publishable key after `auth.signInWithPassword`: `SUBSCRIBED; broadcast received`. The client's `accessToken` option with the same user token: `CHANNEL_ERROR` (recorded, not asserted; whether the option is applied after the first join was not separated) |
+| SD09d | `POST /realtime/v1/api/broadcast` with a secret-key socket listening on the topic | publishable key HTTP 202, listener got the message; secret key HTTP 202, got it; no key HTTP 401 `Unauthorized`, nothing delivered |
+| SD10a | `POST /functions/v1/hello` (the shipped function, `withSupabase({ auth: ["publishable", "secret"] })`), `FUNCTIONS_VERIFY_JWT=false` as `.env.example` ships it | `apikey` publishable or secret: 200 "Hello from Edge Functions!". Publishable key in `apikey` and as `Bearer`: 200. Publishable `apikey` plus a user's ES256 JWT as `Bearer`: 200. Envoy's own 401 (`text/plain`): made-up `sb_secret_` key "Invalid API key"; publishable `apikey` with the secret key as `Bearer` "Conflicting API keys". The function's 401 from `@supabase/server`: no credentials `MISSING_CREDENTIALS`; publishable key only as `Bearer` `UNUSABLE_CREDENTIAL` ("the Authorization header carried an sb_* API key, not a user JWT"); legacy anon or service_role JWT in `apikey` `INVALID_API_KEY`; legacy anon JWT or a user JWT only as `Bearer` `INVALID_CREDENTIALS`; a client-supplied `sb-api-key` header carrying the asymmetric service_role JWT, nothing else: `MISSING_CREDENTIALS` |
+| SD10b | supabase-js 2.112.3 `functions.invoke("hello")` | publishable key, secret key, and publishable key after a password sign-in: all `ok {"message":"Hello from Edge Functions!"}` |
+| SD10c | A probe function written into `volumes/functions` for the run (reports kinds, never values) | it receives `apikey` as sent and `Authorization` as sent; no `sb-api-key` header in any of the five cases (by the code at the pin, Envoy adds one for an `sb_` key and the main router deletes it before the function runs; the two steps were not observed separately); environment: `SUPABASE_PUBLISHABLE_KEYS` `default:publishable`, `SUPABASE_SECRET_KEYS` `default:secret`, `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` HS256 JWTs, `SUPABASE_URL` `http://api-gw:8000`; from inside the function, the environment's secret key read `200 rows 1` and the publishable key `200 rows 0` from a table with RLS on and no policy |
+| SD10d | `hello` again with `FUNCTIONS_VERIFY_JWT=true` (functions container recreated alone, `.env` restored afterwards) | `apikey` publishable or secret: 200, and the two other 200 cases above stay 200. No credentials, a legacy JWT in `apikey`, and a client `sb-api-key` header alone now stop at the main router: 401 `UNAUTHORIZED_NO_AUTH_HEADER` "Missing authorization header". The Envoy 401s and the `@supabase/server` 401s for the Bearer-only cases are unchanged |
+
+### SD11 - Postgres 15 to 17 data-directory upgrade
+
+What the guide and script say (read at the pin, not measured by itself):
+`apps/docs/content/guides/self-hosting/postgres-upgrade-17.mdx` lists the
+requirements (all containers running, `bash`, root or `sudo`, 2x the database
+size plus 5 GB free), the backups to take first (`cp -a ./volumes/db/data
+./volumes/db/data-manual-backup` and the pgsodium key through
+`docker compose run --rm db cat /etc/postgresql-custom/pgsodium_root.key`),
+the command `sudo bash utils/upgrade-pg17.sh` (`--yes` skips the prompts), and
+a rollback block. The script builds a PG 17 binary tarball from
+`supabase/postgres:17.6.1.063`, runs `initiate.sh` (pg_upgrade) in a PG 15
+container and `complete.sh` in a 17.6.1.063 container, swaps
+`volumes/db/data` with the new cluster (keeping `volumes/db/data.bak.pg15`),
+starts the stack with `-f docker-compose.yml -f docker-compose.pg17.yml`, and
+applies seven migrations plus an `ALTER EXTENSION ... UPDATE` for every
+extension against `supabase/postgres:17.6.1.136`. Neither the script nor the
+guide changes `COMPOSE_FILE` in `.env`.
+
+| Module | What was measured | Result |
+| --- | --- | --- |
+| SD11a | PG 15 stack (`sh run.sh config add pg15`, `sh run.sh start`), seeded | `supabase/postgres:15.8.1.085`, server_version 15.8; data directory 186 MB; 55 tables counted; seeded checksums, e.g. `sd11.t_big 200000 rows md5 1d029872c105d519814ca2266530e855`, `sd11.t_child 50000 rows md5 27dbfc93dec46e6d1440528bb0ec6e64`; extensions pg_cron 1.6, pg_graphql 1.5.11, pg_net 0.14.0, pg_stat_statements 1.10, supabase_vault 0.3.1 (and four more) |
+| SD11b | `bash utils/upgrade-pg17.sh --yes` as root, run directory on the host copy (host bind mount, fstype `fakeowner`), clean stack | exit 0 in 170.9 s: building the binary tarball from `17.6.1.063` 92.6 s (1214 MB, cached afterwards), `initiate.sh` (pg_upgrade) 40.0 s, `complete.sh` 7.7 s, starting the stack on 17 16.7 s; the rest under 5 s each |
+| SD11c | After the upgrade | `17.6.1.136`, server_version 17.6, `PG_VERSION` 17; seeded checksums differing: none; row counts differing (of 55 tables): none; extensions changed: pg_cron 1.6 -> 1.6.4, pg_net 0.14.0 -> 0.20.3, pg_stat_statements 1.10 -> 1.11 (pg_graphql 1.5.11 kept); Vault decrypts to the same value; cron job active; the pre-upgrade user signs in (200, same id); REST with the publishable key 10 rows and the secret key 100 rows; GraphQL 200; 11 of 11 containers healthy; `data.bak.pg15` and `pgsodium_root.key.bak.pg15` present; `.env` still `COMPOSE_FILE=docker-compose.yml:docker-compose.pg15.yml` |
+| SD11d | The next `docker compose up -d --wait` (what `sh run.sh start` runs) with that `.env` | compose recreated db on `15.8.1.085`; exit 1, "dependency failed to start: container sd-u-db-1 is unhealthy"; db log "FATAL: database files are incompatible with server" / "The data directory was initialized by PostgreSQL version 17, which is not compatible with this version 15.8." After `sh run.sh config remove pg15` and start: exit 0, server_version 17.6, seeded checksums unchanged, 11 of 11 healthy |
+| SD11e | The guide's rollback block, as written, as root | exit 0 in 25.0 s; `15.8.1.085`, server_version 15.8; seeded checksums equal to SD11a; Vault decrypts; 11 of 11 healthy; REST, sign-in and GraphQL as before |
+
+Artifact for the rows above: `out/2026-10-23/run-2026-10-23T09-02-37-193Z.json`
+(the clean run). The same procedure ran five times in total. Attempts 1-3 ran
+on slot stack sd-u (attempt 2 on attempt 1's data, attempt 3 on a fresh
+stack); attempts 4-5 on sd-v (attempt 5 on attempt 4's data).
+
+| Attempt | Artifact | Run directory | Outcome |
+| --- | --- | --- | --- |
+| 1 | `run-2026-10-23T08-50-20-551Z` | host copy | `initiate.sh` failed after 95.1 s: pg_upgrade "Restoring database schemas in the new cluster *failure*"; the script reported the data directory unchanged and exited 1. The cause, read from the pg_upgrade log on disk by the operator and not in the artifact (the log was deleted with the stack): `PANIC: could not open file "base/1": No such file or directory` on `CREATE DATABASE "template1" ... OID = 1` in the new cluster |
+| 2 | `run-2026-10-23T08-58-48-533Z` | host copy, same data after attempt 1 | script exit 0 (76.9 s, tarball cached); SD11c and SD11e failed: this module version checksummed the full `auth.users` row (flagging its own sign-in) and its row counts caught the sign-in's auth rows and one `cron.job_run_details` run (0 -> 1); fixed before attempt 3 |
+| 3 | `run-2026-10-23T09-02-37-193Z` | host copy, fresh stack | the clean run above |
+| 4 | `run-2026-10-23T09-07-05-541Z` | engine VM ext4 (`make vmfs-up`) | script exit 1 at "Starting Postgres 15 in upgrade container": `pg_ctl: could not start server` |
+| 5 | `run-2026-10-23T09-09-47-902Z` | engine VM ext4, same data | `initiate.sh` ran `apt-get update` in the PG 15 container and got "At least one invalid signature was encountered" for every Ubuntu focal source, then failed |
+
+Attempts 4 and 5 ran with little VM disk left: the script's pre-flight read
+5873 MB available before attempt 4 and 4681 MB before attempt 5, against its
+own estimate of 5370 MB, and warned before attempt 5 (SD11b evidence). The
+tarball and its staging copy were on the VM disk for those two, on the host
+disk for 1-3. Disk exhaustion would explain both failures, but free space was
+not measured while they ran, so the ext4 runs say nothing either way about the
+filesystem; the attempt-1 PANIC is one failure in three host-copy runs, cause
+not isolated. Two controls the operator ran outside the harness (no artifact):
+stock `pg_upgrade` 16 -> 17 from the `postgres:17` image into the same kind
+of bind mount, and into a bind mount reached through a symlink as the
+script's `/data_migration` is, both succeeded.
+
+Deviations from the guide: root was a `docker:29-dind` container used as a
+shell (sudo needs a password here), and TMPDIR was set to
+`volumes/db/.upgrade-tmp` inside the stack so the script's staging bind mounts
+resolve on the Docker host (bash and curl added with apk); neither is in the
+evidence string. The script ran from a copy with two lines changed (the diff
+is in each SD11b evidence string): `DB_CONTAINER` (a SLOT
+stack has no `supabase-db` container) and the db-config volume lookup, which
+upstream is `grep -E '^db-config$|_db-config$' | head -n 1` over every volume
+on the engine; this engine also held the other agent's `supabase_db-config`.
+Reading the script, an unmodified run on an engine with two stacks would act
+on whichever volume and `supabase-db` container it found (not run).
+
+The clean run's script log (SD11b evidence) also shows
+`ERROR:  extension "pg_cron" has no update path from version "1.6" to version "1.6.4"`
+from `update_extensions.sql` and the reconcile step's
+`NOTICE:  skipped extension pg_cron` while verification read pg_cron 1.6.4,
+and `NOTICE:  changing version from 2.39 to 2.40` (collation) on `postgres`,
+`template1` and `_supabase` with no reindex step in the log.
+
+### SD12 - linux/amd64 images, emulated on the arm64 engine
+
+Not a native amd64 measurement. Artifacts: native comparison
+`out/2026-10-23/run-2026-10-23T09-11-43-286Z.json`, emulated
+`out/2026-10-23/run-2026-10-23T09-57-29-678Z.json`; one slot stack (`sd-m`,
+operator read), images local before each `up`, n = 1 each. The emulated run
+replaces one at 09:13 UTC withdrawn for the SD10c label shape (see SD09/SD10);
+that run's per-service outcome was the same, its numbers are not cited. Nine services ran from their amd64 images
+by manifest digest (`make amd64-layer`); Studio and imgproxy stayed arm64
+(VM disk was the constraint).
+
+| Measure | Native arm64 | Emulated amd64 (9 of 11 services) |
+| --- | --- | --- |
+| `docker compose up -d --wait` | 22372 ms, exit 0 | 82620 ms, exit 1 (compose stopped waiting when Realtime turned unhealthy, so this is not a start-up time; reading, not measured) |
+| Healthy at the module's read | 11 of 11 | 10 of 11; Realtime "starting", 7 restarts |
+| Database `uname -m` / version() | aarch64 / PostgreSQL 17.6 on aarch64-unknown-linux-gnu | x86_64 / PostgreSQL 17.6 on x86_64-pc-linux-gnu |
+| Sum of squares over 3,000,000 numerics, EXPLAIN ANALYZE ms, 3 runs | 531, 522, 516 | 845, 834, 801 |
+| Image pull | 3328 ms (cached, inferred from the time) | 41076 ms (nine amd64 images, pulled while slot stack sd-a was still running idle, operator read) |
+
+Realtime under emulation restarted 7 times and stayed "starting" (SD12a); the
+operator read "undefined function erlang:nif_error/1 in function
+prim_tty:isatty/1" then "Kernel pid terminated (application_controller)" in
+its log (not in the artifact). Supavisor, the other Elixir service,
+started healthy. On the emulated stack SD02a-c and SD10a-d passed (SD02d is info) and SD03 passed apart from SD03a, whose check compares the
+running image name with the compose tag and so fails on a digest reference;
+it read server_version 17.6 and `PG_VERSION` 17. SD09 was not run there
+(Realtime down).
+
+### Not measured in Run 2
+
+- Realtime `postgres_changes` with the `sb_` keys (SD09 covers join,
+  broadcast, private-channel authorisation and REST broadcast only).
+- Edge Functions deployed through Studio or the CLI; SD10 used the shipped
+  `hello` and a function file written into `volumes/functions`.
+- The PG 15 -> 17 upgrade on a native Linux host, with a database larger than
+  186 MB, or with Storage objects (the file backend does not store uploads on
+  this Mac, see storage-surface); `pg_graphql` in use beyond `{ __typename }`.
+- Index validity after the collation refresh (2.39 -> 2.40) was not checked.
+- Whether attempt 1's PANIC repeats on the host copy at some rate, and why
+  attempts 4 and 5 failed on ext4 (free disk during the run).
+- Native amd64. SD12 is emulation; Studio and imgproxy were not run as amd64.
+- Repeats: n = 1 for SD09, SD10 and SD12; SD11 as listed.
+
+### Teardown (Run 2)
+
+`make clean SLOT=a|u|v|m` and `make vmfs-down SLOT=v`; afterwards the operator
+listed 0 containers, volumes and networks labelled with the four compose
+projects, removed the images this run pulled (`supabase/postgres:15.8.1.085`,
+`supabase/postgres:17.6.1.063`, the nine amd64 images, `docker:29-dind`) and
+checked the arm64 `supabase/postgres:17.6.1.136` tag still pointed at an arm64
+image (unrecorded: no listing saved). One named Docker volume from a discarded
+docker-in-docker attempt, `sd168-dind-probe-data`, is left on the engine;
+its removal is tracked on the board.

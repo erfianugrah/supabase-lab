@@ -1,0 +1,72 @@
+{
+  "startedAt": "2026-10-23T09:11:43.286Z",
+  "finishedAt": "2026-10-23T09:11:46.446Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "self-hosted-defaults",
+  "labCommit": "661afdf",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "SD12a",
+      "title": "native arm64: engine arm64 29.9.2; every default service's image architecture, health and restart count",
+      "status": "pass",
+      "detail": "mode native arm64; engine arm64 29.9.2, storage driver overlay2; healthy 11 of 11; db uname -m aarch64; PostgreSQL 17.6 on aarch64-unknown-linux-gnu, compiled by gcc (GCC) 15.2.0, 64-bit; supabase-studio: arm64; healthy; restarts 0 | supabase-envoy: arm64; healthy; restarts 0 | supabase-auth: arm64; healthy; restarts 0 | supabase-rest: arm64; healthy; restarts 0 | realtime-dev.supabase-realtime: arm64; healthy; restarts 0 | supabase-storage: arm64; healthy; restarts 0 | supabase-imgproxy: arm64; healthy; restarts 0 | supabase-meta: arm64; healthy; restarts 0 | supabase-edge-functions: arm64; healthy; restarts 0 | supabase-db: arm64; healthy; restarts 0 | supabase-pooler: arm64; healthy; restarts 0",
+      "measurements": {
+        "mode": "native arm64",
+        "engine": "arm64 29.9.2",
+        "storage_driver": "overlay2",
+        "amd64_services": 0,
+        "healthy_of_11": 11,
+        "db_uname_m": "aarch64",
+        "db_version": "PostgreSQL 17.6 on aarch64-unknown-linux-gnu, compiled by gcc (GCC) 15.2.0, 64-b",
+        "supabase-studio": "arm64; healthy; restarts 0",
+        "supabase-envoy": "arm64; healthy; restarts 0",
+        "supabase-auth": "arm64; healthy; restarts 0",
+        "supabase-rest": "arm64; healthy; restarts 0",
+        "realtime-dev.supabase-realtime": "arm64; healthy; restarts 0",
+        "supabase-storage": "arm64; healthy; restarts 0",
+        "supabase-imgproxy": "arm64; healthy; restarts 0",
+        "supabase-meta": "arm64; healthy; restarts 0",
+        "supabase-edge-functions": "arm64; healthy; restarts 0",
+        "supabase-db": "arm64; healthy; restarts 0",
+        "supabase-pooler": "arm64; healthy; restarts 0"
+      },
+      "durationMs": 3160
+    },
+    {
+      "id": "SD12b",
+      "title": "native arm64: image pull and `docker compose up -d --wait` wall time (from .timing)",
+      "status": "info",
+      "detail": "pull: pull_ms=3328 pull_exit=0 layers=; up: up_ms=22372 up_exit=0 layers=",
+      "measurements": {
+        "mode": "native arm64",
+        "pull_ms": 3328,
+        "pull_exit": 0,
+        "up_ms": 22372,
+        "up_exit": 0,
+        "layers": ""
+      },
+      "durationMs": 3160
+    },
+    {
+      "id": "SD12c",
+      "title": "native arm64: sum of squares over 3,000,000 numerics in the database, 3 runs, EXPLAIN ANALYZE execution time in ms",
+      "status": "info",
+      "detail": "runs ms: 531, 522, 516",
+      "measurements": {
+        "mode": "native arm64",
+        "run1_ms": 531,
+        "run2_ms": 522,
+        "run3_ms": 516
+      },
+      "durationMs": 3160
+    }
+  ]
+}

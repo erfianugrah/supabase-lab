@@ -23,7 +23,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Ctx, TestModule, TestResult } from "../../../harness/src/types";
-import { activeLayers, compose, healthOf, http, reload, rigOf, sh, waitFor, type Rig } from "../lib/rig";
+import { activeLayers, cname, compose, healthOf, http, reload, rigOf, sh, waitFor, type Rig } from "../lib/rig";
 
 const ID = "SD08";
 const BLANK = ["SUPABASE_PUBLISHABLE_KEY", "SUPABASE_SECRET_KEY", "ANON_KEY_ASYMMETRIC", "SERVICE_ROLE_KEY_ASYMMETRIC"];
@@ -60,7 +60,7 @@ const mod: TestModule = {
     };
     const layers = await activeLayers();
     const gwLog = async (): Promise<string> => {
-      const l = await sh(["docker", "logs", "--tail", "300", "supabase-envoy"]);
+      const l = await sh(["docker", "logs", "--tail", "300", cname("supabase-envoy")]);
       return (l.out + l.err).split("\n").filter((x) => /legacy API key mode|sb_ key translation enabled/.test(x)).slice(-1)[0] ?? "no mode line found";
     };
 
