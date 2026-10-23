@@ -20,23 +20,29 @@ restart", was `[doc]` only).
 | LO03 | create through `createWithFallback` ([unknown region, ap-southeast-1], then two plain creates): status and body of requests that must fail, orphan check, status transitions and seconds to `ACTIVE_HEALTHY` (n=3), delete-to-gone |
 | LO04 | `POST /v1/projects` whose response the caller abandoned, then the identical request re-sent: duplicate or name collision |
 | LO05 | restart envelope: one Micro project restarted 5 times behind the gate, REST, Auth, Storage, pooler (6543) and direct (5432) sampled at 500 ms, plus since 2026-10-23 a Realtime handshake and the data-path probes `rest_read` and `realtime_join` (the REST probe before that date answered at the HTTP tier only, see RUNLOG); per-path p50 and max of first failure and outage window; a restart refused or accepted inside the post-create window; a second restart sent while one is in flight |
+| LO06 | cluster B drill: the detect-then-self-restart runbook (`lib/runbook.ts`, `RUNBOOK-cluster-b.md`) on one Micro project with an induced fault (a held ACCESS EXCLUSIVE lock on the probe table): a baseline watch of the healthy project, then three episodes - restart and verify on the data path, a second one held by the cooldown, a third escalated by the per-hour cap |
 
 LO02 is not used. The restart module first ran under that id, failed at
 readiness (the direct probe's name lookup, see `lib/probes.ts` and RUNLOG), and
 was re-run as LO05.
 
 `lib/gate.ts` is the change gate (pure decision functions plus a fetcher);
-`lib/gate.test.ts` covers it with fixtures (`make test`).
+`lib/gate.test.ts` covers it with fixtures (`make test`). `lib/runbook.ts` is
+the cluster B runbook (detector, guard rails, the supervise loop with injected
+side effects); `lib/runbook.test.ts` runs the loop under a fake clock.
+`RUNBOOK-cluster-b.md` is the prose version.
 
 ## Run
 
 ```bash
-make test                      # gate unit tests, offline
+make test                      # gate and runbook unit tests, offline
 make status                    # LO01, no credential
 # live, destructive: about 30 min wall clock, 5 to 6 creates, deletes everything
 SUPABASE_ACCESS_TOKEN=... PVLAB_ORG_PRO=<pro-org-slug> make run-destructive
 # or one module
 SUPABASE_ACCESS_TOKEN=... PVLAB_ORG_PRO=<pro-org-slug> make run-destructive ONLY=LO03
+# LO06 is not in the default list: 1 create, about 30 min on 2026-10-23, at most 2 restarts
+SUPABASE_ACCESS_TOKEN=... PVLAB_ORG_PRO=<pro-org-slug> make run-destructive ONLY=LO06
 ```
 
 The runner is invoked from source (`bun harness/src/run.ts`), because

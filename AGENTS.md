@@ -3215,7 +3215,7 @@ when present, so a new module is invisible until it is regenerated).
   neither); in the other the publishable name appeared by 15 s and the secret
   name not within 180 s, until a redeploy (by 5 s, first poll); not settled. Vercel not run (no credential).
 
-## experiments/lifecycle-ops - key facts (validated 2026-10-10, Pro org)
+## experiments/lifecycle-ops - key facts (validated 2026-10-10, Pro org; LO05 re-run and LO06 2026-10-23)
 
 - Status page as a change gate (LO01, `experiments/lifecycle-ops/lib/gate.ts`):
   `status.supabase.com/api/v2/components.json` carries each of the 18 region
@@ -3262,6 +3262,21 @@ when present, so a new module is invisible until it is regenerated).
   the first `ACTIVE_HEALTHY` read was accepted on another project (LO05f). The
   boundary is unresolved. A second restart sent while `RESTARTING` returned 200
   (LO05c).
+- **Cluster B runbook (#150, LO06 2026-10-23, `out/2026-10-23/`)**:
+  `experiments/lifecycle-ops/lib/runbook.ts` + `RUNBOOK-cluster-b.md`. Detect
+  on a sustained data read (`rest_read` failing every sample for 60 s), never
+  on the status; hold while the status is not `ACTIVE_HEALTHY`, within 15 min
+  of a restart, inside the first ten minutes after create (the 400 text; LO05f boundary unresolved), or when the status
+  page gate blocks; escalate at 2 restarts per 60 min; verify on the data path
+  (10 s sustained, 600 s budget). Drill on one Micro project with an induced
+  table lock (a stand-in; real cluster B causes cannot be induced): detection
+  64 to 65 s after the lock, reads back 58 and 60 s after the POST with the
+  status read `ACTIVE_HEALTHY` at 34 and 46 s on a 10 s poll (n=2); the
+  cooldown held drill 2 for 760 s and drill 3 escalated with no POST. With the
+  lock alone (drill 3) `rest_read` failed 21 samples and direct and pooler
+  `select 1` failed 0. The plain LO01 gate refuses a restart
+  during both cluster B incidents (`unresponsive` / `restart` wording);
+  `gateView` downgrades an open incident that advises a restart to a warning.
 - Vantage note: on the macOS orchestrator, `dns.lookup` (getaddrinfo) returned
   ENOTFOUND for an AAAA-only `db.<ref>` host while `dns.resolve6` and a TCP
   connect to the literal address worked; the direct probe resolves with
