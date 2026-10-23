@@ -20,6 +20,7 @@ Nothing about it is a tofu resource; it lives for one probe run.
 | SH04 | destructive | JWKS mode: the self-hosted GoTrue given the platform's ES256 public key as a verify-only JWK verifies managed tokens, while its own tokens stay accepted by both managed verifiers. |
 | SH05 | destructive | Revoke the project's legacy HS256 key: time to rejection of a self-hosted token on managed Auth and PostgREST, and the collateral on the legacy API keys. Irreversible on the project. |
 | SH06 | destructive | The self-hosted GoTrue signing with its OWN ES256 key (`make gotrue-up OWNKEY=1`): public half published from an Edge Function, registered as third-party auth, the resulting token accepted by PostgREST; then the legacy HS256 key is revoked and the own-key token is re-tested. Irreversible; run alone on a fresh project. |
+| SH07 | destructive | The legacy anon key in the `apikey` header after the HS256 signing key is revoked: probed at 10 to 600 s and after a project restart, against a never-issued JWT and a re-signed one, to tell an issued-key match at the gateway from a cache window. Self-provisions and deletes its own project; run with `--only SH07`. |
 
 `make unit` covers the token-shape and error-code helpers.
 
@@ -183,6 +184,8 @@ as third-party auth with the `jwks_url` shape.
   bearer. The other: a gateway cache that had not yet expired (the legacy-key
   disable took ~45 s to propagate in iap-lockdown L05). A later probe was not
   run, so the two are not separated. A fresh self-hosted grant still mints.
+  (SH07, 2026-10-23, separates them: no cache window; the gateway accepts
+  only the issued key. See the section at the end.)
 - Cleanup: the legacy `service_role` call to the MANAGED admin API was 403
   after the revoke (as in SH05); the user was deleted via SQL.
 
@@ -211,3 +214,88 @@ lives on the project's own hostname.
   project exists; this experiment did not try to make the managed one
   unreachable.
 - SMTP, hooks and OAuth providers on the self-hosted side were not run.
+
+## SH07 - the legacy anon apikey after the HS256 revoke (2026-10-23, micro, ap-southeast-1, Pro org, n=3)
+
+SH06f left two readings open for the legacy anon JWT that still worked in the
+`apikey` header 10 s after the HS256 signing key was revoked. The gateway in
+question is the platform's API gateway in front of the MANAGED project's
+PostgREST. A self-hosted Kong or envoy is a different program, so restarting
+one on local Docker would not test it; SH07 runs on managed projects only and
+no local stack was involved. The platform gateway cannot be restarted from
+outside; the closest lever is `POST /v1/projects/{ref}/restart`.
+
+The module provisions its own project, revokes the HS256 key, and probes the
+Data API at 10, 30, 45, 60, 120, 300 and 600 s, then after a project restart.
+The bearer is a managed ES256 user token (the project's in-use key), which
+PostgREST accepts whatever happens to the HS256 key, so only the `apikey`
+header varies:
+
+| variant | apikey | bearer |
+| ------- | ------ | ------ |
+| A | legacy anon key (HS256, the revoked key) | ES256 user token |
+| F | anon claims re-signed under a random secret | ES256 user token |
+| V | anon claims with `iat` + 1, signed with the project's own legacy secret (`GET /postgrest` `jwt_secret`) | ES256 user token |
+| P | `sb_publishable_` | ES256 user token |
+| S | legacy service_role key | ES256 user token |
+| K | none | ES256 user token |
+| N | legacy anon key | the same anon key (the SH05 shape) |
+| H | legacy anon key, `GET /auth/v1/health` | the same anon key |
+
+Three projects (A, B, C), each created, revoked, restarted and deleted by the
+module. Project A ran before V was added. Two earlier attempts were discarded
+(not recorded): one failed its first SQL call about 30 s after creation
+(`28P01`, "If you recently created this project, wait a moment"; the module
+now retries), one was stopped to add V. Both projects were deleted. Signing
+keys on all three before the revoke: `HS256:previously_used,ES256:in_use`;
+the bearer was ES256 with a kid. Evidence: `out/2026-10-23/run-2026-10-23T08-46-09-461Z` (A),
+`run-2026-10-23T08-48-10-179Z` (B), `run-2026-10-23T08-48-15-089Z` (C), each
+`.json` and `.facts.md`.
+
+- **Before the revoke** (SH07b, A/B/C): A 200, P 200, S 200, N 200, H 200.
+  F 401 from the gateway (`Invalid API key`), K 401 from the gateway (`No API
+  key found in request`). V 401 from the gateway (`Invalid API key`) on B and
+  C: a JWT carrying a valid signature under the project's legacy secret is
+  refused as an apikey while the key is still `previously_used`.
+- **Revoke** (SH07c): `PATCH signing-keys/{id} {status: revoked}` -> 200,
+  key status `revoked`, on all three.
+- **The ladder** (SH07d, every mark on A, B and C): A 200, P 200, S 200,
+  H 200; F 401 and V 401 from the gateway; N 401 `PGRST301`, PostgREST
+  refusing the anon key as a bearer, from the 10 s mark on.
+- **After the restart** (SH07e): restart 200, `pg_postmaster_start_time`
+  changed on all three, Data API back 60 s (A), 71 s (B), 60 s (C) after the
+  restart call, probed at 661 s (A), 672 s (B), 662 s (C) after the revoke.
+  The same cells as the ladder: A 200, F and V 401 from the gateway, N 401
+  `PGRST301`.
+
+Reading. No cache window: A never flipped across 600 s and a restart, three
+projects, so the SH06 observation was not a propagation delay. The gateway
+accepts the legacy anon key on something the HS256 revoke does not change,
+and it accepts only the issued key: a valid signature is not enough (V,
+signed with the project's legacy secret and differing from the issued key
+only in `iat`, refused before and after the revoke, n=2), and the issued
+claims with another signature are refused (F, n=3). V rests on the
+`GET /postgrest` `jwt_secret` being the anon key's signing secret. Projects
+A to C did not check that; the module now does (SH07a,
+`secret_reproduces_anon`). A one-off check on a fourth throwaway micro
+(2026-10-23 09:27 UTC, n=1, a script outside the harness, no artifact in
+`out/`): re-signing the legacy anon key and the legacy service_role key with
+that secret, claims unchanged, reproduced each key byte for byte; the project
+was deleted (HTTP 200). F rules out a check on
+the claims alone. Whether the gateway compares the whole string or checks the
+claims plus the signature against the legacy secret (which the revoke does
+not change) was not separated. The SH07f detail string in the published
+artifacts says "the gateway matches the issued key by value" (B, C) or "on
+its value or a key set the revoke did not change" (A); both overstate, and
+this paragraph is the reading. PostgREST verifies
+the bearer independently (N), so the revoked anon key still opens the Data
+API to anyone who also holds a token PostgREST accepts.
+
+What SH07 does not settle:
+
+- Whether disabling legacy API keys (`PUT api-keys/legacy?enabled=false`,
+  iap-lockdown L05, ~45 s with the anon key as apikey AND bearer) refuses the
+  anon apikey when paired with an ES256 bearer. Not run.
+- Storage, Realtime and Edge Function routes with the revoked anon apikey:
+  only `/rest/v1` and `/auth/v1/health` were probed.
+- The gateway behaviour beyond 672 s after the revoke.
