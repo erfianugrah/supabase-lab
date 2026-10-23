@@ -692,3 +692,22 @@ source on a developer Mac. One run. Artifact:
   relacl showed `arwdDxtm` for all three), so W12 would have passed without the
   explicit grants. Separating that needs `alter default privileges ... revoke`
   before the seed (as DD01c did) on a later run.
+
+## W12 grants under the revoked default privileges (2026-10-23, via data-api-defaults DD05)
+
+The 2026-10-13 entry above left open whether W12's GRANTs are load-bearing.
+data-api-defaults DD05 imports W12 and runs it on a project after DD01c's
+`ALTER DEFAULT PRIVILEGES ... REVOKE`, with the GRANTs added in steps (two
+runs, one fresh API-created Pro project each; RUNLOG and artifacts in
+`experiments/data-api-defaults/RUNLOG.md` and
+`experiments/data-api-defaults/out/2026-10-23/`). No GRANT: W12 fails with
+`Insert failed: HTTP 401` and PostgREST code `42501` plus the "Grant the
+required privileges" hint, on all 4 attempts. Table GRANT only: W12 passes,
+because the revoke leaves UPDATE on sequences and `nextval` accepts UPDATE.
+Table and sequence GRANT (the committed fixture): W12 passes. The same module
+showed the `make seed` GRANT on `w_probe` is needed for the publishable-key
+read (401 `42501` without it, 200 with it).
+
+W12 changes in the same commit: `run(ctx, grants)` takes the grant variant
+(the runner passes none, so all GRANTs are issued), and a failed insert now
+carries the PostgREST body in the error instead of the status alone.

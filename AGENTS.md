@@ -2558,6 +2558,18 @@ Numbers: `RUNLOG.md`, artifacts `out/2026-10-08/`.
   (DD03).
 - iap-lockdown: `lib/inventory.ts` GraphQL probe now sends `{ __typename }` and
   `http()` reports `errors[0].message` or `ok:<type>` as the row code.
+- The explicit GRANTs added to older experiments for #128 are load-bearing
+  once DD01c's revoke is applied (DD05, 2026-10-23, two API-created Pro
+  projects, one trial each, out/2026-10-23/): without the GRANT the
+  edge-resilience `w_probe` seed read answered 401 `42501` with the "Grant
+  the required privileges" hint, usage-metering M05's `metering_hourly`
+  insert 403 `42501` for both service_role key kinds, and W12's anon insert
+  401 `42501` on all 4 attempts; with it, 200, 201 and W12 pass. The revoke
+  leaves `Dxtm` on tables and UPDATE (`w`) on sequences, and `nextval` needs
+  USAGE or UPDATE, so W12 also passed with the table GRANT alone: its
+  sequence GRANT is not needed under these statements (kept for a default
+  that also takes UPDATE). Not run under the revoke: M01, D09, O03, T22.
+  Run DD05 as `ONLY=DD05,DD99`; W12's `run(ctx, grants)` takes the variant.
 
 ## experiments/realtime-surface - key facts (validated 2026-10-10, Pro org, n = 1 per row; RT05 2026-10-22, two reps per burst row)
 

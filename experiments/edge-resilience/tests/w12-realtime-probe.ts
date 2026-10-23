@@ -10,18 +10,35 @@
  * - WebSocket connection must use apikey and vsn=1.0.0.
  * - The phx_join payload must specify the postgres_changes configuration.
  * - Use the project's publishable key (ctx.anonKey) for the apikey parameter.
+ *
+ * `run(ctx, grants)` takes an optional grant variant so data-api-defaults DD05
+ * can run this probe with the fixture's GRANTs left out, on a project whose
+ * default privileges were revoked (work-supabase-lab#179). The runner calls
+ * `run(ctx)`, which issues every GRANT.
  */
 import type { Ctx, TestModule, TestResult } from "../../../harness/src/types";
 import { mgmt } from "../../../harness/src/mgmt";
 
-const mod: TestModule = {
+/**
+ * Which of the fixture's explicit GRANTs on probe_canary to issue. "all" is
+ * the committed fixture; "table" leaves out the sequence grant; "none" leaves
+ * out both. Under DD01c's revoke the sequence keeps UPDATE for anon, which
+ * nextval() accepts, so "table" still inserts (DD05e, 2026-10-23); the
+ * sequence grant covers a default that also drops UPDATE.
+ */
+export type W12Grants = "all" | "table" | "none";
+
+const GRANT_TABLE = "GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.probe_canary TO anon, authenticated, service_role";
+const GRANT_SEQUENCE = "GRANT USAGE, SELECT ON SEQUENCE public.probe_canary_id_seq TO anon, authenticated, service_role";
+
+const mod: TestModule & { run(ctx: Ctx, grants?: W12Grants): Promise<TestResult> } = {
   id: "W12",
   title: "realtime probe (connect, subscribe, event latency, reconnect)",
   where: "local",
   requires: ["pat", "anon-key"],
   destructive: true,
 
-  async run(ctx: Ctx): Promise<TestResult> {
+  async run(ctx: Ctx, grants: W12Grants = "all"): Promise<TestResult> {
     const measurements: Record<string, string | number> = {};
     const apiHost = ctx.apiHost;
     const anonKey = ctx.anonKey!;
@@ -82,7 +99,12 @@ const mod: TestModule = {
                 },
                 body: JSON.stringify({ payload: `probe-${connectionId}` }),
               });
-              if (!insertRes.ok) throw new Error(`Insert failed: HTTP ${insertRes.status}`);
+              // Keep the PostgREST body: a missing GRANT is told apart from
+              // any other refusal only by its code (42501) and hint.
+              if (!insertRes.ok) {
+                const body = (await insertRes.text()).replace(/\s+/g, " ").slice(0, 300);
+                throw new Error(`Insert failed: HTTP ${insertRes.status} ${body}`);
+              }
             } else if (msg.event === "postgres_changes") {
               eventTimestamp = Date.now();
               ws.close();
@@ -113,7 +135,10 @@ const mod: TestModule = {
 
     try {
       // 1. Ensure table exists and is in publication.
-      await runSql(`CREATE TABLE IF NOT EXISTS public.probe_canary (id serial primary key, payload text); GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.probe_canary TO anon, authenticated, service_role; GRANT USAGE, SELECT ON SEQUENCE public.probe_canary_id_seq TO anon, authenticated, service_role`);
+      const setup = ["CREATE TABLE IF NOT EXISTS public.probe_canary (id serial primary key, payload text)"];
+      if (grants !== "none") setup.push(GRANT_TABLE);
+      if (grants === "all") setup.push(GRANT_SEQUENCE);
+      await runSql(setup.join("; "));
       await runSql(`DROP PUBLICATION IF EXISTS supabase_realtime`);
       await runSql(`CREATE PUBLICATION supabase_realtime FOR TABLE public.probe_canary`);
       measurements["publication_setup"] = "true";

@@ -218,3 +218,69 @@ project on or after 2026-10-30 and diff the two artifacts (README,
 privileges" hint on DD01Sb would show the enforcement reached an existing
 project, and an unchanged `pg_default_acl` would show it was done some way
 other than rewriting the default ACL.
+
+## 2026-10-23 - DD05: the lab fixtures' explicit GRANTs under the revoked default (work-supabase-lab#179)
+
+Why: the 2026-10-13 re-runs after the explicit GRANTs of #128 (edge-resilience
+W12, usage-metering M01 and M05, compute-disk D09, s2z-wake Z01) all hit
+projects that still carried the legacy `pg_default_acl`, so each would have
+passed without the GRANTs. DD05 applies DD01c's two `ALTER DEFAULT PRIVILEGES
+... REVOKE` statements first, then runs three fixtures with the GRANT left
+out and then issued: the edge-resilience `make seed` SQL for `w_probe`
+(publishable-key read), usage-metering M05's `metering_hourly` (insert with
+the legacy service_role key and an `sb_secret_` key), and edge-resilience W12
+itself, imported and run three times on one table with grants only ever added
+(none, table only, table + sequence).
+
+Harness: `make run ONLY=DD05,DD99`, `--destructive`, lab commit 661afdf plus
+the uncommitted tree that adds DD05 and W12's grant variant. Two runs, n = 1
+fresh Pro-org project per run, created through `POST /v1/projects`
+(ap-southeast-1) and deleted by DD99 (`DELETE 200`, gone from the listing).
+One trial per probe. Published: run 1
+`out/2026-10-23/run-2026-10-23T08-06-02-454Z.json`, run 2
+`out/2026-10-23/run-2026-10-23T08-07-48-510Z.json`, each with a `.facts.md`.
+
+- Run 1: 5 pass, 2 fail. Both fails were the module's own expectations, not
+  the platform: DD05a tested that anon held no privilege at all after the
+  revoke, but the revoke leaves `Dxtm` on tables (as DD01c recorded on
+  2026-10-10) and `w` on sequences; DD05e expected W12 to fail without the
+  sequence GRANT and it passed. DD05a now checks only the letters the revoke
+  targets; DD05e is recorded as `info`. Measurements of the two runs agree
+  apart from W12's latencies.
+- Run 2: 6 pass, 1 info (DD05e), 0 fail. Figures below are run 2 unless stated.
+
+| step | measured |
+|---|---|
+| DD05a `pg_default_acl` for `postgres` in `public`, before | tables `anon=arwdDxtm` (same for authenticated, service_role); sequences `anon=rwU` |
+| DD05a after the revoke (HTTP 201) | tables `anon=Dxtm`; sequences `anon=w` (same for authenticated, service_role) |
+| DD05b `w_probe` seed without its GRANT, publishable GET | 401, code `42501`, hint `Grant the required privileges to the current role with: GRANT SELECT ON public.w_probe TO anon;` |
+| DD05b after the seed's GRANT | 200 `[{"id":1}]`, 0 s to serve |
+| DD05c `metering_hourly` without M05's GRANT, insert | service_role 403 `42501`; `sb_secret_` 403 `42501`, hint `... GRANT INSERT ON public.metering_hourly TO service_role;` |
+| DD05c after M05's GRANT | `sb_secret_` 201, service_role 201 |
+| DD05d W12, no GRANT | W12 fail: `Insert failed: HTTP 401`, code `42501`, hint `... GRANT INSERT ON public.probe_canary TO anon;`, on all 4 attempts (both runs) |
+| DD05e W12, table GRANT only | W12 pass (conn1 480 ms, conn2 277 ms; run 1: 563 ms, 422 ms); sequence relacl `anon=w` |
+| DD05f W12, table + sequence GRANT (the committed fixture) | W12 pass (conn1 474 ms, conn2 403 ms; run 1: 381 ms, 434 ms); sequence relacl `anon=rwU` |
+
+What this settles, for these three fixtures on an API-created project with
+DD01c's revoke applied: the table GRANTs are load-bearing. Without them the
+Data API answers 42501 with the hint (401 for the publishable key, 403 for
+both service_role key kinds), and with them the same request succeeds.
+
+What it does not settle:
+
+- W12's sequence GRANT is not needed under these revoke statements. They take
+  USAGE and SELECT on sequences and leave UPDATE (`w`); Postgres documents
+  that `nextval` requires USAGE or UPDATE on the sequence
+  (https://www.postgresql.org/docs/current/functions-sequence.html), so the
+  anon insert into the `serial` column still drew its id. Whether the
+  platform's own 2026-10-30 default leaves UPDATE the same way is not
+  measured; the GRANT stays in W12 for a default that also takes it.
+- The REVOKE statements are DD01c's wording of the opt-in, not a project
+  created with the dashboard checkbox or a project after the 2026-10-30
+  enforcement (#89).
+- M01, D09, O03, Z01 and privatelink-aws T22 were not run under the revoke.
+  M01 and D09 read their table with the anon key and O03 with an
+  authenticated user's token, through a table-only GRANT of the same form as
+  `w_probe`'s; that they would answer 42501 without it is an inference from
+  the code, not a measurement. Z01's table is never read over the Data API
+  (it exists to trip a security advisor lint), so DD05 says nothing about it.
