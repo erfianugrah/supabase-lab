@@ -3720,7 +3720,7 @@ Management API `PATCH /v1/projects/{ref}/config/auth`, ap-southeast-1:
 - Not measured: pre-2026-06-03 free projects, email delivery, which SMTP
   fields lift the lock, the dashboard path, other plans.
 
-## experiments/mgmt-api-faults - key facts (MF01-MF05, validated 2026-10-10)
+## experiments/mgmt-api-faults - key facts (MF01-MF05 validated 2026-10-10, MF06-MF08 2026-10-23)
 
 Fault injection in front of the Management API (local proxy container; the CLI
 via a profile file whose `api_url` is the proxy, the OpenTofu provider via
@@ -3745,14 +3745,32 @@ cell unless the RUNLOG says otherwise.
 - A create answered 500 after upstream created the project leaves state empty
   and an orphan upstream; re-apply gets 400 (name already exists in the org)
   until the orphan is deleted (MF04b-c). The same-name 400 is the only
-  duplicate protection observed; a retry with a fresh name is not covered and
-  was not run (MF02c).
+  duplicate protection observed (MF02c); a retry with a fresh name is not
+  covered by it (MF07c).
 - Partial apply: project in state, settings write failed (MF04d0); a settings
   write that landed but answered 500 converges at the next plan (MF04d2); a
   DELETE that landed but answered 500 leaves a state entry that destroys
   cleanly later (MF04f2-f3).
-- Not measured: real 5xx bodies, connection-level faults, PATCH through the CLI,
-  writes answered 502/503/504/429 in the provider, docs claims.
+- Connection faults (MF06, 2026-10-23, CLI 2.121.0, n=3): the CLI retries a
+  GET 5 times on an RST, a FIN and a TLS failure (6 attempts or 6 TCP
+  connections; 2-11 ms first to last for RST and FIN), and makes 1 attempt for
+  a create POST; Bun and Node `fetch()` made 1 attempt wherever countable.
+  The CLI prints the same "HttpClientError: Transport error" for reset,
+  close, refused, TLS and DNS failures; Bun reports `ECONNRESET` for both RST
+  and FIN and `ConnectionRefused` for an unresolvable host on GET. Attempt
+  counts on refused and DNS were not countable.
+- A create whose connection is reset after upstream answered 201 leaves an
+  orphan for the CLI (exit 1, same message) and Bun `fetch()` (MF07a-b, n=1).
+  A fresh-name retry made 2 projects for 1 intended (MF07c); listing for the
+  sent name before retrying found and adopted it, 1 project (MF07d).
+- `created_at` on a fresh project preceded the create request by 219 s
+  (MF08a) and 486-564 s (MF07e, 5 projects in a 43 s run): do not filter or
+  age projects by it. `lib/reconcile.ts` (prefix, org, a JSON Lines ledger of
+  acknowledged creates, grace from its own first sighting, exit 3 on orphans)
+  found the one induced orphan and only it (MF08b).
+- Not measured: real 5xx bodies, PATCH through the CLI, writes answered
+  502/503/504/429 in the provider, docs claims, connection faults against the
+  provider, a reset mid-body, DNS timeouts.
 
 ## experiments/pg-minor-17-11 - key facts (validated 2026-10-10, local Docker, supabase/postgres 17.6.1.178 -> 17.11.0.004 and 15.14.1.178 -> 15.19.0.004)
 
