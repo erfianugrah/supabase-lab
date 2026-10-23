@@ -2687,6 +2687,13 @@ git commit -m "fix: explicit Data API grants on SQL-created tables before the 20
 > outage-accounting gap in the module (compute-disk RUNLOG). Artifacts stay
 > in `evidence/` (none of the four experiments has a `publish-evidence`
 > target).
+>
+> **2026-10-23 (#179):** data-api-defaults DD05 ran the `w_probe` seed, M05's
+> `metering_hourly` and W12 itself after DD01c's revoke: the three fixtures'
+> table GRANTs are load-bearing (42501 without them, success with them); W12's
+> sequence GRANT is not needed under that revoke (UPDATE stays, `nextval`
+> accepts it). M01, D09, O03 and T22 were not run under the revoke
+> (M01/D09/O03 inferred from the code).
 
 Before 2026-10-30, on a PAT and the lab Pro org: edge-resilience W12 (one
 project), compute-disk D09, s2z-wake Z01 (about 35 min), usage-metering M01

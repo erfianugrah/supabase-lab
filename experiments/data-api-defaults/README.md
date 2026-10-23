@@ -22,6 +22,7 @@ was fixed from this experiment), `data-api-reenable`.
 | DD03 | as `postgres`: `CREATE EXTENSION ... VERSION` and `ALTER EXTENSION ... UPDATE TO` (warning text, resulting `extversion`); DDL and `schema_migrations` writes in schema `realtime`, with a `realtime.messages` policy as the control |
 | DD01S | the DD01 reading on a STANDING project (`PVLAB_REF`): reading date, `created_at`, exposed schemas, `pg_default_acl` rows for `public` verbatim; one probe table created in SQL, anon and publishable `GET /rest/v1/<probe>` status/code/hint/body verbatim, table dropped in `finally`. No GRANT/REVOKE or `ALTER DEFAULT PRIVILEGES` |
 | DD04 | `GET /rest/v1/` with no key, anon, publishable, service_role and `sb_secret_` keys; `GET /v1/projects/{ref}/database/openapi` with a PAT |
+| DD05 | the lab fixtures' explicit GRANTs are load-bearing: after DD01c's revoke, the edge-resilience `w_probe` seed (publishable read), usage-metering M05's `metering_hourly` (service_role and `sb_secret_` insert) and edge-resilience W12 itself (no GRANT, table GRANT only, table + sequence GRANT) each with the GRANT left out and then issued. Run as `ONLY=DD05,DD99` so DD05a reads the untouched default |
 | DD99 | teardown |
 
 ## Run

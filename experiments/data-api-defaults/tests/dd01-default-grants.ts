@@ -25,10 +25,10 @@
 import type { Ctx, TestModule, TestResult } from "../../../harness/src/types.js";
 import { skipWithoutPro, brief, currentProject, dataApi, ensureProject, pollApi, sql } from "../lib/project.js";
 
-const ACL_SQL = `select defaclrole::regrole::text as role, defaclobjtype as objtype, defaclacl::text as acl
+export const ACL_SQL = `select defaclrole::regrole::text as role, defaclobjtype as objtype, defaclacl::text as acl
   from pg_default_acl where defaclnamespace = 'public'::regnamespace order by 1, 2`;
 
-const REVOKE_SQL = `
+export const REVOKE_SQL = `
 alter default privileges for role postgres in schema public
   revoke select, insert, update, delete on tables from anon, authenticated, service_role;
 alter default privileges for role postgres in schema public
