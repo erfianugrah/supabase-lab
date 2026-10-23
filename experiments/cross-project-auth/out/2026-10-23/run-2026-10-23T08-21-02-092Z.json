@@ -1,0 +1,205 @@
+{
+  "startedAt": "2026-10-23T08:21:02.092Z",
+  "finishedAt": "2026-10-23T08:25:24.272Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "cross-project-auth",
+  "labCommit": "661afdf",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "X04a",
+      "title": "Setup: two projects, seeded",
+      "status": "info",
+      "detail": "A ci_micro, B ci_micro; PostgreSQL 17.11; tenant-a rows A=576 B=664 union=1240; exposed after a=0s b=0s",
+      "measurements": {
+        "compute_a": "ci_micro",
+        "compute_b": "ci_micro",
+        "pg_version": "PostgreSQL 17.11",
+        "create_to_ready_s_a": 6,
+        "create_to_ready_s_b": 4,
+        "seeded_tenant_a_on_a": 576,
+        "seeded_tenant_a_on_b": 664,
+        "seeded_tenant_a_union": 1240,
+        "truth_rows": 1240,
+        "cross_project_exact_ties": 40,
+        "same_ms_clusters_of_3": 100
+      },
+      "durationMs": 14756
+    },
+    {
+      "id": "X04b",
+      "title": "Control: before trust, B refuses the A-issued token",
+      "status": "pass",
+      "detail": "HTTP 401 PGRST301",
+      "measurements": {
+        "status": 401,
+        "code": "PGRST301"
+      },
+      "evidence": "{\"code\":\"PGRST301\",\"details\":\"No suitable key was found to decode the JWT\",\"hint\":null,\"message\":\"No suitable key or wrong key type\"}",
+      "durationMs": 14756
+    },
+    {
+      "id": "X04c",
+      "title": "Trust created on B (oidc_issuer_url = A); same token accepted",
+      "status": "pass",
+      "detail": "create HTTP 201; accepted after 1697 ms (500 ms poll)",
+      "measurements": {
+        "create_status": 201,
+        "accept_ms": 1697,
+        "poll_ms": 500
+      },
+      "evidence": "{\"id\":\"afa283e3-2316-4937-b043-3657e37bb340\",\"type\":\"custom\",\"oidc_issuer_url\":\"https://<ref-a>.supabase.co/auth/v1\",\"jwks_url\":null,\"custom_jwks\":null,\"resolve",
+      "durationMs": 14756
+    },
+    {
+      "id": "X04d",
+      "title": "tenant-a token: only tenant-a rows on A and on B, counts equal the seed",
+      "status": "pass",
+      "detail": "A 576/576 tenants=tenant-a; B 664/664 tenants=tenant-a",
+      "measurements": {
+        "rows_a": 576,
+        "rows_b": 664,
+        "tenants_a": "tenant-a",
+        "tenants_b": "tenant-a"
+      },
+      "durationMs": 14756
+    },
+    {
+      "id": "X04e",
+      "title": "tenant-b token (A-issued): only tenant-b rows on B",
+      "status": "pass",
+      "detail": "HTTP 200, 300 rows, tenants=tenant-b",
+      "measurements": {
+        "status": 200,
+        "rows": 300,
+        "tenants": "tenant-b"
+      },
+      "durationMs": 14756
+    },
+    {
+      "id": "X04f",
+      "title": "Edge Function on A: fan-out read, both legs 200, page equals ground truth",
+      "status": "pass",
+      "detail": "deploy HTTP 201; call HTTP 200, legs b:200 a:200, 50 rows, region ap-southeast-1 (x-sb-edge-region ap-southeast-1)",
+      "measurements": {
+        "deploy_status": 201,
+        "call_status": 200,
+        "rows": 50,
+        "fn_region": "ap-southeast-1",
+        "edge_region_header": "ap-southeast-1"
+      },
+      "evidence": "",
+      "durationMs": 14756
+    },
+    {
+      "id": "X07-hang-client_all",
+      "title": "hang, client_all",
+      "status": "info",
+      "detail": "n=20: whole 0, partial 0 (rows -), failed 20; time to return p50 3002.4 ms p95 3003.1 ms max 3003.2 ms; B leg {\"0 TimeoutError\":20}",
+      "measurements": {
+        "n": 20,
+        "p50_ms": 3002.4,
+        "p95_ms": 3003.1,
+        "p99_ms": 3003.2,
+        "max_ms": 3003.2,
+        "whole": 0,
+        "partial": 0,
+        "failed": 20,
+        "partial_rows": "-",
+        "b_leg": "{\"0 TimeoutError\":20}"
+      },
+      "evidence": "b: no response TimeoutError: The operation timed out.",
+      "durationMs": 244792
+    },
+    {
+      "id": "X07-hang-client_settled",
+      "title": "hang, client_settled",
+      "status": "info",
+      "detail": "n=20: whole 0, partial 20 (rows 50), failed 0; time to return p50 3002.7 ms p95 3003.3 ms max 3003.9 ms; B leg {\"0 TimeoutError\":20}",
+      "measurements": {
+        "n": 20,
+        "p50_ms": 3002.7,
+        "p95_ms": 3003.3,
+        "p99_ms": 3003.9,
+        "max_ms": 3003.9,
+        "whole": 0,
+        "partial": 20,
+        "failed": 0,
+        "partial_rows": "50",
+        "b_leg": "{\"0 TimeoutError\":20}"
+      },
+      "evidence": "b: no response TimeoutError: The operation timed out.",
+      "durationMs": 244793
+    },
+    {
+      "id": "X07-hang-edge_all",
+      "title": "hang, edge_all",
+      "status": "info",
+      "detail": "n=20: whole 0, partial 0 (rows -), failed 20; time to return p50 3111 ms p95 3135.7 ms max 3309.7 ms; B leg {\"0 TimeoutError\":20}",
+      "measurements": {
+        "n": 20,
+        "p50_ms": 3111,
+        "p95_ms": 3135.7,
+        "p99_ms": 3309.7,
+        "max_ms": 3309.7,
+        "inner_n": 20,
+        "inner_p50_ms": 3004.6,
+        "inner_p95_ms": 3006,
+        "inner_p99_ms": 3006.4,
+        "inner_max_ms": 3006.4,
+        "whole": 0,
+        "partial": 0,
+        "failed": 20,
+        "partial_rows": "-",
+        "b_leg": "{\"0 TimeoutError\":20}",
+        "fn_status": "{\"200\":20}"
+      },
+      "evidence": "b: no response TimeoutError: Signal timed out.",
+      "durationMs": 244793
+    },
+    {
+      "id": "X07-hang-edge_settled",
+      "title": "hang, edge_settled",
+      "status": "info",
+      "detail": "n=20: whole 0, partial 20 (rows 50), failed 0; time to return p50 3112.7 ms p95 3148.8 ms max 3171.8 ms; B leg {\"0 TimeoutError\":20}",
+      "measurements": {
+        "n": 20,
+        "p50_ms": 3112.7,
+        "p95_ms": 3148.8,
+        "p99_ms": 3171.8,
+        "max_ms": 3171.8,
+        "inner_n": 20,
+        "inner_p50_ms": 3005.6,
+        "inner_p95_ms": 3006.2,
+        "inner_p99_ms": 3006.8,
+        "inner_max_ms": 3006.8,
+        "whole": 0,
+        "partial": 20,
+        "failed": 0,
+        "partial_rows": "50",
+        "b_leg": "{\"0 TimeoutError\":20}",
+        "fn_status": "{\"200\":20}"
+      },
+      "evidence": "b: no response TimeoutError: Signal timed out.",
+      "durationMs": 244793
+    },
+    {
+      "id": "X99",
+      "title": "Both projects deleted and gone from the listing",
+      "status": "pass",
+      "detail": "DELETE {\"a\":200,\"b\":200}; absent from GET /projects after 0 s",
+      "measurements": {
+        "delete_status": "{\"a\":200,\"b\":200}",
+        "gone_from_listing_s": 0
+      },
+      "durationMs": 2631
+    }
+  ]
+}

@@ -1,0 +1,766 @@
+{
+  "startedAt": "2026-10-23T07:57:57.742Z",
+  "finishedAt": "2026-10-23T08:06:31.768Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "cross-project-auth",
+  "labCommit": "661afdf",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "X04a",
+      "title": "Setup: two projects, seeded",
+      "status": "info",
+      "detail": "A ci_micro, B ci_micro; PostgreSQL 17.11; tenant-a rows A=576 B=664 union=1240; exposed after a=0s b=0s",
+      "measurements": {
+        "compute_a": "ci_micro",
+        "compute_b": "ci_micro",
+        "pg_version": "PostgreSQL 17.11",
+        "create_to_ready_s_a": 6,
+        "create_to_ready_s_b": 4,
+        "seeded_tenant_a_on_a": 576,
+        "seeded_tenant_a_on_b": 664,
+        "seeded_tenant_a_union": 1240,
+        "truth_rows": 1240,
+        "cross_project_exact_ties": 40,
+        "same_ms_clusters_of_3": 100
+      },
+      "durationMs": 15243
+    },
+    {
+      "id": "X04b",
+      "title": "Control: before trust, B refuses the A-issued token",
+      "status": "pass",
+      "detail": "HTTP 401 PGRST301",
+      "measurements": {
+        "status": 401,
+        "code": "PGRST301"
+      },
+      "evidence": "{\"code\":\"PGRST301\",\"details\":\"No suitable key was found to decode the JWT\",\"hint\":null,\"message\":\"No suitable key or wrong key type\"}",
+      "durationMs": 15243
+    },
+    {
+      "id": "X04c",
+      "title": "Trust created on B (oidc_issuer_url = A); same token accepted",
+      "status": "pass",
+      "detail": "create HTTP 201; accepted after 1226 ms (500 ms poll)",
+      "measurements": {
+        "create_status": 201,
+        "accept_ms": 1226,
+        "poll_ms": 500
+      },
+      "evidence": "{\"id\":\"809f50bb-1b08-4337-bdd6-2151cb282f60\",\"type\":\"custom\",\"oidc_issuer_url\":\"https://<ref-a>.supabase.co/auth/v1\",\"jwks_url\":null,\"custom_jwks\":null,\"resolve",
+      "durationMs": 15243
+    },
+    {
+      "id": "X04d",
+      "title": "tenant-a token: only tenant-a rows on A and on B, counts equal the seed",
+      "status": "pass",
+      "detail": "A 576/576 tenants=tenant-a; B 664/664 tenants=tenant-a",
+      "measurements": {
+        "rows_a": 576,
+        "rows_b": 664,
+        "tenants_a": "tenant-a",
+        "tenants_b": "tenant-a"
+      },
+      "durationMs": 15243
+    },
+    {
+      "id": "X04e",
+      "title": "tenant-b token (A-issued): only tenant-b rows on B",
+      "status": "pass",
+      "detail": "HTTP 200, 300 rows, tenants=tenant-b",
+      "measurements": {
+        "status": 200,
+        "rows": 300,
+        "tenants": "tenant-b"
+      },
+      "durationMs": 15243
+    },
+    {
+      "id": "X04f",
+      "title": "Edge Function on A: fan-out read, both legs 200, page equals ground truth",
+      "status": "pass",
+      "detail": "deploy HTTP 201; call HTTP 200, legs a:200 b:200, 50 rows, region ap-southeast-1 (x-sb-edge-region ap-southeast-1)",
+      "measurements": {
+        "deploy_status": 201,
+        "call_status": 200,
+        "rows": 50,
+        "fn_region": "ap-southeast-1",
+        "edge_region_header": "ap-southeast-1"
+      },
+      "evidence": "",
+      "durationMs": 15243
+    },
+    {
+      "id": "X05-client_single",
+      "title": "client_single: one leg, A fan_all (local client)",
+      "status": "info",
+      "detail": "n=200, p50 35.9 ms, p95 59.7 ms, p99 112.2 ms; wrong pages 0, errors 0",
+      "measurements": {
+        "n": 200,
+        "p50_ms": 35.9,
+        "p95_ms": 59.7,
+        "p99_ms": 112.2,
+        "max_ms": 258.7,
+        "leg_a_n": 200,
+        "leg_a_p50_ms": 35.8,
+        "leg_a_p95_ms": 59.6,
+        "leg_a_p99_ms": 112,
+        "leg_a_max_ms": 258.6,
+        "wrong_pages": 0,
+        "errors": 0,
+        "warmup_rounds": 5
+      },
+      "durationMs": 99705
+    },
+    {
+      "id": "X05-client_fanout",
+      "title": "client_fanout: two legs, A + B fan_items, merged (local client)",
+      "status": "info",
+      "detail": "n=200, p50 43.6 ms, p95 179.2 ms, p99 487 ms; wrong pages 0, errors 0",
+      "measurements": {
+        "n": 200,
+        "p50_ms": 43.6,
+        "p95_ms": 179.2,
+        "p99_ms": 487,
+        "max_ms": 566.4,
+        "leg_a_n": 200,
+        "leg_a_p50_ms": 36.4,
+        "leg_a_p95_ms": 58.9,
+        "leg_a_p99_ms": 109.1,
+        "leg_a_max_ms": 228.9,
+        "leg_b_n": 200,
+        "leg_b_p50_ms": 38.8,
+        "leg_b_p95_ms": 98.7,
+        "leg_b_p99_ms": 486.3,
+        "leg_b_max_ms": 565.7,
+        "wrong_pages": 0,
+        "errors": 0,
+        "warmup_rounds": 5
+      },
+      "durationMs": 99705
+    },
+    {
+      "id": "X05-edge_single",
+      "title": "edge_single: one leg, A fan_all (Edge Function on A)",
+      "status": "info",
+      "detail": "n=200, p50 157.9 ms, p95 262.6 ms, p99 630.6 ms; wrong pages 0, errors 0; region/edge ap-southeast-1/ap-southeast-1",
+      "measurements": {
+        "n": 200,
+        "p50_ms": 157.9,
+        "p95_ms": 262.6,
+        "p99_ms": 630.6,
+        "max_ms": 693.5,
+        "inner_n": 200,
+        "inner_p50_ms": 57.4,
+        "inner_p95_ms": 132.4,
+        "inner_p99_ms": 272.3,
+        "inner_max_ms": 537.1,
+        "leg_a_n": 200,
+        "leg_a_p50_ms": 56.4,
+        "leg_a_p95_ms": 130.7,
+        "leg_a_p99_ms": 271,
+        "leg_a_max_ms": 535.9,
+        "wrong_pages": 0,
+        "errors": 0,
+        "warmup_rounds": 5,
+        "region_edge": "ap-southeast-1/ap-southeast-1"
+      },
+      "durationMs": 99705
+    },
+    {
+      "id": "X05-edge_fanout",
+      "title": "edge_fanout: two legs, A + B fan_items, merged (Edge Function on A)",
+      "status": "info",
+      "detail": "n=200, p50 174.1 ms, p95 343.9 ms, p99 571.5 ms; wrong pages 0, errors 0; region/edge ap-southeast-1/ap-southeast-1",
+      "measurements": {
+        "n": 200,
+        "p50_ms": 174.1,
+        "p95_ms": 343.9,
+        "p99_ms": 571.5,
+        "max_ms": 2531.7,
+        "inner_n": 200,
+        "inner_p50_ms": 75.4,
+        "inner_p95_ms": 202.3,
+        "inner_p99_ms": 338.2,
+        "inner_max_ms": 422.6,
+        "leg_a_n": 200,
+        "leg_a_p50_ms": 58,
+        "leg_a_p95_ms": 127.1,
+        "leg_a_p99_ms": 251.5,
+        "leg_a_max_ms": 368.4,
+        "leg_b_n": 200,
+        "leg_b_p50_ms": 59.8,
+        "leg_b_p95_ms": 169.8,
+        "leg_b_p99_ms": 256.9,
+        "leg_b_max_ms": 420.7,
+        "wrong_pages": 0,
+        "errors": 0,
+        "warmup_rounds": 5,
+        "region_edge": "ap-southeast-1/ap-southeast-1"
+      },
+      "durationMs": 99705
+    },
+    {
+      "id": "X05z",
+      "title": "Run shape",
+      "status": "info",
+      "detail": "200 rounds x 4 cells interleaved, 100 s wall",
+      "measurements": {
+        "rounds": 200,
+        "wall_s": 100,
+        "page_size": 50
+      },
+      "durationMs": 99705
+    },
+    {
+      "id": "X06-keyset_exact",
+      "title": "keyset_exact: page 20, walked to exhaustion",
+      "status": "pass",
+      "detail": "63 pages, 1240 rows returned (1240 distinct) vs truth 1240; missing 0, duplicates 0, foreign 0, positions differing 0; equals truth: true",
+      "measurements": {
+        "pages": 63,
+        "rows_returned": 1240,
+        "distinct": 1240,
+        "truth_rows": 1240,
+        "missing": 0,
+        "duplicates": 0,
+        "foreign": 0,
+        "positions_differing": 0,
+        "equals_truth": "true"
+      },
+      "durationMs": 33839
+    },
+    {
+      "id": "X06-keyset_ms_cursor",
+      "title": "keyset_ms_cursor: page 20, walked to exhaustion",
+      "status": "info",
+      "detail": "61 pages, 1201 rows returned (1201 distinct) vs truth 1240; missing 39, duplicates 0, foreign 0, positions differing 1200; equals truth: false",
+      "measurements": {
+        "pages": 61,
+        "rows_returned": 1201,
+        "distinct": 1201,
+        "truth_rows": 1240,
+        "missing": 39,
+        "duplicates": 0,
+        "foreign": 0,
+        "positions_differing": 1200,
+        "equals_truth": "false"
+      },
+      "durationMs": 33839
+    },
+    {
+      "id": "X06-keyset_ms_compare",
+      "title": "keyset_ms_compare: page 20, walked to exhaustion",
+      "status": "info",
+      "detail": "61 pages, 1201 rows returned (1201 distinct) vs truth 1240; missing 39, duplicates 0, foreign 0, positions differing 1202; equals truth: false",
+      "measurements": {
+        "pages": 61,
+        "rows_returned": 1201,
+        "distinct": 1201,
+        "truth_rows": 1240,
+        "missing": 39,
+        "duplicates": 0,
+        "foreign": 0,
+        "positions_differing": 1202,
+        "equals_truth": "false"
+      },
+      "durationMs": 33839
+    },
+    {
+      "id": "X06-offset",
+      "title": "offset: page 20, walked to exhaustion",
+      "status": "info",
+      "detail": "34 pages, 664 rows returned (664 distinct) vs truth 1240; missing 576, duplicates 0, foreign 0, positions differing 1220; equals truth: false",
+      "measurements": {
+        "pages": 34,
+        "rows_returned": 664,
+        "distinct": 664,
+        "truth_rows": 1240,
+        "missing": 576,
+        "duplicates": 0,
+        "foreign": 0,
+        "positions_differing": 1220,
+        "equals_truth": "false"
+      },
+      "durationMs": 33839
+    },
+    {
+      "id": "X06-single_keyset",
+      "title": "single_keyset: page 20, walked to exhaustion",
+      "status": "pass",
+      "detail": "63 pages, 1240 rows returned (1240 distinct) vs truth 1240; missing 0, duplicates 0, foreign 0, positions differing 0; equals truth: true",
+      "measurements": {
+        "pages": 63,
+        "rows_returned": 1240,
+        "distinct": 1240,
+        "truth_rows": 1240,
+        "missing": 0,
+        "duplicates": 0,
+        "foreign": 0,
+        "positions_differing": 0,
+        "equals_truth": "true"
+      },
+      "durationMs": 33839
+    },
+    {
+      "id": "X06-edge_keyset_exact",
+      "title": "edge_keyset_exact: page 20, walked to exhaustion",
+      "status": "pass",
+      "detail": "63 pages, 1240 rows returned (1240 distinct) vs truth 1240; missing 0, duplicates 0, foreign 0, positions differing 0; equals truth: true",
+      "measurements": {
+        "pages": 63,
+        "rows_returned": 1240,
+        "distinct": 1240,
+        "truth_rows": 1240,
+        "missing": 0,
+        "duplicates": 0,
+        "foreign": 0,
+        "positions_differing": 0,
+        "equals_truth": "true"
+      },
+      "durationMs": 33839
+    },
+    {
+      "id": "X07-dead_ref-client_all",
+      "title": "dead_ref, client_all",
+      "status": "info",
+      "detail": "n=20: whole 0, partial 0 (rows -), failed 20; time to return p50 2.1 ms p95 7.6 ms max 43.7 ms; B leg {\"0 Error\":20}",
+      "measurements": {
+        "n": 20,
+        "p50_ms": 2.1,
+        "p95_ms": 7.6,
+        "p99_ms": 43.7,
+        "max_ms": 43.7,
+        "whole": 0,
+        "partial": 0,
+        "failed": 20,
+        "partial_rows": "-",
+        "b_leg": "{\"0 Error\":20}"
+      },
+      "evidence": "b: no response Error: Unable to connect. Is the computer able to access the url?",
+      "durationMs": 362735
+    },
+    {
+      "id": "X07-dead_ref-client_settled",
+      "title": "dead_ref, client_settled",
+      "status": "info",
+      "detail": "n=20: whole 0, partial 20 (rows 50), failed 0; time to return p50 48 ms p95 80.6 ms max 199.6 ms; B leg {\"0 Error\":20}",
+      "measurements": {
+        "n": 20,
+        "p50_ms": 48,
+        "p95_ms": 80.6,
+        "p99_ms": 199.6,
+        "max_ms": 199.6,
+        "whole": 0,
+        "partial": 20,
+        "failed": 0,
+        "partial_rows": "50",
+        "b_leg": "{\"0 Error\":20}"
+      },
+      "evidence": "b: no response Error: Was there a typo in the url or port?",
+      "durationMs": 362735
+    },
+    {
+      "id": "X07-dead_ref-edge_all",
+      "title": "dead_ref, edge_all",
+      "status": "info",
+      "detail": "n=20: whole 0, partial 0 (rows -), failed 20; time to return p50 114.8 ms p95 168.3 ms max 181.6 ms; B leg {\"0 TypeError\":20}",
+      "measurements": {
+        "n": 20,
+        "p50_ms": 114.8,
+        "p95_ms": 168.3,
+        "p99_ms": 181.6,
+        "max_ms": 181.6,
+        "inner_n": 20,
+        "inner_p50_ms": 8.2,
+        "inner_p95_ms": 16.3,
+        "inner_p99_ms": 22.6,
+        "inner_max_ms": 22.6,
+        "whole": 0,
+        "partial": 0,
+        "failed": 20,
+        "partial_rows": "-",
+        "b_leg": "{\"0 TypeError\":20}",
+        "fn_status": "{\"200\":20}"
+      },
+      "evidence": "b: no response TypeError: error sending request for url (https://<ref>.supabase.co/rest/v1/fan_items?select=id,created_at,body,src&order=created_at.desc,id.desc",
+      "durationMs": 362735
+    },
+    {
+      "id": "X07-dead_ref-edge_settled",
+      "title": "dead_ref, edge_settled",
+      "status": "info",
+      "detail": "n=20: whole 0, partial 20 (rows 50), failed 0; time to return p50 165.3 ms p95 221.9 ms max 286.1 ms; B leg {\"0 TypeError\":20}",
+      "measurements": {
+        "n": 20,
+        "p50_ms": 165.3,
+        "p95_ms": 221.9,
+        "p99_ms": 286.1,
+        "max_ms": 286.1,
+        "inner_n": 20,
+        "inner_p50_ms": 67,
+        "inner_p95_ms": 130.1,
+        "inner_p99_ms": 204.4,
+        "inner_max_ms": 204.4,
+        "whole": 0,
+        "partial": 20,
+        "failed": 0,
+        "partial_rows": "50",
+        "b_leg": "{\"0 TypeError\":20}",
+        "fn_status": "{\"200\":20}"
+      },
+      "evidence": "b: no response TypeError: error sending request for url (https://<ref>.supabase.co/rest/v1/fan_items?select=id,created_at,body,src&order=created_at.desc,id.desc",
+      "durationMs": 362735
+    },
+    {
+      "id": "X07-nxdomain-client_all",
+      "title": "nxdomain, client_all",
+      "status": "info",
+      "detail": "n=20: whole 0, partial 0 (rows -), failed 20; time to return p50 2.1 ms p95 4.6 ms max 4.6 ms; B leg {\"0 Error\":20}",
+      "measurements": {
+        "n": 20,
+        "p50_ms": 2.1,
+        "p95_ms": 4.6,
+        "p99_ms": 4.6,
+        "max_ms": 4.6,
+        "whole": 0,
+        "partial": 0,
+        "failed": 20,
+        "partial_rows": "-",
+        "b_leg": "{\"0 Error\":20}"
+      },
+      "evidence": "b: no response Error: Unable to connect. Is the computer able to access the url?",
+      "durationMs": 362735
+    },
+    {
+      "id": "X07-nxdomain-client_settled",
+      "title": "nxdomain, client_settled",
+      "status": "info",
+      "detail": "n=20: whole 0, partial 20 (rows 50), failed 0; time to return p50 40.6 ms p95 84.5 ms max 133.7 ms; B leg {\"0 Error\":20}",
+      "measurements": {
+        "n": 20,
+        "p50_ms": 40.6,
+        "p95_ms": 84.5,
+        "p99_ms": 133.7,
+        "max_ms": 133.7,
+        "whole": 0,
+        "partial": 20,
+        "failed": 0,
+        "partial_rows": "50",
+        "b_leg": "{\"0 Error\":20}"
+      },
+      "evidence": "b: no response Error: Was there a typo in the url or port?",
+      "durationMs": 362735
+    },
+    {
+      "id": "X07-nxdomain-edge_all",
+      "title": "nxdomain, edge_all",
+      "status": "info",
+      "detail": "n=20: whole 0, partial 0 (rows -), failed 20; time to return p50 98.5 ms p95 125.9 ms max 133.6 ms; B leg {\"0 TypeError\":20}",
+      "measurements": {
+        "n": 20,
+        "p50_ms": 98.5,
+        "p95_ms": 125.9,
+        "p99_ms": 133.6,
+        "max_ms": 133.6,
+        "inner_n": 20,
+        "inner_p50_ms": 5.4,
+        "inner_p95_ms": 6.9,
+        "inner_p99_ms": 7.1,
+        "inner_max_ms": 7.1,
+        "whole": 0,
+        "partial": 0,
+        "failed": 20,
+        "partial_rows": "-",
+        "b_leg": "{\"0 TypeError\":20}",
+        "fn_status": "{\"200\":20}"
+      },
+      "evidence": "b: no response TypeError: error sending request for url (https://fanout-dead.invalid/rest/v1/fan_items?select=id,created_at,body,src&order=created_at.desc,id.desc&limit=50): c",
+      "durationMs": 362735
+    },
+    {
+      "id": "X07-nxdomain-edge_settled",
+      "title": "nxdomain, edge_settled",
+      "status": "info",
+      "detail": "n=20: whole 0, partial 20 (rows 50), failed 0; time to return p50 164.3 ms p95 512 ms max 930.4 ms; B leg {\"0 TypeError\":20}",
+      "measurements": {
+        "n": 20,
+        "p50_ms": 164.3,
+        "p95_ms": 512,
+        "p99_ms": 930.4,
+        "max_ms": 930.4,
+        "inner_n": 20,
+        "inner_p50_ms": 59.2,
+        "inner_p95_ms": 243.4,
+        "inner_p99_ms": 448.6,
+        "inner_max_ms": 448.6,
+        "whole": 0,
+        "partial": 20,
+        "failed": 0,
+        "partial_rows": "50",
+        "b_leg": "{\"0 TypeError\":20}",
+        "fn_status": "{\"200\":20}"
+      },
+      "evidence": "b: no response TypeError: error sending request for url (https://fanout-dead.invalid/rest/v1/fan_items?select=id,created_at,body,src&order=created_at.desc,id.desc&limit=50): c",
+      "durationMs": 362735
+    },
+    {
+      "id": "X07-blackhole-client_all",
+      "title": "blackhole, client_all",
+      "status": "info",
+      "detail": "n=20: whole 0, partial 0 (rows -), failed 20; time to return p50 3001.8 ms p95 3002.8 ms max 3002.9 ms; B leg {\"0 TimeoutError\":20}",
+      "measurements": {
+        "n": 20,
+        "p50_ms": 3001.8,
+        "p95_ms": 3002.8,
+        "p99_ms": 3002.9,
+        "max_ms": 3002.9,
+        "whole": 0,
+        "partial": 0,
+        "failed": 20,
+        "partial_rows": "-",
+        "b_leg": "{\"0 TimeoutError\":20}"
+      },
+      "evidence": "b: no response TimeoutError: The operation timed out.",
+      "durationMs": 362735
+    },
+    {
+      "id": "X07-blackhole-client_settled",
+      "title": "blackhole, client_settled",
+      "status": "info",
+      "detail": "n=20: whole 0, partial 20 (rows 50), failed 0; time to return p50 3002.2 ms p95 3002.8 ms max 3005.3 ms; B leg {\"0 TimeoutError\":20}",
+      "measurements": {
+        "n": 20,
+        "p50_ms": 3002.2,
+        "p95_ms": 3002.8,
+        "p99_ms": 3005.3,
+        "max_ms": 3005.3,
+        "whole": 0,
+        "partial": 20,
+        "failed": 0,
+        "partial_rows": "50",
+        "b_leg": "{\"0 TimeoutError\":20}"
+      },
+      "evidence": "b: no response TimeoutError: The operation timed out.",
+      "durationMs": 362735
+    },
+    {
+      "id": "X07-blackhole-edge_all",
+      "title": "blackhole, edge_all",
+      "status": "info",
+      "detail": "n=20: whole 0, partial 0 (rows -), failed 20; time to return p50 3099.8 ms p95 3136.6 ms max 4620.3 ms; B leg {\"0 TimeoutError\":20}",
+      "measurements": {
+        "n": 20,
+        "p50_ms": 3099.8,
+        "p95_ms": 3136.6,
+        "p99_ms": 4620.3,
+        "max_ms": 4620.3,
+        "inner_n": 20,
+        "inner_p50_ms": 3004.4,
+        "inner_p95_ms": 3009.8,
+        "inner_p99_ms": 4521.8,
+        "inner_max_ms": 4521.8,
+        "whole": 0,
+        "partial": 0,
+        "failed": 20,
+        "partial_rows": "-",
+        "b_leg": "{\"0 TimeoutError\":20}",
+        "fn_status": "{\"200\":20}"
+      },
+      "evidence": "b: no response TimeoutError: Signal timed out.",
+      "durationMs": 362735
+    },
+    {
+      "id": "X07-blackhole-edge_settled",
+      "title": "blackhole, edge_settled",
+      "status": "info",
+      "detail": "n=20: whole 0, partial 20 (rows 50), failed 0; time to return p50 3102 ms p95 3129 ms max 3136.5 ms; B leg {\"0 TimeoutError\":20}",
+      "measurements": {
+        "n": 20,
+        "p50_ms": 3102,
+        "p95_ms": 3129,
+        "p99_ms": 3136.5,
+        "max_ms": 3136.5,
+        "inner_n": 20,
+        "inner_p50_ms": 3005.2,
+        "inner_p95_ms": 3006.4,
+        "inner_p99_ms": 3006.5,
+        "inner_max_ms": 3006.5,
+        "whole": 0,
+        "partial": 20,
+        "failed": 0,
+        "partial_rows": "50",
+        "b_leg": "{\"0 TimeoutError\":20}",
+        "fn_status": "{\"200\":20}"
+      },
+      "evidence": "b: no response TimeoutError: Signal timed out.",
+      "durationMs": 362735
+    },
+    {
+      "id": "X07-trust_revoked-setup",
+      "title": "trust_revoked: integration deleted on B",
+      "status": "info",
+      "detail": "DELETE HTTP 200; B refuses after 1741 ms",
+      "measurements": {
+        "delete_status": 200,
+        "refused_after_ms": 1741
+      },
+      "durationMs": 362735
+    },
+    {
+      "id": "X07-trust_revoked-client_all",
+      "title": "trust_revoked, client_all",
+      "status": "info",
+      "detail": "n=20: whole 0, partial 0 (rows -), failed 20; time to return p50 29.8 ms p95 56.8 ms max 62 ms; B leg {\"401 PGRST301\":20}",
+      "measurements": {
+        "n": 20,
+        "p50_ms": 29.8,
+        "p95_ms": 56.8,
+        "p99_ms": 62,
+        "max_ms": 62,
+        "whole": 0,
+        "partial": 0,
+        "failed": 20,
+        "partial_rows": "-",
+        "b_leg": "{\"401 PGRST301\":20}"
+      },
+      "evidence": "b: HTTP 401 PGRST301 {\"code\":\"PGRST301\",\"details\":\"No suitable key was found to decode the JWT\",\"hint\":null,\"message\":\"No suitable key or wro",
+      "durationMs": 362735
+    },
+    {
+      "id": "X07-trust_revoked-client_settled",
+      "title": "trust_revoked, client_settled",
+      "status": "info",
+      "detail": "n=20: whole 0, partial 20 (rows 50), failed 0; time to return p50 43.1 ms p95 73.1 ms max 89.3 ms; B leg {\"401 PGRST301\":20}",
+      "measurements": {
+        "n": 20,
+        "p50_ms": 43.1,
+        "p95_ms": 73.1,
+        "p99_ms": 89.3,
+        "max_ms": 89.3,
+        "whole": 0,
+        "partial": 20,
+        "failed": 0,
+        "partial_rows": "50",
+        "b_leg": "{\"401 PGRST301\":20}"
+      },
+      "evidence": "b: HTTP 401 PGRST301 {\"code\":\"PGRST301\",\"details\":\"No suitable key was found to decode the JWT\",\"hint\":null,\"message\":\"No suitable key or wro",
+      "durationMs": 362735
+    },
+    {
+      "id": "X07-trust_revoked-edge_all",
+      "title": "trust_revoked, edge_all",
+      "status": "info",
+      "detail": "n=20: whole 0, partial 0 (rows -), failed 20; time to return p50 154.8 ms p95 396.7 ms max 592.2 ms; B leg {\"401 PGRST301\":20}",
+      "measurements": {
+        "n": 20,
+        "p50_ms": 154.8,
+        "p95_ms": 396.7,
+        "p99_ms": 592.2,
+        "max_ms": 592.2,
+        "inner_n": 20,
+        "inner_p50_ms": 50.6,
+        "inner_p95_ms": 244.2,
+        "inner_p99_ms": 260.4,
+        "inner_max_ms": 260.4,
+        "whole": 0,
+        "partial": 0,
+        "failed": 20,
+        "partial_rows": "-",
+        "b_leg": "{\"401 PGRST301\":20}",
+        "fn_status": "{\"200\":20}"
+      },
+      "evidence": "b: HTTP 401 PGRST301 {\"code\":\"PGRST301\",\"details\":\"No suitable key was found to decode the JWT\",\"hint\":null,\"message\":\"No suitable key or wro",
+      "durationMs": 362735
+    },
+    {
+      "id": "X07-trust_revoked-edge_settled",
+      "title": "trust_revoked, edge_settled",
+      "status": "info",
+      "detail": "n=20: whole 0, partial 20 (rows 50), failed 0; time to return p50 176.1 ms p95 600.1 ms max 605.1 ms; B leg {\"401 PGRST301\":20}",
+      "measurements": {
+        "n": 20,
+        "p50_ms": 176.1,
+        "p95_ms": 600.1,
+        "p99_ms": 605.1,
+        "max_ms": 605.1,
+        "inner_n": 20,
+        "inner_p50_ms": 66.5,
+        "inner_p95_ms": 499.4,
+        "inner_p99_ms": 502.9,
+        "inner_max_ms": 502.9,
+        "whole": 0,
+        "partial": 20,
+        "failed": 0,
+        "partial_rows": "50",
+        "b_leg": "{\"401 PGRST301\":20}",
+        "fn_status": "{\"200\":20}"
+      },
+      "evidence": "b: HTTP 401 PGRST301 {\"code\":\"PGRST301\",\"details\":\"No suitable key was found to decode the JWT\",\"hint\":null,\"message\":\"No suitable key or wro",
+      "durationMs": 362735
+    },
+    {
+      "id": "X07-trust_revoked-restore",
+      "title": "trust_revoked: integration re-created, token accepted again",
+      "status": "info",
+      "detail": "create HTTP 201; accepted after 685 ms",
+      "measurements": {
+        "create_status": 201,
+        "accepted_after_ms": 685
+      },
+      "durationMs": 362735
+    },
+    {
+      "id": "X07-restart",
+      "title": "restart of B: settled fan-out sampled once per second (client and edge alternating)",
+      "status": "info",
+      "detail": "restart HTTP 200; 82 samples over 89 s; B leg failed in 22 (first at 1.8 s, last at 58.1 s after the call); partial results 22; whole-read failures 0; kinds {\"edge 521\":6,\"client 521\":4,\"client 0 TimeoutError\":6,\"edge 0 TimeoutError\":5,\"client 503 PGRST002\":1}",
+      "measurements": {
+        "restart_status": 200,
+        "samples": 82,
+        "b_failed_samples": 22,
+        "first_fail_s": 1.8,
+        "last_fail_s": 58.1,
+        "partial_samples": 22,
+        "whole_failures": 0,
+        "kinds": "{\"edge 521\":6,\"client 521\":4,\"client 0 TimeoutError\":6,\"edge 0 TimeoutError\":5,\"client 503 PGRST002\":1}",
+        "failed_sample_n": 22,
+        "failed_sample_p50_ms": 1308.6,
+        "failed_sample_p95_ms": 3110,
+        "failed_sample_p99_ms": 3121.4,
+        "failed_sample_max_ms": 3121.4
+      },
+      "evidence": "b: HTTP 521 <!DOCTYPE html> <!--[if lt IE 7]> <html class=\"no-js ie6 oldie\" lang=\"en-US\"> <![endif]--> <!--[if IE 7]> <html class=\"n",
+      "durationMs": 362735
+    },
+    {
+      "id": "X07-pause-call",
+      "title": "pause of B through the Management API",
+      "status": "info",
+      "detail": "HTTP 400: {\"message\":\"Project is not free-tier. Please downgrade it to free-tier first and try again.\"}",
+      "measurements": {
+        "pause_status": 400
+      },
+      "durationMs": 362735
+    },
+    {
+      "id": "X99",
+      "title": "Both projects deleted and gone from the listing",
+      "status": "pass",
+      "detail": "DELETE {\"a\":200,\"b\":200}; absent from GET /projects after 0 s",
+      "measurements": {
+        "delete_status": "{\"a\":200,\"b\":200}",
+        "gone_from_listing_s": 0
+      },
+      "durationMs": 2503
+    }
+  ]
+}

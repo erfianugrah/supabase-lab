@@ -477,7 +477,7 @@ Affects every experiment here, since they all create projects.
   non-JWT as a bearer and gets `PGRST301 "Expected 3 parts in JWT; got 1"`, which
   reads like an auth finding and is not.
 
-## experiments/cross-project-auth - key facts (validated 2026-08-03)
+## experiments/cross-project-auth - key facts (validated 2026-08-03; fan-out X04-X07 2026-10-23, two runs, Micro x2, ap-southeast-1, Pro org)
 
 Two projects, no AWS. Can one project's identity be trusted by another, so a
 tenant keeps its token across a move? See RUNLOG.md.
@@ -505,6 +505,43 @@ tenant keeps its token across a move? See RUNLOG.md.
   mint. A refresh presented to the trusting project answers
   `400 refresh_token_not_found` - measured here by X03 (green 2026-08-17, see
   the RUNLOG), so it is reproducible, not reported.
+- Fan-out read in a tenant-per-project layout (X04-X07, `out/2026-10-23/`,
+  two runs plus a run 3 of the X07 hang cells). X04-X07 self-provision their
+  own pair (`pvlab-xf-*`, `make fanout`, PVLAB_ORG_PRO; X99 deletes it),
+  unlike X01-X03's tofu pair. One token issued by A's Auth reads RLS-filtered
+  rows from A and, once B trusts A via `oidc_issuer_url`, from B (576 + 664
+  rows, tenant-a only; tenant-b's token sees only tenant-b on B). The merge
+  code is one file (`lib/merge.ts`) run by the client and by an Edge
+  Function on A.
+- Latency (n = 200 per cell per run, interleaved, warm, one vantage, page of
+  50): client single-project read p50 35.9 / 34.7 ms, p95 59.7 / 84 ms;
+  client two-project fan-out p50 43.6 / 43 ms, p95 179.2 / 233.3 ms. The
+  median barely moves; the p95 does (the merge waits for the slower leg
+  every time - reasoned from the merge code, not separated per sample).
+  Edge Function on A: round trip p50 157.9 / 154 ms single, 174.1 / 176 ms
+  fan-out; inside the function the leg to A's own Data API took p50 56.4 /
+  54.3 ms, slower than from the client (cause not measured).
+- Pagination: keyset by `(created_at, id)` with the same cursor filter on
+  every leg and the cursor kept as PostgREST's text returned all 1240 rows in
+  truth order (also from the function). A cursor passed through a JS `Date`
+  drops microseconds and silently skipped 39 rows (rows sharing a millisecond
+  with the cursor row; the count is the seed layout's, and the offline replay
+  in `lib/merge.test.ts` reproduces it). Per-project OFFSET returned 664 of
+  1240.
+- One project unavailable (per-leg timeout 3000 ms, n = 20 per cell): DNS
+  failure (a ref-shaped hostname of no project gave `ENOTFOUND`, run 2) or
+  revoked trust (`401 PGRST301`) fail fast, so policy "all" errors in about
+  2 ms or 30 ms from the client and policy "settled" returns A's 50 rows as
+  partial at about normal read cost. A leg that never answers holds both
+  policies to the timeout (p50 3001.7 ms or more), measured with an
+  unanswered TCP connect (runs 1-2; that target was removed after run 2) and
+  with an Edge Function path that accepts and stays silent (run 3, the
+  target the committed code uses). A real restart of B (`POST .../restart`)
+  failed B's leg in 22 of 82 samples from 1.8 s to 58.1 s after the call
+  (run 1) and 19 of 86 from 2.8 s to 61.0 s (run 2), as HTML `521`, client
+  timeouts and one `503 PGRST002`; "settled" kept every read partial, none
+  failed whole. `POST .../pause` on a Pro-plan project answers `400
+  "Project is not free-tier"`.
 
 ## experiments/tenant-consolidation - key facts (validated 2026-08-04)
 
