@@ -62,6 +62,8 @@ make onprem                     # self-hosted, MinIO backend (about 15 min); sta
 make onprem-file                # file backend control
 export PVLAB_ORG_PRO=...        # in the command environment only; never in a tracked file
 sx SUPABASE_ACCESS_TOKEN -- make managed      # two Pro-org micro projects, deleted in the same make target
+sx SUPABASE_ACCESS_TOKEN -- make managed MANAGED=region-b IDS=CK04,CK06   # one region, chosen modules
+CK_BIG_MIB=2250 make ...        # large fixture size in MiB (default 2048); CK04's chunk-count check follows it
 sx SUPABASE_ACCESS_TOKEN -- make sweep        # lists ck- projects left behind
 make parity RUNS="evidence/<a>/run-*.json evidence/<b>/run-*.json ..."
 make publish-evidence RUN=evidence/<ts>/run-<stamp>.json

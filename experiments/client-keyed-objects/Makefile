@@ -6,6 +6,7 @@
 #   make onprem                 self-hosted, MinIO backend: stack up, setup, CK01-CK13, stack down
 #   make onprem-file            the same stack on the default file backend (control)
 #   make managed                two Pro-org projects (ap-southeast-1, eu-central-1), suite, delete in finally
+#   make managed MANAGED=region-b IDS=CK04,CK06   one region, chosen modules
 #   make sweep                  list ck- projects left behind (needs SUPABASE_ACCESS_TOKEN)
 #   make parity RUNS="a.json b.json ..."   one parity table from run artifacts
 #   make publish-evidence RUN=evidence/<ts>/run-<stamp>.json
@@ -20,6 +21,8 @@
 ROOT := $(abspath ../..)
 TS := $(shell date +%Y%m%d-%H%M%S)
 IDS ?= CK01,CK02,CK03,CK04,CK05,CK06,CK07,CK08,CK09,CK10,CK11,CK12,CK13
+# MANAGED=region-b re-runs one region; CK_BIG_MIB=2250 sizes the large fixture (default 2048).
+MANAGED ?= region-a region-b
 CK := bun scripts/ck.ts
 RUN_DIR := $(abspath work/run$(if $(CK_SLOT),-$(CK_SLOT),))
 
@@ -49,7 +52,7 @@ managed: deps
 	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "SUPABASE_ACCESS_TOKEN not set"; exit 1)
 	@test -n "$$PVLAB_ORG_PRO" || (echo "PVLAB_ORG_PRO not set (slug of a Pro org)"; exit 1)
 	@status=0; \
-	  ( $(CK) managed-up && $(CK) run-init region-a region-b && $(CK) setup region-a region-b && $(CK) keysvc-up && $(MAKE) probe ) || status=$$?; \
+	  ( CK_MANAGED="$(MANAGED)" $(CK) managed-up && $(CK) run-init $(MANAGED) && $(CK) setup $(MANAGED) && $(CK) keysvc-up && $(MAKE) probe ) || status=$$?; \
 	  $(CK) keysvc-down; $(CK) managed-down; $(CK) sweep; exit $$status
 
 probe:

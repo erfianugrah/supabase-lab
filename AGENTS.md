@@ -4571,7 +4571,7 @@ partitions, other durability policies, a contended pool.
   whether unlisted functions list later than +299 s, how long a destroyed
   function keeps answering.
 
-## experiments/client-keyed-objects - key facts (validated 2026-10-12, local self-hosted stack + two Pro-org micro projects, ap-southeast-1 and eu-central-1)
+## experiments/client-keyed-objects - key facts (validated 2026-10-12, local self-hosted stack + two Pro-org micro projects, ap-southeast-1 and eu-central-1; region-b CK04/CK06 re-run 2026-10-23)
 
 A reference application (catalogue + RLS + custom access token hook in
 Postgres, an operator-run key service in Docker, a TypeScript client doing
@@ -4616,16 +4616,27 @@ partial rows: `experiments/client-keyed-objects/RUNLOG.md`; generated table
   `./volumes/storage` bind mount fails every upload on Docker Desktop for Mac
   (file backend needs xattrs); PostgREST 14.17 once answered
   `PGRST303 JWT issued at future` to a fresh token (the client retries once).
-- Not measured: CK04 and CK06 on region-b (the resume timed out while the
-  host was in maintenance sleep; cause not isolated, a platform cause is not
-  excluded; not re-run), CK04-CK06 on onprem-file (Docker VM disk), CK10 on
-  both self-hosted targets (needs two regions in one run), other vantages,
-  repeat runs, Linux amd64.
+- Region-b re-run 2026-10-23 (`out/2026-10-23/`, n = 1, under `caffeinate`):
+  CK04 pass (killed at 0.4063, 13 of 32 parts kept, 13 ETags match, full read
+  SHA-256 equals the fixture). CK06 fail on one read: 99 of 100 reads equal
+  the fixture slice with bodies of exactly the covering chunks; 1 of 25
+  `authenticated` reads threw a non-`CkError` (`authenticated:Thrown x1`; the
+  message was not recorded, CK06 now keeps `error_messages`). Signed-URL
+  reads `MISS:25`, p50 50507 ms; `/object/authenticated` `HIT:24`, p50 983 ms.
+  The 2026-10-12 CK04 timeout is still unexplained; the sleep reading fits,
+  a platform cause is not excluded.
+- Not measured: an object past 2 GiB (`CK_BIG_MIB=2250` is wired, not run),
+  a second region-b run, repeat runs of the other managed cells, CK04-CK06 on
+  onprem-file (Docker VM disk), CK10 on both self-hosted targets (needs two
+  regions in one run), other vantages, Linux amd64.
 - Ops: own compose project `ck-<name>` on 8100/5532/6643 beside the
   self-hosted-defaults rig; `CK_SLOT=b` gives a second run dir, key service and
   port; run the managed suite detached under `caffeinate` (a laptop that
   sleeps breaks long transfers and skews the Docker VM clock); `make sweep`
-  for `ck-` leftovers.
+  for `ck-` leftovers. `make managed MANAGED=region-b IDS=CK04,CK06` re-runs
+  one region; `CK_BIG_MIB` sizes the large fixture (CK04's pass check derives
+  the chunk count from it). The harness run for CK04+CK06 on region-b took
+  31 min (10:34:14Z-11:05:26Z) from Singapore.
 
 ## experiments/cipherstash-eql - key facts (validated 2026-10-19 on a local Docker rig, supabase/postgres 17.11.0.004 + PostgREST v14.17, and managed Pro-org micro projects in ap-southeast-1; EQL 3.0.6; ZeroKMS in ap-southeast-2)
 

@@ -164,7 +164,7 @@ async function s3ops(c: {
 
 async function main() {
   const input = JSON.parse(await Bun.stdin.text()) as Base & Record<string, any>;
-  if (input.cmd === "fixtures") return ensureFixtures(input.dir);
+  if (input.cmd === "fixtures") return ensureFixtures(input.dir, input.bigMiB);
   if (input.cmd === "s3ops") return s3ops(input as any);
   const ck = new Ck(input.directory, input.creds, bunPlatform);
   switch (input.cmd) {
