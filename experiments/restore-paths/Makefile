@@ -12,7 +12,7 @@ TS := $(shell date +%Y%m%d-%H%M%S)
 OUT ?= evidence/$(TS)
 PVLAB := cd $(ROOT) && bun harness/src/run.ts --tests experiments/restore-paths/tests --where local --experiment restore-paths --destructive
 
-.PHONY: gen surface pitr pause daily rollback all
+.PHONY: gen surface pitr pause daily rollback rpo size all
 
 # The registry is generated and gitignored; regenerate after adding a module.
 gen:
@@ -37,6 +37,16 @@ daily: gen
 # RP05: what DELETE database/migrations?gte= does to schema, data and history. ~1-2 minutes with the preview branch.
 rollback: gen
 	$(PVLAB) --only RP05 --out experiments/restore-paths/$(OUT)
+
+# RP06: PITR recovery point - lag of the latest recoverable instant under a light writer and idle,
+# then a restore to it (Small, pitr_7 ~1 hour; RP06_PHASE_MIN per phase, default 20).
+rpo: gen
+	$(PVLAB) --only RP06 --out experiments/restore-paths/$(OUT)
+
+# RP07: PITR restore time vs database size (RP07_SIZES_GB default 3,10; RP07_COMPUTE default small;
+# disk grown once to RP07_DISK_GB, default 40). 36.6 to 46.5 minutes in the 2026-10-22/23 runs (R15, R18, R19, R22, R23).
+size: gen
+	$(PVLAB) --only RP07 --out experiments/restore-paths/$(OUT)
 
 all: surface pitr pause daily rollback
 
