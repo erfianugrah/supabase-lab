@@ -7,10 +7,12 @@
 #   make sweep                 # list ss- projects left behind
 #   make probe MODS=SS03       # SS03-SS05 rows on a managed project
 #   make probe-sh              # the same rows on the local self-hosted stack (SS06 input)
+#   make probe-sh SHMODS=SS12  # self-hosted only: does a delete free backend space (file or MinIO)
+#   make probe MODS=SS11       # overwrite staleness per path, purge, past-2 GiB objects, parallel parts, TUS race
 #   make probe MODS=SS03 ROWS=SS03d,SS03k   # only those rows (setup and uploads still run)
 #   make probe MODS=SS07       # read-only: region catalogue, key-management API surface
 #   make ss06 RUNS=a.json,b.json,c.json   # diff table from published run artifacts
-#   make clean-fixtures        # delete the 2 GiB / 64 MiB / 256 MiB fixtures
+#   make clean-fixtures        # delete the 2 GiB / 64 MiB / 256 MiB fixtures and the SS11 ones
 #   make probe MODS=SS10       # egress-meter load on two KEPT projects; then make ss10-teardown REFS=a,b
 #   make aws-control           # optional: dot-segment and double-slash keys against Amazon S3 (needs AWS credentials)
 #
@@ -20,6 +22,7 @@ ROOT := $(abspath ../..)
 comma := ,
 TS := $(shell date +%Y%m%d-%H%M%S)
 MODS ?= SS01,SS02
+SHMODS ?= SS03
 
 SH_RIG := $(ROOT)/experiments/self-hosted-defaults
 FIXTURES := evidence/fixtures
@@ -30,7 +33,7 @@ probe:
 	@test -n "$$PVLAB_ORG_PRO" || (echo "PVLAB_ORG_PRO not set (slug of a Pro org)"; exit 1)
 	@cd $(ROOT)/harness && bun scripts/gen-registry.ts >/dev/null
 	@mkdir -p evidence/$(TS)
-	@cd $(ROOT) && PVLAB_ENDPOINT_SS03_ROWS="$(ROWS)" bun harness/src/run.ts --where local --experiment storage-surface \
+	@cd $(ROOT) && PVLAB_ENDPOINT_SS03_ROWS="$(ROWS)" PVLAB_ENDPOINT_SS11_ROWS="$(ROWS)" bun harness/src/run.ts --where local --experiment storage-surface \
 		--only $(MODS) --destructive --out experiments/storage-surface/evidence/$(TS)
 	@echo "== evidence/$(TS) =="
 
@@ -45,7 +48,7 @@ probe-sh:
 	@mkdir -p evidence/$(TS)
 	@cd $(ROOT) && PVLAB_ENDPOINT_STACK_DIR="$(SH_RIG)/work/stack" PVLAB_ENDPOINT_GW="http://localhost:8000" PVLAB_ENDPOINT_SS03_ROWS="$(ROWS)" \
 		bun harness/src/run.ts --where local --experiment storage-surface \
-		--only SS03 --destructive --out experiments/storage-surface/evidence/$(TS)
+		--only $(SHMODS) --destructive --out experiments/storage-surface/evidence/$(TS)
 	@echo "== evidence/$(TS) =="
 
 # SS06: the row-by-row diff of SS03 runs (published artifacts, offline).
@@ -62,6 +65,7 @@ ss06:
 # The fixture files by name (no recursive delete).
 clean-fixtures:
 	rm -f $(FIXTURES)/big.bin $(FIXTURES)/mid.bin $(FIXTURES)/gz.bin.gz $(FIXTURES)/solid.png $(FIXTURES)/manifest.json
+	rm -f $(FIXTURES)/huge.bin $(FIXTURES)/r1.bin $(FIXTURES)/r2.bin $(FIXTURES)/ss11.json
 	-rmdir $(FIXTURES)
 
 # Orphan check: any project left behind by a crashed run carries this prefix.

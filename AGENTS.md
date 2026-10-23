@@ -3615,7 +3615,7 @@ not list the zone). Details: RUNLOG.md.
   `identity_data.custom_claims`. Docker container IPs are not routable from
   macOS, so resolver probes run `dig` inside the Unbound container.
 
-## experiments/storage-surface - key facts (SS01-SS02 2026-10-10, n = 3; SS03-SS07 2026-10-12, Pro org, ap-southeast-1, plus the local self-hosted rig)
+## experiments/storage-surface - key facts (SS01-SS02 2026-10-10, n = 3; SS03-SS07 2026-10-12; SS11-SS12 2026-10-23; Pro org, ap-southeast-1, plus the local self-hosted rig)
 
 - storage-surface (SS01, SS02; 2026-10-10, Pro org, ap-southeast-1, n = 3 runs
   each; `experiments/storage-surface/RUNLOG.md`). Self-provisioning, projects
@@ -3732,6 +3732,41 @@ not list the zone). Details: RUNLOG.md.
 - SS07: 17 specific regions for a Pro org (same count as 2026-08-20); the
   published OpenAPI document (169 operations) has no KMS or customer-managed
   key operation; the only encryption match is `PUT /v1/projects/{ref}/pgsodium`.
+- SS11 (2026-10-23, managed, storage 1.80.2, n = 1 run; RUNLOG "2026-10-23 -
+  SS11 ... and SS12"): after an overwrite of a cached object, 6 of 8 trials
+  without a purge (public URL, `/object/authenticated` ranged, another range of
+  it, `download()` on a private bucket) served the old bytes through 50 or 51 s
+  and the new from 55 or 56 s; 2 of 8 alternated old and new until 30 and 45 s
+  (SS09b saw the same). A range never requested before the overwrite was as
+  stale as the warmed one. `DELETE /storage/v1/cdn/<bucket>/<key>` with the
+  legacy service_role key (`200 {"message":"success"}`) gave the new bytes from
+  the read at 5 to 7 s in 4 of 4 trials (docs: up to 60 s); a new signed URL
+  per read gave the new bytes from 0 s (every read a MISS).
+- SS11: a 2304 MiB object completes through S3 multipart (144 x 16 MiB,
+  concurrency 8, 39.2 MB/s from one laptop) and through TUS (384 chunks of 6
+  MiB, 12.3 MB/s, ETag `md5-dash-384`); SHA-256 of a full GET matches and
+  metadata, list, HEAD and GET all report 2,415,919,104 B. UploadPart
+  concurrency 1/4/8/16 on 256 MiB: 23.6/30.8/32.4/36.4 MB/s, one upload each,
+  limiter not measured.
+- SS11e: two clients on one TUS URL did not both write at one offset. A PATCH
+  still sending ended with 5 of 6 MiB stored, and the second client's request
+  (sent at 1.5 s) was answered only then, at about 5 s; a second PATCH at
+  offset 0 got `409 Upload-Offset conflict`, a HEAD got the first client's
+  final offset and a PATCH there succeeded (object mixed by writer, valid by
+  offset). How the server ended the first PATCH is not separated. Two
+  tus-js-client processes resuming one URL: one fails with 409, the other
+  completes a correct object.
+- SS12 (self-hosted, 2026-10-23, n = 1 per variant): every API delete path
+  frees the object's path at once. The file backend frees the bytes at once;
+  MinIO (`RELEASE.2026-09-22T19-25-18Z`, untagged image in the pinned compose)
+  holds them in `.minio.sys/tmp` and had released them about 240 to 260 s after
+  the first delete in both runs (only the tail's last listing was kept, so one
+  step or several is not recorded; cause not separated). A SQL delete
+  (`allow_delete_query`) orphans the bytes on both backends, past bucket
+  deletion. A killed TUS upload and an open multipart upload hold their data
+  until a TUS DELETE / AbortMultipartUpload. The file backend on the default
+  macOS bind mount still fails the 1 KiB preflight (xattrs), so nothing past it
+  runs there.
 
 ## experiments/pipelines - key facts (validated 2026-10-10)
 

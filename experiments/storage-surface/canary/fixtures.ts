@@ -42,7 +42,7 @@ function keystream(name: string) {
   return createCipheriv("aes-256-ctr", key, Buffer.alloc(16));
 }
 
-function writeSeeded(path: string, name: string, size: number): Fix {
+export function writeSeeded(path: string, name: string, size: number): Fix {
   const c = keystream(name);
   const fd = openSync(path, "w");
   const all = createHash("sha256");
