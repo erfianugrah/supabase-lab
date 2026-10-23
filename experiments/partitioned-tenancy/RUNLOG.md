@@ -184,7 +184,8 @@ titles say "run 1" and "run 2"; the test now says "rep 1" and "rep 2"); the
   tenants in the table. The tenant policy stays on the parent; the detached
   table is open to the anon key under the legacy default privileges.
 - Archiving the detached table elsewhere (Storage, another database) was not
-  attempted.
+  attempted in these runs; PT06 (2026-10-23, below) archived to Storage, and
+  another database was not attempted.
 
 Re-run note: run 2's postgres session refused the PT04 DDL as read-only
 after the PT03 and PT04 loads; running PT04 on its own project (`make run
@@ -194,3 +195,131 @@ Teardown: PT99 deleted each project (`DELETE 200`, absent from `GET
 /projects` on the first read). Afterwards `make clean` printed 0 projects
 with the `pvlab-pt-` prefix (console output, not in `out/`). Project time:
 about 14 minutes of Micro across the three runs.
+
+## 2026-10-23 - PT05 and PT06 (vantage: this lab's Mac, over the public internet)
+
+Harness: `make run ONLY=PT05,PT06,PT99`, `--destructive`, one fresh project
+(an earlier invocation the same minute skipped all three modules because
+`PVLAB_ORG_SLUGS` was not set, so the `org` capability was absent; no
+project was created; console output, not in `out/`). Published (redacted)
+under `out/2026-10-23/`:
+
+- `run-2026-10-23T03-07-40-623Z.json` - PT05, PT06, PT99. 1 pass, 0 fail,
+  12 info. The harness stamps each module's elapsed time on every row it
+  emits, so the per-row `durationMs` values repeat within a module; counted
+  once per module they are PT05 20535 + PT06 35865 + PT99 1380 = 57780 ms,
+  the 58 s between the start and finish stamps. PT05's 20535 ms includes
+  creating the project.
+
+Question: PT04e and PT02g left a detached partition (and a pg_partman
+retention `keep_table` child) in `public` with RLS off and the anon grant,
+readable by anon through the Data API. Which step closes that, and can a
+detached partition go to Storage and come back for a lookup using only
+generally available pieces (not the alpha Analytics buckets)?
+
+### PT05 - closing the read (one table per step, n = 1)
+
+Table `public.ar_events` range by month with the tenant policy on the
+parent; each partition held 1000 rows from tenants 1 and 2. Reads are anon
+(legacy anon JWT) and a tenant-2 user's token, at the default profile and,
+for tables outside `public`, with `Accept-Profile: archive`. `archive` is a
+new schema not added to the exposed schemas. Advisors read once, after all
+steps (PT05f).
+
+| row | step | RLS / policies / anon SELECT / anon USAGE on schema | anon read | tenant-2 read | advisor lint on the table |
+|---|---|---|---|---|---|
+| PT05a | plain DETACH (control) | off / 0 / true / true | 200, 1000 rows, tenants 1,2 | 200, 1000 rows, tenants 1,2 | `rls_disabled_in_public` |
+| PT05b | REVOKE ALL from anon, authenticated, then DETACH | off / 0 / false / true | 401 `42501` | 403 `42501` | none |
+| PT05c | DETACH, then SET SCHEMA archive | off / 0 / true / false | 404 `PGRST205`; with the archive profile 406 `PGRST106` | the same | none |
+| PT05d | ENABLE ROW LEVEL SECURITY, then DETACH | on / 0 / true / true | 200, 0 rows | 200, 0 rows | `rls_enabled_no_policy` |
+
+- The control reproduces PT04e: any token reads every tenant's rows from the
+  detached table, and the advisor flags it `rls_disabled_in_public`.
+- PT05b, PT05c and PT05d each closed the read. The revoke (PT05b) and the
+  schema move (PT05c) answer with an error; RLS without a policy (PT05d)
+  answers 200 with no rows.
+- After the schema move the table still carries the anon SELECT grant; what
+  blocks the read is that `archive` is not exposed (PGRST205 at the default
+  profile, PGRST106 when the profile is requested) and anon has no USAGE on
+  it. Exposing `archive` later, or granting USAGE on it, was not tested.
+- The advisor did not flag the revoked table or the moved table, and flagged
+  the RLS-on table as `rls_enabled_no_policy`.
+
+PT05e - pg_partman (installed per PT02) on `public.rp_events`, daily
+children from 10 days back, premake 2, tenant policy on the parent; then
+`retention = '5 days'` with `retention_schema = 'archive'` and one
+`run_maintenance_proc` through a session:
+
+- children 14 -> 9 attached; the 5 retired children were moved to `archive`
+  (none left in `public`), with RLS off, no policies and the anon SELECT
+  grant (5 of 5);
+- the newest retired child (2 rows) answered anon 404 `PGRST205` at the
+  default profile and 406 `PGRST106` with the archive profile (anon only;
+  PT05e did not read it as the tenant-2 user);
+- the advisor flagged none of the 5 (PT05f).
+
+So `retention_schema` pointed at a non-exposed schema closed the read the
+same way PT05c did. The grant travels with the table.
+
+### PT06 - a detached partition to Storage and back
+
+`public.cs_events_2026_06`: 1,000,000 rows (tenants 1 to 50, spread over
+the 43200 minutes of June by `g % 43200`, about 23 rows a minute, short
+text payload), loaded in 6 s, detached, 114679808
+bytes with its primary-key index. Checksum = count plus the sum of
+`hashtextextended(row::text, 0)` over (id, tenant_id, created_at, payload).
+Lookup = count of tenant 7's rows on 2026-06-15 (644 rows), execution time
+from `EXPLAIN ANALYZE`, median of 5. Storage global file size limit read as
+52428800 bytes.
+
+| step | rep 1 | rep 2 |
+|---|---|---|
+| psql `\copy ... to pstdout`, gzip, ms | 1590 | 1420 |
+| gzip CSV object, bytes | 6611657 | 6611657 |
+| upload, Storage REST (service_role), status / ms | 200 / 505 | 200 / 471 |
+| download, Storage REST (service_role), status / ms | 200 / 505 | 200 / 601 |
+| gunzip + psql `\copy ... from pstdin` into `archive.cs_restore_rN`, ms | 1925 | 1913 |
+| rows / checksum against the original | 1000000 / equal | 1000000 / equal |
+| lookup, restored table without an index, ms | 95.61 | 96.1 |
+| index on (tenant_id, created_at), build ms | 935 | 942 |
+| lookup, restored table with that index, ms | 0.23 | 0.22 |
+| anon read of the restored table: default profile / archive profile | 404 `PGRST205` / 406 `PGRST106` | the same |
+
+The same lookup on the detached table before the drop, through its primary
+key on (created_at, id), took 4.94 ms (PT06a).
+
+PT06c - the Wrappers S3 FDW (wrappers 0.6.3) against the uploaded object:
+
+- The Supabase Storage form in the S3 FDW docs uses S3 access keys from the
+  dashboard. The Management API v1 document lists no endpoint that creates
+  them (its storage paths are `config/storage` and `storage/buckets`), and
+  the dashboard's own credential route answered the PAT with 401
+  `{"message":"Unsupported access token"}`. So the documented form was not
+  exercised.
+- Three credential forms a test can produce, each a server plus a foreign
+  table over the gzip CSV: access key id = project ref with the anon key as
+  secret on `<ref>.storage.supabase.co` and on `<ref>.supabase.co`, and the
+  project ref with the service_role key on the storage host. All three
+  answered `ERROR: HV000: request failed: service error` on the first
+  `select count(*)`. These are the session-token shape of Storage S3 auth
+  without the session token; the FDW's documented server options list no
+  session-token field, and sending one was not tested. What Storage answered
+  underneath the FDW's generic error was not captured.
+
+Reading of PT06: on generally available pieces, a detached partition can be
+kept in a private bucket as gzip CSV at about 6.6 MB per 1,000,000 rows of
+this shape and restored with its rows intact in about 2.5 s of download and
+import on default compute (Micro, not read back); a lookup needs the restore (or dashboard keys for the FDW,
+not tested), and an index on the restored table took the lookup from about
+96 ms to about 0.2 ms.
+
+Not tested: Parquet; objects above the 52428800-byte limit (multipart or
+TUS); the FDW with dashboard-generated keys; what happens when `archive` is
+exposed or granted; a revoke after the detach (reasoned to match PT05b);
+larger compute.
+
+Teardown: PT99 `DELETE 200`, absent from `GET /projects` on the first read.
+The project existed for under a minute: created inside PT05's 20535 ms,
+deleted in PT99's 1380 ms, 57780 ms of module time in all. Afterwards `make
+clean` printed 0 projects with the `pvlab-pt-` prefix (console output, not
+in `out/`).
