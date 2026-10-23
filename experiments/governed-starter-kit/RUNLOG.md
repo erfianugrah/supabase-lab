@@ -1,5 +1,45 @@
 # governed-starter-kit - RUNLOG
 
+## 2026-10-23 - next 16.4.2 for the Next.js RCE advisories; not deployed
+
+Why: `bun audit` on the app listed next 16.3.8 under GHSA-2464-fhr4-w9xw and
+GHSA-673q-mjm6-r5xr (critical, unauthenticated RCE) and GHSA-p3m5-59mp-jv5r
+(high, Server Actions DoS), all fixed in 16.4.1, plus ip-address 10.7.3
+under GHSA-rxp7-6hxx-x8q5 (moderate) via the shadcn CLI.
+
+- Bumped in `app/`: next and eslint-config-next 16.3.8 -> 16.4.2,
+  @opennextjs/cloudflare ^1.20.2 (1.20.8 installed) -> ^1.20.13, wrangler
+  ^4.121.0 (4.147.0 installed) -> ^4.148.0 (4.152.0 installed; OpenNext
+  1.20.13's peer floor). OpenNext 1.20.8 already accepted next 16.4.2
+  (peer `>=16.3.8`), but its release notes put Next.js 16.4 support and the
+  `preview-props.json` loadManifest fix (the 500 recorded 2026-10-07) in
+  1.20.12, so it moved too. ip-address: `bun update ip-address` added it as
+  a direct dependency and left both nested copies at 10.7.3, so it is an
+  `overrides` entry at 10.7.4 instead, inside both parents' ranges (socks
+  ^10.1.1, express-rate-limit ^10.2.0).
+- `bun audit` before: 5 vulnerabilities (2 critical, 2 high, 1 moderate).
+  After: 2 high. braces (GHSA-vfj7-8cjw-p6xm) as before, no patched release.
+  New: glob 10.3.3 (GHSA-5j98-mcp5-4vw2, the glob CLI's `-c/--cmd`), pinned
+  exactly by @node-minify/core 9.0.2 under @opennextjs/aws 4.1.12; build-time
+  only and no 9.x release of node-minify moves it, so left.
+- `next build`, `build:cf`, `bun run lint`, `tsc --noEmit`: pass (placeholder
+  Supabase env). Under `wrangler dev --local` on the built Worker, one
+  request each: `/` and `/login` 200, `/dashboard` and `/assistant` 307 to
+  `/login`, `/auth/callback` 307 to `/login?error=auth`, an unknown path 404.
+- `LIVE_NEXT` (the `live-app-prep` pin) 16.3.8 -> 16.4.2: on a fresh
+  `create-next-app -e with-supabase` scaffold, `make live-app-prep
+  LIVE_NEXT=16.4.2` (OpenNext 1.20.13, wrangler 4.152.0), then
+  `opennextjs-cloudflare build` and `wrangler dev --local`, one request
+  each: `/`, `/auth/login`, `/auth/sign-up` 200, `/protected` 307 to
+  `/auth/login`. Not deployed; the scaffold was deleted.
+- Next.js 16.4 warns that the `middleware` file convention is deprecated in
+  favour of `proxy`; left as is.
+- No deployed instance to update: `starter-kit.erfi.dev` and
+  `kit-live.erfi.dev` had no A record and `wrangler deployments list` with
+  the stage token answered 10007 ("This Worker does not exist") for
+  `starter-kit-app` and `kit-live-app` (07:55 UTC). The next
+  `make app-deploy` ships 16.4.2.
+
 ## 2026-10-13 - fourth full rebuild; kit left up
 
 First run through the kit after `1eda7df` (credentials off command lines,

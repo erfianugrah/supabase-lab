@@ -156,7 +156,7 @@ request list is `apps.auto.tfvars` (gitignored), so `make apply` and
 through the same check, `make apps` lists them, and `PLAN=1` stops after the
 plan. Deploys go to Cloudflare Workers at erfi.dev custom domains (workers.dev off): `make app-deploy`
 for the example app, and for a `create-next-app -e with-supabase` app
-`make live-app-prep` (OpenNext adapter, next pinned to 16.3.8, no
+`make live-app-prep` (OpenNext adapter, next pinned to 16.4.2, no
 cacheComponents - both broke on Workers) then `npm run deploy`;
 `make live-app-delete` / `make app-delete` remove them.
 

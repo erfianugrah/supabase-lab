@@ -2265,7 +2265,10 @@ README.md, RUNLOG.md and docs/.
   only (tool and embed checks pass, K03 reports `BLOCKED` with the reason).
 - **The `with-supabase` scaffold does not run on Workers as generated**: next
   16.4.0 + OpenNext 1.20.9 500s every page, `cacheComponents: true` hangs.
-  `make live-app-prep` pins next 16.3.8 and drops it. `create-next-app -e`
+  `make live-app-prep` pins next and drops it. The pin is 16.4.2 since
+  2026-10-23 (OpenNext 1.20.12's release notes list the fix for the 500, not
+  re-checked on a deployed Worker; 1.20.13 needs next >=16.4.1); 16.4.2
+  checked by a local build and `wrangler dev` only, not deployed. `create-next-app -e`
   needs the unauthenticated GitHub API (60/h per IP): pre-scaffold.
 - **Wrangler**: the vault `CLOUDFLARE_TOKEN` fails Workers calls with 10000.
   For an agent use `sx CLOUDFLARE_API_TOKEN=CLOUDFLARE_STAGE_WORKERS_TOKEN
