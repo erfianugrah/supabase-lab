@@ -97,12 +97,12 @@ const mod: TestModule = {
         id: "EF07c",
         title: "wall clock and idle timeout",
         status: "info",
-        detail: `not re-measured here - edge-resilience W13 measured the ${RUNTIME.idleTimeoutS} s idle timeout (504 IDLE_TIMEOUT); docs: wall clock ${RUNTIME.wallClockS.free} s free / ${RUNTIME.wallClockS.paid} s paid, recursive calls ~${RUNTIME.recursiveRequestsPerMinute}/min`,
+        detail: `not re-measured here - edge-resilience W13 measured the ${RUNTIME.idleTimeoutS} s idle timeout (504 IDLE_TIMEOUT); docs: wall clock ${RUNTIME.wallClockS.free} s free / ${RUNTIME.wallClockS.paid} s paid, nested calls ${RUNTIME.nestedCallsPerTrace} per trace per ${RUNTIME.nestedWindowS} s (EF14)`,
         measurements: {
           docs_idle_timeout_s: RUNTIME.idleTimeoutS,
           docs_wall_clock_free_s: RUNTIME.wallClockS.free,
           docs_wall_clock_paid_s: RUNTIME.wallClockS.paid,
-          docs_recursive_per_minute: RUNTIME.recursiveRequestsPerMinute,
+          docs_nested_calls_per_trace: RUNTIME.nestedCallsPerTrace,
           measured_in: "edge-resilience/W13",
         },
       });

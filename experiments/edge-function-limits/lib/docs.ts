@@ -10,7 +10,15 @@
  * Source: https://supabase.com/docs/guides/functions/limits
  */
 export const DOCS_URL = "https://supabase.com/docs/guides/functions/limits";
-export const DOCS_READ_AT = "2026-09-02";
+export const DOCS_READ_AT = "2026-10-23";
+/**
+ * The nested-call figure changed between the two reads: 2026-09-02 said about
+ * 5000 requests per minute; supabase/supabase#50806 (merged 2026-09-23)
+ * replaced it with 30 requests per trace within a 60-second window, budgeted
+ * per trace rather than per project. Every other figure here read the same on
+ * 2026-10-23 as on 2026-09-02.
+ */
+export const RECURSIVE_DOCS_URL = "https://supabase.com/docs/guides/functions/recursive-functions";
 
 export type Plan = "free" | "pro" | "team" | "enterprise";
 
@@ -43,7 +51,12 @@ export const RUNTIME = {
   cpuMs: 2_000,
   wallClockS: { free: 150, paid: 400 },
   idleTimeoutS: 150,
+  /** The 2026-09-02 reading, kept because EF10 was measured against it. */
   recursiveRequestsPerMinute: 5_000,
+  /** The reading since 2026-09-23: function-to-function calls per trace... */
+  nestedCallsPerTrace: 30,
+  /** ...within this window. */
+  nestedWindowS: 60,
 } as const;
 
 /** Outbound ports the runtime refuses (direct SMTP). */

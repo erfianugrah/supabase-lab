@@ -1,0 +1,491 @@
+{
+  "startedAt": "2026-10-23T08:21:31.417Z",
+  "finishedAt": "2026-10-23T08:27:19.686Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "projectRegion": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "edge-function-limits",
+  "labCommit": "661afdf",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "EF13a",
+      "title": "CPU busy loop, ms: ladder 1000-3000, 3 per rung (docs 2000)",
+      "status": "info",
+      "detail": "all ok up to 1950, all failed from 2000, mixed none; first refusal 546 {\"code\":\"WORKER_RESOURCE_LIMIT\",\"message\":\"Function failed due to not having enough compute resources (please check logs)\"}",
+      "measurements": {
+        "plan": "free",
+        "docs_figure": 2000,
+        "rung_1000": "3/3 ok; 200,200,200",
+        "rung_1500": "3/3 ok; 200,200,200",
+        "rung_1750": "3/3 ok; 200,200,200",
+        "rung_1900": "3/3 ok; 200,200,200",
+        "rung_1950": "3/3 ok; 200,200,200",
+        "rung_2000": "0/3 ok; 546,546,546",
+        "rung_2050": "0/3 ok; 546,546,546",
+        "rung_2100": "0/3 ok; 546,546,546",
+        "rung_2250": "0/3 ok; 503,546,546",
+        "rung_2500": "0/3 ok; 546,546,546",
+        "rung_3000": "0/3 ok; 546,546,546",
+        "reps_per_rung": 3,
+        "highest_rung_all_ok_contiguous": 1950,
+        "lowest_rung_all_failed_contiguous": 2000,
+        "highest_rung_all_ok_any": 1950,
+        "lowest_rung_all_failed_any": 2000,
+        "mixed_rungs": "none",
+        "over_status": 546,
+        "over_body": "{\"code\":\"WORKER_RESOURCE_LIMIT\",\"message\":\"Function failed due to not having enough compute resources (please check logs)\"}",
+        "over_bodies_distinct": 2,
+        "shots": "1000#1:200 dcf8c0c7/1/busy1000 2041ms; 1500#1:200 34400426/1/busy1500 1605ms; 1750#1:200 5e5e6e91/1/busy1750 1853ms; 1900#1:200 d39db7ec/1/busy1900 1994ms; 1950#1:200 373757b6/1/busy1950 2052ms; 2000#1:546x /0 2075ms; 2050#1:546x /0 2164ms; 2100#1:546x /0 2215ms; 2250#1:503x /0 2373ms; 2500#1:546x /0 2592ms; 3000#1:546x /0 3085ms; 1000#2:200 e79148a9/1/busy1000 1237ms; 1500#2:200 54158400/1/busy1500 1591ms; 1750#2:200 176aed47/1/busy1750 1876ms; 1900#2:200 1940cb7e/1/busy1900 2007ms; 1950#2:200 98760514/1/busy1950 2047ms; 2000#2:546x /0 2094ms; 2050#2:546x /0 2197ms; 2100#2:546x /0 2192ms; 2250#2:546x /0 2355ms; 2500#2:546x /0 2600ms; 3000#2:546x /0 3092ms; 1000#3:200 6db17a41/1/busy1000 1097ms; 1500#3:200 adc8e1cc/1/busy1500 1625ms; 1750#3:200 902c7458/1/busy1750 2174ms; 1900#3:200 18399934/1/busy1900 2071ms; 1950#3:200 f1cc6ef2/1/busy1950 2100ms; 2000#3:546x /0 2122ms; 2050#3:546x /0 2178ms; 2100#3:546x /0 2208ms; 2250#3:546x /0 2360ms; 2500#3:546x /0 2606ms; 3000#3:546x /0 3092ms"
+      },
+      "durationMs": 203584
+    },
+    {
+      "id": "EF13b",
+      "title": "memory, ArrayBuffer MiB: ladder 128-400, 3 per rung (docs 256)",
+      "status": "info",
+      "detail": "all ok up to 240, all failed from 256, mixed 248; first refusal 546 {\"code\":\"WORKER_RESOURCE_LIMIT\",\"message\":\"Function failed due to not having enough compute resources (please check logs)\"}",
+      "measurements": {
+        "plan": "free",
+        "docs_figure": 256,
+        "rung_128": "3/3 ok; 200,200,200",
+        "rung_160": "3/3 ok; 200,200,200",
+        "rung_192": "3/3 ok; 200,200,200",
+        "rung_208": "3/3 ok; 200,200,200",
+        "rung_224": "3/3 ok; 200,200,200",
+        "rung_240": "3/3 ok; 200,200,200",
+        "rung_248": "2/3 ok; 200,200,546",
+        "rung_256": "0/3 ok; 546,546,546",
+        "rung_264": "0/3 ok; 546,546,546",
+        "rung_272": "0/3 ok; 546,546,546",
+        "rung_288": "0/3 ok; 546,546,546",
+        "rung_320": "0/3 ok; 546,546,546",
+        "rung_400": "0/3 ok; 546,546,546",
+        "reps_per_rung": 3,
+        "highest_rung_all_ok_contiguous": 240,
+        "lowest_rung_all_failed_contiguous": 256,
+        "highest_rung_all_ok_any": 240,
+        "lowest_rung_all_failed_any": 256,
+        "mixed_rungs": "248",
+        "over_status": 546,
+        "over_body": "{\"code\":\"WORKER_RESOURCE_LIMIT\",\"message\":\"Function failed due to not having enough compute resources (please check logs)\"}",
+        "over_bodies_distinct": 1,
+        "shots": "128#1:200 bfd5394e/1 (rss 0 heap 7 ext 131 MiB) 119ms; 160#1:200 3686ac60/1 (rss 0 heap 7 ext 163 MiB) 137ms; 192#1:200 3c57fd36/1 (rss 0 heap 7 ext 195 MiB) 203ms; 208#1:200 f0ae6792/1 (rss 0 heap 7 ext 211 MiB) 143ms; 224#1:200 355c5c24/1 (rss 0 heap 7 ext 227 MiB) 135ms; 240#1:200 4a20ac15/1 (rss 0 heap 7 ext 243 MiB) 161ms; 248#1:200 47103f2d/1 (rss 0 heap 7 ext 251 MiB) 154ms; 256#1:546x /0 144ms; 264#1:546x /0 179ms; 272#1:546x /0 166ms; 288#1:546x /0 166ms; 320#1:546x /0 166ms; 400#1:546x /0 159ms; 128#2:200 18d0774c/1 (rss 0 heap 7 ext 131 MiB) 107ms; 160#2:200 f6429211/1 (rss 0 heap 7 ext 163 MiB) 123ms; 192#2:200 60647fc8/1 (rss 0 heap 7 ext 195 MiB) 108ms; 208#2:200 31f009df/1 (rss 0 heap 7 ext 211 MiB) 128ms; 224#2:200 d6fdf5d2/1 (rss 0 heap 7 ext 227 MiB) 127ms; 240#2:200 ef093aa5/1 (rss 0 heap 7 ext 243 MiB) 466ms; 248#2:200 f4f12cca/1 (rss 0 heap 7 ext 251 MiB) 164ms; 256#2:546x /0 138ms; 264#2:546x /0 183ms; 272#2:546x /0 204ms; 288#2:546x /0 131ms; 320#2:546x /0 223ms; 400#2:546x /0 209ms; 128#3:200 70138cb9/1 (rss 0 heap 7 ext 131 MiB) 100ms; 160#3:200 a3de29b4/1 (rss 0 heap 7 ext 163 MiB) 141ms; 192#3:200 4c54572c/1 (rss 0 heap 7 ext 195 MiB) 124ms; 208#3:200 11af26f6/1 (rss 0 heap 7 ext 211 MiB) 130ms; 224#3:200 daa9419a/1 (rss 0 heap 7 ext 227 MiB) 164ms; 240#3:200 35d8db56/1 (rss 0 heap 7 ext 243 MiB) 135ms; 248#3:546x /0 140ms; 256#3:546x /0 206ms; 264#3:546x /0 158ms; 272#3:546x /0 141ms; 288#3:546x /0 173ms; 320#3:546x /0 165ms; 400#3:546x /0 412ms"
+      },
+      "durationMs": 203584
+    },
+    {
+      "id": "EF13c",
+      "title": "memory, JS heap MiB: ladder 128-400, 3 per rung (docs 256)",
+      "status": "info",
+      "detail": "all ok up to 240, all failed from 248, mixed none; first refusal 546 {\"code\":\"WORKER_RESOURCE_LIMIT\",\"message\":\"Function failed due to not having enough compute resources (please check logs)\"}",
+      "measurements": {
+        "plan": "free",
+        "docs_figure": 256,
+        "rung_128": "3/3 ok; 200,200,200",
+        "rung_160": "3/3 ok; 200,200,200",
+        "rung_192": "3/3 ok; 200,200,200",
+        "rung_208": "3/3 ok; 200,200,200",
+        "rung_224": "3/3 ok; 200,200,200",
+        "rung_240": "3/3 ok; 200,200,200",
+        "rung_248": "0/3 ok; 546,546,546",
+        "rung_256": "0/3 ok; 546,546,546",
+        "rung_264": "0/3 ok; 546,546,546",
+        "rung_272": "0/3 ok; 546,546,546",
+        "rung_288": "0/3 ok; 546,546,546",
+        "rung_320": "0/3 ok; 546,546,546",
+        "rung_400": "0/3 ok; 546,546,546",
+        "reps_per_rung": 3,
+        "highest_rung_all_ok_contiguous": 240,
+        "lowest_rung_all_failed_contiguous": 248,
+        "highest_rung_all_ok_any": 240,
+        "lowest_rung_all_failed_any": 248,
+        "mixed_rungs": "none",
+        "over_status": 546,
+        "over_body": "{\"code\":\"WORKER_RESOURCE_LIMIT\",\"message\":\"Function failed due to not having enough compute resources (please check logs)\"}",
+        "over_bodies_distinct": 1,
+        "shots": "128#1:200 3f8e54bd/1 (rss 0 heap 135 ext 3 MiB) 255ms; 160#1:200 b3c2ea19/1 (rss 0 heap 167 ext 3 MiB) 193ms; 192#1:200 7a932d9d/1 (rss 0 heap 199 ext 3 MiB) 227ms; 208#1:200 8d5afef6/1 (rss 0 heap 215 ext 3 MiB) 262ms; 224#1:200 efb4c8ea/1 (rss 0 heap 231 ext 3 MiB) 211ms; 240#1:200 f8e2c360/1 (rss 0 heap 252 ext 3 MiB) 359ms; 248#1:546x /0 642ms; 256#1:546x /0 261ms; 264#1:546x /0 253ms; 272#1:546x /0 257ms; 288#1:546x /0 270ms; 320#1:546x /0 364ms; 400#1:546x /0 275ms; 128#2:200 067d14a2/1 (rss 0 heap 154 ext 3 MiB) 259ms; 160#2:200 584a1a82/1 (rss 0 heap 167 ext 3 MiB) 215ms; 192#2:200 d575ad6d/1 (rss 0 heap 199 ext 3 MiB) 211ms; 208#2:200 76e76068/1 (rss 0 heap 215 ext 3 MiB) 240ms; 224#2:200 8e37bbbc/1 (rss 0 heap 231 ext 3 MiB) 203ms; 240#2:200 4a2ab4da/1 (rss 0 heap 251 ext 3 MiB) 357ms; 248#2:546x /0 379ms; 256#2:546x /0 281ms; 264#2:546x /0 277ms; 272#2:546x /0 366ms; 288#2:546x /0 281ms; 320#2:546x /0 238ms; 400#2:546x /0 206ms; 128#3:200 28f30f4d/1 (rss 0 heap 135 ext 3 MiB) 178ms; 160#3:200 98913d5d/1 (rss 0 heap 167 ext 3 MiB) 206ms; 192#3:200 a41c6e0f/1 (rss 0 heap 199 ext 3 MiB) 212ms; 208#3:200 9bdcedf4/1 (rss 0 heap 215 ext 3 MiB) 236ms; 224#3:200 9794ef68/1 (rss 0 heap 231 ext 3 MiB) 487ms; 240#3:200 e89f56bd/1 (rss 0 heap 247 ext 3 MiB) 261ms; 248#3:546x /0 285ms; 256#3:546x /0 425ms; 264#3:546x /0 233ms; 272#3:546x /0 223ms; 288#3:546x /0 397ms; 320#3:546x /0 278ms; 400#3:546x /0 310ms"
+      },
+      "durationMs": 203584
+    },
+    {
+      "id": "EF13z",
+      "title": "cleanup: delete pvlab-ef13-* functions",
+      "status": "pass",
+      "detail": "deleted 1",
+      "measurements": {
+        "deleted": 1,
+        "left": 0
+      },
+      "durationMs": 203584
+    },
+    {
+      "id": "EF14a",
+      "title": "control: fan of 5 sequential calls",
+      "status": "pass",
+      "detail": "outer 200, 5 ok, first refused #none; leaf saw headers accept,accept-encoding,accept-language,baggage,cdn-loop,cf-connecting-ip,cf-ew-via,cf-ray,cf-visitor,cf-worker,host,sb-api-key-compatibility,sb-forwarded-for,sb-request-id,traceparent,user-agent,x-amzn-trace-id,x-forwarded-for,x-forwarded-port,x-forwarded-proto",
+      "measurements": {
+        "outer_status": 200,
+        "ok": 5,
+        "leaf_header_names": "accept,accept-encoding,accept-language,baggage,cdn-loop,cf-connecting-ip,cf-ew-via,cf-ray,cf-visitor,cf-worker,host,sb-api-key-compatibility,sb-forwarded-for,sb-request-id,traceparent,user-agent,x-amzn-trace-id,x-forwarded-for,x-forwarded-port,x-forwarded-proto",
+        "outer_has_traceparent": 1,
+        "leaf_has_traceparent": 1,
+        "leaf_trace_equals_outer": 1
+      },
+      "durationMs": 144684
+    },
+    {
+      "id": "EF14b1",
+      "title": "fan of 40 sequential calls, trace 1 of 3 back to back (docs 30 per trace)",
+      "status": "info",
+      "detail": "outer 200, 30 ok, first refused #31; 200x30,errx10; refusal RateLimitError: Rate limit exceeded for trace 01a167dd00c579818090f417b294a34a. Retry after 56435ms.",
+      "measurements": {
+        "docs_per_trace": 30,
+        "outer_status": 200,
+        "ok": 30,
+        "first_refused_call": 31,
+        "first_refused_at_ms": 3566,
+        "statuses": "200x30,errx10",
+        "refusal": "RateLimitError: Rate limit exceeded for trace 01a167dd00c579818090f417b294a34a. Retry after 56435ms.",
+        "retry_after_ms": "56435",
+        "leaf_trace_equals_outer": 1
+      },
+      "durationMs": 144684
+    },
+    {
+      "id": "EF14b2",
+      "title": "fan of 40 sequential calls, trace 2 of 3 back to back (docs 30 per trace)",
+      "status": "info",
+      "detail": "outer 200, 30 ok, first refused #31; 200x30,errx10; refusal RateLimitError: Rate limit exceeded for trace 01a167dd0f327a538d1e9cf94a434376. Retry after 56020ms.",
+      "measurements": {
+        "docs_per_trace": 30,
+        "outer_status": 200,
+        "ok": 30,
+        "first_refused_call": 31,
+        "first_refused_at_ms": 3981,
+        "statuses": "200x30,errx10",
+        "refusal": "RateLimitError: Rate limit exceeded for trace 01a167dd0f327a538d1e9cf94a434376. Retry after 56020ms.",
+        "retry_after_ms": "56020",
+        "leaf_trace_equals_outer": 1
+      },
+      "durationMs": 144684
+    },
+    {
+      "id": "EF14b3",
+      "title": "fan of 40 sequential calls, trace 3 of 3 back to back (docs 30 per trace)",
+      "status": "info",
+      "detail": "outer 200, 30 ok, first refused #31; 200x30,errx10; refusal RateLimitError: Rate limit exceeded for trace 01a167dd1f417e73815d0edfd299beb0. Retry after 56730ms.",
+      "measurements": {
+        "docs_per_trace": 30,
+        "outer_status": 200,
+        "ok": 30,
+        "first_refused_call": 31,
+        "first_refused_at_ms": 3271,
+        "statuses": "200x30,errx10",
+        "refusal": "RateLimitError: Rate limit exceeded for trace 01a167dd1f417e73815d0edfd299beb0. Retry after 56730ms.",
+        "retry_after_ms": "56730",
+        "leaf_trace_equals_outer": 1
+      },
+      "durationMs": 144684
+    },
+    {
+      "id": "EF14c1",
+      "title": "two concurrent traces, 25 sequential calls each, round 1",
+      "status": "info",
+      "detail": "A: outer 200, 25 ok, first refused #none; B: outer 200, 25 ok, first refused #none; A trace != B trace: true",
+      "measurements": {
+        "a_ok": 25,
+        "b_ok": 25,
+        "a_first_refused": 0,
+        "b_first_refused": 0,
+        "total_ok": 50,
+        "distinct_traces": 1,
+        "refusal": "none"
+      },
+      "durationMs": 144684
+    },
+    {
+      "id": "EF14c2",
+      "title": "two concurrent traces, 25 sequential calls each, round 2",
+      "status": "info",
+      "detail": "A: outer 200, 25 ok, first refused #none; B: outer 200, 25 ok, first refused #none; A trace != B trace: true",
+      "measurements": {
+        "a_ok": 25,
+        "b_ok": 25,
+        "a_first_refused": 0,
+        "b_first_refused": 0,
+        "total_ok": 50,
+        "distinct_traces": 1,
+        "refusal": "none"
+      },
+      "durationMs": 144684
+    },
+    {
+      "id": "EF14c3",
+      "title": "two concurrent traces, 25 sequential calls each, round 3",
+      "status": "info",
+      "detail": "A: outer 200, 25 ok, first refused #none; B: outer 200, 25 ok, first refused #none; A trace != B trace: true",
+      "measurements": {
+        "a_ok": 25,
+        "b_ok": 25,
+        "a_first_refused": 0,
+        "b_first_refused": 0,
+        "total_ok": 50,
+        "distinct_traces": 1,
+        "refusal": "none"
+      },
+      "durationMs": 144684
+    },
+    {
+      "id": "EF14d1",
+      "title": "fan of 40 parallel calls, trace 1",
+      "status": "info",
+      "detail": "outer 200, 30 ok, first refused #31; 200x30,errx10; refusal RateLimitError: Rate limit exceeded for trace 01a167dd53017cfb9e3e51a04bf9f34f. Retry after 59994ms.",
+      "measurements": {
+        "outer_status": 200,
+        "ok": 30,
+        "refused": 10,
+        "statuses": "200x30,errx10",
+        "refusal": "RateLimitError: Rate limit exceeded for trace 01a167dd53017cfb9e3e51a04bf9f34f. Retry after 59994ms.",
+        "retry_after_ms": "59994"
+      },
+      "durationMs": 144684
+    },
+    {
+      "id": "EF14d2",
+      "title": "fan of 40 parallel calls, trace 2",
+      "status": "info",
+      "detail": "outer 200, 30 ok, first refused #31; 200x30,errx10; refusal RateLimitError: Rate limit exceeded for trace 01a167dd54687575b5519033a979e2d1. Retry after 59991ms.",
+      "measurements": {
+        "outer_status": 200,
+        "ok": 30,
+        "refused": 10,
+        "statuses": "200x30,errx10",
+        "refusal": "RateLimitError: Rate limit exceeded for trace 01a167dd54687575b5519033a979e2d1. Retry after 59991ms.",
+        "retry_after_ms": "59991"
+      },
+      "durationMs": 144684
+    },
+    {
+      "id": "EF14d3",
+      "title": "fan of 40 parallel calls, trace 3",
+      "status": "info",
+      "detail": "outer 200, 30 ok, first refused #31; 200x30,errx10; refusal RateLimitError: Rate limit exceeded for trace 01a167dd559e76c8b81509063c6b3fda. Retry after 59996ms.",
+      "measurements": {
+        "outer_status": 200,
+        "ok": 30,
+        "refused": 10,
+        "statuses": "200x30,errx10",
+        "refusal": "RateLimitError: Rate limit exceeded for trace 01a167dd559e76c8b81509063c6b3fda. Retry after 59996ms.",
+        "retry_after_ms": "59996"
+      },
+      "durationMs": 144684
+    },
+    {
+      "id": "EF14e1",
+      "title": "chain of depth 40 (one nested call per hop), trace 1",
+      "status": "info",
+      "detail": "outer 200 in 5352 ms; nested calls that completed: 40; stopped by bottom",
+      "measurements": {
+        "docs_per_trace": 30,
+        "outer_status": 200,
+        "nested_calls_completed": 40,
+        "stop": "bottom",
+        "retry_after_ms": "none",
+        "ms": 5352
+      },
+      "durationMs": 144684
+    },
+    {
+      "id": "EF14e2",
+      "title": "chain of depth 40 (one nested call per hop), trace 2",
+      "status": "info",
+      "detail": "outer 200 in 6769 ms; nested calls that completed: 40; stopped by bottom",
+      "measurements": {
+        "docs_per_trace": 30,
+        "outer_status": 200,
+        "nested_calls_completed": 40,
+        "stop": "bottom",
+        "retry_after_ms": "none",
+        "ms": 6769
+      },
+      "durationMs": 144684
+    },
+    {
+      "id": "EF14e3",
+      "title": "chain of depth 40 (one nested call per hop), trace 3",
+      "status": "info",
+      "detail": "outer 200 in 5347 ms; nested calls that completed: 40; stopped by bottom",
+      "measurements": {
+        "docs_per_trace": 30,
+        "outer_status": 200,
+        "nested_calls_completed": 40,
+        "stop": "bottom",
+        "retry_after_ms": "none",
+        "ms": 5347
+      },
+      "durationMs": 144684
+    },
+    {
+      "id": "EF14f1",
+      "title": "window: 30 calls, 62 s pause, 6 more, trace 1",
+      "status": "info",
+      "detail": "outer 200, 36 ok, first refused #none; before pause 30/30 ok; after 6/6 ok (call 31 at 65622 ms); 200x36; refusal none",
+      "measurements": {
+        "docs_window_s": 60,
+        "outer_status": 200,
+        "ok_before_pause": 30,
+        "ok_after_pause": 6,
+        "call31_at_ms": 65622,
+        "statuses": "200x36",
+        "refusal": "none"
+      },
+      "durationMs": 144684
+    },
+    {
+      "id": "EF14f2",
+      "title": "window: 30 calls, 62 s pause, 6 more, trace 2",
+      "status": "info",
+      "detail": "outer 200, 36 ok, first refused #none; before pause 30/30 ok; after 6/6 ok (call 31 at 65038 ms); 200x36; refusal none",
+      "measurements": {
+        "docs_window_s": 60,
+        "outer_status": 200,
+        "ok_before_pause": 30,
+        "ok_after_pause": 6,
+        "call31_at_ms": 65038,
+        "statuses": "200x36",
+        "refusal": "none"
+      },
+      "durationMs": 144684
+    },
+    {
+      "id": "EF14f3",
+      "title": "window: 30 calls, 62 s pause, 6 more, trace 3",
+      "status": "info",
+      "detail": "outer 200, 36 ok, first refused #none; before pause 30/30 ok; after 6/6 ok (call 31 at 64264 ms); 200x36; refusal none",
+      "measurements": {
+        "docs_window_s": 60,
+        "outer_status": 200,
+        "ok_before_pause": 30,
+        "ok_after_pause": 6,
+        "call31_at_ms": 64264,
+        "statuses": "200x36",
+        "refusal": "none"
+      },
+      "durationMs": 144684
+    },
+    {
+      "id": "EF14g1",
+      "title": "client-supplied traceparent shared by two outer invocations, 20 calls each, round 1",
+      "status": "info",
+      "detail": "first: outer 200, 20 ok, first refused #none; second: outer 200, 20 ok, first refused #none; function saw the client's trace id: true; leaf trace = client's: true",
+      "measurements": {
+        "first_ok": 20,
+        "second_ok": 20,
+        "second_first_refused": 0,
+        "outer_trace_is_client": 1,
+        "leaf_trace_is_client": 1,
+        "refusal": "none"
+      },
+      "durationMs": 144684
+    },
+    {
+      "id": "EF14g2",
+      "title": "client-supplied traceparent shared by two outer invocations, 20 calls each, round 2",
+      "status": "info",
+      "detail": "first: outer 200, 20 ok, first refused #none; second: outer 200, 20 ok, first refused #none; function saw the client's trace id: true; leaf trace = client's: true",
+      "measurements": {
+        "first_ok": 20,
+        "second_ok": 20,
+        "second_first_refused": 0,
+        "outer_trace_is_client": 1,
+        "leaf_trace_is_client": 1,
+        "refusal": "none"
+      },
+      "durationMs": 144684
+    },
+    {
+      "id": "EF14g3",
+      "title": "client-supplied traceparent shared by two outer invocations, 20 calls each, round 3",
+      "status": "info",
+      "detail": "first: outer 200, 20 ok, first refused #none; second: outer 200, 20 ok, first refused #none; function saw the client's trace id: true; leaf trace = client's: true",
+      "measurements": {
+        "first_ok": 20,
+        "second_ok": 20,
+        "second_first_refused": 0,
+        "outer_trace_is_client": 1,
+        "leaf_trace_is_client": 1,
+        "refusal": "none"
+      },
+      "durationMs": 144684
+    },
+    {
+      "id": "EF14h1",
+      "title": "chain of depth 5 with 10 leaf calls per hop (65 nested calls in one chain), trace 1",
+      "status": "info",
+      "detail": "outer 200 in 6568 ms; hop-to-hop calls completed 5 of 5; leaf calls ok 60, refused 0; nested calls completed 65; no refusal; stopped by bottom",
+      "measurements": {
+        "docs_per_trace": 30,
+        "outer_status": 200,
+        "hop_calls_completed": 5,
+        "leaf_calls_ok": 60,
+        "leaf_calls_refused": 0,
+        "nested_calls_completed": 65,
+        "first_refusal": "none",
+        "stop": "bottom"
+      },
+      "durationMs": 144684
+    },
+    {
+      "id": "EF14h2",
+      "title": "chain of depth 5 with 10 leaf calls per hop (65 nested calls in one chain), trace 2",
+      "status": "info",
+      "detail": "outer 200 in 6491 ms; hop-to-hop calls completed 5 of 5; leaf calls ok 60, refused 0; nested calls completed 65; no refusal; stopped by bottom",
+      "measurements": {
+        "docs_per_trace": 30,
+        "outer_status": 200,
+        "hop_calls_completed": 5,
+        "leaf_calls_ok": 60,
+        "leaf_calls_refused": 0,
+        "nested_calls_completed": 65,
+        "first_refusal": "none",
+        "stop": "bottom"
+      },
+      "durationMs": 144684
+    },
+    {
+      "id": "EF14h3",
+      "title": "chain of depth 5 with 10 leaf calls per hop (65 nested calls in one chain), trace 3",
+      "status": "info",
+      "detail": "outer 200 in 6845 ms; hop-to-hop calls completed 5 of 5; leaf calls ok 60, refused 0; nested calls completed 65; no refusal; stopped by bottom",
+      "measurements": {
+        "docs_per_trace": 30,
+        "outer_status": 200,
+        "hop_calls_completed": 5,
+        "leaf_calls_ok": 60,
+        "leaf_calls_refused": 0,
+        "nested_calls_completed": 65,
+        "first_refusal": "none",
+        "stop": "bottom"
+      },
+      "durationMs": 144684
+    },
+    {
+      "id": "EF14z",
+      "title": "cleanup: delete pvlab-ef14-* functions",
+      "status": "pass",
+      "detail": "deleted 1",
+      "measurements": {
+        "deleted": 1,
+        "left": 0
+      },
+      "durationMs": 144684
+    }
+  ]
+}
