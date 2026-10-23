@@ -3,7 +3,7 @@
 Vantage for every row: one workstation (macOS, local Docker) in the lab,
 the Management API at api.supabase.com, throwaway projects in ap-southeast-1.
 Harness run from source (`bun harness/src/run.ts --where local`), lab commit
-70e4244 plus the uncommitted files of this experiment. The Auth server
+d8a16df plus the uncommitted files of this experiment. The Auth server
 version is not exposed by the platform and was not recorded. supabase-js
 2.112.3 (root lockfile); the browser is the Chromium that ships in the
 Playwright container image named in `tests/au02-passkeys.ts`; AU02a records

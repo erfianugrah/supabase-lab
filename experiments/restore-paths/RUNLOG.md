@@ -292,7 +292,7 @@ can use to recover from a deleted-data mistake or a bad release.
 | R12 | RP05 | 09:53 | Pro | as R11, plus a git-less preview branch (RP05g) | `out/2026-10-20/run-2026-10-20T09-53-31-105Z.json` |
 | R13 | RP04 | 09:53 | Team | as R10, with the retention value recorded | `out/2026-10-20/run-2026-10-20T09-53-54-870Z.json` |
 
-The artifacts record lab commit `abe720d`; RP04 and RP05 ran from the
+The artifacts record lab commit `3a6ca0a`; RP04 and RP05 ran from the
 working tree, revised between R10 and R13 (retention value recorded) and
 between R11 and R12 (RP05g added), and the committed sources are the R12 and
 R13 revisions.
@@ -383,7 +383,7 @@ instant keeps; and how restore time grows past 1 GB (RP02 stopped at 574 MB).
 
 Same vantage (IPv4-only workstation), Pro org, ap-southeast-1, every project
 created on Small by the module with `pitr_7` applied by the module. All runs
-recorded lab commit `b6bd1d2` and ran from the working tree; the committed
+recorded lab commit `3a2f9bd` and ran from the working tree; the committed
 sources are the final revisions (RP06 from R24, RP07 from R22/R23). Every
 project was deleted in `finally`: `DELETE 200` in every published artifact
 (R14's included), and in the local reports of R16 and R17 (local only, not

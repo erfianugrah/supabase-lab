@@ -13,7 +13,7 @@ means the source named in the module header; "measured" means the artifact.
 ## 2026-10-22/23 - four runs (run 4 is the reference)
 
 Harness: `make run` (DC01, DC02, DC03, DC99, `--destructive`), lab commit
-b6bd1d2 plus the uncommitted tree that adds this experiment. All figures
+3a2f9bd plus the uncommitted tree that adds this experiment. All figures
 below are run 4 unless a run is named. Published (redacted):
 
 - run 1 `out/2026-10-22/run-2026-10-22T23-02-55-371Z.json` (13 results)

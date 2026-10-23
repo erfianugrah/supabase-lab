@@ -6,7 +6,7 @@
   "projectRegion": "ap-southeast-1",
   "ref": "<ref>",
   "experiment": "platform-downtime",
-  "labCommit": "b6bd1d2",
+  "labCommit": "3a2f9bd",
   "toolVersions": {
     "bun": "1.3.14",
     "psql": "psql (PostgreSQL) 18.6",

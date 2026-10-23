@@ -2,8 +2,8 @@
 
 ## 2026-10-13 - fourth full rebuild; kit left up
 
-First run through the kit after `40521f6` (credentials off command lines,
-Makefile), `5a6cb4c` (sharp override) and two `db_password` rotations.
+First run through the kit after `1eda7df` (credentials off command lines,
+Makefile), `6e648e7` (sharp override) and two `db_password` rotations.
 `secrets.tfvars` compared equal to a fresh decrypt before the run.
 
 - Model key: one-token call to the in-app agent's model answered 200 before

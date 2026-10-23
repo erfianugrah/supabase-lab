@@ -660,7 +660,7 @@ The queries the module sent are in the artifact's `evidence` fields and in
 
 ## W12 re-run with the explicit Data API grants (2026-10-13, green, module)
 
-Why: commit 8785380 added explicit `GRANT`s ahead of the 2026-10-30 Data API
+Why: commit 8b60c5b added explicit `GRANT`s ahead of the 2026-10-30 Data API
 default (the seed target's `w_probe` grant, and W12's grant on `probe_canary`
 and its sequence). This run checks that the statements execute and W12 still
 passes. One fresh Pro-org project (ap-southeast-1, no compute add-on selected,

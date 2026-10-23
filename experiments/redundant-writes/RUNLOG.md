@@ -22,7 +22,7 @@ Artifacts:
 - `out/2026-10-08/run-2026-10-08T13-35-31-791Z.{json,facts.md}` - RW06,
   12 results (status `info`, the module records counts and passes nothing).
 
-Both artifacts carry `lab commit e3408a6`; the experiment's own files were not
+Both artifacts carry `lab commit a300567`; the experiment's own files were not
 yet committed when they ran, so that stamp is the repo HEAD underneath them,
 not the module source. The `region ap-southeast-1` in the artifact header is
 the harness default and means nothing for a local run.

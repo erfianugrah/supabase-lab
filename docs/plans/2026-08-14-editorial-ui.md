@@ -1,6 +1,6 @@
 # demo UI: the editorial surface (as-at bridging, timelines, registry pins)
 
-> **STATUS 2026-10-11: SHIPPED** in 429a51c (follow-ups 37d0907, 5c3b7f4, a6b489f, 478af5b) (2026-08-14); loop outcomes and demo-readiness status in 8058e77. The banner below is the original one, kept for history.
+> **STATUS 2026-10-11: SHIPPED** in 131484a (follow-ups 0668ae9, 07777b9, 3a1978f, afb03ef) (2026-08-14); loop outcomes and demo-readiness status in ac3d983. The banner below is the original one, kept for history.
 >
 > **STATUS 2026-08-14: PLANNING.** Depends on `2026-08-14-editorial-graph-layer.md`
 > (Slice A) having landed: the RPCs it adds are this slice's data sources.
