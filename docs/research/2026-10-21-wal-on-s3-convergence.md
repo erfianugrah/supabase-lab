@@ -9,7 +9,7 @@ verbatim quotes: `raw/2026-10-21-wal-on-s3-convergence/`. Measurements:
 
 | | OrioleDB S3 mode | Turso Cloud |
 |---|---|---|
-| Commit acknowledged after | local WAL flush; S3 sync is asynchronous (docs; WS01e measured commit rates within 1.5% of each other with S3 on and off, n = 2) | the WAL write to S3 Express One Zone, batched across databases and in time (Turso durability docs; AWS storage blog, 6.4 ms average 4 KB PUT) |
+| Commit acknowledged after | local WAL flush; S3 sync is asynchronous (docs; WS01e run 2 measured the commit rate 1.4% lower with S3 on than off, n = 1; run 1 spanned a host sleep and is void, #234) | the WAL write to S3 Express One Zone, batched across databases and in time (Turso durability docs; AWS storage blog, 6.4 ms average 4 KB PUT) |
 | What S3 holds | data files at each checkpoint, WAL as whole 16 MB archived segments (WS01a), a lock object (WS01b start errors; raw notes, section 3) | WAL in S3 Express One Zone, the database file in S3 Standard after checkpoints |
 | Recovery after losing the node | "the state of the last PostgreSQL checkpoint" (docs); measured: after a crash with no clean shutdown since setup, no restore started in any of three variants (WS01b, WS01c); after a clean stop and start, a restore started only with the lock object deleted and a patched loader, and returned 100,000 of 100,000 rows from before the checkpoint and 0 of 1,000 committed after it (WS01f) | a replacement node serves reads from S3 Express while it warms its cache (AWS storage blog) |
 | Local disk | write target for commits and a cache of S3 data; `s3_desired_size` evicts to S3 (WS01d) | write-through cache |

@@ -50,16 +50,23 @@ if (trimOut) {
   process.exit(0);
 }
 const iso = (t: number) => new Date(t).toISOString().slice(11, 19);
+// run.ts reads performance.now() once per result after the module returns, so
+// one module's results can differ by a millisecond or two (DC02a 650760, DC02b
+// 650761 in a 2026-10-22 data-api-capacity artifact); exact equality split
+// such a module in two and placed it twice.
+const sameModule = (a: number | undefined, b: number | undefined) =>
+  a !== undefined && b !== undefined && Math.abs(a - b) <= 5;
 for (const f of arts) {
   const a = JSON.parse(await Bun.file(f).text());
   let w = Date.parse(a.startedAt);
   const wallEnd = Date.parse(a.finishedAt);
   const inside = sleeps.filter((x) => x.e > w && x.s < wallEnd);
   const total = inside.reduce((n, x) => n + Math.min(x.e, wallEnd) - Math.max(x.s, w), 0);
-  // Wall span against the summed test durations (consecutive equal durations
-  // are one module, counted once): equal when the host never slept.
+  // Wall span against the summed test durations (consecutive equal durations,
+  // within sameModule, are one module, counted once): equal when the host
+  // never slept.
   const summed = (a.results as { durationMs?: number }[]).reduce(
-    (acc, r) => (r.durationMs === acc.last ? acc : { n: acc.n + (r.durationMs ?? 0), last: r.durationMs }),
+    (acc, r) => (sameModule(r.durationMs, acc.last) ? acc : { n: acc.n + (r.durationMs ?? 0), last: r.durationMs }),
     { n: 0, last: undefined as number | undefined },
   ).n;
   console.log(
@@ -72,7 +79,7 @@ for (const f of arts) {
   const runs: { ids: string[]; durationMs: number }[] = [];
   for (const r of a.results) {
     const last = runs.at(-1);
-    if (last && last.durationMs === r.durationMs) last.ids.push(r.id);
+    if (last && sameModule(last.durationMs, r.durationMs)) last.ids.push(r.id);
     else runs.push({ ids: [r.id], durationMs: r.durationMs ?? 0 });
   }
   for (const r of runs) {

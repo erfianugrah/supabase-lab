@@ -769,7 +769,7 @@ c=3072 step. Order 150, 250, 70; the ramp's c=3072 step (pool 70 with
 | `db_pool` (PATCH, readback, restart after) | clients answered per round | req/s | p50 / p95 / p99 ms | statuses | `authenticator` active / idle / idle in transaction (range in load) | pool snapshots (scrapes) | Postgres exec ms/s | invocation statuses; retried attempts |
 |---|---|---|---|---|---|---|---|---|
 | unset, 70 (ramp) | 365.7 | 6148 | 273 / 320 / 384 | 200:236259 201:29312 206:29554 | 0-7 / 58-64 / 6-13 | 0/70/70, 1078/58/70 (16) | 801 | 0:1 200:2194 429:54 503:41 546:14; 429:1372 |
-| 150 (200, 150, 1.8 s) | 299 | 4830 | 281 / 362 / 490 | 200:185881 201:22964 206:22977 | 0-4 / 133-149 / 2-18 | 0/51/150 (4) | 240 | 0:394 200:1794 429:56 503:13 546:47; 429:1749 |
+| 150 (200, 150, 1.8 s) | 299 (void, #234) | 4830 (void, #234) | 281 / 362 / 490 | 200:185881 201:22964 206:22977 | 0-4 / 133-149 / 2-18 | 0/51/150 (4) | 240 | 0:394 200:1794 429:56 503:13 546:47; 429:1749 |
 | 250 (200, 250, 1 s) | 360 | 5901 | 278 / 353 / 462 | 200:226689 201:28304 206:28249 | 0-5 / 173-240 / 7-78 | 0/0/250 (5) | 1204 | 200:2160 429:78 503:66; 429:2124 |
 | 70 (200, 70, 1.4 s) | 368.8 | 6210 | 274 / 328 / 379 | 200:238435 201:29769 206:29875 502:3 | 0-6 / 51-61 / 5-14 | 0/70/70 (12) | 891 | 0:13 200:2213 429:78; 0:3 429:2716 |
 
@@ -779,9 +779,9 @@ recorded (countExact) was Cloudflare's page, `502 Bad Gateway` with
 
 Readings:
 
-- A bigger pool did not raise throughput or lower p50. p50 was 273, 281,
-  278 and 274 ms at pool 70 (unset), 150, 250 and 70; req/s 6,148, 4,830,
-  5,901 and 6,210. p95 and p99 were higher at 150 and 250 (362 / 490 and
+- A bigger pool did not lower p50, and pool 250 did not raise throughput.
+  p50 was 273, 281, 278 and 274 ms at pool 70 (unset), 150, 250 and 70;
+  req/s 6,148, 4,830 (void, host sleep audit below), 5,901 and 6,210. p95 and p99 were higher at 150 and 250 (362 / 490 and
   353 / 462 against 320 / 384 and 328 / 379; one step each). One step per
   arm, no repeats; the two pool-70 steps differ by 62 req/s.
 - The pool 150 arm's lower rate came with fewer clients answering (299
@@ -791,7 +791,22 @@ Readings:
   384 clients, and the arm's samples stop at 41 s, which fits one lost
   round (derived; the artifact has no per-round split): 4,830 x 6/5 is
   about 5,800 req/s. Its rate measures the generator; its p50 matched the
-  other arms.
+  other arms. **Host sleep audit (2026-10-26, #234):** two sleeps of the
+  orchestrator Mac fell inside DC08, 09:50:15 to 09:53:46 (211 s) and
+  09:53:57 to 09:55:10 (73 s) UTC, 750 s and 972 s of wall time after the
+  module began; walking the module across them lands 3 s from `finishedAt`
+  (`../platform-downtime/out/2026-10-26/host-sleep/overlap.txt`). No step
+  has a wall stamp, but about 253 s of the module remained after the second
+  wake, room for the last two arms, and the pool-150 arm carries the marks:
+  394 status 0 (what in-flight fetches get across a sleep), samples ending
+  at 41 s, and Postgres exec at 240 ms/s against 801 to 1204 in the other
+  c=3072 steps (a window stretched by a sleep dilutes a per-second rate;
+  the lower calls per request is not explained by it). Void: the
+  pool-150 arm's req/s, clients answered per round, Postgres exec ms/s,
+  calls/s and xact/s. Its p50 / p95 / p99 are timed by the generator in the
+  project's region, which a Mac sleep does not pause: unaffected. No other
+  step shows those marks (status 0 on at most 13 invocations); unaffected,
+  by that reading rather than by placement.
 - With more connections, more sat idle: 133 to 149 at pool 150, 173 to
   240 at 250, active 0 to 4 at 150 and 0 to 5 at 250. Idle in transaction
   reached 78 in one pool-250 sample, against at most 22 in any other step.
@@ -1199,7 +1214,45 @@ differs:
   where they occur) whose error text was not recorded.
 - Module durations do not add up to the wall clock in runs 2 and 4 either:
   561029 ms against 800 s, and 2323221 ms against 2419 s. The cause is not
-  separated.
+  separated. **Separated by the host sleep audit (2026-10-26, #234):** in all
+  three runs the difference is the orchestrator Mac asleep.
+  `harness/scripts/sleep-overlap.ts` against the sleep log
+  (`../platform-downtime/out/2026-10-26/host-sleep/overlap.txt`, from the
+  trimmed `pm-events.tsv` beside it) places 4 sleeps (898 s) inside run 1's
+  DC02, 2 (244 s) in run 2 and 1 (97 s) inside run 4's DC02; walking each
+  run's modules forward across them lands 2 to 7 s from `finishedAt`. By
+  figure:
+  - Run 4, the reference: unaffected. Its sleep (01:10:01 to 01:11:38 UTC)
+    began after DC02d's second ping window had ended (restart line
+    01:08:48, 55.3 s after that PATCH, so the 120 s window ran to about
+    01:09:53) and before DC02e's log read, a line count with no timing.
+  - Run 1: DC01 and DC03 spanned no sleep, so the run-1 figures quoted in
+    DC01 stand, and the DC03a anon row's client errors at 18.1 s stay
+    unexplained. In DC02 the fourth restart line (23:17:00) is the
+    timeout-4 s PATCH and the first sleep began at 23:17:28; that row's two
+    probes answered 200 after 261 ms with 0 holders sleeping, which fits the
+    holders having finished while the Mac slept. Void: the run-1
+    timeout-4 s row. DC02c's `db_pool` 1000 burst went out with its PATCH,
+    about 6 s after the 23:29:09 dark wake that ended a 262 s sleep
+    (restart line 23:29:15; restarts came 0.5 to 0.9 s after a PATCH); the
+    next sleep began 55 s later, at 23:30:10. Its 218 closed sockets fit a
+    restart overlap or pooled sockets the server closed during that sleep;
+    not separated.
+  - Run 2: DC01's sleep (23:48:34 to 23:50:58) began 306 s into a module
+    that ran 309 s of monotonic time, after DC01a to DC01c had reported, so
+    "The operation timed out." came right after the wake; DC01b (61972 /
+    61795 ms) and DC01c (41 s) came before the sleep and stand. DC03's sleep
+    (23:51:08 to 23:52:48) began 1 s into DC03, beside its first calls'
+    status 0 at 0.0 s (a reading; the 78.6 s hang is not placed). DC02 (6
+    s, 23:51:00 to 23:51:06) ran inside the 10 s dark wake between the two
+    sleeps, which fits its failure to measure the pool (a reading). DC03d
+    came later in the module, after DC03's only sleep had ended: its run-2
+    result (the same as run 4, DC03 table) stands.
+  - Run 3 wrote no artifact and its console times were not kept; between
+    run 2's finish (23:56:48) and run 3's project deletion (about 00:36
+    UTC) the sleep log has four sleeps, 00:24:39 to 00:36:13 UTC. Whether
+    run 3 was still running at any of them, and whether its `ECONNRESET`
+    came at a wake, is not known.
 
 ### DC01 - default pool and the default wait for PGRST003
 

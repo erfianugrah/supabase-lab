@@ -408,6 +408,10 @@ R16/R17, R18/R19); the published copies carry a suffix to keep them apart.
 R14's RP06d, R16 and R17 died on `The socket connection was closed
 unexpectedly` from a Management API fetch (no retry on a thrown fetch then);
 the modules now retry a throw on their own reads (`again()` in `lib/rp.ts`).
+The orchestrator Mac was asleep from 23:17:28 UTC (host sleep audit below):
+R14's RP06d died after that sleep, and R16 and R17, started at 23:16 (run
+table above), ran across it (the times of their failures were not kept), so
+the socket errors fit fetches cut by a sleep.
 
 ### A correction (2026-10-23) to the `rest` path in RP02 (RUNLOG 2026-10-10 table)
 
@@ -422,8 +426,10 @@ table RP06 never creates: `404 PGRST205` throughout, so their `rest_read`
 column is void). Every restore where `rest_read` was valid shows the read
 failing with `503 PGRST002`: 15 s of R24's 30 s to healthy and 14 s of R25's
 41 s, and 192 to 544 s in the seven RP07 restores that carried the probe
-(R18, R19, R22, R23; tables below), while `rest` in the same runs shows no
-failure in 8 of those 9 restores and 6 s in one (R18, 3 GB).
+(R18, R19, R22, R23; tables below; R18's 211 s and R19's 202 s at 3 GB are
+upper bounds, host sleep audit below), while `rest` in the same runs failed in
+none of those 9 restores (R18's 3 GB 6 s is a sample cut by a sleep, void;
+host sleep audit below).
 
 ### RP06 - lag of the latest recoverable instant (R14)
 
@@ -511,12 +517,12 @@ the fill's end plus 10 s, then restored to that bound. Every restore went
 |---|---|---|---|---|---|---|---|---|---|
 | R15 | 3111 MB | 130, 23.9 | 30 | not recorded | 222 | no probe | 182 | 18 | 11,000,000 / 11,000,000 |
 | R15 | 10441 MB | 311, 23.6 | 30 | not recorded | 787 | no probe | 330 | 12 | 37,000,000 / 31,000,000 |
-| R18 | 3210 MB | 129, 24.8 | 121 | 121 | 221 | 211 | 322 | 12 | 11,000,000 / 11,000,000 |
+| R18 | 3210 MB | 129, 24.8 | 121 | 121 | 221 (upper bound, #234) | 211 (upper bound) | 322 (upper bound) | 12 | 11,000,000 / 11,000,000 |
 | R18 | 10482 MB | 290, 25.1 | 31 | 26 | 555 | 417 | 400 | 15 | 36,000,000 / 36,000,000 |
-| R19 control | 3210 MB | 128, 25 | 131 | 128 | 322 | 202 | 315 | 18 | 11,000,000 / 11,000,000 |
+| R19 control | 3210 MB | 128, 25 | 131 | 128 | 322 (upper bound, #234) | 202 (upper bound) | 315 (upper bound) | 18 | 11,000,000 / 11,000,000 |
 | R19 control | 10482 MB | 291, 25 | 61 | 51 | 545 | 415 | 402 | 12 | 36,000,000 / 36,000,000 |
-| R22 | 10482 MB | 1114, 9.4 | 152 | 123 | 697 | 544 | 531 | 12 | 36,000,000 / 36,000,000 |
-| R23 | 3210 MB | 116, 27.6 | 208 | 170 | 232 | 192 | 176 | 12 | 11,000,000 / 11,000,000 |
+| R22 | 10482 MB | 1114, 9.4 (void, #234) | 152 | 123 | 697 | 544 | 531 | 12 | 36,000,000 / 36,000,000 |
+| R23 | 3210 MB | 116, 27.6 | 208 (void, #234) | 170 (void, #234) | 232 | 192 | 176 | 12 | 11,000,000 / 11,000,000 |
 | R23 | 10482 MB | 216, 33.7 | 31 | 29 | 475 | 320 | 320 | 15 | 36,000,000 / 36,000,000 |
 
 "Down" is the longest contiguous failure window from the sampler at 1 s
@@ -529,10 +535,12 @@ explained. The 10 GB rows in R15, R18, R19 and
 R23 are a second fill on top of the restored 3 GB database; R22 filled to
 10 GB in one pass.
 
-- Time to `ACTIVE_HEALTHY`: 221 to 322 s at 3111 to 3210 MB (n=4), 475 to
-  787 s at 10441 to 10482 MB (n=5). Against RP02 (30 s at 10 MB, 81 s at
-  574 MB) time grows with size at this compute; n is small and the spread at
-  each size is wide.
+- Time to `ACTIVE_HEALTHY` at 3111 to 3210 MB: 222 s (R15) and 232 s (R23)
+  taken awake; R18 between about 67 and 221 s and R19 between about 59 and
+  322 s, the 221 s and 322 s being the first polls after a sleep of the
+  orchestrator Mac (host sleep audit below). 475 to 787 s at 10441 to 10482
+  MB (n=5). Against RP02 (30 s at 10 MB, 81 s at 574 MB) time grows with size at
+  this compute; n is small and the spread at each size is wide.
 - What replay cost, from `postgres_logs` (R22, R23): `redo done ...
   elapsed: 166.13 s` (R23, 3 GB), `278.96 s` (R23, 10 GB), `512.03 s` (R22,
   10 GB); the rest of the time to healthy is outside replay.
@@ -541,10 +549,17 @@ R23 are a second fill on top of the restored 3 GB database; R22 filled to
   `rest` probe (anon on `/rest/v1/`) showed no failure in 8 of 9 restores
   and 6 s in one. Auth (`/auth/v1/health`) failed for 144 s in R19's 3 GB
   restore and not at all in the others; Realtime for 144 s in R18's 3 GB
-  restore and 6 s in R19's 3 GB restore.
+  restore and 6 s in R19's 3 GB restore. **Void (host sleep audit below):**
+  the 144 s Auth and Realtime windows are the 144 s sleep and the 6 s
+  `rest` and Realtime windows are samples cut at a wake, so Auth, Realtime
+  and `rest` failed in none of the 9 RP07 restores. R18's and R19's 3 GB
+  `rest_read` and pooler windows are upper bounds; the range ends (192,
+  544; 176, 531) are awake runs and stand.
 - R18's 3 GB restore ended with the current password refused by the pooler
   (`cred_final_current` `refused`; pooler down 322 s against 221 s to
-  healthy); every other RP07 restore ended `ok`. Not followed up.
+  healthy); every other RP07 restore ended `ok`. Not followed up. Void as a
+  finding (host sleep audit below): the credential watch spanned both
+  sleeps, and the pooler window closed 3 s after the second wake.
 - **R15's 10 GB restore came back short**: 31,000,000 of 37,000,000 rows,
   and without the `filled-10gb` marker row written after the fill. The
   restore answered `201` and the project returned to `ACTIVE_HEALTHY`;
@@ -572,6 +587,36 @@ RP02 saw once PITR is on); other compute sizes; a heavy writer's effect on the b
 restore-to-latest with the archiver measurably behind (the case R15
 suggests; run as RP08 on 2026-10-23, below); the Dashboard's restore button, which may pick its target
 differently.
+
+### Host sleep audit (2026-10-26, #234)
+
+The orchestrator Mac slept inside seven of this section's artifacts (R14,
+R18, R19, R20, R21, R22, R23).
+`harness/scripts/sleep-overlap.ts` against the sleep log
+(`../platform-downtime/out/2026-10-26/host-sleep/overlap.txt`, the trimmed
+`pm-events.tsv` beside it) walks each run's modules across the sleeps and
+lands 4 to 9 s from `finishedAt`. A module's results share one duration, so
+single restores are placed from their own fields: the fill end is
+`target_unix` minus `target_minus_fill_end_s`, and a sampler path that was
+up and first fails exactly at a logged sleep start, for that sleep's
+length, marks when the call went in. Every timing in these modules is
+wall-clock (`Date.now()`), so a sleep inside a window stretches it to the
+first poll or sample after the wake. Times UTC.
+
+| run | sleeps inside (s) | where they fell | outcome |
+|---|---|---|---|
+| R14 | 235, 184, 262 from 23:17:28 | RP06c's 75th sample is at 23:17:29 (the bound plus its lag), so the sleep stopped the idle phase 5 samples short of 20 min; RP06d died after it | RP06b unaffected; RP06c's values unaffected, its 752 s maximum a floor for a full 20 min; RP06d's abort fits the sleep |
+| R18 | 144, then 100 after a 10 s dark wake (23:48:34 to 23:52:48) | 3 GB restore: Realtime first failed at 77 s for 144 s, the first sleep, so the call went in at about 23:47:17 and healthy was read at the wake | 3 GB: back healthy between about 67 and 221 s (10 s polls), `rest_read` down 66 to 211 s, pooler 65 to 322 s (bounded); Realtime 144 s, `rest` 6 s and the refused password void. 10 GB (fill from 23:54:05): unaffected |
+| R19 | the same two | 3 GB restore: Auth first failed at 69 s for 144 s, so the call went in at about 23:47:25; healthy was read at 322 s, the second wake | 3 GB: back healthy between about 59 and 322 s, `rest_read` 59 to 202 s, pooler 58 to 315 s (bounded); Auth 144 s and Realtime 6 s void. 10 GB: unaffected |
+| R20, R21 | 197, 262, 101, 104 (00:24:39 to 00:36:13) | Realtime first failed at 670 s for 100 s, the 00:32:38 sleep, so the call went in at about 00:21:28 and the project was back 40 s later, before the first sleep | the figures quoted above (bound age, 40 s, missing and lost rows) unaffected; the later Realtime, `rest` and Auth windows are sleeps (not quoted) |
+| R22 | the same four | inside the 10 GB fill (00:22:34 to 00:41:08) | fill 1114 s and 9.4 MB/s void (at most 450 s of it ran awake); its `Connection terminated unexpectedly` fits a sleep (reading); the restore, called after 00:43, unaffected |
+| R23 | the same four | 3 GB: the first inside the bound wait (fill end 00:24:29, wait 208 s); the call came after the last wake, because a call in any dark wake between the sleeps would put a sleep inside Storage's 12 s window | 3 GB bound wait (208 s) and target after fill end (170 s) void, the bound having been read at the wake; the 3 GB restore and all of 10 GB unaffected |
+
+R15 (ended 23:14:42), R24 and R25 spanned no sleep. In R18 and R19 the
+probes that failed were not the same per sleep (a sleep does not fail every
+path), so a path with no failure does not show that no sleep fell in it;
+the placements above rest on a failure that matches a logged sleep in start
+and length, or on the poll that saw healthy landing at a wake.
 
 ## 2026-10-23 - RP08 (restore to the quoted latest instant while the archiver is behind)
 
@@ -639,7 +684,7 @@ R26's two bulk cycles, 68.8 to 71.6 MiB/s for R29 (4 writers) and 63.5 to
 | R27 2 | live | 1 / 2 | 1 (log read by hand) | not computed | 0 of 219 | 0 of 945 | kept (0.4) | 10 (below) |
 | R29 1 | live | 3 / 8 | 9 | 0.1 | 0 of 306 | 1 of 314 (0.1 s) | kept (1.2) | 323 |
 | R29 2 | live | 2 / 7 | 5 | -0.5 | 0 of 312 | 0 of 366 | kept (0.6) | 313 |
-| R29 3 | live | 4 / 8 | 7 | 0.1 | 0 of 303 | 0 of 343 | kept (0.8) | 354 |
+| R29 3 | live | 4 / 8 | 7 | 0.1 | 0 of 303 | 0 of 343 | kept (0.8) | 354 (upper bound, #234) |
 | R30 1 | live | 9 / 12 | 8 | 0.2 | 1 of 278 (0.4 s) | 0 of 302 | absent (-0.3) | 283 |
 | R30 2 | live | 14 / 33 | 33 | 0.4 | 0 of 312 | 0 of 321 | absent (-0.2) | 313 |
 | R30 3 | live | 14 / 31 | 26 | 0.3 | 1 of 305 (0.2 s) | 1 of 331 (0 s) | kept (0.4) | 313 |
@@ -723,12 +768,14 @@ run.
   by hand, not in the artifact (the target L was 08:25:33 and the call went
   in 2 s later). The status was not read during the outage. In the other 9
   restores the status went back to healthy after 283 to 545 s. 1 of 10.
+  (R29 3's 354 s is an upper bound, below; the range ends stand.)
 - Password after the restore (R18 recurrence): no restore ended with the
   current password refused (0 of 10). 8 of 10 ended `ok` inside the
   credential watch; R27 2 and R29 3 ended `down` when the watch stopped and
-  the next login after it succeeded. The single 5 s poll that refuses the
-  current password before it works showed in 7 of 10 (`cred_refused_until_ok_s`
-  5 in R26 1-2, R27 1, R29 2, R30 1-3).
+  the next login after it succeeded (R29 3's watch spanned a sleep, below).
+  The single 5 s poll that refuses the current password before it works
+  showed in 7 of 10 (`cred_refused_until_ok_s` 5 in R26 1-2, R27 1, R29 2,
+  R30 1-3).
 - Harness defect found in R27 2: once the credential watch stopped, the
   pooler probe returned its last login result forever, so a restore that ended
   with the pooler down held the sampler's watchdog to its 93-minute cap (R27
@@ -738,6 +785,21 @@ run.
   probe opens a real pooler connection); the check is R29 3, which ended with
   the watch `down` (`pooler_window_s` 330) and still finished, its project
   living 0.50 h against R27's 2.13 h.
+- **Host sleep audit (2026-10-26, #234).** The sleep log
+  (`../platform-downtime/out/2026-10-26/host-sleep/overlap.txt`) has the
+  orchestrator Mac asleep inside two of these artifacts. R29: one sleep,
+  09:17:22 to 09:19:20 UTC (118 s), in cycle 3, whose target was 09:13:26;
+  its `rest_http` probe first failed at 237 s for 117 s (the sleep) and
+  healthy was read at 354 s, at the wake. R29 3's back-healthy time is
+  bounded: between about 226 and 354 s (10 s polls). Its `rest_read`
+  (258 s) and pooler (330 s) windows contain the sleep (upper bounds), the
+  117 s `rest_http` window is void, and its watch ending `down` is not a
+  clean observation. R29 1 and 2
+  (targets 08:57:25 and 09:05:27, healthy by about 09:10:40) and every
+  figure above from them are unaffected. R27: three sleeps from 09:17:22,
+  all inside the frozen-pooler wait after cycle 2's outage had ended
+  (08:32:58 by its `rest_read` window): unaffected. R26 and R30 spanned no
+  sleep.
 
 Not measured: a backlog that grows without bound (none of these loads built
 one on Small); a heavier write than 8 WAL writers or a larger compute;
