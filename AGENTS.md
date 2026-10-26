@@ -1395,7 +1395,7 @@ artifacts: `out/2026-08-25/` (redacted and made trackable on 2026-09-02;
 before that they sat untracked under the global `**/out/` ignore while this
 line called them committed).
 
-## experiments/byo-oauth - key facts (validated 2026-08-17/18)
+## experiments/byo-oauth - key facts (validated 2026-08-17/18; O03 re-run 2026-10-26, four runs, Pro org, ap-southeast-1)
 
 The Management API OAuth2 surface (BYO-backend / Path B). O01: bogus
 client_id -> `422 Unrecognized client_id` (client validation before
@@ -1410,6 +1410,22 @@ OAuth 2.1 IdP is fully headless-automatable (authorize -> GET
 authorizations/{id} binds the user -> POST consent approve -> token with
 client_secret_basic; PKCE required even for confidential clients) and its
 tokens carry `client_id`, usable in RLS (two-client isolation measured).
+The OAuth server is not live when the auth config PATCH returns 200:
+discovery answered `404 feature_disabled` right after the PATCH in all four
+O03 runs of 2026-10-26, and `POST /auth/v1/admin/oauth/clients` answered the
+same 404 in the two runs that registered without waiting (that both wait on
+Auth applying the PATCH is inferred). The first discovery 200 arrived 4322
+and 4313 ms after the PATCH returned (third request, 2 s apart; the second
+request still answered 404); cross-project-auth X09 saw 5119-5263 ms on 5 s
+polls (second request), which cannot say sooner. The 2026-10-13 O03b
+`consent=404` was most likely that registration 404 (inferred: the old code
+reported registration, authorize and consent failures in the same
+`consentStatus` field, and the 2026-10-13 artifacts cannot separate them).
+Since 2026-10-26 O03 records each step's status and polls discovery before
+registering. With the wait, O03b passed and O03c scoped as before (visible
+1, hidden 1) in 2 of 2 runs; without it O03b failed at registration in 2 of
+2. O03c's setup SQL now carries #128's explicit grant, but the default
+grants were not revoked, so the runs do not show the grant is needed.
 
 ## experiments/rate-limits - key facts (validated 2026-08-17/18)
 

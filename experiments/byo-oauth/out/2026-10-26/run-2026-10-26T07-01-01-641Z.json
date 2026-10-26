@@ -1,0 +1,62 @@
+{
+  "startedAt": "2026-10-26T07:01:01.641Z",
+  "finishedAt": "2026-10-26T07:01:15.562Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "byo-oauth",
+  "labCommit": "adc597c",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "O03-control",
+      "title": "O03-control: provision + enable OAuth server",
+      "status": "pass",
+      "detail": "discovery right after the PATCH: HTTP 404 (feature_disabled: OAuth server is disabled)",
+      "measurements": {
+        "provision_s": 12,
+        "config_status": 200,
+        "discovery_after_patch_status": 404
+      },
+      "durationMs": 13920
+    },
+    {
+      "id": "O03a",
+      "title": "O03a: user + client registration",
+      "status": "info",
+      "measurements": {
+        "admin_user_status": 200
+      },
+      "durationMs": 13920
+    },
+    {
+      "id": "O03b",
+      "title": "O03b: headless authorization code flow, claim shape",
+      "status": "fail",
+      "detail": "flow failed at register HTTP 404 (feature_disabled: OAuth server is disabled)",
+      "measurements": {
+        "register_status": 404,
+        "authorize_status": 0,
+        "authorization_status": 0,
+        "consent_status": 0,
+        "token_status": 0,
+        "client_id_claim": 0,
+        "aud": "absent",
+        "scope": "absent"
+      },
+      "durationMs": 13920
+    },
+    {
+      "id": "O03c",
+      "title": "O03c: RLS client_id scoping",
+      "status": "skip",
+      "detail": "no OAuth token",
+      "durationMs": 13920
+    }
+  ]
+}

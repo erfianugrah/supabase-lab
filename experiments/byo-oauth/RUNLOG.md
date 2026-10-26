@@ -126,3 +126,95 @@ and the authorization id is still lowercase base32, which the module's
 seconds of the auth config PATCH, and the module does not wait for the
 config to apply; with provisioning now reading healthy at the first 10 s
 poll, the whole run took 13-14 s. Cause not established.
+
+Correction (2026-10-26, entry below): `consentStatus` also carried the
+client registration's status when registration failed, so the 404 could
+have come from any of three calls (registration, authorize, consent). In the
+2026-10-26 re-run's two no-wait runs the same failure was at registration
+(`register_status` 404); that the 2026-10-13 404 was also the registration
+is inferred from the matching timing, not separable from the 2026-10-13
+artifacts.
+
+## 2026-10-26 - O03b: the no-wait 404 is the client registration while discovery still answers 404; with a wait for discovery 200, O03b passes and O03c scopes (visible 1, hidden 1)
+
+Question: which call answered the 2026-10-13 `consent=404`, and does it go
+away once the auth config PATCH has applied.
+
+Module changes, in this order: (1) `runFlow` records each step's status in
+its own column (`register_status`, `authorize_status`,
+`authorization_status`, `consent_status`, `token_status`; 0 = not reached)
+and the first failing step's error code and message (`lib/flow-steps.ts`,
+unit-tested), and O03-control reads the project's RFC 8414 discovery
+document (`/.well-known/oauth-authorization-server/auth/v1`) once right
+after the PATCH; (2) O03-control then polls that document every 2 s, budget
+300 s, until it answers 200, and only then starts the flow. Runs 1-2 used
+(1) only; runs 3-4 used (1) and (2). Nothing else changed between them.
+
+Four runs, `make probe` equivalent (`--only O03 --experiment byo-oauth`),
+local vantage, Pro org, ap-southeast-1, lab commit adc597c plus
+uncommitted module changes: runs 1-2 ran change (1) alone, runs 3-4 ran (1)
+and (2); `labCommit` reads adc597c in all four artifacts and does not
+separate them. Other agents were running live work from the same Mac.
+`oauth_ready_ms` is measured from the PATCH response to the arrival of the
+first discovery 200, including each request's round trip; with requests 2 s
+apart it bounds the apply delay from above (the second request, a little
+over 2 s in, still answered 404). Each run's project was created and deleted by the module;
+no `o03-idp` project remained in `GET /v1/projects` afterwards. Published
+(redacted) under `out/2026-10-26/`:
+
+- run 1 `run-2026-10-26T07-01-01-641Z.json` (no wait)
+- run 2 `run-2026-10-26T07-01-31-048Z.json` (no wait)
+- run 3 `run-2026-10-26T07-02-06-582Z.json` (wait)
+- run 4 `run-2026-10-26T07-02-28-677Z.json` (wait)
+
+| Row | Runs 1, 2 (no wait) | Runs 3, 4 (wait) |
+|---|---|---|
+| O03-control `provision_s` (create to end of O03-control; in runs 3-4 it includes the discovery wait) | 12, 12 | 16, 16 |
+| `discovery_after_patch_status` | 404, 404 | 404, 404 |
+| `oauth_ready_ms` (first discovery 200 after the PATCH returned) | not polled | 4322, 4313 (`oauth_ready_polls` 3, 3) |
+| O03b `register_status` | 404, 404 | 201, 201 |
+| O03b `authorize_status` / `authorization_status` / `consent_status` / `token_status` | 0 (not reached) | 302 / 200 / 200 / 200 in both |
+| O03b | FAIL: `flow failed at register HTTP 404 (feature_disabled: OAuth server is disabled)` | pass: `client_id_claim` 1, `aud` authenticated, `scope` email |
+| O03c | skip: "no OAuth token" | `policy_status` 201, `visible_with_matching_client` 1, `hidden_with_other_client` 1, `client_b_token` 1 |
+
+In these four runs `provision_s` was computed after the discovery read (and,
+with the wait, after the poll loop), so the 4 s more in runs 3-4 matches the
+4322 and 4313 ms discovery wait. The module now takes it at the PATCH response again, the span
+the 2026-08-18 and 2026-10-13 figures cover; the published runs used the
+longer span.
+
+- In runs 1-2 (no wait) the 404 came from `POST
+  /auth/v1/admin/oauth/clients`, the first call of the flow. Its error code
+  and message were the same `feature_disabled: OAuth server is disabled` that discovery answered right
+  after the PATCH in all four runs (the PATCH itself answered 200 in all
+  four). The authorize and consent
+  routes were not reached.
+- Waiting for discovery to answer 200 was the only change, and with it every
+  step answered (register 201, authorize 302, authorization 200, consent 200,
+  token 200) in both runs. The first 200 came on the third discovery
+  request (the right-after read counts as the first; `oauth_ready_polls` 3),
+  4322 and 4313 ms after the PATCH returned. cross-project-auth X09 measured 5149,
+  5263 and 5119 ms on 5 s polls on 2026-10-23, and its unpublished run 1 (10:36:42 UTC,
+  cross-project-auth RUNLOG 2026-10-23) stopped at the same `404
+  feature_disabled` on registration.
+- The 2026-10-13 artifacts recorded only `consent=404 token=0`, which the
+  old code also produced for a failed registration. Their timing matches
+  runs 1-2 (healthy at the first poll, 13-14 s per run; runs 1-2 took 13.9
+  s each), so a registration 404 is the likely reading for them as well.
+  Inferred, not separable from those artifacts.
+- Why 2026-08-18 passed with no wait is not established: that run took
+  175 s to healthy and its artifact does not record the time between the
+  PATCH and the registration.
+- #128's explicit grant (in O03c's setup SQL, `grant select, insert,
+  update, delete on table public.o03_docs to anon, authenticated,
+  service_role`) was part of a setup batch that answered 201 in runs 3-4
+  (`policy_status`, the status of the whole batch), and both OAuth tokens' REST reads
+  answered with a JSON array (1 row for client A, 0 for client B); a 401,
+  403 or 42501 body on either read would have scored 0 on that read's
+  cell. The run did not
+  revoke the platform's default grants first, so it does not show whether
+  this grant is load-bearing.
+
+Not run: O01c/d/e (they need the manual consent drill's inputs). The OAuth
+2.1 server docs were not re-read for a changed route: the registration 404
+did not recur once discovery answered 200.
