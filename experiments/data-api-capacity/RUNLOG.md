@@ -12,6 +12,197 @@ means the source named in the module header; "measured" means the artifact.
 DC08 is the exception to that vantage: its clients run in the project's
 region (section below).
 
+## 2026-10-26 - DC16 Realtime pool on a project created at 2XL, DC17 the gateway's long-request timeout (one run each)
+
+Harness: lab commit adc597c plus the uncommitted DC16 and DC17 modules (and
+DC13's Realtime row moved to `lib/rt-read.ts`, unchanged). Three Pro-org
+projects in ap-southeast-1, one per process, the three processes started
+within 22 s of each other from this lab's Mac in Singapore (other agents
+also ran live work from the same Mac); each deleted by its own DC99 (DELETE
+200), and `lib/cleanup.ts` listed 0 projects under each run's name prefix
+afterwards. Postgres 17.11 on all three; PostgREST 14.18 (DC17a, the
+`application_name` of `authenticator`).
+
+- DC17: created `small`, `out/2026-10-26/run-2026-10-26T05-48-07-761Z.json`
+  (31 results), 05:48:07 to 05:58:26 UTC.
+- DC16 at 2XL: created with `desired_instance_size: 2xlarge`,
+  `out/2026-10-26/run-2026-10-26T05-48-18-228Z.json` (4 results), 05:48:18
+  to 05:52:04 UTC.
+- DC16 control: created `small`,
+  `out/2026-10-26/run-2026-10-26T05-48-29-561Z.json` (4 results), 05:48:29
+  to 05:50:27 UTC.
+
+### DC16 - Realtime's authorisation pool on a project created at 2XL
+
+Question: DC13 (2026-10-26, below) read `connection_pool` 5 and held 5
+`realtime_connect` connections on a project created Small and resized to XL
+and 2XL, where the Realtime concepts page's table of default pool sizes
+(https://supabase.com/docs/guides/realtime/concepts, "Authorization Pool
+Size": Nano and Micro 2, Small to Large 5, XL to 4XL 10, 8XL and above 15,
+"If not specified, the default values shown in the table will be used")
+gives 10. H1: the value is set once from the size the project is created
+at and not re-derived on a resize, so a project created at 2XL reads 10. H2:
+the table does not describe these projects, so it reads 5 or another value.
+
+`POST /v1/projects` accepts `desired_instance_size` (enum in the Management
+API's OpenAPI document, https://api.supabase.com/api/v1-json, `2xlarge`
+among them); the 2XL project answered `max_connections` 380 and 8 node CPUs
+114 s after the POST. Each project: GET `/config/realtime` as soon as the
+project answered and before any Realtime client connected (DC16a), the Data
+API pool with `db_pool` unset (one burst of 150 12 s sleeps, DC16b), then
+DC13's Realtime row (DC16c: config again, a 100-join Postgres Changes burst,
+Realtime's connections by name).
+
+| row | created 2XL | created Small (control) |
+| --- | --- | --- |
+| DC16a `connection_pool`, before any Realtime client | 10 | 5 |
+| DC16a `postgres_changes_pool` / `max_concurrent_users` / `max_joins_per_second` / `max_channels_per_client` / `max_events_per_second` | null / 10000 / 2500 / 100 / 2500 | null / 10000 / 2500 / 100 / 2500 |
+| DC16a `max_connections`, node CPUs | 380, 8 | 90, 2 |
+| DC16b `db_pool` read, `pgrst_db_pool_max`, mid-burst PgSleep (burst of 150) | null, 70, 70 | null, 30, 30 |
+| DC16b burst outcomes | 150 x 200 | 130 x 200 + 20 x 504 `PGRST003` |
+| DC16c `realtime_connect` before / max during settle / after 30 s | 10 / 10 / 10 | 5 / 5 / 5 |
+| DC16c `realtime_subscription_manager_pub` max during settle | 7 | 4 |
+| DC16c joins ready, join to ready p50 / p95 | 100 of 100, 2085 / 2954 ms | 100 of 100, 2006 / 2884 ms |
+
+Readings:
+
+- **H1 held: the authorisation pool follows the size the project was
+  created at.** Created at 2XL, `connection_pool` read 10 before any
+  Realtime client and `realtime_connect` held 10; created Small in the same
+  minute, 5 and 5. With DC13 (created Small, then XL and 2XL: 5 throughout)
+  the value is set at creation and a resize does not change it. One project
+  per arm; XL, 4XL and 8XL at creation were not run.
+- The 2026-10-22 RT05 project in realtime-surface read `connection_pool` 2
+  after a resize to Small; its create body sent no `desired_instance_size`
+  (the OpenAPI description: "Omit this field to always default to the
+  smallest possible size"), so the 2 fits a Micro creation (the table's
+  Micro value) carried across the resize. The creation size of that project
+  was not read back.
+- The subscription-manager connections followed the current size on
+  DC13's resized project (4 / 7 / 7); DC16's 7 at 2XL and 4 at Small agree
+  and cannot separate it, each arm being read at its creation size. Both
+  match the table's "Subscription management" 4 and 7, with
+  `postgres_changes_pool` null in every case. So of the two pools only the
+  authorisation pool is shown pinned at creation.
+- The Data API pool with `db_pool` unset was the same on a project created at
+  2XL as on one resized there (70, DC13), and 30 on Small as in DC01 and
+  DC13.
+- A project resized up keeps the smaller authorisation pool until
+  `connection_pool` is set through the Realtime config (the "Database
+  connection pool size" parameter of the Realtime configuration, per the
+  concepts page); setting it after a resize
+  was not run here.
+
+### DC17 - the gateway's long-request timeout, and the statement after it
+
+Question: DC12d and DC14 got 504 `text/plain` `upstream request timeout`
+with no PostgREST code at about 125 s. Which component sends it, at what
+value, and does the statement keep running after the 504? H1: a fixed
+whole-request timeout in the API gateway's Envoy near 125 s; the statement
+runs to its end and commits, because nothing cancels it. H2: Cloudflare's or
+PostgREST's limit (a different status or body, for example a 524). H3: the
+statement is cancelled when the gateway gives up.
+
+Method: `dc17_sleep(s, tag)`, SECURITY DEFINER with `set statement_timeout =
+'600s'` (which PostgREST hoists, DC09), sets its transaction's
+`application_name` to `dc17-<tag>`, inserts its tag and start time, sleeps
+`s`, and stamps a finish time, so a committed row with a finish time means
+the statement ran to its end and its transaction committed. Per round, 11
+POST /rpc requests at 100, 115, 120, 123, 124, 125, 126, 127, 130, 150 and
+180 s went out concurrently with the legacy service_role key, one
+User-Agent each; round 1 added the anon key at 150 s and GET /rpc of a
+read-only twin (`dc17_nap`, no row) at 150 s. Two rounds. The pool
+(`db_pool` unset; 30 on Small in DC01 and DC16b, not read in DC17) was far
+above the 13 concurrent requests of round 1 (11 in round 2). A poller read `pg_stat_activity` for
+`dc17-%` every 3 s (127 reads, 0 failed, largest gap 3002 ms). Client clock
+against the database clock: offset 37 ms (bound 49 ms). Alongside each
+round, the same 180 s call as `postgres` with `statement_timeout = 0` over
+the session pooler (port 5432) and over a direct connection to the db host.
+
+| requested s | round 1: status, client ms | round 2: status, client ms | `x-envoy-upstream-service-time` (r1 / r2) | row finished, s after send (r1 / r2) |
+| --- | --- | --- | --- | --- |
+| 100 | 200, 100309 | 200, 100475 | 100129 / 100195 | 100.3 / 100.4 |
+| 115 | 200, 115246 | 200, 115535 | 115160 / 115234 | 115.2 / 115.5 |
+| 120 | 200, 120296 | 200, 120514 | 120211 / 120208 | 120.2 / 120.4 |
+| 123 | 200, 123242 | 200, 123501 | 123174 / 123209 | 123.2 / 123.5 |
+| 124 | 200, 124226 | 200, 124499 | 124162 / 124214 | 124.2 / 124.4 |
+| 125 | 504, 125065 | 504, 125279 | absent | 125.2 / 125.5 |
+| 126 | 504, 125089 | 504, 125283 | absent | 126.2 / 126.5 |
+| 127 | 504, 125065 | 504, 125283 | absent | 127.2 / 127.5 |
+| 130 | 504, 125090 | 504, 125310 | absent | 130.2 / 130.5 |
+| 150 | 504, 125102 | 504, 125292 | absent | 150.2 / 150.4 |
+| 180 | 504, 125063 | 504, 125305 | absent | 180.1 / 180.5 |
+| 150, anon key (r1) | 504, 125072 | - | absent | 150.2 |
+| 150, GET /rpc (r1) | 504, 125062 | - | absent | no row by design; backend last seen 150 s, gone by 153 s |
+
+| path, 180 s as `postgres` | round 1 | round 2 |
+| --- | --- | --- |
+| session pooler | returned after 180098 ms, row finished | returned after 180099 ms, row finished |
+| direct (db host) | `getaddrinfo ENOTFOUND` after 32 ms, not run | `getaddrinfo ENOTFOUND` after 24 ms, not run |
+
+Every 504 had body `upstream request timeout` (content-length 24),
+`content-type: text/plain`, `server: cloudflare`, `cf-cache-status:
+DYNAMIC`, `sb-gateway-version: 1`, `x-envoy-attempt-count: 1`, no
+`x-envoy-upstream-service-time`, no `content-profile`, no `proxy-status`,
+Cloudflare colo SIN. The 200s carried the same gateway headers plus
+`x-envoy-upstream-service-time` and `content-profile: public`. No `via`
+header on either. Each request had 1 `edge_logs` row with the client's
+status (24 rows); 0 PostgREST access-log lines in total.
+
+Readings:
+
+- **The timeout is the API gateway's Envoy, at 125 s: the same at every
+  requested duration from 125 s up with the legacy service_role key (POST
+  /rpc, two rounds), and for the legacy anon key and GET /rpc at 150 s
+  (round 1, one request each).**
+  Sleeps of up to 124 s answered 200 (upstream service time up to 124214 ms);
+  every sleep of 125 s or more was answered 504 at 125062 to 125310 ms at the
+  client, while its statement was still running. The body is Envoy's local
+  reply text, `x-envoy-attempt-count: 1` says one upstream attempt, and the
+  absent `x-envoy-upstream-service-time` says no upstream response came
+  back. Cloudflare passed the 504 through (`cf-cache-status: DYNAMIC`, no
+  524), so its own limit is above 125 s on this path. This run used a Small
+  project; DC12d (Small, pool held) and DC14 (2XL, CPU-bound) saw the same
+  body at the same time, so the size and the pool state did not change it.
+  Whether the limit counts from the request or from the last byte cannot be
+  told apart here (PostgREST sends nothing before the statement ends);
+  the gateway configuration itself is not readable from a project.
+- **The statement keeps running after the 504 and commits.** Every 504'd
+  POST request's row (12 of 12) was committed with a finish time at its full
+  requested duration (125.2 to 180.5 s after send), up to 55.2 s after the
+  client had its 504 (the 180 s requests); the 504'd GET /rpc, which writes
+  no row, had its backend last seen at 150 s and gone by 153 s. The poller saw each backend until its sleep
+  ended, and `postgres_logs` held 26 `duration: ... plan:` lines (24 for
+  Data API statements, 2 for the pooler calls, matching the 24 requests and
+  2 calls in count; for example 180101.096 ms for an RPC) and no
+  cancellation, termination or lost-client line in the window (the read
+  matched cancel, terminat, client, timeout, EOF, dc17, broken pipe and
+  could not send). So H3 is out: nothing cancelled the statement, and
+  PostgREST committed a transaction whose client had already been told 504.
+  A write behind a request that times out at the gateway is applied.
+- **Postgres outside the Data API ran the same 180 s call to the end** over
+  the session pooler (twice, 180098 and 180099 ms, rows finished), so the 125
+  s cut belongs to the HTTP path. The direct connection did not resolve from
+  this Mac (`getaddrinfo ENOTFOUND` for the db host, both rounds, under 40
+  ms; the reason was not investigated), so the direct path was not measured.
+- The 0 PostgREST access-log lines fit DC09's reading that this PostgREST
+  logs error responses only: from PostgREST's side every one of these
+  requests succeeded.
+
+### Not run
+
+- DC16 at XL, 4XL or 8XL at creation; `connection_pool` set by hand after a
+  resize; whether a later platform change re-derives it.
+- DC17 on another size, region or vantage; a direct Postgres connection
+  (did not resolve); a response that streams bytes before 125 s; repeats
+  beyond two rounds.
+
+### Cost
+
+DC16 at 2XL about 4 minutes (05:48:18 to 05:52:04 UTC, the artifact's
+stamps), the control about 2 minutes at Small, DC17 about 10 minutes at
+Small.
+
 ## 2026-10-26 - DC09 function-level statement timeouts, DC12 PGRST003 resends (one run)
 
 Harness: `make run ONLY=DC09,DC12,DC99`, lab commit 848b9f3 plus the
@@ -246,7 +437,10 @@ while it settled, and client backends by role and application afterwards.
   is not re-derived on a resize (as `db_pool` 45 was kept in DC15), or the
   table does not describe this project; a project created at XL or 2XL was
   not run. That `realtime_connect` is the authorisation pool is inferred
-  from it equalling `connection_pool`.
+  from it equalling `connection_pool`. Separated by DC16 (later run the
+  same day, section above): a project created at 2XL read 10 and held 10
+  `realtime_connect`, a Small one created alongside read 5, so the value is
+  set from the creation size and a resize keeps it.
 
 ### DC14 - statements of about 3 s against `db_pool` unset (70), 140, 200 on 2XL
 
@@ -313,8 +507,11 @@ CPU (`dc14_cpu`, about 3 s alone):
   near 125 s; the body and the time match DC12d's Envoy `upstream request
   timeout` (about 125 s, `x-envoy-attempt-count: 1`), and DC14 kept no
   headers, so the match rests on body text and timing. Whether the statement
-  kept running in Postgres after its 504 was not measured; node CPU stayed
-  at 99 to 100 % in those rows.
+  kept running in Postgres after its 504 was not measured here; node CPU
+  stayed at 99 to 100 % in those rows. DC17 (later run the same day, section
+  above, Small, `pg_sleep`) measured the 504 at 125 s with Envoy's headers,
+  and that each of its own 504'd POST statements ran to its end and
+  committed; DC14's CPU-bound statements were not followed.
 - Throughput ceiling, reasoned: 8 vCPUs at one 3 s statement each is about
   2.7 statements per second; the best measured was 1.4 per second (200s
   over wall time, including the drain). The vCPU-to-core mapping and the
@@ -335,7 +532,8 @@ CPU (`dc14_cpu`, about 3 s alone):
   so the split is not recorded). Not investigated.
 - Not measured: CPU statements between 3 s and the 125 s timeout at other
   pool sizes or rates; a pool below 70; the gateway timeout's exact value
-  and owner; statements that both compute and wait; another vantage.
+  and owner (measured later the same day by DC17, section above);
+  statements that both compute and wait; another vantage.
 
 ### DC15 - a set `db_pool` across a resize (two projects, one run each)
 

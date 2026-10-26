@@ -1,0 +1,108 @@
+{
+  "startedAt": "2026-10-26T05:48:18.228Z",
+  "finishedAt": "2026-10-26T05:52:04.503Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "data-api-capacity",
+  "labCommit": "adc597c",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "DC16a-config",
+      "title": "Created 2xlarge: GET /config/realtime before any Realtime client",
+      "status": "info",
+      "detail": "config connection_pool=10 postgres_changes_pool=null max_concurrent_users=10000 max_joins_per_second=2500 max_channels_per_client=100 max_events_per_second=2500; max_connections 380; node CPUs 8; ready 114 s after the POST",
+      "measurements": {
+        "created_size": "2xlarge",
+        "pg_version": "PostgreSQL 17.11",
+        "config_http": 200,
+        "config_connection_pool": "10",
+        "config_postgres_changes_pool": "null",
+        "config_max_concurrent_users": "10000",
+        "config_max_joins_per_second": "2500",
+        "config_max_channels_per_client": "100",
+        "config_max_events_per_second": "2500",
+        "max_connections": 380,
+        "node_cpus": 8,
+        "ready_after_post_s": 114
+      },
+      "durationMs": 225019
+    },
+    {
+      "id": "DC16b-pool",
+      "title": "Created 2xlarge: Data API pool with db_pool unset",
+      "status": "info",
+      "detail": "db_pool null; max_connections 380; pgrst_db_pool_max t+0:70; mid-burst PgSleep 70 (k 150); outcomes 200:150",
+      "measurements": {
+        "created_size": "2xlarge",
+        "config_db_pool": "null",
+        "config_acquisition_timeout": "10",
+        "max_connections": 380,
+        "idle_authenticator_backends": 2,
+        "pgrst_db_pool_max_first": 70,
+        "pgrst_db_pool_max_last": 70,
+        "pgrst_db_pool_max_changes": "t+0:70",
+        "metrics_scrapes": 12,
+        "node_cpus": 8,
+        "burst1_k": 150,
+        "burst1_mid_pgsleep": 70,
+        "burst1_mid_authenticator_total": 71,
+        "burst1_mid_client_backends": 75,
+        "burst1_statuses": "200:150",
+        "burst1_codes": "none"
+      },
+      "durationMs": 225019
+    },
+    {
+      "id": "DC16c-realtime",
+      "title": "created 2xlarge: Realtime config and connections around a 100-join Postgres Changes burst (settings as created)",
+      "status": "info",
+      "detail": "config connection_pool=10 postgres_changes_pool=null max_concurrent_users=10000 max_joins_per_second=2500 max_channels_per_client=100 max_events_per_second=2500; ready 100/100 (ready:100); realtime conns max during settle {\"supabase_admin/realtime_connect\":10,\"supabase_admin/realtime_replication_connection\":1,\"supabase_admin/realtime_rls\":1,\"supabase_admin/realtime_subscription_manager\":1,\"supabase_admin/realtime_subscription_manager_pub\":7}; after supabase_admin/realtime_connect:10 supabase_admin/realtime_subscription_manager_pub:7 supabase_admin/realtime_rls:1 supabase_admin/realtime_subscription_manager:1; +30 s supabase_admin/realtime_connect:10 supabase_admin/realtime_subscription_manager_pub:7 supabase_admin/realtime_rls:1 supabase_admin/realtime_subscription_manager:1",
+      "measurements": {
+        "config_http": 200,
+        "config_connection_pool": "10",
+        "config_postgres_changes_pool": "null",
+        "config_max_concurrent_users": "10000",
+        "config_max_joins_per_second": "2500",
+        "config_max_channels_per_client": "100",
+        "config_max_events_per_second": "2500",
+        "realtime_ready_ms": 186,
+        "joins": 100,
+        "ready": 100,
+        "outcomes": "ready:100",
+        "join_to_ready_p50_ms": 2085,
+        "join_to_ready_p95_ms": 2954,
+        "fanout_delivered": "100 of 100",
+        "settle_max_supabase_admin/realtime_connect": 10,
+        "settle_max_supabase_admin/realtime_replication_connection": 1,
+        "settle_max_supabase_admin/realtime_rls": 1,
+        "settle_max_supabase_admin/realtime_subscription_manager": 1,
+        "settle_max_supabase_admin/realtime_subscription_manager_pub": 7,
+        "realtime_backends_before": "supabase_admin/realtime_connect:10",
+        "realtime_backends_after": "supabase_admin/realtime_connect:10 supabase_admin/realtime_subscription_manager_pub:7 supabase_admin/realtime_rls:1 supabase_admin/realtime_subscription_manager:1",
+        "realtime_backends_after_30s": "supabase_admin/realtime_connect:10 supabase_admin/realtime_subscription_manager_pub:7 supabase_admin/realtime_rls:1 supabase_admin/realtime_subscription_manager:1",
+        "client_backends_by_role_after": "supabase_admin/realtime_connect:10 supabase_admin/realtime_subscription_manager_pub:7 pgbouncer/Supavisor (auth_query):1 postgres/mgmt-api:1 postgres/Supavisor:1 supabase_admin/postgres_exporter:1 supabase_admin/realtime_rls:1 supabase_admin/realtime_subscription_manager:1 authenticator/PostgREST 14.18:1 supabase_auth_admin/-:1 pgbouncer/-:1",
+        "client_backends_after": 26,
+        "max_connections": 380
+      },
+      "durationMs": 225019
+    },
+    {
+      "id": "DC99",
+      "title": "DC99: project deleted and gone from the listing",
+      "status": "pass",
+      "detail": "DELETE 200; absent from GET /projects after 0 s",
+      "measurements": {
+        "delete_status": 200,
+        "gone_from_listing_s": 0
+      },
+      "durationMs": 1257
+    }
+  ]
+}
