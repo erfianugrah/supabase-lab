@@ -290,6 +290,15 @@ facts):
   in-region Edge Function clients (DC01-DC08, DC99). Self-provisioning, one
   Pro project per run. Measured 2026-10-22/23; see its
   RUNLOG and https://erfi.dev/reference/supabase-data-api-capacity/.
+- `pgnet-under-load` - hosted `pg_net` (0.20.4) with slow, hung and
+  unreliable receivers: the `timeout_milliseconds` default (5000) and the
+  absent `max_timeout_ms` ceiling, head-of-line blocking between batches of
+  200, timeouts under database CPU saturation attributed across a Cloudflare
+  Worker and two Edge Functions, why the timeout `error_msg` phase split
+  does not locate a timeout, and delivery of 1,000 messages through raw
+  `pg_net`, a retry job and `pgmq` (NL01-NL05, NL99). Self-provisioning,
+  Micro and Large Pro projects plus a workers.dev receiver. Measured
+  2026-10-26; see its RUNLOG.
 - `hyperdrive-direct` - Cloudflare Hyperdrive against the direct connection:
   reaching the IPv6-only host without the IPv4 add-on and named prepared
   statements (H01, Micro, 2026-10-05), and Hyperdrive and the Data API sharing

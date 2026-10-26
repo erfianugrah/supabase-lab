@@ -5175,3 +5175,77 @@ was the same in both runs. See RUNLOG.md; artifacts in `out/2026-10-23/`.
 - **Audit false positive seen**: check 3 reports a restrictive INSERT policy
   (`WITH CHECK (body is not null)`) as CRITICAL "Policy open to anon",
   because it reads `USING` only and coalesces the null to `true`.
+
+## experiments/pgnet-under-load - key facts (validated 2026-10-26, Pro org, ap-southeast-1; NL01/NL02 Micro, NL03-NL05 Large; Postgres 17.11, pg_net 0.20.4)
+
+Self-provisioning (one project per `make micro` / `make large` process,
+NL99 deletes it) plus a workers.dev receiver Worker whose Durable Object
+ledger records every arrival before answering. n = 1 per module except NL04
+(two runs). Figures from `out/2026-10-26/`; details in its RUNLOG.
+
+- **Do not read pg_net's timeout `error_msg` phases as a location.** The
+  text has the shape `Timeout of 5000 ms reached. Total time: ... (DNS time:
+  ..., TCP/SSL handshake time: ..., HTTP Request/Response time: ...)`. All 8
+  timeouts in NL01 put the whole ~5001 ms under "DNS time" although every
+  one of those requests had reached the receiver (so DNS, TCP and TLS had
+  completed); NL03's one timeout did the same (5000.566 ms, arrival of that
+  call not recorded); NL02c's 30 s timeout put it under "HTTP
+  Request/Response" with a negative handshake time (-0.294 ms). Locate a
+  timeout from the receiver's side (arrival log) or from timing, never from
+  this split. NL05's cold-burst timeouts split plausibly (DNS 35.321 ms, TCP/SSL
+  112.676 ms, HTTP 4888.822 ms) for requests that had equally arrived, so the split
+  is inconsistent across runs. Why was not investigated.
+- **`net._http_response.created` is the batch pickup time, not the response
+  time**: a call that timed out after 30 s had `created` 48 ms after its
+  enqueue (NL02c), and 27 calls picked up together share one `created`
+  (NL01). Do not compute response latency from it.
+- **Timeout default and ceiling (NL01)**: `timeout_milliseconds` defaults to
+  5000 in the hosted `http_post` signature and omitted-timeout calls time
+  out at 5000 ms; the Supabase pg_net guide shows `default 2000` (wrong for
+  0.20.4). `pg_net.max_timeout_ms` does not exist at 0.20.4 (`42704
+  unrecognized configuration parameter`); the only settings are
+  `batch_size` (200), `ttl` (6 hours), `database_name`, `username`. 600001
+  and 0 are accepted at enqueue; 0 means no timeout (a 90 s call returned
+  200); 30 s and 90 s calls complete when the timeout allows. Nothing ran
+  600 s, so a cap above 600000 is unmeasured.
+- **Head-of-line blocking (NL02)**: the worker takes up to 200 queued
+  requests and starts the next batch only when the whole batch is done. One
+  4.5 s call delayed the next 200 calls to 6010-6065 ms after enqueue; one
+  call timing out at 30 s delayed them to 31031-31083 ms. None of the
+  delayed calls timed out at 5000 ms: the timeout clock starts at send, not
+  at enqueue. Even with no slow call the second batch arrived 2132-2187 ms
+  after enqueue (unexplained gap of about 1.8 s between batches).
+- **CPU saturation did not cause timeouts (NL03)**: on Large (2 CPUs) with 4
+  backends spinning (CPU busy 0.954, 1.0 in 9 of 10 samples), 0 of 3009
+  calls timed out across a Cloudflare Worker, a trivial Edge Function and an
+  Edge Function querying the same database (about 100 calls/min each,
+  timeout 5000, 600 s); pickup p50 4 -> 14 ms, Worker arrival p50 8 -> 19 ms.
+  The one timeout (idle arm, 1 of 1020) was the function querying the same
+  database, whose query took 1326 ms p50 / 3870 ms max idle and 1692 / 4482
+  ms saturated, mostly its own 17-at-once concurrency (181 ms alone). Cold
+  start was not the cause: Boot rows for most invocations (833-865 per about
+  1000 calls), arrival max 2.6 s. Untested: heavier saturation, I/O or lock
+  pressure, Micro's shared CPU.
+- **Delivery (NL04, 1,000 messages, receiver 20% 503 and 10% held 8 s,
+  timeout 5000, two runs x idle/saturated)**: raw pg_net lost exactly the
+  refused messages (194-274 per arm). A pg_cron retry job re-enqueuing on
+  5xx/timeout and a pgmq 1.5.1 queue with a pg_cron consumer (vt 30 s, ack
+  on 2xx) lost 0 in all 8 rows and processed 11-14% of messages twice or
+  more: each held request that timed out at 5 s had been processed and was
+  sent again (extra deliveries = held requests in every retry row). Retry
+  confirmed all 1,000 in 73-103 s, pgmq in about 186-187 s (run 1 stopped at
+  180 s with 1 and 2 already-delivered messages still invisible). CPU
+  saturation changed no count. Receivers of either at-least-once path must
+  be idempotent.
+- **A cold burst times out calls the receiver already got (NL05)**: 200
+  calls sent after the worker had sent nothing for a while (the project's
+  first outbound calls, or after 120 s idle) lost 89 and 139 of 200 to the
+  5000 ms timeout although every one reached the receiver within 825 ms;
+  the two bursts sent straight after lost 0 (arrival p50 55 and 44 ms vs 484
+  and 493 ms cold, consistent with 200 new TLS connections). The same
+  receiver answered 200 concurrent requests from the lab Mac after 150 s
+  idle in under 0.9 s, so the stall sits on the database host's side or the
+  path to Cloudflare (not separated). This is what inflated NL04's idle raw
+  timeouts (240 for 81 held, 277 for 97). Treat a pg_net `timed_out` as
+  "maybe delivered", and give the first calls after a quiet period headroom
+  (a smaller batch or a longer timeout - neither tested).
