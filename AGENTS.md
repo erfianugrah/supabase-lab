@@ -4357,7 +4357,7 @@ projects (feature battery, two conversion probes), all `small`,
   cannot call them), so the blog's "tracked" is untested for the dashboard;
   `migration_version`; the dashboard merge-request screen.
 
-## experiments/replica-routing - key facts (validated 2026-10-10, Pro org; RR02 2026-10-23, two runs; RR03 2026-10-26, two runs)
+## experiments/replica-routing - key facts (validated 2026-10-10, Pro org; RR02 2026-10-23, two runs; RR03 and RR04 2026-10-26, two runs each)
 
 - **The API load balancer's host is `<ref>-all.supabase.co` and the Management
   API does not return it** (RR01e, 2026-10-10): the Dashboard route
@@ -4427,7 +4427,20 @@ projects (feature battery, two conversion probes), all `small`,
   `edge_logs` names the primary for Auth and carries no redirect identifier
   for Storage or Realtime. The replica's own host serves REST GETs only; a
   `HEAD` there answers 400 `text/plain`, though the load balancer delivers
-  HEADs to the replica (RR03g, 2026-10-26).
+  HEADs to the replica (RR03g, 2026-10-26). The 400 has the shape of the
+  replica host's POST 400 (RR04d, two runs): same header names (`Read
+  replica does not handle POST requests for the path ...`), Content-Length
+  75, the same as the POST 400's body (HEAD and POST are both four letters,
+  so this fits a method-substituted template without proving one), no
+  `x-envoy-*`, `content-profile` or `content-range`; inference: the same
+  gateway method rule refuses it before the request reaches Envoy or
+  PostgREST. The CORS preflight there answers 200 with the same
+  allowed-methods list as the other two hosts, HEAD and POST included. A
+  HEAD through the load balancer that the replica served answered 200
+  (RR04d), so the replica host's method rule did not apply on that path;
+  where the forward enters is not visible (`edge_logs` logs one row per
+  client request, under the host the client addressed, so its rows cannot
+  separate the two readings; RR04l).
 - **With the primary and the replica in the SAME region the load balancer
   spreads GETs over both** (RR03h, 2026-10-26, two runs, both nodes in
   ap-southeast-1): replica/primary 111/89 and 94/106 of 200 from the
@@ -4468,8 +4481,34 @@ projects (feature battery, two conversion probes), all `small`,
   99, against the primary host's p50 12 (the 20 ms insert period is inside
   both; clock skew between the two hosts only in the replica figures);
   `pg_stat_replication.replay_lag` p50 2.2 and 2.1 ms, max 2.5 and 3.4 ms.
-  Not measured: read-your-writes through `-all` in this shape, heavier write
-  rates, two replicas.
+  Not measured: heavier write rates, two replicas.
+- **Read-your-writes through `-all` held in the same-region shape from this
+  vantage** (RR04e-g, 2026-10-26, two runs): a POST then an immediate GET of
+  the row, both through `-all`: 0 misses (row not visible) of 108, 25 and 93
+  replica-served GETs (run 1) and of 107, 28 and 95 (run 2), raw fetch,
+  supabase-js 2.118.0, and raw under 50 inserts/s. Likely mechanism
+  (inferred, not separated): when `rr4_seen` ran on the replica, the last
+  replayed commit was 29 to 31 ms old at p50 in the arms without background
+  writes (`replica_replay_age_p50_ms`), against `replay_lag` p50 2.3 to 2.7
+  ms (sampled once a second; max 33.5 and 34.7 ms in RR04e), so the GET
+  reached the replica well after the row had replayed. 0 misses of 456
+  replica-served reads over both runs. A client much closer to the
+  database, or a replica whose replay stops (RR04j), can read stale; neither
+  was run as read-your-writes.
+- **The same-region split does not follow read load, four busy loops on
+  either node, a stopped replay or a node down in a restart** (RR04h-k, two
+  runs): replica share 46.5 to 51.1 % at 1, 8 and 32 concurrent readers (up
+  to 1,125.1 requests a second, 0 errors); 48.7 to 50.8 % with four busy
+  loops on either node (which barely slowed REST reads, so a slow node was
+  not tested); with the replica's replay stopped (RR02h method,
+  `pg_wal_replay_pause` refused 42501) `-all` sent 46 of 102 (run 1, one
+  stop, all 46 stale) and 180 of 343 (run 2, three stops, 160 stale) reads
+  in the stale window to the replica, heartbeat ages (`stale_ms`) up to
+  29,613 and 30,669 ms. During `POST /restart` reads that `-all` sent to whichever
+  node was down failed (`edge_logs` 521/522 to both nodes); while only the
+  primary was failing it served 14 and 13 reads from the replica and failed
+  12 and 9. Same result as RR02h/i cross-region, now with an equally near
+  alternative node.
 - **`max_standby_streaming_delay` through `PUT config/database/postgres`**
   (RR02d): HTTP 200 and config `600s` both runs, but the replica's
   `pg_settings` read `600000ms` in run 1 and `30000ms (default)` in run 2 at
