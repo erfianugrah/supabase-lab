@@ -1,0 +1,12 @@
+{
+  // pgnet-under-load receiver: workers.dev Worker plus a SQLite-backed Durable
+  // Object ledger (one object per run id). Deployed for one run and deleted
+  // after (`make receiver-up` / `make receiver-down`).
+  "name": "pvlab-nl-receiver",
+  "main": "index.ts",
+  "compatibility_date": "2025-06-01",
+  "workers_dev": true,
+  "upload_source_maps": false,
+  "durable_objects": { "bindings": [{ "name": "LEDGER", "class_name": "Ledger" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Ledger"] }]
+}
