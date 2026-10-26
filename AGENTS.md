@@ -90,6 +90,34 @@ platform behaviour or writing it into docs
   for its lifetime (`PVLAB_ALLOW_SLEEP=1` skips it; `-i` blocks idle sleep
   only, so a lid-close still sleeps). For an older artifact, `harness/scripts/sleep-overlap.ts`
   places its tests against `pmset -g log`.
+- **A module whose promise never settles is a failed result and exit 2**
+  (#236, `harness/src/settle.ts`). On 2026-10-23 `Bun.write(path, response)`
+  hung on a download and pvlab exited 0 with no result and no artifact (no
+  RUNLOG records that run). Mechanism, reproduced 2026-10-26 on Bun 1.3.14
+  (macOS) with a module awaiting `new Promise(() => {})`, not with the
+  download: when the awaited promise has no timer, socket or child behind
+  it, the event loop drains, `beforeExit` fires once and the process exits 0
+  with `main()` still parked at the `await`, so nothing after it runs. That
+  the 2026-10-23 hang was this drain (no socket left pending) is inference
+  from its exit 0 and missing artifact. The runner now races each module
+  against a `beforeExit` wake: the module is recorded as `fail` ("module
+  promise never settled: the event loop drained..."), the remaining modules
+  run, the artifact is written and pvlab exits 2. The wake goes through
+  `setTimeout(wake, 0)`: resolving a promise inside `beforeExit` did not keep
+  the process alive on Bun 1.3.14. A hang that still holds a handle (a
+  socket that never delivers) never drains; for that a module can declare
+  `timeoutMs` on its `TestModule`, which fails it with "did not settle
+  within its timeoutMs" and exits 2 explicitly (the abandoned handle would
+  otherwise keep the process up). There is no default timeout, because
+  modules legitimately run for hours. Exit codes: 0 = artifact written,
+  measured failures and modules that threw included (both recorded as
+  `fail`); 1 = no artifact: the runner itself threw, or the event loop
+  drained outside any module (while building the test context or writing
+  the artifact); 2 = artifact written, a module drained or timed out.
+  `harness/src/settle.test.ts` tests exit 2 (drain and timeout) and the
+  exit-1 drain end to end, driving `run.ts` from a copy of `src/` without
+  `tests.generated.ts`, because `run.ts` loads a generated registry in
+  preference to `--tests` even from source.
 - Probe the data, not the tier: `harness/src/real-probes.ts` (#204,
   2026-10-23). `rest_read` is up only on HTTP 200 with the seeded row;
   `realtime_join` only when a Postgres Changes join is confirmed and the

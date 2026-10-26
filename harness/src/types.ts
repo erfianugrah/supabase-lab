@@ -113,6 +113,14 @@ export interface TestModule {
    * what lets `--experiment` scope a run to one dir.
    */
   experiment?: string;
+  /**
+   * Fail the module if it has not settled after this many ms (settle.ts).
+   * Optional and unset by default, because modules legitimately run for
+   * hours; a module whose promise never settles with nothing pending is
+   * caught without it. Declare one when a hang could hold a handle open (a
+   * download or a socket that never delivers).
+   */
+  timeoutMs?: number;
   run(ctx: Ctx): Promise<TestResult | TestResult[]>;
 }
 
