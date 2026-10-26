@@ -335,7 +335,7 @@ client can poll. See RUNLOG.md; artifacts in `out/2026-09-24/` and
   extension. privatelink-aws T22 carries the same change, not run (needs the
   AWS PrivateLink rig).
 
-## experiments/data-api-capacity - key facts (validated 2026-10-22/23, Pro org; DC01-03 ap-southeast-1 Small then Large, DC04 ap-northeast-2 Small then 4XL, DC05-07 ap-northeast-2 Small, DC08 ap-northeast-2 Small then 4XL, in-region clients)
+## experiments/data-api-capacity - key facts (validated 2026-10-22/23/26, Pro org; DC01-03 ap-southeast-1 Small then Large, DC04 ap-northeast-2 Small then 4XL, DC05-07 ap-northeast-2 Small, DC08 ap-northeast-2 Small then 4XL, in-region clients; DC09 and DC12 ap-southeast-1 Small)
 
 The Data API's connection pool, what a full pool looks like to a client, the
 pool settings' PATCH, statement timeouts per role, throughput under request
@@ -346,7 +346,9 @@ named (RUNLOG.md says why runs 1-3 differ). DC04 and DC05-DC07: one run each
 (`run-2026-10-23T07-13-34-754Z`, `run-2026-10-23T07-49-11-858Z`), from a
 Mac in Singapore, so every latency includes the Singapore-Seoul round trip.
 DC08: one run (`run-2026-10-23T09-37-44-863Z`) with clients in
-ap-northeast-2 (Edge Functions). PostgREST 14.18 and Postgres 17.11:
+ap-northeast-2 (Edge Functions). DC09 and DC12: one run
+(`out/2026-10-26/run-2026-10-26T00-23-46-863Z.json`), Singapore Mac, versions
+not recorded. PostgREST 14.18 and Postgres 17.11:
 console for DC01-DC03, the DC04a and DC08a artifacts; not recorded for
 DC05-DC07 (DC04a, same day and region, read 14.18). The
 artifacts' top-level `region` is the harness default; the project region
@@ -361,12 +363,15 @@ and DC05a from the next run on).
   before PGRST003.** Single requests (service_role key) queued behind a held
   pool answered 504 PGRST003 after 61364 and 61972 ms at the default 10 s
   (DC01b; runs 1 and 2 the same within 1 s) and 13767 / 13752 ms at 2 s
-  (DC02b). At 4 s one request answered after 25007 ms and the other got no
-  answer by the client's 105001 ms timeout and left 0 log lines (n = 1,
-  unexplained). Each answered request's User-Agent appears on 6 PostgREST
-  access-log lines: 6 attempts in total, so something between the client and
-  PostgREST sends the request again after a PGRST003. The component and its
-  policy are not identified. Under a 220-request burst at pool 50 the 70
+  (DC02b); 6669-7886 ms at 1 s, 30405-32115 at 5 s, 120881-121746 at 20 s
+  (DC12a-c, 8 / 8 / 4 requests). At 4 s one request answered after 25007 ms
+  and the other got no answer by the client's 105001 ms timeout and left 0
+  log lines (see the DC12 bullet on requests that never reach PostgREST).
+  Each request answered PGRST003 is on 6 PostgREST access-log lines and 1
+  `edge_logs` row, and the sampled answers carry `x-envoy-attempt-count: 6`
+  (DC12): the API gateway's Envoy resends after each 504, GET, HEAD, PATCH
+  and POST alike, with no pause beyond the acquisition timeout, so the wait
+  is 6 x the timeout plus about 1-2 s. Under a 220-request burst at pool 50 the 70
   PGRST003 answers came after 10923 to 20903 ms (median 20855), shorter than
   a lone request's wait; attempts were not counted there, so that is
   inferred from latency only. A 500 (statement timeout after a side effect,
@@ -406,9 +411,44 @@ and DC05a from the next run on).
   service_role's `rolconfig` is null, so it runs with `authenticator`'s login
   setting (`statement_timeout=8s,lock_timeout=8s`). A function declared
   `set statement_timeout = '30s'` ran a 12 s sleep to 200 for all three keys,
-  anon included. `alter role authenticated set statement_timeout = '15s'` had
+  anon included, because PostgREST applies the CALLED function's setting
+  before the statement starts (DC09, corrected 2026-10-26; DC03's RUNLOG
+  reading credited Postgres). `alter role authenticated set statement_timeout = '15s'` had
   no effect until `notify pgrst, 'reload config'`; then 10 s sleeps answered
   200.
+- **Only the function the Data API calls can lift the timeout** (DC09, n = 3
+  per arm, authenticated, 12 s sleeps): a nested function's `set 30s` under a
+  plain outer failed 57014 at 8060-8066 ms; an outer `set 30s` with an inner
+  `set 2s` answered 200 at about 12.1 s while the inner read `2s`; `language
+  sql stable` (GET and POST /rpc) and SECURITY DEFINER with `search_path = ''`
+  were lifted like plpgsql. Outside PostgREST no function setting lifted the
+  caller's 8 s: pg_cron jobs (`set statement_timeout = '8s'; select f(12)`)
+  and a session-pooler `set role authenticated` session failed at 8 s for the
+  top-level `set 30s` function too. So Postgres arms the timer at statement
+  start and PostgREST hoists the called function's value; no other path
+  tried here lifted it. `alter function ... set statement_timeout` took effect once
+  PostgREST's schema cache reloaded, which happened within about 0.3 s with
+  no NOTIFY from the module (sender not identified); one call sent about
+  0.2 s after the ALTER still failed at 8 s.
+- **The Data API answered a 70 s request** (DC09g, 3 of 3 at about 70.1 s,
+  function `set 120s`), against the timeouts guide's 60 s for client queries.
+  The gateway's whole-request limit measured about 125 s (DC12d: Envoy's
+  `upstream request timeout` 504 at 125055-125066 ms, `text/plain`, no
+  PGRST003, after two 60 s pool attempts; holders sleeping 150 s and longer
+  got 504), and the query kept running in Postgres after that 504 until
+  cancelled (ordering-inferred). Successful requests leave no PostgREST
+  access-log line (0 for the three 200s); 5xx answers do.
+- **`pgrst_db_pool_timeouts_total` counts attempts, not client requests**
+  (DC12): +6 per client 504 PGRST003 (48 for 8, 24 for 4, 246 for 41). The
+  counter resets with each PostgREST restart (0 after every PATCH). Its
+  snapshot refreshed 60-61 s apart in DC12 (5 s reads), which bounds DC05's
+  "at least about 40 s".
+- **Some requests never reach PostgREST under a held pool** (DC12, 2 of 66,
+  and DC02b's 4 s probe): 0 PostgREST lines, 1 edge row, Envoy's 504 after
+  about 125 s; the timeout counter agrees, so not lost log lines. Where they
+  wait is not identified. A burst of 42 with the pool held throughout did not
+  shorten the wait (41 x PGRST003, minimum 30.8 s, median 31.5 s, 6 lines
+  each).
 - Harness: bursts use `dc_sleep_xl` (function timeout 180 s) so the 8 s
   login default does not end the sleep; requests go out with `keepalive:
   false` (client-side failures before run 4: "socket closed" text on 218 of

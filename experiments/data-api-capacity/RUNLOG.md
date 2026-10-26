@@ -12,6 +12,157 @@ means the source named in the module header; "measured" means the artifact.
 DC08 is the exception to that vantage: its clients run in the project's
 region (section below).
 
+## 2026-10-26 - DC09 function-level statement timeouts, DC12 PGRST003 resends (one run)
+
+Harness: `make run ONLY=DC09,DC12,DC99`, lab commit 848b9f3 plus the
+uncommitted DC09 and DC12 modules. One Pro-org project, ap-southeast-1,
+Small throughout (`db_pool` unset at creation), deleted by DC99 (DELETE 200,
+absent from the listing at once; `make clean` listed 0 `pvlab-dc-` projects
+afterwards, console). Client: this lab's Mac in Singapore. Postgres and
+PostgREST versions are not recorded in this artifact. Published:
+`out/2026-10-26/run-2026-10-26T00-23-46-863Z.json` (16 results) and its
+`.facts.md` (one test user's id in a response header was replaced with
+`<user-uuid>` by hand; the module no longer keeps that header).
+
+### DC09 - which function-level `statement_timeout` a request honours
+
+Question: DC03b's 12 s sleep under a function declared `set
+statement_timeout = '30s'` answered 200. Either PostgREST applies the called
+function's setting before the statement starts (PostgREST docs, "hoisted
+function settings", `db-hoisted-tx-settings`, whose default includes
+`statement_timeout`; doc-cited, not re-read here) and Postgres keeps the timer
+it armed when the statement started (H1), or Postgres honours a function's
+SET mid-statement (H2). Every Data API call below: anon key plus a signed-in
+user's token (role `authenticated`, `rolconfig` `{statement_timeout=8s}`),
+POST /rpc unless named, 12 s sleep, n = 3 sequential calls. Bodies are the
+`current_setting('statement_timeout')` each function returned.
+
+| row | measured |
+|---|---|
+| DC09a control, no function setting | 500 57014 after 8053 / 8047 / 8054 ms |
+| DC09b outer `set 30s` calls inner (no setting) | 200 after 12288 / 12053 / 12055 ms, body `outer=30s inner=30s` |
+| DC09c outer (no setting) calls inner `set 30s` | 500 57014 after 8066 / 8060 / 8063 ms |
+| DC09d outer `set 30s` calls inner `set 2s` | 200 after 12127 / 12055 / 12070 ms, body `outer=30s inner=2s` |
+| DC09e `language sql stable`, `set 30s` | GET /rpc: 200 after 12062 / 12056 / 12055 ms; POST /rpc: 200 after 12057 / 12060 / 12070 ms; body `30s` |
+| DC09f SECURITY DEFINER, `set search_path = ''`, `set 30s` | 200 after 12057 / 12057 / 12056 ms, body `30s` |
+| DC09g `set 120s`, 70 s sleep, 3 concurrent requests | 200 after 70144 / 70144 / 70119 ms, body `2min`; 3 executions started and 3 finished (non-transactional sequences), 3 rows committed; 3 `edge_logs` rows (200), 0 PostgREST access-log lines; no backend still active at the first read after the answers |
+| DC09h `alter function ... set statement_timeout = '30s'` on a function without one | before the ALTER: 500 57014 after 8264 / 8081 / 8094 ms. Right after it (first call sent about 0.2 s after the ALTER was sent, derived below): 500 57014 after 8061 ms, then 200 after 12089 and 12058 ms. After `notify pgrst, 'reload schema'`: 200 after 12086 / 12064 / 12066 ms. PostgREST logged `Received a schema cache reload message on the "pgrst" channel` 0.1 s and `Schema cache loaded` 0.3 s after the ALTER was sent (log timestamps against the orchestrator's clock, skew not measured), with no NOTIFY from the module; the `pg_event_trigger` read returned `none` |
+| DC09i pg_cron 1.6.4 (`cron.use_background_workers` off), jobs `set statement_timeout = '8s'; select f(12)` every 20 s, 3 runs each | control `dc_sleep`: failed after 8004 / 8004 / 8006 ms; top-level `dc_sleep_long` (`set 30s`): failed after 8004 / 8003 / 8004 ms; arm 2's outer: failed after 8005 / 8006 / 8002 ms; every message `canceling statement due to statement timeout` |
+| DC09j session-mode pooler as `postgres`, `set statement_timeout = '8s'`, `set role authenticated`, one psql process per call | baseline `select current_user, current_setting(...)` read `authenticated|8s` in 282 ms; control, top-level `set 30s` and arm 2's outer all 57014 after 8110 to 8154 ms (9 calls, connection set-up included) |
+
+The DC09h "sent" column in this run's artifact reads 24.3 s: the module
+computed it after all three calls as (now - ALTER sent - call 1 ms), which
+also counts calls 2 and 3; 24.3 - 12.089 - 12.058 gives about 0.2 s. The
+module records each call's own send time from the next run on.
+
+Readings:
+
+- H1 held in every arm and H2 in none. A function's own `set
+  statement_timeout` lifted the caller's 8 s only when it was the function the
+  Data API called (DC09b, d, e, f): a nested function's longer value did not
+  (DC09c), a nested function's shorter value did not cut the call (DC09d, the
+  inner function read `2s` and still slept 12 s), and outside PostgREST
+  (pg_cron, a pooler session) even the top-level function's 30 s did not lift
+  the session's 8 s (DC09i, DC09j). That matches PostgREST applying the
+  called function's setting before the statement and Postgres arming the
+  statement timer once, at statement start (Postgres docs on
+  `statement_timeout`; doc-cited, not re-read here).
+- This corrects the reading under DC03 (2026-10-22/23 section): the function
+  setting applies to Data API calls because PostgREST hoists it, not because
+  Postgres applies a function's SET to a running statement.
+- DC09h fits the same mechanism: the ALTER takes effect for Data API calls
+  once PostgREST's schema cache has the new setting. A reload arrived without
+  a NOTIFY from the module, within about 0.3 s; the sender is not identified
+  (`pg_event_trigger` read `none`, and a failed read would record the same
+  word), and the first call raced it and lost.
+- DC09g: 70 s requests answered 200 through the Data API, against the
+  Supabase timeouts guide's "Dashboard and Client queries have a
+  max-configurable timeout of 60 seconds"
+  (https://supabase.com/docs/guides/database/postgres/timeouts). The cap the
+  gateway applied in DC12 was about 125 s (below). A successful request left
+  no PostgREST access-log line here, while every 5xx in DC01b, DC02b, DC03d
+  and DC12 did: PostgREST at this log level writes error responses only (a
+  reading; its log level was not read).
+
+### DC12 - which layer resends after a PGRST003
+
+Question: DC01b and DC02b found 6 PostgREST access-log lines per request
+answered 504 PGRST003, and a client wait of about 6 x the acquisition
+timeout. Per arm the module PATCHed `db_pool` (a different size per arm, so
+a metrics snapshot names its PostgREST process by `pgrst_db_pool_max`) and
+`db_pool_acquisition_timeout`, waited for the restart line (0.9 to 1.3 s
+after the PATCH), held every pooled connection with service_role `dc12_hold`
+sleeps (`pg_stat_activity`: 10 of 10, 11 of 11, 12 of 12, 13 of 13, 14 of 14
+sleeping at probe time and still after the last answer), sent single GET,
+HEAD, PATCH and POST /rpc requests concurrently with the service_role key
+and one User-Agent each, cancelled the holders with `pg_cancel_backend`, and
+read the metrics endpoint until its snapshot had refreshed twice.
+
+| row | measured |
+|---|---|
+| DC12a timeout 1 s, pool 10, two rounds of 4 methods (8 requests) | all 504, PGRST003 body except HEAD (no body), after 6669 to 7886 ms; each request: 6 PostgREST lines (504:6), 1 `edge_logs` row (504), gaps between its PostgREST lines 1.0 to 1.9 s, one remote address. `pgrst_db_pool_timeouts_total` 0 before, 48 after |
+| DC12b timeout 5 s, pool 11, two rounds (8) | all 504 after 30405 to 32115 ms; each 6 PostgREST lines, 1 edge row; gaps 5.0 to 6.0 s. Timeouts 0 to 48 |
+| DC12c timeout 20 s, pool 12, one round (4) | all 504 PGRST003 (HEAD no body) after 120881 to 121746 ms; each 6 PostgREST lines, gaps 20.0 to 20.9 s; edge rows 1 for GET, HEAD and POST /rpc, 0 for the PATCH. Timeouts 0 to 24 |
+| DC12d timeout 60 s, pool 13, one round (4) | all 504 `text/plain` `upstream request timeout`, no PGRST003, after 125055 to 125066 ms. GET, HEAD, PATCH: 2 PostgREST lines each (504:2), 60.0 to 60.1 s apart; POST /rpc: 0 PostgREST lines. 1 edge row each (504). Timeouts 0 to 6 |
+| DC12e burst: timeout 5 s, pool 14 held, 42 concurrent POST /rpc | 41 x 504 PGRST003 after 30768 ms (min) to 31458 ms (median), each 6 PostgREST lines; 1 x 504 `upstream request timeout` after 125097 ms with 0 PostgREST lines; 1 edge row per request (42). Timeouts 0 to 246 |
+| headers, one sampled PGRST003 answer per arm (DC12a-c; the module keeps one) | `server: cloudflare`, `cf-cache-status: DYNAMIC`, `sb-gateway-version: 1`, `proxy-status: PostgREST; error=PGRST003`, `x-envoy-attempt-count: 6`, `x-envoy-upstream-service-time` 7575 / 31144 / 120961 ms in the DC12a-c samples |
+| headers, the sampled `upstream request timeout` answer in DC12d and in DC12e | `content-type: text/plain`, `x-envoy-attempt-count: 1`, no `proxy-status`, no `x-envoy-upstream-service-time` |
+| holders | DC12a, b: 500 57014 (the cancel); DC12c, d, e (holds of 240, 480 and 150 s): 504 from every holder |
+| metrics snapshot | refreshes seen 60 to 61 s apart (reads every 5 s: 63 s and 123 s after the arm began; 132, 193 and 253 s) |
+
+Readings:
+
+- The resending layer is Envoy, behind the hop that writes `edge_logs`:
+  `x-envoy-attempt-count: 6` on each sampled PGRST003 answer, one `edge_logs` row
+  per client request, six PostgREST attempts. GET, HEAD, PATCH and POST were
+  all resent. The attempts follow each other with no measurable pause (the
+  gap between PostgREST lines is the acquisition timeout plus at most about
+  0.9 s), so a client waits 6 x the timeout plus about 1 to 2 s.
+- PostgREST counts every attempt: `pgrst_db_pool_timeouts_total` went up 6
+  per failed client request (48 for 8, 24 for 4, 246 for 41), and 6 for the
+  three DC12d requests that reached PostgREST twice each. One client 504 is
+  six pool timeouts on that counter.
+- Envoy's whole-request limit is about 125 s: at a 60 s acquisition timeout
+  two attempts fit (0 and 60 s) and the third was cut, so the client got
+  Envoy's own `upstream request timeout` 504 after 125 s instead of a
+  PGRST003, and holders sleeping 150 s or longer were answered 504 too. At
+  20 s six attempts (about 121 s) still fit. Retry policy and timeout values
+  are not readable from a project; the attempt count and the about 125 s are
+  this run's observations.
+- Postgres kept running a request's query after the gateway answered it:
+  the holders' answers in DC12c-e were the gateway's 504 (the cancel gives
+  57014, as in DC12a-b), and `pg_stat_activity` still showed every holder
+  sleeping after the last probe answer (131 s into DC12d and DC12e), until
+  the module cancelled them. Ordering inferred: holder answer times were not
+  recorded.
+- Two requests never reached PostgREST: DC12d's POST /rpc and one of the 42
+  in DC12e, each 0 PostgREST lines, 1 edge row and Envoy's 125 s timeout. The
+  timeout counter agrees (DC12d: 6 = three requests x 2 attempts; DC12e: 246 =
+  41 x 6), so they are not lost log lines. DC02b's request with 0 lines and no
+  answer by 105 s fits the same thing. Where they waited is not identified.
+- The DC12c PATCH with 0 edge rows had 6 PostgREST lines and its 504; an
+  `edge_logs` row missing from ingestion is the likely reading, not separated.
+- The burst did not shorten the wait: with the pool held throughout, 41 of
+  42 waited about 6 x 5 s. DC02c's shorter waits (holders finishing in waves)
+  are a different shape and are not contradicted.
+
+### Not run
+
+- DC09 under the anon or service_role key, other hoisted settings
+  (`plan_filter.statement_cost_limit`, `default_transaction_isolation`),
+  functions reached through views or RLS policies; PostgREST's hoisting code
+  (source not read); the sender of the reload after an ALTER.
+- DC12 on another size or region; a 5xx other than PGRST003 (for example
+  503 PGRST002) to test whether Envoy resends it (DC03d: a 500 was not
+  resent); the time at which a holder's 504 arrived; where the two requests
+  without PostgREST lines waited.
+- Repeats of either module.
+
+### Cost
+
+Project time about 38 minutes (00:23:46 to 01:01:42 UTC, the artifact's
+start and finish stamps), Small throughout, one project.
+
 ## 2026-10-23 - DC08, in-region clients and an application-like mix on 4XL (one run)
 
 Harness: `make run ONLY=DC08,DC99` with `PVLAB_DC_REGION=ap-northeast-2`
@@ -694,7 +845,12 @@ Readings: service_role carries no timeout of its own, so a Data API request
 under it runs with the 8 s that `authenticator` logs in with. A function's
 own `set statement_timeout` applied to the call for every key, anon's 3 s
 included, so the competing hypothesis in the module header (the timer starts
-before the function's setting applies) did not hold here. An `alter role`
+before the function's setting applies) did not hold here.
+Correction (2026-10-26, DC09): the mechanism is PostgREST's, not Postgres's.
+A nested function's setting did not lift the 8 s and a top-level function's
+did not lift it outside the Data API, so the statement timer does start
+before a function's own SET applies; PostgREST applies the called function's
+setting before the statement starts. An `alter role`
 reaches the Data API only at the next config reload. A 500 under the
 authenticated role (DC03d) was not sent again, while the PGRST003 probes
 (DC01b, DC02b, service_role key) were.

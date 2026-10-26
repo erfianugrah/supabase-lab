@@ -50,6 +50,8 @@ export interface DcProject {
   pgVersion: string;
   reused: boolean;
   createMs: number;
+  /** The generated database password (memory only, never logged); "" for a reused project. */
+  dbPass: string;
 }
 
 let cached: Promise<DcProject> | null = null;
@@ -122,13 +124,14 @@ async function create(ctx: Ctx): Promise<DcProject> {
   const t0 = Date.now();
   let ref = process.env.PVLAB_DC_REF ?? "";
   const reused = Boolean(ref);
+  const dbPass = reused ? "" : `${crypto.randomUUID().replaceAll("-", "")}Aa1!`;
   if (!reused) {
     const org = ctx.orgs.pro ?? "";
     if (!org) throw new Error("PVLAB_ORG_PRO not set");
     const res = await mgmt(ctx, "POST", "/projects", {
       organization_slug: org,
       name: `${prefix()}${t0}`,
-      db_pass: `${crypto.randomUUID().replaceAll("-", "")}Aa1!`,
+      db_pass: dbPass,
       region: REGION,
       desired_instance_size: START_SIZE,
     });
@@ -136,7 +139,7 @@ async function create(ctx: Ctx): Promise<DcProject> {
     if (res.status !== 201 || !ref) throw new Error(`create project: HTTP ${res.status} ${res.text.slice(0, 200)}`);
   }
   // Registered before any wait, so DC99 can delete a project that never got healthy.
-  current = { ref, host: `${ref}.supabase.co`, keys: { anon: "", service: "" }, userJwt: "", pgVersion: "", reused, createMs: 0 };
+  current = { ref, host: `${ref}.supabase.co`, keys: { anon: "", service: "" }, userJwt: "", pgVersion: "", reused, createMs: 0, dbPass };
 
   let status = "";
   for (let i = 0; i < 120 && status !== "ACTIVE_HEALTHY"; i++) {
@@ -186,7 +189,7 @@ async function create(ctx: Ctx): Promise<DcProject> {
     await sleep(2_000);
   }
 
-  current = { ref, host, keys, userJwt: tj.access_token, pgVersion: version.split(" on ")[0] ?? version, reused, createMs: Date.now() - t0 };
+  current = { ref, host, keys, userJwt: tj.access_token, pgVersion: version.split(" on ")[0] ?? version, reused, createMs: Date.now() - t0, dbPass };
   return current;
 }
 
@@ -362,9 +365,9 @@ const median = (xs: number[]) => {
  * login default of `authenticator` would cut every sleep short (measured
  * 2026-10-22). With K above the pool, the mid-burst count of `authenticator`
  * backends in PgSleep is the pool. The request outcomes are NOT a clean pool
- * count: something between the client and PostgREST, not identified, sends
- * a request again after a PGRST003, so queued requests outlive the
- * acquisition timeout (see DC01b, DC02b) and arrive in waves.
+ * count: the API gateway's Envoy sends a request again after each 504
+ * PGRST003 (6 attempts, `x-envoy-attempt-count`, DC12), so queued requests
+ * outlive the acquisition timeout (see DC01b, DC02b) and arrive in waves.
  */
 export async function burst(ctx: Ctx, p: DcProject, k: number, sleepS: number, midS: number): Promise<BurstResult> {
   const calls = Array.from({ length: k }, () => rpc(p.host, "dc_sleep_xl", { s: sleepS }, p.keys.service, p.keys.service, (sleepS + 60) * 1000));
@@ -640,3 +643,107 @@ export const redact = (s: string): string => (current ? s.replaceAll(current.ref
 
 /** Facts one module hands the next within a run (DC01 measures, DC02 reuses). */
 export const state: { smallPool: number; largePool: number } = { smallPool: -1, largePool: -1 };
+
+export interface HttpResult {
+  status: number;
+  ms: number;
+  code: string;
+  message: string;
+  body: string;
+  /** Response headers worth keeping to place the answering layer: server, via, cf-*, x-*, sb-*, proxy-status, content-type. */
+  headers: Record<string, string>;
+}
+
+const KEEP_HEADER = /^(server|via|cf-|x-|sb-|proxy-status|content-type|content-profile|content-range|retry-after|alt-svc)/;
+
+/** Any Data API request (method, path under the host, extra headers, JSON body); a fresh connection per request like `rpc`. */
+export async function request(
+  host: string,
+  method: string,
+  path: string,
+  headers: Record<string, string>,
+  body?: unknown,
+  timeoutMs = 90_000,
+): Promise<HttpResult> {
+  const t0 = performance.now();
+  try {
+    const res = await fetch(`https://${host}${path}`, {
+      method,
+      headers: { ...(body !== undefined ? { "Content-Type": "application/json" } : {}), ...headers },
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+      signal: AbortSignal.timeout(timeoutMs),
+      keepalive: false,
+    });
+    const text = await res.text();
+    const ms = Math.round(performance.now() - t0);
+    let code = "";
+    let message = "";
+    try {
+      const j = JSON.parse(text) as { code?: string; message?: string };
+      if (j && typeof j === "object" && !Array.isArray(j)) {
+        code = String(j.code ?? "");
+        message = String(j.message ?? "");
+      }
+    } catch {
+      /* non-JSON or empty body */
+    }
+    const kept: Record<string, string> = {};
+    res.headers.forEach((v, k) => {
+      // sb-jwt-sub is the caller's user id: not needed to place a layer.
+      if (KEEP_HEADER.test(k.toLowerCase()) && k.toLowerCase() !== "sb-jwt-sub") kept[k.toLowerCase()] = v;
+    });
+    return { status: res.status, ms, code, message, body: text.replace(/\s+/g, " ").slice(0, 300), headers: kept };
+  } catch (e) {
+    return { status: 0, ms: Math.round(performance.now() - t0), code: "client", message: errText(e), body: "", headers: {} };
+  }
+}
+
+export interface UaLogLine {
+  ua: string;
+  /** epoch ms of the log row */
+  t: number;
+  status: string;
+  /** postgrest_logs: the access line's remote address; edge_logs: the request method. */
+  extra: string;
+}
+
+/**
+ * Rows of one log source whose User-Agent starts with `prefix`, polled until
+ * two reads 20 s apart agree (ingestion lags). postgrest_logs carries the UA
+ * inside the access line (`event_message`); edge_logs as
+ * `log_attributes['request.headers.user_agent']`.
+ */
+export async function logLinesByUaPrefix(
+  ctx: Ctx,
+  ref: string,
+  source: "postgrest_logs" | "edge_logs",
+  prefix: string,
+  maxWaitS = 180,
+): Promise<{ lines: UaLogLine[]; error: string }> {
+  const c: Ctx = { ...ctx, ref };
+  const q =
+    source === "postgrest_logs"
+      ? `select timestamp, event_message from logs where source = 'postgrest_logs' and event_message like '%${prefix}%' order by timestamp limit 1000`
+      : `select timestamp, log_attributes['request.headers.user_agent'] as ua, log_attributes['response.status_code'] as st, log_attributes['request.method'] as m from logs where source = 'edge_logs' and log_attributes['request.headers.user_agent'] like '${prefix}%' order by timestamp limit 1000`;
+  const parse = (rows: Record<string, unknown>[]): UaLogLine[] =>
+    rows.map((r) => {
+      const t = Date.parse(`${String(r.timestamp ?? "").replace(/Z?$/, "Z")}`);
+      if (source === "edge_logs") return { ua: String(r.ua ?? ""), t, status: String(r.st ?? ""), extra: String(r.m ?? "") };
+      const msg = String(r.event_message ?? "");
+      const ua = msg.match(new RegExp(`(${prefix}[A-Za-z0-9_.-]*)`))?.[1] ?? "";
+      const status = msg.match(/" (\d{3}) /)?.[1] ?? "?";
+      const addr = msg.split(" ")[0] ?? "";
+      return { ua, t, status, extra: addr };
+    });
+  const t0 = Date.now();
+  let prev = -1;
+  let last: { lines: UaLogLine[]; error: string } = { lines: [], error: "" };
+  while (Date.now() - t0 < maxWaitS * 1000) {
+    const r = await safeLogs(c, q, 2);
+    last = { lines: parse(r.rows), error: r.error };
+    if (r.rows.length > 0 && r.rows.length === prev) return last;
+    prev = r.rows.length;
+    await sleep(20_000);
+  }
+  return last;
+}
