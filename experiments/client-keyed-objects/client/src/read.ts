@@ -30,6 +30,13 @@ export interface Fetched {
   status: number;
   contentRange: string;
   cacheStatus: string;
+  /** HTTP paths only: ms from request start to response headers, and to the last body byte. */
+  ttfbMs?: number;
+  fetchMs?: number;
+  /** signed-url only: ms for the POST /object/sign that minted the URL. */
+  signMs?: number;
+  /** HTTP paths only: allowlisted response headers (cf-ray reduced to its colo) plus `names`, every header name. */
+  hdr?: Record<string, string>;
 }
 
 export interface ReadResult {
@@ -42,6 +49,10 @@ export interface ReadResult {
   status: number;
   cacheStatus: string;
   ms: number;
+  ttfbMs?: number;
+  fetchMs?: number;
+  signMs?: number;
+  hdr?: Record<string, string>;
 }
 
 export interface ReadOpts {
@@ -62,15 +73,44 @@ async function assetOf(t: TargetConfig, s: Session, id: string): Promise<AssetRo
   return a;
 }
 
+/** Response headers worth keeping to explain a slow read; values only for these, names for all. */
+const KEEP = ["age", "cache-control", "cf-cache-status", "content-length", "server-timing", "via", "x-cache", "x-served-by", "last-modified", "etag"];
+
+function keepHeaders(h: Headers): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const k of KEEP) {
+    const v = h.get(k);
+    if (v !== null) out[k] = v;
+  }
+  // cf-ray is <id>-<colo>: keep the colo (where the edge answered), not the id.
+  const ray = h.get("cf-ray");
+  if (ray) out.colo = ray.split("-").pop() ?? "";
+  out.names = [...h.keys()].filter((k) => k !== "set-cookie").sort().join(",");
+  return out;
+}
+
 async function httpRange(url: string, headers: Record<string, string>, range: string): Promise<Fetched> {
   let r: Response;
+  const t0 = performance.now();
   try {
     // A stalled transfer must fail (and be recorded), not hang the caller.
     r = await fetch(url, { headers: { ...headers, range }, signal: AbortSignal.timeout(READ_TIMEOUT_MS) });
   } catch (e) {
     throw new CkError("StorageError", `GET failed: ${(e as Error).message}`);
   }
-  const bytes = new Uint8Array(await r.arrayBuffer());
+  const ttfbMs = performance.now() - t0;
+  const hdr = keepHeaders(r.headers);
+  let bytes: Uint8Array;
+  try {
+    bytes = new Uint8Array(await r.arrayBuffer());
+  } catch (e) {
+    // Until 2026-10-26 a failing body read (reset, the timeout above) surfaced as an unlabelled `Thrown`; it is one
+    // candidate for the CK06 region-b `Thrown` read of 2026-10-23, which that run could not separate from the
+    // other unwrapped steps.
+    const ms = Math.round(performance.now() - t0);
+    throw new CkError("StorageError", `body read failed after ${ms} ms (status ${r.status}, headers at ${Math.round(ttfbMs)} ms, cf-cache-status ${hdr["cf-cache-status"] ?? "-"}, age ${hdr.age ?? "-"}): ${(e as Error)?.name ?? ""} ${(e as Error)?.message ?? e}`, { status: r.status, code: "BodyRead" });
+  }
+  const fetchMs = performance.now() - t0;
   if (r.status !== 206 && r.status !== 200) {
     let code = "";
     try {
@@ -81,7 +121,7 @@ async function httpRange(url: string, headers: Record<string, string>, range: st
     }
     throw new CkError("StorageError", `ranged GET answered ${r.status} ${code}`, { status: r.status, code });
   }
-  return { bytes, status: r.status, contentRange: r.headers.get("content-range") ?? "", cacheStatus: r.headers.get("cf-cache-status") ?? "" };
+  return { bytes, status: r.status, contentRange: r.headers.get("content-range") ?? "", cacheStatus: r.headers.get("cf-cache-status") ?? "", ttfbMs, fetchMs, hdr };
 }
 
 const enc = (key: string) => key.split("/").map(encodeURIComponent).join("/");
@@ -101,6 +141,7 @@ export async function fetchCipher(t: TargetConfig, s: Session, a: AssetRow, cSta
   }
   const auth = { apikey: t.anonKey, authorization: `Bearer ${await s.token()}` };
   if (path === "signed-url") {
+    const t0 = performance.now();
     const r = await fetch(`${t.url}/storage/v1/object/sign/${t.bucket}/${enc(a.object_key)}`, {
       method: "POST",
       headers: { ...auth, "content-type": "application/json" },
@@ -108,7 +149,8 @@ export async function fetchCipher(t: TargetConfig, s: Session, a: AssetRow, cSta
     });
     const j = (await r.json().catch(() => ({}))) as { signedURL?: string; error?: string };
     if (r.status !== 200 || !j.signedURL) throw new CkError("StorageError", `sign answered ${r.status} ${j.error ?? ""}`, { status: r.status, code: j.error ?? "" });
-    return httpRange(`${t.url}/storage/v1${j.signedURL}`, {}, range);
+    const signMs = performance.now() - t0;
+    return { ...(await httpRange(`${t.url}/storage/v1${j.signedURL}`, {}, range)), signMs };
   }
   return httpRange(`${t.url}/storage/v1/object/authenticated/${t.bucket}/${enc(a.object_key)}`, auth, range);
 }
@@ -162,7 +204,7 @@ export async function readRange(ck: Ck, tenantId: string, assetId: string, start
     plain.set(pt.subarray(from - pStart, to - pStart), from - start);
   }
   if (o.log !== false) await logAccess(t, s, { action: `read:${path}`, tenant_id: tenantId, asset_id: assetId, byte_range: `${start}-${endExcl - 1}` });
-  return { plain, transferred: got.bytes.length, cipherNeeded: need, chunks: sp.last - sp.first + 1, status: got.status, cacheStatus: got.cacheStatus, ms: performance.now() - t0 };
+  return { plain, transferred: got.bytes.length, cipherNeeded: need, chunks: sp.last - sp.first + 1, status: got.status, cacheStatus: got.cacheStatus, ms: performance.now() - t0, ttfbMs: got.ttfbMs, fetchMs: got.fetchMs, signMs: got.signMs, hdr: got.hdr };
 }
 
 /** Full read in windows of `windowChunks` chunks; checks the plaintext SHA-256 against the catalogue. */

@@ -189,7 +189,7 @@ async function main() {
         for (const path of input.spread ? [paths[i % paths.length]!] : paths) {
           try {
             const r = await readRange(ck, input.tenant, input.asset, s, e, { path });
-            rows.push({ path, s, e, ok: true, equal: Buffer.compare(Buffer.from(r.plain), want) === 0, transferred: r.transferred, need: r.cipherNeeded, status: r.status, cache: r.cacheStatus, ms: Math.round(r.ms) });
+            rows.push({ path, s, e, ok: true, equal: Buffer.compare(Buffer.from(r.plain), want) === 0, transferred: r.transferred, need: r.cipherNeeded, status: r.status, cache: r.cacheStatus, ms: Math.round(r.ms), ttfb: r.ttfbMs === undefined ? undefined : Math.round(r.ttfbMs), fetch: r.fetchMs === undefined ? undefined : Math.round(r.fetchMs), sign: r.signMs === undefined ? undefined : Math.round(r.signMs), hdr: r.hdr });
           } catch (err) {
             rows.push({ path, s, e, ...errOut(err) });
           }
