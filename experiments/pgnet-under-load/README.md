@@ -11,13 +11,13 @@ how many of 1,000 messages arrive (lost, duplicated) through raw `pg_net`,
 consumer.
 
 Self-provisioning, no OpenTofu state: NL01/NL02 create a Pro-org Micro,
-NL03/NL04 a Pro-org Large (dedicated CPU), both in ap-southeast-1; NL99
-deletes what the process created. The external receiver is a workers.dev
-Worker (`receiver/`) that records every arrival in a Durable Object ledger
-before it answers, so a call the sender gave up on still leaves a record.
-Sibling context: `security-lockdown` S08 (pg_net egress) and S23 (pg_net and
-webhooks under restrict-all), `edge-resilience` W18 (Edge Function cold
-start).
+NL03/NL04 (and NL05 when opted in) a Pro-org Large (dedicated CPU), both in
+ap-southeast-1; NL99 deletes what the process created. The external receiver
+is a workers.dev Worker (`receiver/`) that records every arrival in a
+Durable Object ledger before it answers, so a call the sender gave up on
+still leaves a record. Sibling context: `security-lockdown` S08 (pg_net
+egress) and S23 (pg_net and webhooks under restrict-all), `edge-resilience`
+W18 (Edge Function cold start).
 
 ## Modules
 
@@ -35,15 +35,15 @@ start).
 ```bash
 export PVLAB_ORG_PRO=<pro-org-slug>
 sx CLOUDFLARE_API_TOKEN=CLOUDFLARE_WORKERS_TOKEN CLOUDFLARE_ACCOUNT_ID -- make receiver-up   # prints the workers.dev URL
-sx SUPABASE_ACCESS_TOKEN -- make micro RECEIVER=<url>   # NL01, NL02, NL99; about 10 minutes
-sx SUPABASE_ACCESS_TOKEN -- make large RECEIVER=<url>   # NL03, NL04, NL99; about 50 minutes
+sx SUPABASE_ACCESS_TOKEN -- make micro RECEIVER=<url>   # NL01, NL02, NL99; about 3 minutes
+sx SUPABASE_ACCESS_TOKEN -- make large RECEIVER=<url>   # NL03, NL04, NL99; about 40 minutes (NL03 about 25, NL04 about 14, measured separately)
 sx SUPABASE_ACCESS_TOKEN -- make clean                  # list leftover pvlab-nl-* projects; DELETE=1 deletes
 sx CLOUDFLARE_API_TOKEN=CLOUDFLARE_WORKERS_TOKEN CLOUDFLARE_ACCOUNT_ID -- make receiver-down
 make publish-evidence RUN=evidence/<ts>/run-<stamp>.json
 ```
 
 `PVLAB_NL_ARM_S` (default 600) and `PVLAB_NL_MECH_S` (default 180) set the
-NL03 arm and NL04 per-mechanism lengths. `PVLAB_NL_REF_MICRO` /
-`PVLAB_NL_REF_LARGE` reuse a project (development only; NL99 leaves it, and
-the burners then need `PVLAB_NL_DB_PASS`). Results and their limits are in
-RUNLOG.md.
+NL03 arm length and the NL04 retry and pgmq deadline (raw is fixed at 90 s).
+`PVLAB_NL_REF_MICRO` / `PVLAB_NL_REF_LARGE` reuse a project (development
+only; NL99 leaves it, and the burners then need `PVLAB_NL_DB_PASS`). Results
+and their limits are in RUNLOG.md.

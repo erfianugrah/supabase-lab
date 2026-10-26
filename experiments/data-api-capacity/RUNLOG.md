@@ -104,20 +104,21 @@ read the metrics endpoint until its snapshot had refreshed twice.
 | DC12b timeout 5 s, pool 11, two rounds (8) | all 504 after 30405 to 32115 ms; each 6 PostgREST lines, 1 edge row; gaps 5.0 to 6.0 s. Timeouts 0 to 48 |
 | DC12c timeout 20 s, pool 12, one round (4) | all 504 PGRST003 (HEAD no body) after 120881 to 121746 ms; each 6 PostgREST lines, gaps 20.0 to 20.9 s; edge rows 1 for GET, HEAD and POST /rpc, 0 for the PATCH. Timeouts 0 to 24 |
 | DC12d timeout 60 s, pool 13, one round (4) | all 504 `text/plain` `upstream request timeout`, no PGRST003, after 125055 to 125066 ms. GET, HEAD, PATCH: 2 PostgREST lines each (504:2), 60.0 to 60.1 s apart; POST /rpc: 0 PostgREST lines. 1 edge row each (504). Timeouts 0 to 6 |
-| DC12e burst: timeout 5 s, pool 14 held, 42 concurrent POST /rpc | 41 x 504 PGRST003 after 30768 ms (min) to 31458 ms (median), each 6 PostgREST lines; 1 x 504 `upstream request timeout` after 125097 ms with 0 PostgREST lines; 1 edge row per request (42). Timeouts 0 to 246 |
+| DC12e burst: timeout 5 s, pool 14 held, 42 concurrent POST /rpc | 41 x 504 PGRST003 (minimum 30768 ms; median of all 42 requests 31458 ms; the 41's maximum not recorded), each 6 PostgREST lines; 1 x 504 `upstream request timeout` after 125097 ms with 0 PostgREST lines; 1 edge row per request (42). Timeouts 0 to 246 |
 | headers, one sampled PGRST003 answer per arm (DC12a-c; the module keeps one) | `server: cloudflare`, `cf-cache-status: DYNAMIC`, `sb-gateway-version: 1`, `proxy-status: PostgREST; error=PGRST003`, `x-envoy-attempt-count: 6`, `x-envoy-upstream-service-time` 7575 / 31144 / 120961 ms in the DC12a-c samples |
 | headers, the sampled `upstream request timeout` answer in DC12d and in DC12e | `content-type: text/plain`, `x-envoy-attempt-count: 1`, no `proxy-status`, no `x-envoy-upstream-service-time` |
 | holders | DC12a, b: 500 57014 (the cancel); DC12c, d, e (holds of 240, 480 and 150 s): 504 from every holder |
-| metrics snapshot | refreshes seen 60 to 61 s apart (reads every 5 s: 63 s and 123 s after the arm began; 132, 193 and 253 s) |
+| metrics snapshot | refreshes seen 60 to 61 s apart in every arm (5 s reads; snapshots at 22/63/123 s after the arm began in DC12a, 71/132/192 s in DC12b, 129/189/250 s in DC12c, 132/193/253 s in DC12d and DC12e) |
 
 Readings:
 
 - The resending layer is Envoy, behind the hop that writes `edge_logs`:
-  `x-envoy-attempt-count: 6` on each sampled PGRST003 answer, one `edge_logs` row
-  per client request, six PostgREST attempts. GET, HEAD, PATCH and POST were
-  all resent. The attempts follow each other with no measurable pause (the
-  gap between PostgREST lines is the acquisition timeout plus at most about
-  0.9 s), so a client waits 6 x the timeout plus about 1 to 2 s.
+  `x-envoy-attempt-count: 6` on each sampled PGRST003 answer, one
+  `edge_logs` row per client request, six PostgREST attempts. GET, HEAD,
+  PATCH and POST were all resent. The attempts follow each other with no
+  added back-off (the gap between PostgREST lines is the acquisition timeout
+  plus 0.0 to 1.0 s), so a client waits 6 x the timeout plus 0.4 to 2.1 s
+  (DC12a-c).
 - PostgREST counts every attempt: `pgrst_db_pool_timeouts_total` went up 6
   per failed client request (48 for 8, 24 for 4, 246 for 41), and 6 for the
   three DC12d requests that reached PostgREST twice each. One client 504 is
@@ -125,10 +126,12 @@ Readings:
 - Envoy's whole-request limit is about 125 s: at a 60 s acquisition timeout
   two attempts fit (0 and 60 s) and the third was cut, so the client got
   Envoy's own `upstream request timeout` 504 after 125 s instead of a
-  PGRST003, and holders sleeping 150 s or longer were answered 504 too. At
-  20 s six attempts (about 121 s) still fit. Retry policy and timeout values
-  are not readable from a project; the attempt count and the about 125 s are
-  this run's observations.
+  PGRST003, and holders still running at about 125 s were answered 504 too
+  (DC12c-e; DC12b's 150 s holders were cancelled after the last probe
+  answer, about 70 s in, and got 500 57014). At 20 s six attempts (about 121
+  s) still fit. Retry policy and timeout values are not readable from a
+  project; the attempt count and the about 125 s are this run's
+  observations.
 - Postgres kept running a request's query after the gateway answered it:
   the holders' answers in DC12c-e were the gateway's 504 (the cancel gives
   57014, as in DC12a-b), and `pg_stat_activity` still showed every holder
@@ -166,24 +169,27 @@ start and finish stamps), Small throughout, one project.
 ## 2026-10-26 - DC13-DC15, defaults per size up to 2XL, statements of a few seconds, a set pool across a resize (one run each)
 
 Lab commit 848b9f3 plus the uncommitted DC13-DC15 modules (`lib/tier.ts`,
-the `lib/dc.ts` changes). Three projects on the Pro org, ap-southeast-1,
-each created with `desired_instance_size: small`, Postgres 17.11, PostgREST
-14.18 (`application_name` of its connections). Vantage: this lab's Mac over
-the public internet (`dc_ping` through the Data API 38 to 47 ms, DC14a).
+the `lib/dc.ts` changes). Five projects on the Pro org, ap-southeast-1 (the
+main project, the DC15 custom project and three DC15 control projects, two
+of which failed before any read and are not published), each created with
+`desired_instance_size: small`, Postgres 17.11, PostgREST 14.18
+(`application_name` of its connections). Vantage: this lab's Mac over the
+public internet (`dc_ping` through the Data API 38 to 47 ms, DC14a).
 
 - Main project: DC13 resized it Small -> XL -> 2XL, then DC14 ran on 2XL,
   then realtime-surface RT05 (its RUNLOG, 2026-10-26) reused it at 2XL; it
   was deleted after RT05. Published:
   `out/2026-10-26/run-2026-10-26T00-24-26-283Z.json` (27 results; DC13
   took 942 s, DC14 2,484 s).
-- Two DC15 projects (custom and control arms), each deleted by its DC99;
-  section below.
-- Two of the three `POST /v1/projects` calls returned a project whose
-  `created_at` was before the request (about 4 min and 3.7 min, read from
-  `GET /v1/projects` during the run, console only); DC13 logged it ready 4 s
-  after the POST, at Small (`max_connections` 90). The third project's
-  `created_at` matched its request. Read: the platform sometimes hands out
-  a project provisioned ahead of the request; not investigated further, and
+- The two published DC15 projects (custom and control arms), each deleted by
+  its DC99; section below.
+- Of the three published projects' `POST /v1/projects` calls, two returned a
+  project whose `created_at` was before the request (about 4 min and 3.7
+  min, read from `GET /v1/projects` during the run, console only); DC13
+  logged the main project, one of those two, ready 4 s after the POST, at
+  Small (`max_connections` 90; the 4 s is console only). The third project's
+  `created_at` matched its request. Read: the platform sometimes hands out a
+  project provisioned ahead of the request; not investigated further, and
   nothing in the measurements depended on it.
 
 ### DC13 - pool and Realtime connections with nothing configured, Small -> XL -> 2XL
@@ -232,14 +238,14 @@ while it settled, and client backends by role and application afterwards.
   pool sizes: Small to Large 4, XL to 4XL 7). That name tracked
   `postgres_changes_pool` in RT05 (2026-10-22), which is the basis for the
   reading; it is not a documented mapping.
-- **The authorization pool did not follow the size.** The concepts table
+- **The authorisation pool did not follow the size.** The concepts table
   gives an "Authorization Pool Size" of 5 for Small to Large and 10 for XL
   to 4XL, "If not specified". `realtime_connect` held 5 at every size here
   and `connection_pool` read 5 (an explicit value, not null) on XL and 2XL.
   Two readings, not separated: the 5 was written at creation for Small and
   is not re-derived on a resize (as `db_pool` 45 was kept in DC15), or the
   table does not describe this project; a project created at XL or 2XL was
-  not run. That `realtime_connect` is the authorization pool is inferred
+  not run. That `realtime_connect` is the authorisation pool is inferred
   from it equalling `connection_pool`.
 
 ### DC14 - statements of about 3 s against `db_pool` unset (70), 140, 200 on 2XL
@@ -293,18 +299,22 @@ CPU (`dc14_cpu`, about 3 s alone):
   acquisition-timeout wait of DC01b. Postgres was idle in the open loops
   (node CPU 0.9 to 1.5 % over 71 to 197 s windows; 0 to 1 `authenticator`
   on CPU).
-- **CPU-bound statements: a larger pool made it worse, and at 200 no
-  request succeeded.** At 70, 70 `authenticator` backends were on CPU at
-  once (8 vCPUs, node CPU 92 to 100 %), 200s came at 1.4 per second, and
-  the excess got `PGRST003`. At 140, 140 were on CPU, each statement took
-  longer (p50 of 200s about 98 s), and two new answers appeared: 504
-  without a PostgREST code, body `upstream request timeout`, and 503
-  `PGRST002`. At 200, 200 were on CPU and every answer that came back was
-  an error: the uncoded 504s arrived at about 125 s (row p50 125062 to
-  125304 ms), so the timeout that produced them sits near 125 s, between
-  the client and PostgREST (component not identified; the body text is the
-  only evidence). Whether the statement kept running in Postgres after its
-  504 was not measured; node CPU stayed at 99 to 100 % in those rows.
+- **CPU-bound statements: a larger pool made it worse, and at 200 no request
+  succeeded.** At 70, 70 `authenticator` backends were active with no wait
+  event at once (the module's 'on CPU'; 8 vCPUs, so most waited for a core;
+  node CPU 92.4 to 99.8 % except 42 % in the 26 s burst-105 window), 200s
+  came at 1.4 per second, and the excess got `PGRST003`. At 140, 140 were on
+  CPU, requests took longer (p50 of the 200s about 98 s, client time
+  including the wait for a connection; statement time was not recorded), and
+  two new answers appeared: 504 without a PostgREST code, body `upstream
+  request timeout`, and 503 `PGRST002`. At 200, 200 were on CPU and every
+  answer that came back was an error: the uncoded 504s arrived at about 125
+  s (row p50 125062 to 125304 ms), so the timeout that produced them sits
+  near 125 s; the body and the time match DC12d's Envoy `upstream request
+  timeout` (about 125 s, `x-envoy-attempt-count: 1`), and DC14 kept no
+  headers, so the match rests on body text and timing. Whether the statement
+  kept running in Postgres after its 504 was not measured; node CPU stayed
+  at 99 to 100 % in those rows.
 - Throughput ceiling, reasoned: 8 vCPUs at one 3 s statement each is about
   2.7 statements per second; the best measured was 1.4 per second (200s
   over wall time, including the drain). The vCPU-to-core mapping and the
@@ -348,8 +358,8 @@ mid-burst (6 s) count of `authenticator` backends in PgSleep.
   read 45 on Large, and Postgres saw 45 (Large's unset value is 50, control
   and DC01). 120 set on Large read 120 on Small, and `pgrst_db_pool_max`
   read 120 there. Nothing clamped it to the new `max_connections` and the
-  resize PATCH answered 200 with no warning in the response (body not
-  recorded beyond the status).
+  resize PATCH answered 200 (its body was not recorded, so whether it
+  carried a warning is unknown).
 - **On Small with `db_pool` 120, each burst of 150 got 84 x 200 and 66 x
   503 `PGRST002`** (PostgREST's "Could not query the database for the
   schema cache. Retrying.", as DC02's pool-1000 arm on Large). 84 is about
@@ -377,14 +387,14 @@ mid-burst (6 s) count of `authenticator` backends in PgSleep.
 
 Main project: requested 00:24:26 UTC, Small to about 00:31, XL to about
 00:35, 2XL from then until deleted at 01:42:50 UTC (about 68 minutes at 2XL;
-the size boundaries are from the console, the run stamps and DC13's
-settle times, not exact). The deletion came after realtime-surface RT05
-(01:21:52 to 01:33:06 UTC) and was done with `lib/cleanup.ts --delete`
-under the prefix `pvlab-dc243-` (DELETE 200); list mode then showed 0. DC15
-custom: 00:24:41 to 00:36:44 UTC, Small and Large. DC15 control: three
-projects in turn, the two failed attempts (00:24:56 to 00:27:12 and
-00:28:01 to 00:28:07 UTC, artifact stamps) and the published run (00:37:13
-to 00:48:10 UTC), Small and Large. At the compute page's hourly rates (2XL
+the size boundaries are from the console, the run stamps and DC13's settle
+times, not exact). The deletion came after realtime-surface RT05 (01:21:52
+to 01:33:06 UTC) and was done with `lib/cleanup.ts --delete` under the run's
+`pvlab-dc` prefix (DELETE 200); list mode then showed 0. DC15 custom:
+00:24:41 to 00:36:44 UTC, Small and Large. DC15 control: three projects in
+turn, the two failed attempts (00:24:56 to 00:27:12 and 00:28:01 to 00:28:07
+UTC, stamps of the unpublished artifacts) and the published run (00:37:13 to
+00:48:10 UTC), Small and Large. At the compute page's hourly rates (2XL
 $0.562, XL $0.2877) that is about $0.65 of 2XL and under $0.10 for the rest;
 how billing rounds partial hours was not checked.
 
@@ -1069,16 +1079,14 @@ Docs (Supabase timeouts guide): anon 3 s, authenticated 8 s, set per role.
 Readings: service_role carries no timeout of its own, so a Data API request
 under it runs with the 8 s that `authenticator` logs in with. A function's
 own `set statement_timeout` applied to the call for every key, anon's 3 s
-included, so the competing hypothesis in the module header (the timer starts
-before the function's setting applies) did not hold here.
-Correction (2026-10-26, DC09): the mechanism is PostgREST's, not Postgres's.
-A nested function's setting did not lift the 8 s and a top-level function's
-did not lift it outside the Data API, so the statement timer does start
-before a function's own SET applies; PostgREST applies the called function's
-setting before the statement starts. An `alter role`
-reaches the Data API only at the next config reload. A 500 under the
-authenticated role (DC03d) was not sent again, while the PGRST003 probes
-(DC01b, DC02b, service_role key) were.
+included. Correction (2026-10-26, DC09): this is PostgREST applying the
+called function's setting before the statement starts; the module header's
+competing hypothesis (the timer starts before the function's setting
+applies) holds for Postgres itself, since a nested function's setting did
+not lift the 8 s and a top-level function's did not lift it outside the Data
+API. An `alter role` reaches the Data API only at the next config reload. A
+500 under the authenticated role (DC03d) was not sent again, while the
+PGRST003 probes (DC01b, DC02b, service_role key) were.
 
 ### Not run
 

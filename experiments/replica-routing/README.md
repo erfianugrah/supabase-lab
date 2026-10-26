@@ -90,7 +90,7 @@ Full record: `RUNLOG.md`; artifacts `out/2026-10-23/`.
 | Auth, Storage, Realtime, Edge Functions through the load balancer | 200 / joined; `edge_logs` names the primary for Auth, no identifier for Storage and Realtime | RR02f3-f6, RR02k |
 | Replica's own host | serves REST GETs only; Auth, Storage, Functions, GraphQL 400, Realtime handshake fails | RR02f |
 
-## Measured (2026-10-26, RR03, two projects, two runs, Singapore vantage, primary and replica both in ap-southeast-1)
+## Measured (2026-10-26, RR03, two projects, two runs, Singapore workstation plus Edge Functions in ap-southeast-1, us-east-1 and eu-west-1, primary and replica both in ap-southeast-1)
 
 Full record: `RUNLOG.md`; artifacts `out/2026-10-26/`. supabase-js 2.118.0.
 
@@ -102,12 +102,13 @@ Full record: `RUNLOG.md`; artifacts `out/2026-10-26/`. supabase-js 2.118.0.
 | `rpc(..., { get: true })` through the load balancer | stable, definer and volatile read-only functions 200 on either node; a writing function 405 SQLSTATE `25006` on either node (replica 3 of 5, primary 2 of 5, both runs) | RR03f |
 | `rpc(...)` (POST) through the load balancer | primary 5 of 5 for every function; the writing function wrote | RR03f |
 | `HEAD` + `count=exact` | through the load balancer 200 on both nodes (replica 6 and 3 of 10); on the replica's own host 400 | RR03g |
-| Same-region split, GETs through the load balancer | workstation 111/89 and 94/106 replica/primary of 200; Edge Function ap-southeast-1 100/100 and 115/85 of 200; us-east-1 and eu-west-1 roughly half of 50; order not alternating (92 switches in 199) | RR03h |
-| Lag at 50 inserts/s, same region | replica host `stale_ms` p50 17 and 21 ms, p95 28 and 30, max 91 and 99 (primary host p50 12 both runs); `replay_lag` p50 2.2 and 2.1 ms | RR03i |
+| Same-region split, GETs through the load balancer | workstation 111/89 and 94/106 replica/primary of 200; Edge Function ap-southeast-1 100/100 and 115/85 of 200; 20/30 and 27/23 of 50 from us-east-1, 26/24 and 24/26 from eu-west-1 (chosen region `SIN` for the SIN, IAD and DUB colos, the only region available); order not alternating (run 2, workstation keep-alive: 92 switches in 199) | RR03h |
+| Staleness and lag at 50 inserts/s, same region | replica host `stale_ms` (includes the 20 ms insert period and clock skew) p50 17 and 21 ms, p95 28 and 30, max 91 and 99 (primary host p50 12 both runs); `replay_lag` p50 2.2 and 2.1 ms | RR03i |
 
-Not measured: other region pairs, load, behaviour with `hot_standby_feedback`
-on, the load balancer's rule, a replica that is down while the primary is
-untouched (the Management API has no per-replica restart as of 2026-10-23), recovery of the load
+Not measured: other region pairs, read load or write rates above 50
+inserts/s, behaviour with `hot_standby_feedback` on, the load balancer's
+rule, a replica that is down while the primary is untouched (the Management
+API has no per-replica restart as of 2026-10-23), recovery of the load
 balancer endpoint after the last replica is removed beyond 1,200 s, the
-same-region spreading rule, read-your-writes through the load balancer in the
-same-region shape, Auth-issued HS256 or third-party user tokens.
+same-region spreading rule, read-your-writes through the load balancer in
+the same-region shape, Auth-issued HS256 or third-party user tokens.
