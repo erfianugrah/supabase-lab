@@ -335,7 +335,7 @@ client can poll. See RUNLOG.md; artifacts in `out/2026-09-24/` and
   extension. privatelink-aws T22 carries the same change, not run (needs the
   AWS PrivateLink rig).
 
-## experiments/data-api-capacity - key facts (validated 2026-10-22/23/26, Pro org; DC01-03 ap-southeast-1 Small then Large, DC04 ap-northeast-2 Small then 4XL, DC05-07 ap-northeast-2 Small, DC08 ap-northeast-2 Small then 4XL, in-region clients; DC09 and DC12 ap-southeast-1 Small)
+## experiments/data-api-capacity - key facts (validated 2026-10-22/23/26, Pro org; DC01-03 ap-southeast-1 Small then Large, DC04 ap-northeast-2 Small then 4XL, DC05-07 ap-northeast-2 Small, DC08 ap-northeast-2 Small then 4XL, in-region clients; DC09 and DC12 ap-southeast-1 Small; DC13-15 ap-southeast-1, Small to XL to 2XL and Small/Large)
 
 The Data API's connection pool, what a full pool looks like to a client, the
 pool settings' PATCH, statement timeouts per role, throughput under request
@@ -558,6 +558,45 @@ and DC05a from the next run on).
   in-flight load, and the `gen_*` columns for what was delivered. Since
   the run the generator targets only its own project (`SUPABASE_URL`),
   not a host from the request; that version has not been run.
+- **Unset pool per size, Small to 2XL** (DC13, 2026-10-26, one project
+  resized Small -> XL -> 2XL, two bursts of 150 per size,
+  `out/2026-10-26/run-2026-10-26T00-24-26-283Z.json`): Small 30, XL 60, 2XL
+  70 (`max_connections` 90 / 240 / 380, node CPUs 2 / 4 / 8);
+  `pgrst_db_pool_max` read the same at each. With DC01 and DC04 the unset
+  pool is 30 / 50 / 60 / 70 / 70 for Small / Large / XL / 2XL / 4XL; 8XL
+  and above not measured.
+- **A set `db_pool` survives a resize and is not clamped** (DC15, one run
+  per arm, `run-2026-10-26T00-24-41-341Z` custom,
+  `run-2026-10-26T00-37-13-794Z` control). 45 set on Small read and measured
+  45 on Large (unset there: 50). 120 set on Large read 120 and
+  `pgrst_db_pool_max` 120 after the resize to Small (`max_connections` 90),
+  and each burst of 150 got 84 x 200 and 66 x 503 `PGRST002` (two bursts);
+  the mid-burst Management query returned no row. The control (never set)
+  followed the size: 30, 50, 50, 30. After a downsize, a pool set for the
+  bigger size has to be lowered by hand.
+- **Statements of about 3 s against the pool on 2XL** (DC14, same artifact
+  as DC13, one run per cell, legacy service_role key from this lab's Mac;
+  table in RUNLOG). Waiting statements (`pg_sleep(3)`) at 40/s: pool 70
+  answered all 4800 with 200 at p50 45237 ms and p95 85443 ms (23 per
+  second, the pool's 70 / 3 s), pools 140 and 200 at p50 3045 ms; no
+  `PGRST003` at 70. CPU-bound statements (a plpgsql loop calibrated to
+  about 3 s alone) on 8 vCPUs: every pool connection was on CPU at once and
+  node CPU read 92 to 100 %; 200s at 1.4 per second at pool 70, 0.9 to 1.4
+  at 140, and none at 200, where every answer was a 504 (`PGRST003`, or
+  uncoded with body `upstream request timeout` at about 125 s at the
+  client) or a client-side failure. 503 `PGRST002` (105 of 480) appeared in
+  the pool-140 CPU open loop with 144 of 380 connections in use. Raising
+  `db_pool` helps requests that wait, and past the core count hurts
+  requests that compute; one run per cell, the 125 s timeout's owner not
+  identified.
+- Harness: `lib/tier.ts` `readPool` reads the pool four ways at the current
+  size; DC13 imports realtime-surface `lib/burst.ts` for its 100-join burst
+  and needs the project's database password (`PVLAB_DC_DBPASS`, also how
+  RT05 reuses the project through `PVLAB_PEER_RT`). `create()` now retries
+  the first admin user create (a 500 on a fresh project failed a DC15 run).
+  Two of three `POST /v1/projects` on 2026-10-26 returned a project whose
+  `created_at` predated the request by about 4 min (ready 4 s after the
+  POST); the third did not.
 
 ## Provisioning: ACTIVE_HEALTHY is not readiness (validated 2026-08-03)
 
@@ -2953,9 +2992,12 @@ Numbers: `RUNLOG.md`, artifacts `out/2026-10-08/`.
   clients "retry after 5 to 10 seconds", and recovery was not measured.
   `postgres_changes_pool` 20 joined 5000 of 5000 both reps;
   `postgres_changes_pool` 1 got timeouts from 2000 joins (1234, 1202 of 2000).
-  The null default held 4 `realtime_subscription_manager_pub` connections, not
-  the documented 2; that name peaked at 1, 20, 21 and 81 at settings 1, 20, 21
-  and 100. No rate-limit or socket error at 5000; the project's config read
+  The null default held 4 `realtime_subscription_manager_pub` connections
+  (the settings page says 2; the concepts page's table of default pool sizes,
+  https://supabase.com/docs/guides/realtime/concepts, says 4 for Small, so
+  the "not the documented 2" of 2026-10-22 compared against the wrong page,
+  corrected 2026-10-26); that name peaked at 1, 20, 21 and 81 at settings 1,
+  20, 21 and 100. No rate-limit or socket error at 5000; the project's config read
   `max_concurrent_users` 10000 and `max_joins_per_second` 2500, not the limits
   page's Pro 500/500. Private Broadcast from an AFTER INSERT trigger
   (`realtime.send`, default config only) joined 5000 of 5000 and delivered one
@@ -2969,6 +3011,24 @@ Numbers: `RUNLOG.md`, artifacts `out/2026-10-08/`.
   90, and a Management query answered 503 with `53300: sorry, too many clients
   already`. Raw-protocol harness: `lib/burst.ts` (records each channel's
   `phx_reply` and `system` frame without a supabase-js client per socket).
+- **Subscription bursts on 2XL** (RT05, 2026-10-26, one run, two reps per
+  row, `out/2026-10-26/run-2026-10-26T01-21-52-456Z.json`; the project was
+  created Small and resized to 2XL by data-api-capacity DC13): Postgres
+  Changes joined 2000 of 2000 and 5000 of 5000 at `postgres_changes_pool`
+  null and at 20, private Broadcast 5000 of 5000; no `Too many database
+  timeouts` (Small: 1421 and 1611 of 5000 at the null default), no other
+  failure class. `realtime_subscription_manager_pub` peaked at 7 at the null
+  default and 20 at 20. Join to ready p50 at 5000: 1607 and 1571 ms (null),
+  632 and 641 ms (20), Broadcast 639 and 689 ms. Config read
+  `connection_pool` 5, `max_concurrent_users` 10000, `max_joins_per_second`
+  2500.
+- **Realtime connections per size with nothing configured** (data-api-capacity
+  DC13, 2026-10-26, one project Small -> XL -> 2XL, one 100-join burst per
+  size): `realtime_subscription_manager_pub` 4 / 7 / 7, the concepts table's
+  "Subscription management" 4 (Small) and 7 (XL to 4XL); `realtime_connect`
+  5 at all three and `connection_pool` read 5 at all three, where the table's
+  "Authorization Pool Size" is 10 from XL. Whether a value fixed at creation
+  (Small) explains the 5 was not separated (no project created at XL or 2XL).
 
 ## experiments/auth-providers - key facts (AU01-AU04 2026-10-10, self-provisioned throwaway projects)
 

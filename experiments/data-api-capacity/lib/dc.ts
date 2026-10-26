@@ -50,7 +50,7 @@ export interface DcProject {
   pgVersion: string;
   reused: boolean;
   createMs: number;
-  /** The generated database password (memory only, never logged); "" for a reused project. */
+  /** Database password, memory only, never logged: generated, or PVLAB_DC_DBPASS when the caller chose it (a reused project, or RT05 reusing a DC13 project); "" for a reused project without one. */
   dbPass: string;
 }
 
@@ -124,7 +124,9 @@ async function create(ctx: Ctx): Promise<DcProject> {
   const t0 = Date.now();
   let ref = process.env.PVLAB_DC_REF ?? "";
   const reused = Boolean(ref);
-  const dbPass = reused ? "" : `${crypto.randomUUID().replaceAll("-", "")}Aa1!`;
+  // PVLAB_DC_DBPASS: a password chosen by the caller, so a later process (RT05 via
+  // PVLAB_PEER_RT and PVLAB_RT_DBPASS) can open a pooler session on the same project.
+  const dbPass = process.env.PVLAB_DC_DBPASS || (reused ? "" : `${crypto.randomUUID().replaceAll("-", "")}Aa1!`);
   if (!reused) {
     const org = ctx.orgs.pro ?? "";
     if (!org) throw new Error("PVLAB_ORG_PRO not set");
@@ -168,12 +170,20 @@ async function create(ctx: Ctx): Promise<DcProject> {
   const host = `${ref}.supabase.co`;
   const email = `dc-${t0}@example.com`;
   const password = `${crypto.randomUUID().replaceAll("-", "")}Aa1!`;
-  const cu = await fetch(`https://${host}/auth/v1/admin/users`, {
-    method: "POST",
-    headers: { apikey: keys.service, Authorization: `Bearer ${keys.service}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password, email_confirm: true }),
-  });
-  if (cu.status >= 300 && cu.status !== 422) throw new Error(`admin create user: HTTP ${cu.status}`);
+  // The first Auth write on a fresh project can answer 500 (AGENTS.md,
+  // "ACTIVE_HEALTHY is not readiness"; DC15 control arm 2026-10-26): retry.
+  let cuStatus = 0;
+  for (let i = 0; i < 6; i++) {
+    const cu = await fetch(`https://${host}/auth/v1/admin/users`, {
+      method: "POST",
+      headers: { apikey: keys.service, Authorization: `Bearer ${keys.service}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password, email_confirm: true }),
+    }).catch(() => null);
+    cuStatus = cu?.status ?? 0;
+    if (cuStatus && (cuStatus < 300 || cuStatus === 422)) break;
+    await sleep(10_000);
+  }
+  if (!cuStatus || (cuStatus >= 300 && cuStatus !== 422)) throw new Error(`admin create user: HTTP ${cuStatus}`);
   const tok = await fetch(`https://${host}/auth/v1/token?grant_type=password`, {
     method: "POST",
     headers: { apikey: keys.anon, "Content-Type": "application/json" },
@@ -606,14 +616,18 @@ export async function postgrestStarts(ctx: Ctx, ref: string, sinceMs: number): P
  * target's max_connections, the project is ACTIVE_HEALTHY, and the Data API
  * answered 5 consecutive pings.
  */
-export async function resize(ctx: Ctx, p: DcProject, variant: string, wantMaxConn: number, maxMs = 20 * 60_000, watchS = 300, fromMaxConn = -1): Promise<{ status: number; text: string; settledS: number; maxConn: number; watch?: Outage }> {
+export async function resize(ctx: Ctx, p: DcProject, variant: string, wantMaxConn: number, maxMs = 20 * 60_000, watchS = 300, fromMaxConn = -1): Promise<{ status: number; text: string; settledS: number; maxConn: number; watch?: Outage; retries429?: number }> {
   const t0 = Date.now();
+  let retries429 = 0;
   let r = await mgmt(ctx, "PATCH", `/projects/${p.ref}/billing/addons`, { addon_type: "compute_instance", addon_variant: variant });
-  for (let i = 0; i < 4 && r.status === 429; i++) {
+  // 429 "still processing addon changes" follows a resize for a few minutes
+  // (platform-downtime setComputeSize; DC13 resizes twice in a row).
+  for (let i = 0; i < 10 && r.status === 429; i++) {
+    retries429++;
     await sleep(60_000);
     r = await mgmt(ctx, "PATCH", `/projects/${p.ref}/billing/addons`, { addon_type: "compute_instance", addon_variant: variant });
   }
-  if (r.status >= 300) return { status: r.status, text: r.text.slice(0, 200), settledS: -1, maxConn: -1 };
+  if (r.status >= 300) return { status: r.status, text: r.text.slice(0, 200), settledS: -1, maxConn: -1, retries429 };
   let maxConn = -1;
   while (Date.now() - t0 < maxMs) {
     await sleep(10_000);
@@ -633,10 +647,10 @@ export async function resize(ctx: Ctx, p: DcProject, variant: string, wantMaxCon
       // Run 2 (2026-10-22) passed this check 41 s after the PATCH and then
       // saw the Data API fail for minutes: watch for a late second phase.
       const { outage } = await sampleDuring(p, watchS, 1_000, async () => undefined);
-      return { status: r.status, text: "", settledS, maxConn, watch: outage };
+      return { status: r.status, text: "", settledS, maxConn, watch: outage, retries429 };
     }
   }
-  return { status: r.status, text: "timed out waiting for the resize to settle", settledS: -1, maxConn };
+  return { status: r.status, text: "timed out waiting for the resize to settle", settledS: -1, maxConn, retries429 };
 }
 
 export const redact = (s: string): string => (current ? s.replaceAll(current.ref, "<ref>") : s);

@@ -236,6 +236,67 @@ server version, and says older clients drop binary silently.
   `realtime.send_binary(..., private => false)`, an `ArrayBuffer` larger than
   16 bytes over WebSocket, any size limit.
 
+## 2026-10-26 - RT05 on 2XL (subscription bursts at 2000 and 5000 joins)
+
+Artifact: `out/2026-10-26/run-2026-10-26T01-21-52-456Z.json` (15 results,
+all `info`). Lab commit 848b9f3 plus the uncommitted `RT05_COMPUTE`,
+`RT05_BOUNDS` and `RT05_BC_LEVELS` knobs. Run started 01:21:52 UTC and
+finished 01:33:06 UTC. The project was not created by RT05: it was the
+data-api-capacity DC13/DC14 project (created Small through `POST
+/v1/projects`, ap-southeast-1, resized Small -> XL -> 2XL by DC13, then
+DC14's `db_pool` arms left it at `db_pool` 200), reused through
+`PVLAB_PEER_RT`, and deleted after this run (DELETE 200 at 01:42:50 UTC by
+`lib/cleanup.ts` in data-api-capacity, list mode then showed none). Before
+RT05 it had served DC13's three 100-join bursts on a different table.
+Settings: `RT05_COMPUTE=ci_2xlarge` (RT05-setup read `max_connections` 380,
+no resize needed), `RT05_LEVELS=2000,5000`, `RT05_POOLS=20`,
+`RT05_BOUNDS=` (no over-range probes), `RT05_BC_LEVELS=5000`, two reps.
+Shape per burst as in the 2026-10-22 section below.
+
+- **Config as read (RT05a-read):** `connection_pool` 5,
+  `postgres_changes_pool` null, `max_concurrent_users` 10000,
+  `max_joins_per_second` 2500, `max_channels_per_client` 100 (the
+  2026-10-22 Small project read `connection_pool` 2).
+- **No failure of any class at either level, either pool.** Every burst
+  joined every channel: `pc` at the default pool 2000 of 2000 and 5000 of
+  5000 (two reps each), `pc` at `postgres_changes_pool` 20 the same, `bc`
+  5000 of 5000 (two reps). No `Too many database timeouts`, no join error,
+  no rate-limit reply, 2000 or 5000 of the sockets opened every time,
+  `realtime.subscription` held the ready count, `pg_postmaster_start_time`
+  unchanged. On Small (2026-10-22) the default pool gave the timeout to 1421
+  and 1611 of 5000; on 2XL it gave it to 0 and 0. H1 (RT05c-2000,
+  RT05c-5000) was therefore not exercised on 2XL: `info`, [0,0] at both.
+- **Pool connections:** `realtime_subscription_manager_pub` peaked at 7 on
+  every default-pool row (Small: 4) and 20 on every pool-20 row;
+  `realtime_connect` at 5 on every row.
+
+| row | ready | join to ready p50 / p95 ms | fan-out p50 / p95 / max ms |
+| --- | --- | --- | --- |
+| default `pc` 2000 r1 | 2000/2000 | 2051 / 2938 | 612 / 825 / 836 |
+| default `pc` 2000 r2 | 2000/2000 | 633 / 1192 | 628 / 840 / 1262 |
+| default `pc` 5000 r1 | 5000/5000 | 1607 / 3005 | 1041 / 1458 / 1465 |
+| default `pc` 5000 r2 | 5000/5000 | 1571 / 2987 | 1074 / 1480 / 1490 |
+| default `bc` 5000 r1 | 5000/5000 | 639 / 1184 | 46 / 623 / 674 |
+| default `bc` 5000 r2 | 5000/5000 | 689 / 1318 | 46 / 465 / 872 |
+| pool 20 `pc` 2000 r1 | 2000/2000 | 2044 / 2937 | 647 / 848 / 852 |
+| pool 20 `pc` 2000 r2 | 2000/2000 | 273 / 502 | 174 / 375 / 381 |
+| pool 20 `pc` 5000 r1 | 5000/5000 | 632 / 1192 | 623 / 1029 / 1250 |
+| pool 20 `pc` 5000 r2 | 5000/5000 | 641 / 1210 | 1289 / 2764 / 2828 |
+
+- Join to ready at 5000, `pc`: default pool 1607 and 1571 ms p50, pool 20
+  632 and 641 ms; on Small (2026-10-22) default 2964 and 2864 ms for the
+  ready channels, pool 20 2038 and 2028 ms. The first burst at each config
+  on 2XL (2000 r1, default and pool 20) was the slowest of its pair (2051
+  and 2044 ms against 633 and 273 ms); why was not separated.
+- Fan-out of one insert at 5000: `bc` p50 46 ms both reps, `pc` p50 1041 and
+  1074 ms (default pool) and 623 and 1289 ms (pool 20). One local process
+  received every frame, so its own scheduling is inside these figures, as on
+  Small.
+- Not measured on 2XL: a level that makes the default pool time out (none
+  above 5000 was run), `postgres_changes_pool` 1, the over-range values, a
+  project created at 2XL rather than resized to it, several channels per
+  socket, more than one client address.
+
 ## 2026-10-22 - RT05 (subscription bursts: Postgres Changes pool, private Broadcast)
 
 Artifact: `out/2026-10-22/run-2026-10-22T22-53-26-669Z.json` (1 pass, 4 fail).
@@ -298,7 +359,11 @@ clock. Two reps per burst row, except the two over-range probes
   to 1, 20, 21 and 100. That name tracking the setting is the basis for reading
   it as the Postgres Changes pool. With the setting null it held 4 of those
   connections where the docs give a default of 2; explicit settings from 2 to
-  19 were not tested.
+  19 were not tested. **Correction 2026-10-26:** "the docs" here is the
+  settings page's default of 2. The concepts page's table of default pool
+  sizes (https://supabase.com/docs/guides/realtime/concepts, "Subscription
+  management") gives 4 for Small, which is what was measured; DC13 in
+  data-api-capacity read 4 on Small and 7 on XL and 2XL, the table's figures.
 - **H1 held at 5000 joins and at no lower level.** Default config: 1421 of 5000
   and 1611 of 5000 channels got `system` `{:error, "Too many database
   timeouts"}` (`pc_error`), and `realtime.subscription` held 3579 and 3389

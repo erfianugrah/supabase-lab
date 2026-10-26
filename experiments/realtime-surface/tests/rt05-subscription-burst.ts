@@ -14,14 +14,14 @@
  * Broadcast at scale.
  *
  * SIDE: managed. PROJECT: one throwaway project on the Pro org, resized to
- * Small (shared CPU). KEY: every WebSocket connects with the anon key and
+ * RT05_COMPUTE (Small, shared CPU, by default). KEY: every WebSocket connects with the anon key and
  * joins with an authenticated user's session access token (password grant,
  * re-issued every 40 minutes); 10 users, round-robin over sockets. Raw
  * protocol frames (lib/burst.ts), one channel per socket, so N subscriptions
  * = N WebSockets, opened at RT05_CONNECT_RATE per second BEFORE the burst;
  * then all N `phx_join` frames are sent at once.
  *
- *   RT05-setup     max_connections (proves the Small resize), Realtime ready.
+ *   RT05-setup     max_connections (proves the RT05_COMPUTE resize), Realtime ready.
  *   RT05a          Realtime config as the Management API reads it on a new
  *                  project, and whether PATCH accepts and reads back
  *                  postgres_changes_pool (RT05_POOLS, then 21 and 100, above
@@ -56,14 +56,17 @@
  *
  * Not settled by this module: Realtime's internal join-rate accounting
  * window; a burst of joins spread over many projects; payload-size effects;
- * filters (`filter=`) per subscriber; anything above Small; an org whose
+ * filters (`filter=`) per subscriber; sizes other than RT05_COMPUTE; an org whose
  * Realtime limits read differently from this one's; client fleets on many
  * IPs (one orchestrator, one egress address); several channels per socket.
  *
  * DESTRUCTIVE: creates and deletes a project; PATCHes its Realtime config.
  * Knobs: RT05_LEVELS (default 100,500,1000,2000,5000), RT05_REPS (2),
  * RT05_POOLS (1,20), RT05_KINDS (pc,bc), RT05_CONNECT_RATE (100),
- * RT05_SETTLE_MS (60000).
+ * RT05_SETTLE_MS (60000), RT05_COMPUTE (ci_small; the project is resized to
+ * it unless max_connections already reads that size's figure), RT05_BOUNDS
+ * (21,100; the over-range pool probes, empty skips them), RT05_BC_LEVELS
+ * (every level; the levels the bc kind runs at).
  */
 import type { Ctx, TestModule, TestResult } from "../../../harness/src/types";
 import { sql } from "../../../harness/src/platform";
@@ -72,6 +75,8 @@ import type { Client as PgClient } from "pg";
 import { ddl, errText, makeUser, mg, pgConnect, rows, skipWithoutOrg, sleep, waitHealthy, waitRealtime, warmMessages, withProject, type Proj, type TestUser } from "../lib/rt";
 
 const T = "rt05_items";
+/** max_connections per compute add-on (compute-disk D01 and data-api-capacity DC01/DC04; xlarge/2xlarge are the docs figures DC13 reads). */
+const MAX_CONN: Record<string, number> = { ci_micro: 60, ci_small: 90, ci_medium: 120, ci_large: 160, ci_xlarge: 240, ci_2xlarge: 380, ci_4xlarge: 480 };
 const envList = (k: string, d: string) => (process.env[k] || d).split(",").map((s) => s.trim()).filter(Boolean);
 const envNum = (k: string, d: number) => Number(process.env[k] || d);
 
@@ -172,22 +177,26 @@ const mod: TestModule = {
     const kinds = envList("RT05_KINDS", "pc,bc") as Kind[];
     const connectRate = envNum("RT05_CONNECT_RATE", 100);
     const settleMs = envNum("RT05_SETTLE_MS", 60_000);
+    const compute = process.env.RT05_COMPUTE || "ci_small";
+    const wantMc = MAX_CONN[compute] ?? 0;
+    const bounds = (process.env.RT05_BOUNDS ?? "21,100").split(",").filter(Boolean).map(Number);
+    const bcLevels = process.env.RT05_BC_LEVELS ? envList("RT05_BC_LEVELS", "").map(Number) : null;
     try {
       await withProject(ctx, "rt05", async (p: Proj) => {
-        /* ---- Small compute ---- */
+        /* ---- compute (RT05_COMPUTE, Small by default) ---- */
         const mc0 = Number((await rows(p, "select setting::int as n from pg_settings where name = 'max_connections'"))[0]?.n ?? 0);
-        if (mc0 < 90) {
-          const r = await mg(p.ctx, "PATCH", `/projects/${p.ref}/billing/addons`, { addon_type: "compute_instance", addon_variant: "ci_small" });
-          ctx.log(`resize to small HTTP ${r.status}`);
+        if (mc0 !== wantMc) {
+          const r = await mg(p.ctx, "PATCH", `/projects/${p.ref}/billing/addons`, { addon_type: "compute_instance", addon_variant: compute });
+          ctx.log(`resize to ${compute} HTTP ${r.status}`);
           await sleep(30_000);
           await waitHealthy(p.ctx, p.ref, 20 * 60_000);
         }
         let mc = 0;
-        for (let i = 0; i < 30 && mc < 90; i++) {
+        for (let i = 0; i < 30 && mc !== wantMc; i++) {
           try {
             mc = Number((await rows(p, "select setting::int as n from pg_settings where name = 'max_connections'"))[0]?.n ?? 0);
           } catch {}
-          if (mc < 90) await sleep(10_000);
+          if (mc !== wantMc) await sleep(10_000);
         }
         const warm = await warmMessages(p);
         await ddl(p, SCHEMA + BC_POLICY);
@@ -232,9 +241,9 @@ const mod: TestModule = {
         put({
           id: "RT05-setup",
           title: "RT05-setup: compute, versions, readiness",
-          status: mc >= 90 ? "info" : "fail",
-          detail: `max_connections ${mc} (Small = 90 per compute-disk D01); realtime join ready after ${warm.realtimeReadyMs} ms; ${String(nproc).slice(0, 40)}`,
-          measurements: { max_connections: mc, realtime_ready_ms: warm.realtimeReadyMs, users: users.length },
+          status: mc === wantMc ? "info" : "fail",
+          detail: `${compute}: max_connections ${mc} (expected ${wantMc}); realtime join ready after ${warm.realtimeReadyMs} ms; ${String(nproc).slice(0, 40)}`,
+          measurements: { compute, max_connections: mc, max_connections_expected: wantMc, realtime_ready_ms: warm.realtimeReadyMs, users: users.length },
         });
 
         const readCfg = async () => {
@@ -298,7 +307,11 @@ const mod: TestModule = {
 
         const results: Array<{ cfg: string; kind: Kind; n: number; r: BurstResult }> = [];
         const runLevels = async (cfg: string, ks: Kind[], ns: number[]) => {
-          for (const n of ns) for (const kind of ks) for (let k = 1; k <= reps; k++) results.push({ cfg, kind, n, r: await burst(cfg, kind, n, k) });
+          for (const n of ns)
+            for (const kind of ks) {
+              if (kind === "bc" && bcLevels && !bcLevels.includes(n)) continue;
+              for (let k = 1; k <= reps; k++) results.push({ cfg, kind, n, r: await burst(cfg, kind, n, k) });
+            }
         };
 
         /* ---- defaults: levels within the plan's connection limit ---- */
@@ -356,7 +369,7 @@ const mod: TestModule = {
         }
 
         /* ---- pool bounds the API accepts (docs range 1-20; OpenAPI 1-100) ---- */
-        for (const v of [21, 100]) {
+        for (const v of bounds) {
           const pr = await patchCfg({ postgres_changes_pool: v });
           put({
             id: `RT05a-bound${v}`,
