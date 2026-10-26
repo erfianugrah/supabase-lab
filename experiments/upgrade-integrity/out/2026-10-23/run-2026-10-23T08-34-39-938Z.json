@@ -1,0 +1,481 @@
+{
+  "startedAt": "2026-10-23T08:34:39.938Z",
+  "finishedAt": "2026-10-23T08:46:16.566Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "upgrade-integrity",
+  "labCommit": "661afdf",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "UI01a",
+      "title": "UI01a: POST /v1/projects with postgres_engine \"15\" (micro, ap-southeast-1)",
+      "status": "pass",
+      "detail": "create 201; healthy and answering after 3 s; database.version 15.19.0.003, postgres_engine 15, server_version 15.19",
+      "measurements": {
+        "create_status": 201,
+        "create_to_ready_s": 3,
+        "app_version": "15.19.0.003",
+        "postgres_engine": "15",
+        "release_channel": "ga",
+        "server_version": "15.19"
+      },
+      "evidence": "create response: {\"id\":\"<ref>\",\"ref\":\"<ref>\",\"name\":\"pvlab-ui-1792744479938\",\"region\":\"ap-southeast-1\",\"created_at\":\"2026-10-23T06:34:10.648021Z\",\"status\":\"ACTIVE_HEALTHY\"}\nGET /projects/{ref} database: {\"host\":\"db.<ref>.supabase.co\",\"version\":\"15.19.0.003\",\"postgres_engine\":\"15\",\"release_channel\":\"ga\"}",
+      "durationMs": 3382
+    },
+    {
+      "id": "UI01b",
+      "title": "UI01b: upgrade eligibility of the fresh project",
+      "status": "info",
+      "detail": "HTTP 200; eligible true; current supabase-postgres-15.19.0.003; targets 17:supabase-postgres-17.11.0.003; estimate 1 h",
+      "measurements": {
+        "status": 200,
+        "eligible": "true",
+        "targets": "17:supabase-postgres-17.11.0.003",
+        "duration_estimate_hours": 1
+      },
+      "evidence": "{\"eligible\":true,\"current_app_version\":\"supabase-postgres-15.19.0.003\",\"current_app_version_release_channel\":\"ga\",\"latest_app_version\":\"supabase-postgres-17.11.0.003\",\"target_upgrade_versions\":[{\"postgres_version\":\"17\",\"release_channel\":\"ga\",\"app_version\":\"supabase-postgres-17.11.0.003\"}],\"duration_estimate_hours\":1,\"legacy_auth_custom_roles\":[],\"objects_to_be_dropped\":[],\"unsupported_extensions\":[],\"user_defined_objects_in_internal_schemas\":[],\"validation_errors\":[],\"warnings\":[]}",
+      "durationMs": 3382
+    },
+    {
+      "id": "UI02a",
+      "title": "UI02a: fixture up, cron firing, queue moving",
+      "status": "pass",
+      "detail": "15.19; amcheck 1.3, pg_cron 1.6.4, pgmq 1.5.1; '5 seconds' accepted (jobid 1); ui-minute accepted; after 180 s: 36 ticks (median gap 5.01 s), 3 minute rows, archive 54, queue 0, job_run_details 39 (succeeded=39)",
+      "measurements": {
+        "server_version": "15.19",
+        "extensions": "amcheck 1.3, pg_cron 1.6.4, pgmq 1.5.1",
+        "sql_user": "postgres (superuser false)",
+        "tick_schedule": "5 seconds",
+        "ticks": 36,
+        "tick_median_gap_s": 5.01,
+        "minute_rows": 3,
+        "events": 540,
+        "archive_rows": 54,
+        "queue_rows": 0,
+        "job_run_details": 39,
+        "run_status": "succeeded=39"
+      },
+      "evidence": "{\n \"cronJobs\": [\n  {\n   \"jobid\": 1,\n   \"jobname\": \"ui-tick\",\n   \"schedule\": \"5 seconds\",\n   \"active\": true,\n   \"username\": \"postgres\"\n  },\n  {\n   \"jobid\": 2,\n   \"jobname\": \"ui-minute\",\n   \"schedule\": \"* * * * *\",\n   \"active\": true,\n   \"username\": \"postgres\"\n  }\n ],\n \"cronTables\": \"job:r, job_pkey:i, job_run_details:r, job_run_details_pkey:i, jobid_seq:S, jobname_username_uniq:i, runid_seq:S\",\n \"pgmqTables\": \"a_ui_q:r, meta:r, q_ui_q:r\",\n \"counts\": {\n  \"ui_events\": 540,\n  \"ui_ticks\": 36,\n  \"ui_minute\": 3,\n  \"ui_client\": 0,\n  \"queue\": 0,\n  \"archive\": 54,\n  \"job_run_details\": 39\n },\n \"maxIds\": {\n  \"ticks\": \"36\",\n  \"runid\": \"39\",\n  \"events\": \"720\",\n  \"archive\": \"108\"\n }\n}",
+      "durationMs": 194661
+    },
+    {
+      "id": "UI02b",
+      "title": "UI02b: amcheck before the upgrade",
+      "status": "pass",
+      "detail": "amcheck 1.3 in pg_catalog: heap 9/9, bt_index_check 16/16, bt_index_parent_check 16/16 clean",
+      "measurements": {
+        "amcheck_version": "1.3",
+        "heap_ok": "9/9",
+        "btree_ok": "16/16",
+        "btree_parent_ok": "16/16"
+      },
+      "evidence": "heap cron.job: ok\nheap cron.job_run_details: ok\nheap pgmq.a_ui_q: ok\nheap pgmq.meta: ok\nheap pgmq.q_ui_q: ok\nheap ui_client: ok\nheap ui_events: ok\nheap ui_minute: ok\nheap ui_ticks: ok\nbtree cron.jobname_username_uniq: ok\nbtree_parent cron.jobname_username_uniq: ok\nbtree cron.job_pkey: ok\nbtree_parent cron.job_pkey: ok\nbtree cron.job_run_details_pkey: ok\nbtree_parent cron.job_run_details_pkey: ok\nbtree pgmq.archived_at_idx_ui_q: ok\nbtree_parent pgmq.archived_at_idx_ui_q: ok\nbtree pgmq.a_ui_q_pkey: ok\nbtree_parent pgmq.a_ui_q_pkey: ok\nbtree pgmq.meta_queue_name_key: ok\nbtree_parent pgmq.meta_queue_name_key: ok\nbtree pgmq.q_ui_q_pkey: ok\nbtree_parent pgmq.q_ui_q_pkey: ok\nbtree pgmq.q_ui_q_vt_idx: ok\nbtree_parent pgmq.q_ui_q_vt_idx: ok\nbtree ui_client_pkey: ok\nbtree_parent ui_client_pkey: ok\nbtree ui_client_src_seq_key: ok\nbtree_parent ui_client_src_seq_key: ok\nbtree ui_events_created_at_idx: ok\nbtree_parent ui_events_created_at_idx: ok\nbtree ui_events_payload_idx: ok\nbtree_parent ui_events_payload_idx: ok\nbtree ui_events_pkey: ok\nbtree_parent ui_events_pkey: ok\nbtree ui_minute_pkey: ok\nbtree_parent ui_minute_pkey: ok\nbtree ui_ticks_at_idx: ok\nbtree_parent ui_ticks_at_idx: ok\nbtree ui_ticks_pkey: ok\nbtree_parent ui_ticks_pkey: ok",
+      "durationMs": 194661
+    },
+    {
+      "id": "UI02c",
+      "title": "UI02c: sequences at or above max(column) before the upgrade",
+      "status": "pass",
+      "detail": "8/8 sequences at or above their column max",
+      "measurements": {
+        "seq_ok": "8/8"
+      },
+      "evidence": "cron.job.jobid <- cron.jobid_seq: last_value 2, max 2\ncron.job_run_details.runid <- cron.runid_seq: last_value 40, max 40\npgmq.q_ui_q.msg_id <- pgmq.q_ui_q_msg_id_seq: last_value 111, max null\npublic.ui_client.id <- ui_client_id_seq: last_value null, max null\npublic.ui_events.id <- ui_events_id_seq: last_value 740, max 740\npublic.ui_minute.id <- ui_minute_id_seq: last_value 3, max 3\npublic.ui_ticks.id <- ui_ticks_id_seq: last_value 37, max 37\npgmq.a_ui_q.msg_id <- pgmq.q_ui_q_msg_id_seq (queue sequence): last_value 111, max 110",
+      "durationMs": 194661
+    },
+    {
+      "id": "UI02d",
+      "title": "UI02d: relfrozenxid / relminmxid ages before the upgrade",
+      "status": "info",
+      "detail": "cron.job_run_details age 263 (owner supabase_admin); pgmq.a_ui_q age 262 (owner postgres); pgmq.q_ui_q age 14 (owner postgres); public.ui_events age 254 (owner postgres); public.ui_ticks age 263 (owner postgres)",
+      "measurements": {
+        "age_cron.job_run_details": 263,
+        "age_pgmq.a_ui_q": 262,
+        "age_pgmq.q_ui_q": 14,
+        "age_public.ui_events": 254,
+        "age_public.ui_ticks": 263
+      },
+      "evidence": "cron.job_run_details: relfrozenxid 1195 age 263; relminmxid 1 mxid_age 0; owner supabase_admin\npgmq.a_ui_q: relfrozenxid 1196 age 262; relminmxid 1 mxid_age 0; owner postgres\npgmq.q_ui_q: relfrozenxid 1444 age 14; relminmxid 1 mxid_age 0; owner postgres\npublic.ui_events: relfrozenxid 1204 age 254; relminmxid 1 mxid_age 0; owner postgres\npublic.ui_ticks: relfrozenxid 1195 age 263; relminmxid 1 mxid_age 0; owner postgres",
+      "durationMs": 194661
+    },
+    {
+      "id": "UI03a",
+      "title": "UI03a: eligibility with pg_cron, pgmq and amcheck enabled",
+      "status": "pass",
+      "detail": "HTTP 200; eligible true; target 17 (supabase-postgres-17.11.0.003); unsupported_extensions []; objects_to_be_dropped 0; warnings 0",
+      "measurements": {
+        "eligible": "true",
+        "target_app_version": "supabase-postgres-17.11.0.003"
+      },
+      "evidence": "{\"eligible\":true,\"current_app_version\":\"supabase-postgres-15.19.0.003\",\"current_app_version_release_channel\":\"ga\",\"latest_app_version\":\"supabase-postgres-17.11.0.003\",\"target_upgrade_versions\":[{\"postgres_version\":\"17\",\"release_channel\":\"ga\",\"app_version\":\"supabase-postgres-17.11.0.003\"}],\"duration_estimate_hours\":1,\"legacy_auth_custom_roles\":[],\"objects_to_be_dropped\":[],\"unsupported_extensions\":[],\"user_defined_objects_in_internal_schemas\":[],\"validation_errors\":[],\"warnings\":[]}",
+      "durationMs": 346131
+    },
+    {
+      "id": "UI03b",
+      "title": "UI03b: upgrade 15.19 -> 17",
+      "status": "pass",
+      "detail": "POST 201; ACTIVE_HEALTHY and answering on 17.11 after 305 s; final app version 17.11.0.003",
+      "measurements": {
+        "post_status": 201,
+        "from_version": "15.19",
+        "to_version": "17.11",
+        "app_version_after": "17.11.0.003",
+        "post_to_healthy_on_new_s": 305,
+        "final_progress": "null"
+      },
+      "evidence": "+0 s POST /upgrade {\"target_version\":\"17\",\"release_channel\":\"ga\"} -> 201 {\"tracking_id\":\"baf28c66-9436-438e-9415-a93647ea4c73\"}\n+6 s (2026-10-23T08:38:14.220Z) upgrade/status progress null status null; project UPGRADING; database.version 15.19.0.003\n+21 s (2026-10-23T08:38:29.893Z) upgrade/status progress 1_started status 0; project UPGRADING; database.version 15.19.0.003\n+129 s (2026-10-23T08:40:18.140Z) upgrade/status progress 2_launched_upgraded_instance status 0; project UPGRADING; database.version 15.19.0.003\n+145 s (2026-10-23T08:40:33.584Z) upgrade/status progress 4_attached_volume_to_original_instance status 0; project UPGRADING; database.version 15.19.0.003\n+160 s (2026-10-23T08:40:49.088Z) upgrade/status progress 5_initiated_data_upgrade status 0; project UPGRADING; database.version 15.19.0.003\n+253 s (2026-10-23T08:42:21.840Z) upgrade/status progress 6_completed_data_upgrade status 0; project UPGRADING; database.version 15.19.0.003\n+269 s (2026-10-23T08:42:37.308Z) upgrade/status progress 7_detached_volume_from_original_instance status 0; project UPGRADING; database.version 15.19.0.003\n+274 s (2026-10-23T08:42:42.414Z) upgrade/status progress 8_attached_volume_to_upgraded_instance status 0; project UPGRADING; database.version 15.19.0.003\n+289 s (2026-10-23T08:42:57.812Z) upgrade/status progress 9_completed_upgrade status 0; project UPGRADING; database.version 15.19.0.003\n+305 s (2026-10-23T08:43:13.479Z) upgrade/status progress null status null; project ACTIVE_HEALTHY; database.version 17.11.0.003\n+302 s first acknowledged Management API write on 17.11\nversion(): PostgreSQL 17.11 on x86_64-pc-linux-gnu, compiled by gcc (GCC) 15.2.0, 64-bit",
+      "durationMs": 346131
+    },
+    {
+      "id": "UI03e",
+      "title": "UI03e: server identity before the POST and after the upgrade",
+      "status": "info",
+      "detail": "before: 15.19 postmaster 2026-10-23 06:36:19.007333+00 sysid 7692130795874382474 lsn 0/60616A8 xid 1462 synchronous_commit on fsync on; after: 17.11 postmaster 2026-10-23 08:43:22.298534+00 sysid 7699780795292339104 lsn 0/16044E78 xid 2898 synchronous_commit on fsync on",
+      "measurements": {
+        "pre_sysid": "7692130795874382474",
+        "post_sysid": "7699780795292339104",
+        "pre_addr": "addr#1",
+        "post_addr": "addr#2",
+        "pre_lsn": "0/60616A8",
+        "post_lsn": "0/16044E78",
+        "pre_xid": "1462",
+        "post_xid": "2898"
+      },
+      "evidence": "{\n \"pre\": {\n  \"v\": \"15.19\",\n  \"pm\": \"2026-10-23 06:36:19.007333+00\",\n  \"sysid\": \"7692130795874382474\",\n  \"addr\": \"addr#1\",\n  \"lsn\": \"0/60616A8\",\n  \"xid\": \"1462\",\n  \"recovery\": \"false\",\n  \"synchronous_commit\": \"on\",\n  \"fsync\": \"on\",\n  \"wal_level\": \"logical\"\n },\n \"post\": {\n  \"v\": \"17.11\",\n  \"pm\": \"2026-10-23 08:43:22.298534+00\",\n  \"sysid\": \"7699780795292339104\",\n  \"addr\": \"addr#2\",\n  \"lsn\": \"0/16044E78\",\n  \"xid\": \"2898\",\n  \"recovery\": \"false\",\n  \"synchronous_commit\": \"on\",\n  \"fsync\": \"on\",\n  \"wal_level\": \"logical\"\n }\n}",
+      "durationMs": 346131
+    },
+    {
+      "id": "UI03c",
+      "title": "UI03c: client writes through the Management API query endpoint across the window",
+      "status": "info",
+      "detail": "345 attempts, 45 acknowledged, 300 failed; largest gap between acknowledged writes 300 s (seq 13 at +2 s -> seq 313 at +302 s); 3 distinct server_version@postmaster_start among acknowledged writes",
+      "measurements": {
+        "attempts": 345,
+        "acknowledged": 45,
+        "failed": 300,
+        "max_ack_gap_s": 300,
+        "gap_start_after_post_s": 2,
+        "gap_end_after_post_s": 302,
+        "postmasters": 3
+      },
+      "evidence": "seq 1-13 (start +-10..2 s, ack +-10..2 s) ok 15.19 postmaster 2026-10-23 06:36:19.007333+00 sysid 7692130795874382474 addr addr#1 recovery false lsn 0/605E000..0/6073F90 xid 1459..1518\nseq 14-312 (start +3..301 s, ack +3..301 s) FAIL 400 Database is possibly not accessible at the moment\nseq 313-323 (start +302..312 s, ack +302..312 s) ok 17.11 postmaster 2026-10-23 08:42:58.070774+00 sysid 7699780795292339104 addr addr#2 recovery false lsn 0/13022398..0/13065260 xid 2760..2804\nseq 324 (start +313 s, ack +313 s) FAIL 400 connect ECONNREFUSED <ipv6>\nseq 325-345 (start +314..334 s, ack +314..334 s) ok 17.11 postmaster 2026-10-23 08:43:22.298534+00 sysid 7699780795292339104 addr addr#2 recovery false lsn 0/14000988..0/16044A20 xid 2805..2895",
+      "durationMs": 346131
+    },
+    {
+      "id": "UI03d",
+      "title": "UI03d: client writes through the session pooler (5432) across the window",
+      "status": "info",
+      "detail": "338 attempts, 330 acknowledged, 8 failed; largest gap between acknowledged writes 10 s (seq 244 at +234 s -> seq 249 at +243 s); 6 distinct server_version@postmaster_start among acknowledged writes",
+      "measurements": {
+        "attempts": 338,
+        "acknowledged": 330,
+        "failed": 8,
+        "max_ack_gap_s": 10,
+        "gap_start_after_post_s": 234,
+        "gap_end_after_post_s": 243,
+        "postmasters": 6
+      },
+      "evidence": "seq 1-238 (start +-10..227 s, ack +-10..227 s) ok 15.19 postmaster 2026-10-23 06:36:19.007333+00 sysid 7692130795874382474 addr addr#1 recovery false lsn 0/6061530..0/808D9A0 xid 1461..2273\nseq 239 (start +228 s, ack +228 s) FAIL Client has encountered a connection error and is not queryable\nseq 240-242 (start +229..232 s, ack +231..232 s) ok 15.19 postmaster 2026-10-23 08:41:57.845663+00 sysid 7692130795874382474 addr addr#1 recovery false lsn 0/900C000..0/9017410 xid 2279..2290\nseq 243 (start +233 s, ack +233 s) FAIL Client has encountered a connection error and is not queryable\nseq 244 (start +234 s, ack +234 s) ok 15.19 postmaster 2026-10-23 08:42:02.353886+00 sysid 7692130795874382474 addr addr#1 recovery false lsn 0/A000710..0/A000710 xid 2291..2291\nseq 245 (start +235 s, ack +235 s) FAIL Client has encountered a connection error and is not queryable\nseq 246-248 (start +236..241 s, ack +238..243 s) FAIL Failed to connect to database: {:error, :econnrefused}\nseq 249-292 (start +243..288 s, ack +246..288 s) ok 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 recovery false lsn 0/C00E648..0/C05CF10 xid 2296..2433\nseq 293 (start +289 s, ack +289 s) FAIL Client has encountered a connection error and is not queryable\nseq 294-316 (start +290..312 s, ack +290..312 s) ok 17.11 postmaster 2026-10-23 08:42:58.070774+00 sysid 7699780795292339104 addr addr#2 recovery false lsn 0/112B2000..0/13064F80 xid 2716..2802\nseq 317 (start +313 s, ack +313 s) FAIL Client has encountered a connection error and is not queryable\nseq 318-338 (start +314..334 s, ack +314..334 s) ok 17.11 postmaster 2026-10-23 08:43:22.298534+00 sysid 7699780795292339104 addr addr#2 recovery false lsn 0/140023B0..0/16044B98 xid 2806..2896",
+      "durationMs": 346131
+    },
+    {
+      "id": "UI03f",
+      "title": "UI03f: client writes through the transaction pooler (6543) across the window",
+      "status": "info",
+      "detail": "338 attempts, 330 acknowledged, 8 failed; largest gap between acknowledged writes 10 s (seq 244 at +234 s -> seq 249 at +244 s); 6 distinct server_version@postmaster_start among acknowledged writes",
+      "measurements": {
+        "attempts": 338,
+        "acknowledged": 330,
+        "failed": 8,
+        "max_ack_gap_s": 10,
+        "gap_start_after_post_s": 234,
+        "gap_end_after_post_s": 244,
+        "postmasters": 6
+      },
+      "evidence": "seq 1-238 (start +-10..227 s, ack +-10..227 s) ok 15.19 postmaster 2026-10-23 06:36:19.007333+00 sysid 7692130795874382474 addr addr#1 recovery false lsn 0/6060000..0/808D9A0 xid 1460..2274\nseq 239 (start +228 s, ack +228 s) FAIL Client has encountered a connection error and is not queryable\nseq 240-242 (start +229..232 s, ack +231..232 s) ok 15.19 postmaster 2026-10-23 08:41:57.845663+00 sysid 7692130795874382474 addr addr#1 recovery false lsn 0/900C000..0/9017410 xid 2278..2289\nseq 243 (start +233 s, ack +233 s) FAIL Client has encountered a connection error and is not queryable\nseq 244 (start +234 s, ack +234 s) ok 15.19 postmaster 2026-10-23 08:42:02.353886+00 sysid 7692130795874382474 addr addr#1 recovery false lsn 0/A001D50..0/A001D50 xid 2292..2292\nseq 245 (start +235 s, ack +235 s) FAIL Client has encountered a connection error and is not queryable\nseq 246-248 (start +236..241 s, ack +239..244 s) FAIL Failed to connect to database: {:error, :econnrefused}\nseq 249-292 (start +244..288 s, ack +246..288 s) ok 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 recovery false lsn 0/C00FE60..0/C05D168 xid 2298..2434\nseq 293 (start +289 s, ack +289 s) FAIL Client has encountered a connection error and is not queryable\nseq 294-316 (start +290..312 s, ack +290..312 s) ok 17.11 postmaster 2026-10-23 08:42:58.070774+00 sysid 7699780795292339104 addr addr#2 recovery false lsn 0/112B3CA0..0/130650F8 xid 2717..2803\nseq 317 (start +313 s, ack +313 s) FAIL Client has encountered a connection error and is not queryable\nseq 318-338 (start +314..334 s, ack +314..334 s) ok 17.11 postmaster 2026-10-23 08:43:22.298534+00 sysid 7699780795292339104 addr addr#2 recovery false lsn 0/140037F0..0/16044D10 xid 2807..2897",
+      "durationMs": 346131
+    },
+    {
+      "id": "UI03g",
+      "title": "UI03g: client writes through the direct connection across the window",
+      "status": "skip",
+      "detail": "path unreachable from this vantage, dropped after 5 attempts: getaddrinfo ENOTFOUND",
+      "measurements": {
+        "attempts": 5,
+        "acknowledged": 0,
+        "failed": 5,
+        "max_ack_gap_s": 0,
+        "gap_start_after_post_s": -1,
+        "gap_end_after_post_s": -1,
+        "postmasters": 0
+      },
+      "evidence": "seq 1-5 (start +-10..-6 s, ack +-10..-6 s) FAIL getaddrinfo ENOTFOUND",
+      "durationMs": 346131
+    },
+    {
+      "id": "UI04a",
+      "title": "UI04a: amcheck after the upgrade",
+      "status": "pass",
+      "detail": "amcheck 1.4 in pg_catalog: heap 9/9, bt_index_check 16/16, bt_index_parent_check 16/16 clean (before: heap 9/9, btree 16/16)",
+      "measurements": {
+        "amcheck_version": "1.4",
+        "heap_ok": "9/9",
+        "btree_ok": "16/16",
+        "btree_parent_ok": "16/16"
+      },
+      "evidence": "heap cron.job: ok\nheap cron.job_run_details: ok\nheap pgmq.a_ui_q: ok\nheap pgmq.meta: ok\nheap pgmq.q_ui_q: ok\nheap ui_client: ok\nheap ui_events: ok\nheap ui_minute: ok\nheap ui_ticks: ok\nbtree cron.jobname_username_uniq: ok\nbtree_parent cron.jobname_username_uniq: ok\nbtree cron.job_pkey: ok\nbtree_parent cron.job_pkey: ok\nbtree cron.job_run_details_pkey: ok\nbtree_parent cron.job_run_details_pkey: ok\nbtree pgmq.archived_at_idx_ui_q: ok\nbtree_parent pgmq.archived_at_idx_ui_q: ok\nbtree pgmq.a_ui_q_pkey: ok\nbtree_parent pgmq.a_ui_q_pkey: ok\nbtree pgmq.meta_queue_name_key: ok\nbtree_parent pgmq.meta_queue_name_key: ok\nbtree pgmq.q_ui_q_pkey: ok\nbtree_parent pgmq.q_ui_q_pkey: ok\nbtree pgmq.q_ui_q_vt_idx: ok\nbtree_parent pgmq.q_ui_q_vt_idx: ok\nbtree ui_client_pkey: ok\nbtree_parent ui_client_pkey: ok\nbtree ui_client_src_seq_key: ok\nbtree_parent ui_client_src_seq_key: ok\nbtree ui_events_created_at_idx: ok\nbtree_parent ui_events_created_at_idx: ok\nbtree ui_events_payload_idx: ok\nbtree_parent ui_events_payload_idx: ok\nbtree ui_events_pkey: ok\nbtree_parent ui_events_pkey: ok\nbtree ui_minute_pkey: ok\nbtree_parent ui_minute_pkey: ok\nbtree ui_ticks_at_idx: ok\nbtree_parent ui_ticks_at_idx: ok\nbtree ui_ticks_pkey: ok\nbtree_parent ui_ticks_pkey: ok",
+      "durationMs": 6046
+    },
+    {
+      "id": "UI04b",
+      "title": "UI04b: sequences at or above max(column) after the upgrade",
+      "status": "pass",
+      "detail": "8/8 at or above their column max",
+      "measurements": {
+        "seq_ok": "8/8"
+      },
+      "evidence": "cron.job.jobid <- cron.jobid_seq: last_value 2, max 2\ncron.job_run_details.runid <- cron.runid_seq: last_value 106, max 106\npgmq.q_ui_q.msg_id <- pgmq.q_ui_q_msg_id_seq: last_value 291, max null\npublic.ui_client.id <- ui_client_id_seq: last_value 617, max 617\npublic.ui_events.id <- ui_events_id_seq: last_value 1940, max 1940\npublic.ui_minute.id <- ui_minute_id_seq: last_value 9, max 9\npublic.ui_ticks.id <- ui_ticks_id_seq: last_value 97, max 97\npgmq.a_ui_q.msg_id <- pgmq.q_ui_q_msg_id_seq (queue sequence): last_value 291, max 290",
+      "durationMs": 6046
+    },
+    {
+      "id": "UI04c",
+      "title": "UI04c: acknowledged writes and baseline rows kept",
+      "status": "fail",
+      "detail": "acknowledged writes present: mgmt 45/45, pooler 286/330, txn 286/330, direct unreachable (lost ones started +243 s to +288 s after the POST); baseline rows still present: ticks 36/36, archive 54/54, job_run_details 39/39",
+      "measurements": {
+        "acked_mgmt": 45,
+        "lost_mgmt": 0,
+        "acked_pooler": 330,
+        "lost_pooler": 44,
+        "acked_txn": 330,
+        "lost_txn": 44,
+        "acked_direct": 0,
+        "lost_direct": 0,
+        "baseline_ticks_kept": "36/36",
+        "baseline_archive_kept": "54/54",
+        "baseline_job_runs_kept": "39/39"
+      },
+      "evidence": "pooler seq 249 start +243 s ack +246 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C00E648 xid 2296 recovery false\npooler seq 250 start +246 s ack +246 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C00FCE8 xid 2297 recovery false\ntxn seq 249 start +244 s ack +246 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C00FE60 xid 2298 recovery false\ntxn seq 250 start +246 s ack +246 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C0106F8 xid 2299 recovery false\npooler seq 251 start +247 s ack +247 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C010860 xid 2300 recovery false\ntxn seq 251 start +247 s ack +247 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C0109D8 xid 2301 recovery false\npooler seq 252 start +248 s ack +248 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C010B40 xid 2302 recovery false\ntxn seq 252 start +248 s ack +248 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C010CB8 xid 2303 recovery false\npooler seq 253 start +249 s ack +249 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C010E20 xid 2304 recovery false\ntxn seq 253 start +249 s ack +249 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C010F98 xid 2305 recovery false\npooler seq 254 start +250 s ack +250 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C011100 xid 2306 recovery false\ntxn seq 254 start +250 s ack +250 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C011278 xid 2307 recovery false\npooler seq 255 start +251 s ack +251 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C029C40 xid 2315 recovery false\ntxn seq 255 start +251 s ack +251 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C029DB8 xid 2316 recovery false\npooler seq 256 start +252 s ack +252 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C029F20 xid 2317 recovery false\ntxn seq 256 start +252 s ack +252 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C02A0B0 xid 2318 recovery false\npooler seq 257 start +253 s ack +253 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C02A218 xid 2319 recovery false\ntxn seq 257 start +253 s ack +253 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C02A390 xid 2320 recovery false\npooler seq 258 start +254 s ack +254 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C02A4F8 xid 2321 recovery false\ntxn seq 258 start +254 s ack +254 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C02A670 xid 2322 recovery false\npooler seq 259 start +255 s ack +255 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C02A7D8 xid 2323 recovery false\ntxn seq 259 start +255 s ack +255 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C02A950 xid 2324 recovery false\npooler seq 260 start +256 s ack +256 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C0344B8 xid 2331 recovery false\ntxn seq 260 start +256 s ack +256 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C034630 xid 2332 recovery false\npooler seq 261 start +257 s ack +257 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C034798 xid 2333 recovery false\ntxn seq 261 start +257 s ack +257 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C034910 xid 2334 recovery false\npooler seq 262 start +258 s ack +258 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C034A78 xid 2335 recovery false\ntxn seq 262 start +258 s ack +258 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C034BF0 xid 2336 recovery false\npooler seq 263 start +259 s ack +259 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C034D58 xid 2337 recovery false\ntxn seq 263 start +259 s ack +259 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C034ED0 xid 2338 recovery false\npooler seq 264 start +260 s ack +260 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C035038 xid 2339 recovery false\ntxn seq 264 start +260 s ack +260 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C0351B0 xid 2340 recovery false\npooler seq 265 start +261 s ack +261 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C038530 xid 2347 recovery false\ntxn seq 265 start +261 s ack +261 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C0386A8 xid 2348 recovery false\npooler seq 266 start +262 s ack +262 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C038878 xid 2349 recovery false\ntxn seq 266 start +262 s ack +262 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C0389F0 xid 2350 recovery false\npooler seq 267 start +263 s ack +263 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C038B58 xid 2351 recovery false\ntxn seq 267 start +263 s ack +263 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C038CD0 xid 2352 recovery false\npooler seq 268 start +264 s ack +264 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C038E38 xid 2353 recovery false\ntxn seq 268 start +264 s ack +264 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C038FB0 xid 2354 recovery false\npooler seq 269 start +265 s ack +265 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C039118 xid 2355 recovery false\ntxn seq 269 start +265 s ack +265 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C039290 xid 2356 recovery false\npooler seq 270 start +266 s ack +266 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C03D618 xid 2363 recovery false\ntxn seq 270 start +266 s ack +266 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C03D790 xid 2364 recovery false\npooler seq 271 start +267 s ack +267 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C03D8F8 xid 2365 recovery false\ntxn seq 271 start +267 s ack +267 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C03DA70 xid 2366 recovery false\npooler seq 272 start +268 s ack +268 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C03DBD8 xid 2367 recovery false\ntxn seq 272 start +268 s ack +268 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C03DD50 xid 2368 recovery false\npooler seq 273 start +269 s ack +269 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C03DEB8 xid 2369 recovery false\ntxn seq 273 start +269 s ack +269 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C03E048 xid 2370 recovery false\npooler seq 274 start +270 s ack +270 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C03E1B0 xid 2371 recovery false\ntxn seq 274 start +270 s ack +270 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C03E328 xid 2372 recovery false\npooler seq 275 start +271 s ack +271 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C0426F0 xid 2379 recovery false\ntxn seq 275 start +271 s ack +271 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C042868 xid 2380 recovery false\npooler seq 276 start +272 s ack +272 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C0429D0 xid 2381 recovery false\ntxn seq 276 start +272 s ack +272 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C042B48 xid 2382 recovery false\npooler seq 277 start +273 s ack +273 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C042CB0 xid 2383 recovery false\ntxn seq 277 start +273 s ack +273 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C042E28 xid 2384 recovery false\npooler seq 278 start +274 s ack +274 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C042F90 xid 2385 recovery false\ntxn seq 278 start +274 s ack +274 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C043108 xid 2386 recovery false\npooler seq 279 start +275 s ack +275 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C043270 xid 2387 recovery false\ntxn seq 279 start +275 s ack +275 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C0433E8 xid 2388 recovery false\npooler seq 280 start +276 s ack +276 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C052560 xid 2397 recovery false\ntxn seq 280 start +276 s ack +276 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C0526D8 xid 2398 recovery false\npooler seq 281 start +277 s ack +277 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C052840 xid 2399 recovery false\ntxn seq 281 start +277 s ack +277 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C0529B8 xid 2400 recovery false\npooler seq 282 start +278 s ack +278 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C052B20 xid 2401 recovery false\ntxn seq 282 start +278 s ack +278 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C052D00 xid 2402 recovery false\npooler seq 283 start +279 s ack +279 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C052E68 xid 2403 recovery false\ntxn seq 283 start +279 s ack +279 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C052FE0 xid 2404 recovery false\npooler seq 284 start +280 s ack +280 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C053148 xid 2405 recovery false\ntxn seq 284 start +280 s ack +280 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C0532C0 xid 2406 recovery false\npooler seq 285 start +281 s ack +281 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C0579E8 xid 2413 recovery false\ntxn seq 285 start +281 s ack +281 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C057B60 xid 2414 recovery false\npooler seq 286 start +282 s ack +282 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C057CC8 xid 2415 recovery false\ntxn seq 286 start +282 s ack +282 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C057E40 xid 2416 recovery false\npooler seq 287 start +283 s ack +283 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C057FA8 xid 2417 recovery false\ntxn seq 287 start +283 s ack +283 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C058138 xid 2418 recovery false\npooler seq 288 start +284 s ack +284 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C0582A0 xid 2419 recovery false\ntxn seq 288 start +284 s ack +284 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C058418 xid 2420 recovery false\npooler seq 289 start +285 s ack +285 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C058580 xid 2421 recovery false\ntxn seq 289 start +285 s ack +285 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C0586F8 xid 2422 recovery false\npooler seq 290 start +286 s ack +286 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C05C950 xid 2429 recovery false\ntxn seq 290 start +286 s ack +286 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C05CAC8 xid 2430 recovery false\npooler seq 291 start +287 s ack +287 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C05CC30 xid 2431 recovery false\ntxn seq 291 start +287 s ack +287 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C05CDA8 xid 2432 recovery false\npooler seq 292 start +288 s ack +288 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C05CF10 xid 2433 recovery false\ntxn seq 292 start +288 s ack +288 s: 15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1 lsn 0/C05D168 xid 2434 recovery false",
+      "durationMs": 6046
+    },
+    {
+      "id": "UI04e",
+      "title": "UI04e: identity of the servers that acknowledged lost and kept writes",
+      "status": "info",
+      "detail": "6 server identities among acknowledged writes; original 15: postmaster 2026-10-23 06:36:19.007333+00 sysid 7692130795874382474 addr addr#1 lsn 0/60616A8; 17 after: postmaster 2026-10-23 08:43:22.298534+00 sysid 7699780795292339104 addr addr#2 lsn 0/16044E78 txid_current 2898; highest txid in any acknowledged write 2897",
+      "measurements": {
+        "identities": 6,
+        "post_txid": "2898",
+        "max_acked_txid": "2897",
+        "post_lsn": "0/16044E78"
+      },
+      "evidence": "15.19 postmaster 2026-10-23 06:36:19.007333+00 sysid 7692130795874382474 addr addr#1: lost 0, kept 489 (paths mgmt+txn+pooler); ack +-10..+227 s; lsn 0/605E000..0/808D9A0; xid 1459..2274; sysid = original 15\n15.19 postmaster 2026-10-23 08:41:57.845663+00 sysid 7692130795874382474 addr addr#1: lost 0, kept 6 (paths txn+pooler); ack +231..+232 s; lsn 0/900C000..0/9017410; xid 2278..2290; sysid = original 15\n15.19 postmaster 2026-10-23 08:42:02.353886+00 sysid 7692130795874382474 addr addr#1: lost 0, kept 2 (paths pooler+txn); ack +234..+234 s; lsn 0/A000710..0/A001D50; xid 2291..2292; sysid = original 15\n15.19 postmaster 2026-10-23 08:42:13.830604+00 sysid 7692130795874382474 addr addr#1: lost 88, kept 0 (paths pooler+txn); ack +246..+288 s; lsn 0/C00E648..0/C05D168; xid 2296..2434; sysid = original 15\n17.11 postmaster 2026-10-23 08:42:58.070774+00 sysid 7699780795292339104 addr addr#2: lost 0, kept 57 (paths pooler+txn+mgmt); ack +290..+312 s; lsn 0/112B2000..0/13065260; xid 2716..2804; sysid = 17 instance\n17.11 postmaster 2026-10-23 08:43:22.298534+00 sysid 7699780795292339104 addr addr#2: lost 0, kept 63 (paths mgmt+pooler+txn); ack +314..+334 s; lsn 0/14000988..0/16044D10; xid 2805..2897; sysid = 17 instance",
+      "durationMs": 6046
+    },
+    {
+      "id": "UI04f",
+      "title": "UI04f: pg_cron rows inside the second old-version postmaster's window",
+      "status": "info",
+      "detail": "window 2026-10-23 08:41:57.845663+00 (postmaster start) to 2026-10-23T08:42:56.793Z (last acknowledgement from it): job_run_details 3, ui_ticks 2, ui_minute 1 rows present after the upgrade",
+      "measurements": {
+        "window_job_runs": 3,
+        "window_ticks": 2,
+        "window_minute": 1
+      },
+      "durationMs": 6046
+    },
+    {
+      "id": "UI04d",
+      "title": "UI04d: cron and pgmq catalog before and after",
+      "status": "info",
+      "detail": "17.11; amcheck 1.4, pg_cron 1.6.4, pgmq 1.5.1; cron.job identical; cron relations identical; pgmq tables identical",
+      "measurements": {
+        "server_version": "17.11",
+        "extensions": "amcheck 1.4, pg_cron 1.6.4, pgmq 1.5.1",
+        "cron_jobs_identical": "yes"
+      },
+      "evidence": "before cron.job: [{\"jobid\":1,\"jobname\":\"ui-tick\",\"schedule\":\"5 seconds\",\"active\":true,\"username\":\"postgres\"},{\"jobid\":2,\"jobname\":\"ui-minute\",\"schedule\":\"* * * * *\",\"active\":true,\"username\":\"postgres\"}]\nafter  cron.job: [{\"jobid\":1,\"jobname\":\"ui-tick\",\"schedule\":\"5 seconds\",\"active\":true,\"username\":\"postgres\"},{\"jobid\":2,\"jobname\":\"ui-minute\",\"schedule\":\"* * * * *\",\"active\":true,\"username\":\"postgres\"}]\nbefore cron: job:r, job_pkey:i, job_run_details:r, job_run_details_pkey:i, jobid_seq:S, jobname_username_uniq:i, runid_seq:S\nafter  cron: job:r, job_pkey:i, job_run_details:r, job_run_details_pkey:i, jobid_seq:S, jobname_username_uniq:i, runid_seq:S\nbefore pgmq: a_ui_q:r, meta:r, q_ui_q:r\nafter  pgmq: a_ui_q:r, meta:r, q_ui_q:r\nbefore extensions: amcheck 1.3, pg_cron 1.6.4, pgmq 1.5.1\nafter counts: {\"ui_events\":1455,\"ui_ticks\":97,\"ui_minute\":9,\"ui_client\":617,\"queue\":0,\"archive\":145,\"job_run_details\":106} runs succeeded=106",
+      "durationMs": 6046
+    },
+    {
+      "id": "UI05-cron.job_run_details",
+      "title": "UI05: VACUUM (FREEZE, VERBOSE) cron.job_run_details",
+      "status": "pass",
+      "detail": "age 1710 -> 1, relfrozenxid 1195 -> 2905, mxid_age 0 -> 0; 9 ms via session pooler; 4 notices; owner supabase_admin",
+      "measurements": {
+        "age_before": 1710,
+        "age_after": 1,
+        "relfrozenxid_before": "1195",
+        "relfrozenxid_after": "2905",
+        "mxid_age_before": 0,
+        "mxid_age_after": 0,
+        "vacuum_ms": 9,
+        "owner": "supabase_admin"
+      },
+      "evidence": "INFO: aggressively vacuuming \"postgres.cron.job_run_details\"\nINFO: finished vacuuming \"postgres.cron.job_run_details\": index scans: 1\npages: 0 removed, 2 remain, 2 scanned (100.00% of total)\ntuples: 2 removed, 106 remain, 0 are dead but not yet removable\nremovable cutoff: 2905, which was 0 XIDs old when operation ended\nnew relfrozenxid: 2905, which is 1710 XIDs ahead of previous value\nfrozen: 2 pages from table (100.00% of total) had 106 tuples frozen\nindex scan needed: 1 pages from table (50.00% of total) had 1 dead item identifiers removed\nindex \"job_run_details_pkey\": pages: 2 in total, 0 newly deleted, 0 currently deleted, 0 reusable\navg read rate: 29.315 MB/s, avg write rate: 87.946 MB/s\nbuffer usage: 44 hits, 2 misses, 6 dirtied\nWAL usage: 11 records, 6 full page images, 5050 bytes\nsystem usage: CPU: user: 0.00 s, system: 0.00 s, elapsed: 0.00 s\nINFO: aggressively vacuuming \"postgres.pg_toast.pg_toast_17593\"\nINFO: finished vacuuming \"postgres.pg_toast.pg_toast_17593\": index scans: 0\npages: 0 removed, 0 remain, 0 scanned (100.00% of total)\ntuples: 0 removed, 0 remain, 0 are dead but not yet removable\nremovable cutoff: 2905, which was 0 XIDs old when operation ended\nnew relfrozenxid: 2905, which is 1710 XIDs ahead of previous value\nfrozen: 0 pages from table (100.00% of total) had 0 tuples frozen\nindex scan not needed: 0 pages from table (100.00% of total) had 0 dead item identifiers removed\navg read rate: 55.804 MB/s, avg write rate: 0.000 MB/s\nbuffer usage: 27 hits, 1 misses, 0 dirtied\nWAL usage: 1 records, 0 full page images, 188 bytes\nsystem usage: CPU: user: 0.00 s, system: 0.00 s, elapsed: 0.00 s",
+      "durationMs": 401
+    },
+    {
+      "id": "UI05-pgmq.q_ui_q",
+      "title": "UI05: VACUUM (FREEZE, VERBOSE) pgmq.q_ui_q",
+      "status": "pass",
+      "detail": "age 19 -> 1, relfrozenxid 2886 -> 2905, mxid_age 0 -> 0; 11 ms via session pooler; 5 notices; owner postgres",
+      "measurements": {
+        "age_before": 19,
+        "age_after": 1,
+        "relfrozenxid_before": "2886",
+        "relfrozenxid_after": "2905",
+        "mxid_age_before": 0,
+        "mxid_age_after": 0,
+        "vacuum_ms": 11,
+        "owner": "postgres"
+      },
+      "evidence": "INFO: aggressively vacuuming \"postgres.pgmq.q_ui_q\"\nINFO: finished vacuuming \"postgres.pgmq.q_ui_q\": index scans: 1\npages: 1 removed, 0 remain, 1 scanned (100.00% of total)\ntuples: 12 removed, 0 remain, 0 are dead but not yet removable\nremovable cutoff: 2905, which was 1 XIDs old when operation ended\nnew relfrozenxid: 2905, which is 19 XIDs ahead of previous value\nfrozen: 0 pages from table (0.00% of total) had 0 tuples frozen\nindex scan needed: 1 pages from table (100.00% of total) had 12 dead item identifiers removed\nindex \"q_ui_q_pkey\": pages: 2 in total, 0 newly deleted, 0 currently deleted, 0 reusable\nindex \"q_ui_q_vt_idx\": pages: 2 in total, 0 newly deleted, 0 currently deleted, 0 reusable\navg read rate: 0.000 MB/s, avg write rate: 7.844 MB/s\nbuffer usage: 60 hits, 0 misses, 2 dirtied\nWAL usage: 9 records, 2 full page images, 921 bytes\nsystem usage: CPU: user: 0.00 s, system: 0.00 s, elapsed: 0.00 s\nINFO: aggressively vacuuming \"postgres.pg_toast.pg_toast_17748\"\nINFO: finished vacuuming \"postgres.pg_toast.pg_toast_17748\": index scans: 0\npages: 0 removed, 0 remain, 0 scanned (100.00% of total)\ntuples: 0 removed, 0 remain, 0 are dead but not yet removable\nremovable cutoff: 2906, which was 0 XIDs old when operation ended\nnew relfrozenxid: 2906, which is 1710 XIDs ahead of previous value\nfrozen: 0 pages from table (100.00% of total) had 0 tuples frozen\nindex scan not needed: 0 pages from table (100.00% of total) had 0 dead item identifiers removed\navg read rate: 52.433 MB/s, avg write rate: 0.000 MB/s\nbuffer usage: 25 hits, 1 misses, 0 dirtied\nWAL usage: 1 records, 0 full page images, 188 bytes\nsystem usage: CPU: user: 0.00 s, system: 0.00 s, elapsed: 0.00 s",
+      "durationMs": 401
+    },
+    {
+      "id": "UI05-pgmq.a_ui_q",
+      "title": "UI05: VACUUM (FREEZE, VERBOSE) pgmq.a_ui_q",
+      "status": "pass",
+      "detail": "age 1709 -> 0, relfrozenxid 1196 -> 2906, mxid_age 0 -> 0; 8 ms via session pooler; 4 notices; owner postgres",
+      "measurements": {
+        "age_before": 1709,
+        "age_after": 0,
+        "relfrozenxid_before": "1196",
+        "relfrozenxid_after": "2906",
+        "mxid_age_before": 0,
+        "mxid_age_after": 0,
+        "vacuum_ms": 8,
+        "owner": "postgres"
+      },
+      "evidence": "INFO: aggressively vacuuming \"postgres.pgmq.a_ui_q\"\nINFO: finished vacuuming \"postgres.pgmq.a_ui_q\": index scans: 0\npages: 0 removed, 3 remain, 3 scanned (100.00% of total)\ntuples: 0 removed, 145 remain, 0 are dead but not yet removable\nremovable cutoff: 2906, which was 0 XIDs old when operation ended\nnew relfrozenxid: 2906, which is 1710 XIDs ahead of previous value\nfrozen: 3 pages from table (100.00% of total) had 145 tuples frozen\nindex scan not needed: 0 pages from table (0.00% of total) had 0 dead item identifiers removed\navg read rate: 20.084 MB/s, avg write rate: 80.334 MB/s\nbuffer usage: 48 hits, 1 misses, 4 dirtied\nWAL usage: 9 records, 4 full page images, 4249 bytes\nsystem usage: CPU: user: 0.00 s, system: 0.00 s, elapsed: 0.00 s\nINFO: aggressively vacuuming \"postgres.pg_toast.pg_toast_17757\"\nINFO: finished vacuuming \"postgres.pg_toast.pg_toast_17757\": index scans: 0\npages: 0 removed, 0 remain, 0 scanned (100.00% of total)\ntuples: 0 removed, 0 remain, 0 are dead but not yet removable\nremovable cutoff: 2906, which was 0 XIDs old when operation ended\nnew relfrozenxid: 2906, which is 1710 XIDs ahead of previous value\nfrozen: 0 pages from table (100.00% of total) had 0 tuples frozen\nindex scan not needed: 0 pages from table (100.00% of total) had 0 dead item identifiers removed\navg read rate: 58.741 MB/s, avg write rate: 0.000 MB/s\nbuffer usage: 25 hits, 1 misses, 0 dirtied\nWAL usage: 1 records, 0 full page images, 188 bytes\nsystem usage: CPU: user: 0.00 s, system: 0.00 s, elapsed: 0.00 s",
+      "durationMs": 401
+    },
+    {
+      "id": "UI05-public.ui_events",
+      "title": "UI05: VACUUM (FREEZE, VERBOSE) public.ui_events",
+      "status": "pass",
+      "detail": "age 1701 -> 0, relfrozenxid 1204 -> 2906, mxid_age 0 -> 0; 10 ms via session pooler; 4 notices; owner postgres",
+      "measurements": {
+        "age_before": 1701,
+        "age_after": 0,
+        "relfrozenxid_before": "1204",
+        "relfrozenxid_after": "2906",
+        "mxid_age_before": 0,
+        "mxid_age_after": 0,
+        "vacuum_ms": 10,
+        "owner": "postgres"
+      },
+      "evidence": "INFO: aggressively vacuuming \"postgres.public.ui_events\"\nINFO: finished vacuuming \"postgres.public.ui_events\": index scans: 1\npages: 0 removed, 20 remain, 20 scanned (100.00% of total)\ntuples: 95 removed, 1455 remain, 0 are dead but not yet removable\nremovable cutoff: 2906, which was 0 XIDs old when operation ended\nnew relfrozenxid: 2906, which is 1702 XIDs ahead of previous value\nfrozen: 20 pages from table (100.00% of total) had 1455 tuples frozen\nindex scan needed: 11 pages from table (55.00% of total) had 167 dead item identifiers removed\nindex \"ui_events_pkey\": pages: 8 in total, 0 newly deleted, 0 currently deleted, 0 reusable\nindex \"ui_events_created_at_idx\": pages: 8 in total, 0 newly deleted, 0 currently deleted, 0 reusable\nindex \"ui_events_payload_idx\": pages: 18 in total, 0 newly deleted, 0 currently deleted, 0 reusable\navg read rate: 6.841 MB/s, avg write rate: 123.139 MB/s\nbuffer usage: 158 hits, 1 misses, 18 dirtied\nWAL usage: 81 records, 18 full page images, 67816 bytes\nsystem usage: CPU: user: 0.00 s, system: 0.00 s, elapsed: 0.00 s\nINFO: aggressively vacuuming \"postgres.pg_toast.pg_toast_17692\"\nINFO: finished vacuuming \"postgres.pg_toast.pg_toast_17692\": index scans: 0\npages: 0 removed, 0 remain, 0 scanned (100.00% of total)\ntuples: 0 removed, 0 remain, 0 are dead but not yet removable\nremovable cutoff: 2906, which was 0 XIDs old when operation ended\nnew relfrozenxid: 2906, which is 1711 XIDs ahead of previous value\nfrozen: 0 pages from table (100.00% of total) had 0 tuples frozen\nindex scan not needed: 0 pages from table (100.00% of total) had 0 dead item identifiers removed\navg read rate: 50.731 MB/s, avg write rate: 50.731 MB/s\nbuffer usage: 25 hits, 1 misses, 1 dirtied\nWAL usage: 1 records, 1 full page images, 980 bytes\nsystem usage: CPU: user: 0.00 s, system: 0.00 s, elapsed: 0.00 s",
+      "durationMs": 401
+    },
+    {
+      "id": "UI05-public.ui_ticks",
+      "title": "UI05: VACUUM (FREEZE, VERBOSE) public.ui_ticks",
+      "status": "pass",
+      "detail": "age 1710 -> 0, relfrozenxid 1195 -> 2906, mxid_age 0 -> 0; 8 ms via session pooler; 4 notices; owner postgres",
+      "measurements": {
+        "age_before": 1710,
+        "age_after": 0,
+        "relfrozenxid_before": "1195",
+        "relfrozenxid_after": "2906",
+        "mxid_age_before": 0,
+        "mxid_age_after": 0,
+        "vacuum_ms": 8,
+        "owner": "postgres"
+      },
+      "evidence": "INFO: aggressively vacuuming \"postgres.public.ui_ticks\"\nINFO: finished vacuuming \"postgres.public.ui_ticks\": index scans: 0\npages: 0 removed, 1 remain, 1 scanned (100.00% of total)\ntuples: 0 removed, 97 remain, 0 are dead but not yet removable\nremovable cutoff: 2906, which was 0 XIDs old when operation ended\nnew relfrozenxid: 2906, which is 1711 XIDs ahead of previous value\nfrozen: 1 pages from table (100.00% of total) had 97 tuples frozen\nindex scan not needed: 0 pages from table (0.00% of total) had 0 dead item identifiers removed\navg read rate: 0.000 MB/s, avg write rate: 73.357 MB/s\nbuffer usage: 44 hits, 0 misses, 4 dirtied\nWAL usage: 6 records, 4 full page images, 1175 bytes\nsystem usage: CPU: user: 0.00 s, system: 0.00 s, elapsed: 0.00 s\nINFO: aggressively vacuuming \"postgres.pg_toast.pg_toast_17705\"\nINFO: finished vacuuming \"postgres.pg_toast.pg_toast_17705\": index scans: 0\npages: 0 removed, 0 remain, 0 scanned (100.00% of total)\ntuples: 0 removed, 0 remain, 0 are dead but not yet removable\nremovable cutoff: 2906, which was 0 XIDs old when operation ended\nnew relfrozenxid: 2906, which is 1711 XIDs ahead of previous value\nfrozen: 0 pages from table (100.00% of total) had 0 tuples frozen\nindex scan not needed: 0 pages from table (100.00% of total) had 0 dead item identifiers removed\navg read rate: 60.562 MB/s, avg write rate: 0.000 MB/s\nbuffer usage: 25 hits, 1 misses, 0 dirtied\nWAL usage: 1 records, 0 full page images, 188 bytes\nsystem usage: CPU: user: 0.00 s, system: 0.00 s, elapsed: 0.00 s",
+      "durationMs": 401
+    },
+    {
+      "id": "UI06a",
+      "title": "UI06a: ui-tick (5 seconds) across the window",
+      "status": "pass",
+      "detail": "POST at 2026-10-23T08:38:08.673Z; last tick on 15 2026-10-23 08:41:52.427149+00, first on 17 2026-10-23 08:42:46.169776+00; gap 53.7 s = about 10 runs never started; 41 ticks on 17 so far (median gap 5.01 s); first new tick -27 s after UI03 saw it healthy",
+      "measurements": {
+        "ticks_old": 85,
+        "ticks_new": 41,
+        "tick_gap_s": 53.7,
+        "tick_runs_missed": 10,
+        "tick_median_gap_new_s": 5.01,
+        "last_old_after_post_s": 223.8,
+        "first_new_after_healthy_s": -27.3
+      },
+      "durationMs": 144753
+    },
+    {
+      "id": "UI06b",
+      "title": "UI06b: ui-minute ('* * * * *') across the window",
+      "status": "pass",
+      "detail": "last on 15 2026-10-23 08:42:00.033325+00, first on 17 2026-10-23 08:43:00.063663+00; gap 60.0 s = about 0 minutes skipped; 4 runs on 17",
+      "measurements": {
+        "minute_old": 8,
+        "minute_new": 4,
+        "minute_gap_s": 60
+      },
+      "durationMs": 144753
+    },
+    {
+      "id": "UI06c",
+      "title": "UI06c: cron.job_run_details around the window",
+      "status": "info",
+      "detail": "since POST-60s: ui-minute succeeded=9, ui-tick succeeded=98; non-succeeded rows overall 0; rows started inside the tick gap: succeeded=2",
+      "measurements": {
+        "non_succeeded_runs": 0,
+        "runs_in_gap": 2
+      },
+      "evidence": "{\n \"byStatus\": [\n  {\n   \"jobname\": \"ui-minute\",\n   \"status\": \"succeeded\",\n   \"n\": 9,\n   \"first\": \"2026-10-23 08:38:00.023567+00\",\n   \"last\": \"2026-10-23 08:46:00.009804+00\"\n  },\n  {\n   \"jobname\": \"ui-tick\",\n   \"status\": \"succeeded\",\n   \"n\": 98,\n   \"first\": \"2026-10-23 08:37:11.603709+00\",\n   \"last\": \"2026-10-23 08:46:12.782494+00\"\n  }\n ],\n \"failures\": [],\n \"inGap\": [\n  {\n   \"status\": \"succeeded\",\n   \"n\": 2\n  }\n ]\n}",
+      "durationMs": 144753
+    },
+    {
+      "id": "UI06d",
+      "title": "UI06d: pgmq on the new major",
+      "status": "pass",
+      "detail": "41/41 new-major ticks sent and read (archived 62, deleted 61); direct send 379, read 379, archive true; metrics length 0, total 379",
+      "measurements": {
+        "new_ticks": 41,
+        "new_ticks_moved": 41,
+        "direct_round_trip": "ok"
+      },
+      "durationMs": 144753
+    },
+    {
+      "id": "UI06e-session",
+      "title": "UI06e: acknowledged writes visible after the settle, read through the session pooler",
+      "status": "fail",
+      "detail": "617/705 acknowledged writes visible (617 rows)",
+      "measurements": {
+        "missing": 88
+      },
+      "durationMs": 144753
+    },
+    {
+      "id": "UI06e-direct",
+      "title": "UI06e: acknowledged writes visible after the settle, read through the direct connection",
+      "status": "skip",
+      "detail": "could not read: getaddrinfo ENOTFOUND",
+      "measurements": {
+        "missing": -1
+      },
+      "durationMs": 144753
+    },
+    {
+      "id": "UI99",
+      "title": "UI99: project deleted and gone from the listing",
+      "status": "pass",
+      "detail": "DELETE 200; absent from GET /projects after 0 s",
+      "measurements": {
+        "delete_status": 200,
+        "gone_from_listing_s": 0
+      },
+      "durationMs": 1252
+    }
+  ]
+}

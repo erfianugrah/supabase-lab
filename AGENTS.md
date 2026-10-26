@@ -1070,15 +1070,21 @@ each user's auth rows". Findings and artifacts in RUNLOG.md; out/2026-09-25/.
   and the only two org-scoped writes are org creation and project-claim. The
   `jit/invite` endpoints that a keyword search turns up are DATABASE access, a
   different subsystem - do not read them as membership provisioning.
-- **The upgrade window is not measurable on a throwaway project** (F06). A newly
-  created project comes up already at the latest app version - `eligible: false`,
+- **The upgrade window was taken as not measurable on a throwaway project** (F06;
+  superseded 2026-10-23 by upgrade-integrity UI01, section
+  "experiments/upgrade-integrity - key facts"). A project created without
+  `postgres_engine` comes up already at the latest app version - `eligible: false`,
   current == latest, no targets - and `postgres_engine` / `release_channel` on
   `POST /v1/projects` are both DEPRECATED and typed null in the OpenAPI
   document. That does not make the field inert: orioledb OR01 (2026-10-10) sent
   `postgres_engine: "17-oriole"` and it was accepted and applied. Requesting an
-  older Postgres major through it was not tried. Measuring a real client-visible upgrade window means upgrading
-  something real. That is the structural reason the "upgrades take hours" claim
-  stays unquantified.
+  older Postgres major through it was not tried here; upgrade-integrity UI01
+  (2026-10-23) did, and `"15"` gave an upgradeable 15.19 project, so an
+  upgrade CAN be arranged on a throwaway (see that section). Measuring a real
+  client-visible upgrade window means upgrading something real; upgrade-integrity
+  did that for a Micro 15 -> 17 major upgrade (POST to ACTIVE_HEALTHY 289 s,
+  304 s, 305 s, 330 s over four runs). The "upgrades take hours" claim stays unquantified for larger
+  databases and for app-version (minor) upgrades.
 - What IS free: `duration_estimate_hours` in the eligibility payload. Observed
   `1` for a patch-level app upgrade (17.6.1.141 -> 17.6.1.155) on three aged
   projects, each with one target and zero validation errors. It is a PUBLISHED
@@ -5358,3 +5364,112 @@ ledger records every arrival before answering. n = 1 per module except NL04
   Treat a pg_net `timed_out` as "maybe delivered", and give the first calls
   after a quiet period headroom (a smaller batch or a longer timeout -
   neither tested).
+
+## experiments/upgrade-integrity - key facts (validated 2026-10-23 runs 1-3 and 2026-10-26 run 4, Pro org, Micro, ap-southeast-1, 15.19.0.003 -> 17.11.0.003)
+
+Self-provisioning: one project per run created on Postgres 15, upgraded in
+place through `POST /v1/projects/{ref}/upgrade`, deleted by UI99. pg_cron
+writes every 5 s (inserts, updates, deletes, pgmq send / read / archive)
+through the upgrade; client writers insert through the Management API query
+endpoint (runs 1-4), the session pooler (runs 2-4), the transaction pooler
+(runs 3-4) and the Data API (run 4), every 3 s in runs 1-2 and every 1 s in
+runs 3-4. Numbers and per-write evidence: RUNLOG.md, artifacts
+`out/2026-10-23/` and `out/2026-10-26/`.
+
+- **A fresh project CAN start on an older major** (UI01, four runs and a
+  probe): `postgres_engine: "15"` on `POST /v1/projects` is honoured although
+  the OpenAPI document types it deprecated `null` - `database.version`
+  15.19.0.003, `eligible: true`, one target 17 (`supabase-postgres-17.11.0.003`),
+  `duration_estimate_hours: 1`. Upgrade body: `{ target_version: "17",
+  release_channel: "ga" }` -> 201 with a `tracking_id`. This retires the
+  platform-facts F06 premise that an upgrade cannot be arranged on a
+  throwaway.
+- **Integrity checks clean before and after** (UI02, UI04, all four runs):
+  amcheck (1.3 on 15, 1.4 on 17, installed in `pg_catalog`, runnable by
+  `postgres` on pg_cron's `supabase_admin`-owned tables) `verify_heapam`
+  9/9, `bt_index_check` and `bt_index_parent_check` with heapallindexed
+  16/16; every column sequence in public, cron and pgmq at or above its
+  column max 8/8; cron.job, jobids, schedules and all 39 baseline
+  job_run_details rows kept; `cron.job_run_details` relfrozenxid unchanged
+  across the upgrade (1197, run 2; 1196, 1195, 1200 in runs 1, 3, 4). The
+  upgrade guide (https://supabase.com/docs/guides/platform/upgrading) says
+  pg_cron is dropped and recreated with `cron.job_run_details` duplicated
+  first, which would give the table a fresh relfrozenxid; these runs show
+  the carried value instead (OIDs and filenodes not compared).
+- **`VACUUM (FREEZE, VERBOSE)` works as `postgres` on 17** (UI05) on
+  `cron.job_run_details` (owner `supabase_admin`) and the pgmq queue and
+  archive: age 1239 -> 1, 62 -> 1, 1238 -> 0 (run 2; run 4 1812 -> 1, 246 ->
+  1, 1811 -> 0), no warning, VERBOSE readable through the session pooler
+  only (the Management API query endpoint returns rows, not INFO notices).
+- **Writes acknowledged late in the window by a restarted 15.19 postmaster
+  were lost, in 4 of 4 runs** (UI03, UI04c, UI04e; run 1 recorded no server
+  identity: 15 of 106 lost, every write acknowledged between the failure
+  burst and the first write on 17.11). Run 3 (writes every 1 s, server
+  identity in every write): the original 15.19 cluster was restarted three
+  times during the window, all with the original system_identifier and
+  address; writes on the first two restarts were kept (6 and 2), and all 88
+  writes acknowledged by the third (postmaster started about +245 s after
+  the POST, 44 session pooler + 44 transaction pooler, acknowledged +246 s
+  to +288 s) are absent on 17.11, through the Management API and again
+  through a fresh pooler connection after a 180 s settle. Their WAL
+  positions continue past the last kept write on the same cluster; 17.11 has
+  a new system_identifier. No write from any other postmaster was lost (489
+  original, 57 + 63 on 17.11). Reading: a pre-upgrade instance restarted
+  after the point the upgraded data was taken; the harness/visibility
+  alternative is not supported (lost writes returned txid and LSN from
+  committed autocommit inserts, `synchronous_commit` and `fsync` on, loss
+  splits by server identity, not by path). Run 2: 22 lost, the ones a
+  restarted 15.19 postmaster acknowledged (4 Management API, 18 session
+  pooler). Run 1 (Management API only): 15 of 106 lost. Run 4 repeated run
+  3's shape: two restarts of the original cluster seen, 6 writes on the
+  first kept, all 88 (44 + 44) on the second (started about +244 s) absent,
+  0 lost from any other postmaster. Run 3's status timeline places the lost
+  postmaster between `5_initiated_data_upgrade` (+160 s) and
+  `6_completed_data_upgrade` (+253 s), still answering after
+  `8_attached_volume_to_upgraded_instance` (+274 s). The Management API
+  query endpoint at 1 s cadence answered `Database is possibly not
+  accessible at the moment` from +3 s to +301 s (run 3; +3 s to +329 s in
+  run 4); at 3 s cadence in runs 1-2 it answered on 15.19 until about +221 s
+  and intermittently after; cadence and run were not separated. The Data API
+  (run 4, service_role insert) answered `503 upstream connect error ...
+  remote connection failure` from +17 s, then 525 / 521 and timeouts, until
+  17.11 at +312 s: 36/36 acknowledged kept, none acknowledged by a restarted
+  15.19 postmaster. In runs 3 and 4 (1 s cadence) the HTTP paths (the
+  Management API query endpoint in both, the Data API in run 4) refused
+  writes for the window instead of having them acknowledged by a restarted
+  15.19 postmaster; in runs 1 and 2 (3 s cadence) the Management API query
+  endpoint lost 15 of 106 writes (run 1, no server identity recorded) and 4
+  (run 2, all acknowledged by a restarted 15.19 postmaster). The poolers
+  kept connecting in every run. Direct connection not testable from this
+  vantage (`getaddrinfo ENOTFOUND`).
+- **pg_cron across the window** (UI06): the 5-second job's last run on 15
+  came 208.6 s / 219.5 s after the POST (runs 1 / 2) and it resumed on 17
+  after a 52.4 s / 59.2 s / 53.7 s / 49.4 s gap (runs 1 / 2 / 3 / 4; about 9
+  / 11 / 10 / 9 runs never started, none recorded as failed); the
+  every-minute job missed one run in runs 1 and 2, none in runs 3 and 4;
+  job_run_details holds only `succeeded`. No pg_cron row survives from the
+  restarted 15.19 postmaster whose writes were lost, in runs 3 and 4 (run
+  3's last `ui-minute` row on 15, `08:42:00.033325+00`, came from the first
+  restart, whose writes were kept; run 4: the last surviving 15.19 tick, by
+  its `server_version` column, predates both restarts; the rows in the lost
+  postmaster's window are 17.11's). Whether pg_cron fired on the lost
+  postmaster is not observable from the upgraded data. pgmq send / read /
+  archive worked on 17 from the cron job and directly.
+- POST to ACTIVE_HEALTHY on 17.11, first seen: 289 s, 304 s (runs 1-2, 15 s
+  polling), 305 s, 330 s (runs 3-4, 5 s polling); run 4's UI03b measurement
+  reads 335 s because it also waits for a Management API write on 17.11. The
+  `version()` architecture string read x86_64 on 17.11 in all four runs; the
+  runs did not record the 15.19 architecture (a separate 15.19 probe project
+  on 2026-10-23 read aarch64, not committed), so whether the upgrade changed
+  architecture was not measured.
+- Fresh 15.19 projects in runs 3 and 4 reported the same system_identifier
+  (`...382474`). Run 4's pre-upgrade postmaster started about 42 h before
+  this run's `POST /v1/projects`, and the create response's own `created_at`
+  (`2026-10-24T11:33:40.62798Z`) is earlier still; every run's project
+  carried a `created_at` 2 h to 42 h before the run started and answered 3 s
+  after the POST (inference: the create returned a project provisioned ahead
+  of the request).
+- Not run: larger compute or database, other regions, 17 to a newer major,
+  direct-connection write path, n > 4, why the original
+  cluster was restarted, client-server clock skew (needed to confirm the
+  apparent ~10 s overlap of 15.19 and 17.11 accepting writes in run 3).
