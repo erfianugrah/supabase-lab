@@ -1510,6 +1510,69 @@ Open work lives on the task board (project work-supabase-lab); this section keep
 - compute-disk D10 on the platform-plan org -> work-supabase-lab#15. Needs the platform org's slug and token plus its control-plane base URL; the 2 GB Nano volume makes the fill cheap (~40 min).
 - `.pi/sweep-all.sh` runs every acceptance probe in a burst-safe order.
 
+## experiments/auth-rate-limits - key facts (AR01-AR04 2026-09-08; AR05/AR06 2026-10-26, one self-provisioned Pro-org project, ap-southeast-1, Small then Large then 2XL)
+
+GoTrue's per-IP limits on the managed `/auth/v1/*` endpoints, measured from
+one Mac in Singapore (one egress IPv4, `/auth/v1/health` p50 18 to 20 ms).
+RUNLOG.md has every row; AR05/AR06 artifacts in `out/2026-10-26/`
+(reference AR06 run `run-2026-10-26T00-26-19-212Z`).
+
+- **Defaults on a fresh project** (AR06d, 2026-10-26): `rate_limit_token_refresh`
+  150, `rate_limit_otp` 30, `rate_limit_verify` 30, `rate_limit_web3` 30,
+  `rate_limit_anonymous_users` 30, `rate_limit_email_sent` 2,
+  `rate_limit_sms_sent` 30, Sb-Forwarded-For off. Values are per 5 minutes
+  (anonymous per hour): at `rate_limit_token_refresh` 60 a drained bucket
+  refilled 6 tokens in 30 s (AR06a, n=4). The 2026-09-08 "150 vs 1800/hour
+  discrepancy" was the same rate in two units.
+- **Password and refresh grants share one bucket** (AR06a, 2 trials per
+  order): draining with either grant to its first 429 (request 31) made the
+  other grant 429 at once. ID-token and PKCE grants were not sent (the
+  docs and the GoTrue source put them on the same limiter; `web3` has its own).
+- **The burst is 30 at any limit; the limit only sets the refill** (AR06c,
+  `rate_limit_token_refresh` 10000 = 33.3/s): open-loop grants at 25/s and
+  33/s for 90 s drew no 429; at 45/s the first 429 came at 2.49 s and at
+  60/s at 1.10 s (fixed-bucket prediction 2.56 s and 1.12 s), and both
+  passed exactly 3029 in 90 s = 30 + 33.3 x 90. 300 concurrent grants at a
+  full bucket passed 30 at 150 (twice), 37 to 68 at 10000 (four bursts), 130
+  and 160 at 100000. So one IP gets about limit/300 grants per second
+  sustained plus a one-off 30 (derived from these rows). A spike from one
+  NAT address larger than 30 plus the refill over its arrival window gets
+  429s; raising the limit raises the refill, not the 30. Spreading the
+  requests out or Sb-Forwarded-For (AR02) are the other levers.
+- **`GET /auth/v1/user` is not rate limited** (AR06b, 160 GETs, 0 x 429, and
+  it did not draw on the token bucket). `PUT /auth/v1/user` is, on its own
+  bucket (separate from email sign-up's), at `rate_limit_otp`'s rate:
+  raising `rate_limit_otp` to 3000 raised its refill (41 vs 1 passes 10 s
+  after a drain). The docs' "Sign-ups and sign-ins" row lists `/user`; read
+  it as `PUT /user`, one bucket per endpoint at a shared rate. n=1.
+- **Password grants per second scale with vCPUs and nothing else in the way**
+  (AR05, valid grants, closed loop to c=128, limiter at 1,000,000): Small
+  18.9/s, Large 28/s, 2XL 113.7/s at saturation, no 5xx or 429. At
+  saturation the Auth process used 1.7 / 1.72 / 6.89 cores of 2 / 2 / 8 with
+  node CPU 89 to 91 %. Reading the two series together (inference): Auth
+  runs on the database instance and its bcrypt (cost 10, about 61 ms CPU
+  per grant on Large and 2XL) is the ceiling.
+  Auth's DB pool is 10 on every size and queued only once CPU was saturated
+  (2XL c=16: 111/s, 21 waits). One sweep per size.
+- **Auth slows when Postgres burns the CPU** (AR05 placement, Small and 2XL,
+  n=1 each): with 2 x vCPU `generate_series` sessions running, valid-grant
+  p50 rose 112 -> 275 ms (Small) and 83 -> 174 ms (2XL), c=16 throughput fell
+  18.9 -> 6.6 and 112 -> 54 grants/s, while `/auth/v1/health` and a
+  no-account grant (lookup only) stayed within 2 ms at p50. Heavy SQL and
+  sign-in storms compete for the same cores.
+- Harness: AR05/AR06 self-provision (`make run-self`, `PVLAB_AR_REF` to reuse
+  across invocations, `make clean DELETE=1` by prefix `pvlab-ar-`); the
+  tofu state for AR01-AR04 is empty. `make publish-evidence` needs `ONLY=`
+  set to the module ids: the Makefile's default ONLY is AR01-AR03 and
+  publishes 0 results for an AR05/AR06 run. The metrics endpoint exposes
+  GoTrue's own series (`process_cpu_seconds_total{service_type="gotrue"}`,
+  `db_sql_connection_wait_total`, `http_status_codes_total` per route and
+  code); they refresh with the payload, rarely (DC05).
+- Not measured: ID-token/PKCE grants, the edge's notion of client IP,
+  `/recover` `/resend` `/magiclink` `/otp` buckets, whether an unrelated
+  auth PATCH resets buckets, Medium/XL/4XL, repeats of the sweeps, and the
+  source of the 503s the burner RPCs got (AR05 placement).
+
 ## experiments/auth-refresh-race - key facts (validated 2026-08-19)
 
 - The defect, reproduced: gotrue-dart 2.21.0 (supabase_flutter 2.14.0 pins it)

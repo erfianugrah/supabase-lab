@@ -1,0 +1,135 @@
+{
+  "startedAt": "2026-10-26T00:24:19.000Z",
+  "finishedAt": "2026-10-26T00:25:58.462Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "auth-rate-limits",
+  "labCommit": "848b9f3",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "AR06d",
+      "title": "rate_limit_* values read back from config/auth (project as created)",
+      "status": "info",
+      "detail": "mfa_max_enrolled_factors=10, rate_limit_anonymous_users=30, rate_limit_email_sent=2, rate_limit_otp=30, rate_limit_sms_sent=30, rate_limit_token_refresh=150, rate_limit_verify=30, rate_limit_web3=30, security_sb_forwarded_for_enabled=false",
+      "measurements": {
+        "mfa_max_enrolled_factors": "10",
+        "rate_limit_anonymous_users": "30",
+        "rate_limit_email_sent": "2",
+        "rate_limit_otp": "30",
+        "rate_limit_sms_sent": "30",
+        "rate_limit_token_refresh": "150",
+        "rate_limit_verify": "30",
+        "rate_limit_web3": "30",
+        "security_sb_forwarded_for_enabled": "false",
+        "mailer_autoconfirm": "false",
+        "project_create_ms": 4031
+      },
+      "durationMs": 99462
+    },
+    {
+      "id": "AR06c.0",
+      "title": "rate_limit_token_refresh=10000 took effect (100 sequential grants)",
+      "status": "fail",
+      "detail": "PATCH 200, readback 1.7 s; 400:89 429:1, first 429 at 90; mean 20 ms per request",
+      "measurements": {
+        "patch_status": 200,
+        "first_429": 90,
+        "statuses": "400:89 429:1"
+      },
+      "durationMs": 99462
+    },
+    {
+      "id": "AR06c.45",
+      "title": "steady 45/s password grants for 5 s at rate_limit_token_refresh=10000",
+      "status": "info",
+      "detail": "225 sent over 5.0 s; 400:195 429:30; first 429 at request 113 (2.49 s); passed 195 = 39.2/s; non-429 p50 19 ms",
+      "measurements": {
+        "rate_per_s": 45,
+        "sent": 225,
+        "send_span_s": 5,
+        "statuses": "400:195 429:30",
+        "n429": 30,
+        "first_429_req": 113,
+        "first_429_s": 2.49,
+        "passed_per_s": 39.2,
+        "p50_ms": 19,
+        "p95_ms": 24
+      },
+      "durationMs": 99462
+    },
+    {
+      "id": "AR06c.burst.10000-#1",
+      "title": "300 concurrent grants against a full bucket, rate_limit_token_refresh=10000",
+      "status": "info",
+      "detail": "400:68 429:232; passed 68; client send span 5 ms, response span 1100 ms",
+      "measurements": {
+        "limit": 10000,
+        "statuses": "400:68 429:232",
+        "passed": 68,
+        "send_span_ms": 5,
+        "response_span_ms": 1100,
+        "p50_ms": 545
+      },
+      "durationMs": 99462
+    },
+    {
+      "id": "AR06c.burst.10000-#2",
+      "title": "300 concurrent grants against a full bucket, rate_limit_token_refresh=10000",
+      "status": "info",
+      "detail": "400:42 429:258; passed 42; client send span 2 ms, response span 277 ms",
+      "measurements": {
+        "limit": 10000,
+        "statuses": "400:42 429:258",
+        "passed": 42,
+        "send_span_ms": 2,
+        "response_span_ms": 277,
+        "p50_ms": 259
+      },
+      "durationMs": 99462
+    },
+    {
+      "id": "AR06c.burst.150-control",
+      "title": "300 concurrent grants against a full bucket, rate_limit_token_refresh=150",
+      "status": "info",
+      "detail": "400:30 429:270; passed 30; client send span 6 ms, response span 302 ms",
+      "measurements": {
+        "limit": 150,
+        "statuses": "400:30 429:270",
+        "passed": 30,
+        "send_span_ms": 6,
+        "response_span_ms": 302,
+        "p50_ms": 328
+      },
+      "durationMs": 99462
+    },
+    {
+      "id": "AR06c.burst.100000",
+      "title": "300 concurrent grants against a full bucket, rate_limit_token_refresh=100000",
+      "status": "info",
+      "detail": "400:160 429:140; passed 160; client send span 6 ms, response span 307 ms",
+      "measurements": {
+        "limit": 100000,
+        "statuses": "400:160 429:140",
+        "passed": 160,
+        "send_span_ms": 6,
+        "response_span_ms": 307,
+        "p50_ms": 545
+      },
+      "durationMs": 99462
+    },
+    {
+      "id": "AR06z",
+      "title": "restore auth config",
+      "status": "pass",
+      "detail": "PATCH 200 {\"rate_limit_token_refresh\":150,\"rate_limit_otp\":30,\"mailer_autoconfirm\":false}",
+      "durationMs": 99462
+    }
+  ]
+}

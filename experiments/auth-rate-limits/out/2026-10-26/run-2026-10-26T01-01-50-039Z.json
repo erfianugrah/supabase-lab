@@ -1,0 +1,212 @@
+{
+  "startedAt": "2026-10-26T01:01:50.039Z",
+  "finishedAt": "2026-10-26T01:08:42.003Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "auth-rate-limits",
+  "labCommit": "848b9f3",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "AR05.2xl.resize",
+      "title": "resize to ci_2xlarge",
+      "status": "info",
+      "detail": "200 ; settled 67 s; max_connections 380",
+      "measurements": {
+        "settled_s": 67,
+        "max_connections": 380
+      },
+      "durationMs": 411963
+    },
+    {
+      "id": "AR05.2xl.setup",
+      "title": "setup on 2xl: limiter raised, size facts",
+      "status": "fail",
+      "detail": "PATCH rate_limit_token_refresh=1000000 200; 300 concurrent cheap grants gave 42 x 429; max_connections 380; node CPUs 8; auth db_max_pool_size 10",
+      "measurements": {
+        "limit": 1000000,
+        "patch_status": 200,
+        "check_429": 42,
+        "max_connections": "380",
+        "ncpu": 8,
+        "db_max_pool_size": "10",
+        "pg": "PostgreSQL 17.11",
+        "mfa_max_enrolled_factors": "10",
+        "rate_limit_anonymous_users": "30",
+        "rate_limit_email_sent": "2",
+        "rate_limit_otp": "30",
+        "rate_limit_sms_sent": "30",
+        "rate_limit_token_refresh": "1000000",
+        "rate_limit_verify": "30",
+        "rate_limit_web3": "30",
+        "security_sb_forwarded_for_enabled": "false"
+      },
+      "durationMs": 411963
+    },
+    {
+      "id": "AR05.2xl.rtt",
+      "title": "GET /auth/v1/health from the client (no DB, no bcrypt)",
+      "status": "info",
+      "detail": "p50 19 ms p95 28 ms (200:20)",
+      "measurements": {
+        "p50_ms": 19,
+        "p95_ms": 28
+      },
+      "durationMs": 411963
+    },
+    {
+      "id": "AR05.2xl.c001",
+      "title": "2xl: closed loop c=1 for 40 s",
+      "status": "info",
+      "detail": "11.6 grants/s, p50 84 ms, p95 98 ms; 200:465; node CPU 16.2%, Auth process 1.12 cores, Auth pool waits 104 (472 ms) over 2 snapshots",
+      "measurements": {
+        "c": 1,
+        "statuses": "200:465",
+        "grants_per_s": 11.6,
+        "p50_ms": 84,
+        "p95_ms": 98,
+        "n5xx": 0,
+        "n429": 0,
+        "n0": 0,
+        "node_cpu_pct": 16.2,
+        "gotrue_cores": 1.12,
+        "auth_pool_waits": 104,
+        "auth_pool_wait_ms": 472,
+        "cpu_snapshots": 2,
+        "dur_s": 40
+      },
+      "durationMs": 411963
+    },
+    {
+      "id": "AR05.2xl.c004",
+      "title": "2xl: closed loop c=4 for 40 s",
+      "status": "info",
+      "detail": "46.2 grants/s, p50 85 ms, p95 95 ms; 200:1850; node CPU -1%, Auth process -1 cores, Auth pool waits -1 (-1 ms) over 1 snapshots",
+      "measurements": {
+        "c": 4,
+        "statuses": "200:1850",
+        "grants_per_s": 46.2,
+        "p50_ms": 85,
+        "p95_ms": 95,
+        "n5xx": 0,
+        "n429": 0,
+        "n0": 0,
+        "node_cpu_pct": -1,
+        "gotrue_cores": -1,
+        "auth_pool_waits": -1,
+        "auth_pool_wait_ms": -1,
+        "cpu_snapshots": 1,
+        "dur_s": 40
+      },
+      "durationMs": 411963
+    },
+    {
+      "id": "AR05.2xl.c016",
+      "title": "2xl: closed loop c=16 for 40 s",
+      "status": "info",
+      "detail": "111.1 grants/s, p50 138 ms, p95 204 ms; 200:4453; node CPU 34.7%, Auth process 2.63 cores, Auth pool waits 21 (33 ms) over 2 snapshots",
+      "measurements": {
+        "c": 16,
+        "statuses": "200:4453",
+        "grants_per_s": 111.1,
+        "p50_ms": 138,
+        "p95_ms": 204,
+        "n5xx": 0,
+        "n429": 0,
+        "n0": 0,
+        "node_cpu_pct": 34.7,
+        "gotrue_cores": 2.63,
+        "auth_pool_waits": 21,
+        "auth_pool_wait_ms": 33,
+        "cpu_snapshots": 2,
+        "dur_s": 40
+      },
+      "durationMs": 411963
+    },
+    {
+      "id": "AR05.2xl.c064",
+      "title": "2xl: closed loop c=64 for 40 s",
+      "status": "info",
+      "detail": "113.7 grants/s, p50 533 ms, p95 906 ms; 200:4593; node CPU 89.4%, Auth process 6.89 cores, Auth pool waits 9295 (827885 ms) over 2 snapshots",
+      "measurements": {
+        "c": 64,
+        "statuses": "200:4593",
+        "grants_per_s": 113.7,
+        "p50_ms": 533,
+        "p95_ms": 906,
+        "n5xx": 0,
+        "n429": 0,
+        "n0": 0,
+        "node_cpu_pct": 89.4,
+        "gotrue_cores": 6.89,
+        "auth_pool_waits": 9295,
+        "auth_pool_wait_ms": 827885,
+        "cpu_snapshots": 2,
+        "dur_s": 40
+      },
+      "durationMs": 411963
+    },
+    {
+      "id": "AR05.2xl.c128",
+      "title": "2xl: closed loop c=128 for 40 s",
+      "status": "info",
+      "detail": "113.8 grants/s, p50 1041 ms, p95 1965 ms; 200:4641; node CPU 91.1%, Auth process 7.02 cores, Auth pool waits 25396 (4561078 ms) over 2 snapshots",
+      "measurements": {
+        "c": 128,
+        "statuses": "200:4641",
+        "grants_per_s": 113.8,
+        "p50_ms": 1041,
+        "p95_ms": 1965,
+        "n5xx": 0,
+        "n429": 0,
+        "n0": 0,
+        "node_cpu_pct": 91.1,
+        "gotrue_cores": 7.02,
+        "auth_pool_waits": 25396,
+        "auth_pool_wait_ms": 4561078,
+        "cpu_snapshots": 2,
+        "dur_s": 41
+      },
+      "durationMs": 411963
+    },
+    {
+      "id": "AR05.2xl.placement",
+      "title": "2xl: Auth latency before and while 16 sessions burn Postgres CPU",
+      "status": "info",
+      "detail": "health p50 23 -> 24 ms; no-account grant p50 19 -> 20 ms; valid grant p50 83 -> 174 ms; c=16 112 -> 54 grants/s (p50 137 -> 277 ms); node CPU before -1% during 68.3%; active burners seen 13; burn calls 200:9 503:31",
+      "measurements": {
+        "burners": 16,
+        "active_burners_seen": "13",
+        "health_p50_before": 23,
+        "health_p50_during": 24,
+        "health_p95_before": 170,
+        "health_p95_during": 105,
+        "lookup_p50_before": 19,
+        "lookup_p50_during": 20,
+        "lookup_p95_before": 24,
+        "lookup_p95_during": 40,
+        "grant_p50_before": 83,
+        "grant_p50_during": 174,
+        "grant_p95_before": 109,
+        "grant_p95_during": 253,
+        "c16_gps_before": 112,
+        "c16_gps_during": 54,
+        "c16_p50_before": 137,
+        "c16_p50_during": 277,
+        "cpu_before_c16": -1,
+        "cpu_during": 68.3,
+        "gotrue_cores_before_c16": -1,
+        "gotrue_cores_during_all": 3.39,
+        "burn_statuses": "200:9 503:31",
+        "burn_calls": 40
+      },
+      "durationMs": 411963
+    }
+  ]
+}

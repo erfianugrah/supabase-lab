@@ -67,3 +67,24 @@ publish-evidence:
 destroy:
 	tofu plan -destroy $(VARS) -out=tfplan-destroy
 	tofu apply tfplan-destroy
+
+# Self-provisioned AR05/AR06 (no tofu state): a Pro-org project created through
+# POST /v1/projects, deleted by AR99. Environment only, never argv:
+#   SUPABASE_ACCESS_TOKEN   Management API token
+#   PVLAB_ORG_PRO           slug of a Pro-plan organization
+# PVLAB_AR_REF reuses a project across invocations (AR06 bucket run, then one
+# AR05 run per size); `make clean DELETE=1` removes leftovers by name prefix.
+SELF ?= AR06,AR99
+.PHONY: run-self clean
+run-self:
+	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "export SUPABASE_ACCESS_TOKEN"; exit 1)
+	@test -n "$$PVLAB_ORG_PRO$$PVLAB_AR_REF" || (echo "export PVLAB_ORG_PRO (or PVLAB_AR_REF)"; exit 1)
+	@cd $(ROOT)/harness && bun run gen >/dev/null
+	@mkdir -p evidence/$(TS)
+	cd $(ROOT) && bun harness/src/run.ts --where local --experiment auth-rate-limits \
+		--only $(SELF) --destructive --out experiments/auth-rate-limits/evidence/$(TS)
+	@echo "== evidence/$(TS)/ =="
+
+clean:
+	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "export SUPABASE_ACCESS_TOKEN"; exit 1)
+	bun lib/cleanup.ts $(if $(DELETE),--delete,)
