@@ -435,6 +435,22 @@ at setup, two runs on one project, so not counted. By the local shell clock
 (not in `out/`), the dev project was healthy by 22:39 UTC and deleted at 22:53
 UTC on 2026-10-22.
 
+**Host sleep audit (2026-10-26, #234): no figure in this section is
+affected.** Six sleeps of the orchestrator Mac, 1142 s in all (23:17:28 to
+23:52:48 UTC), fell inside this run's wall span; walking the module across
+them lands 11 s from `finishedAt`
+(`../platform-downtime/out/2026-10-26/host-sleep/overlap.txt`). RT05 is one
+module, so the tool cannot place single rows, but every row's timings are
+wall-clock (`Date.now()` in `lib/burst.ts`) and none holds a sleep of 100 to
+262 s: across the 42 burst rows the longest burst wall time was 7176 ms,
+join to ready 6208 ms, canary wait 1595 ms, fan-out 1771 ms and teardown
+18376 ms. Every channel not ready on any row has a server reply
+(`Too many database timeouts`, or the first burst's 26 join errors and 1
+`phx_error`), so no socket went quiet across a sleep. The sleeps fell
+between bursts. One teardown (pool 20, 500 joins, r1) read -1, no zero
+`realtime.subscription` count within its 90 s wall-clock wait, which a
+sleep in teardown would also give; teardown is not quoted above.
+
 ## Harness lessons (2026-10-10, unpublished iterations)
 
 - A client given only an `Authorization` header and `realtime.setAuth(token)`

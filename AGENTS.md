@@ -89,7 +89,16 @@ platform behaviour or writing it into docs
   and sets `pausedMs` per path, and `run.ts` holds `caffeinate -i -w <pid>`
   for its lifetime (`PVLAB_ALLOW_SLEEP=1` skips it; `-i` blocks idle sleep
   only, so a lid-close still sleeps). For an older artifact, `harness/scripts/sleep-overlap.ts`
-  places its tests against `pmset -g log`.
+  places its tests against `pmset -g log` (a module's results within 5 ms
+  count as one module since 2026-10-26: `run.ts` reads `performance.now()`
+  once per result after the module returns). Audit of every run artifact
+  from 2026-10-19 to 2026-10-26 (#234, platform-downtime RUNLOG
+  2026-10-26): 20 of 147 span a sleep; void or bounded figures are marked
+  beside each figure in data-api-capacity (DC02b run 1, DC08 pool 150),
+  restore-paths (RP06 R14 idle maximum, RP07 R18/R19 3 GB, R22 fill, R23
+  bound wait; RP08 R29 3) and wal-on-s3 (WS01 run 1 timings);
+  realtime-surface RT05 and hyperdrive-direct H03 are unaffected. Nothing
+  before 2026-10-19 06:05 UTC can be checked (the log starts there).
 - **A module whose promise never settles is a failed result and exit 2**
   (#236, `harness/src/settle.ts`). On 2026-10-23 `Bun.write(path, response)`
   hung on a download and pvlab exited 0 with no result and no artifact (no
@@ -426,7 +435,10 @@ from the next run on).
   failed (status 0, no text, 10 s client timeout), first at 1.3 s and 0.8 s,
   in one run of about 50 s that ended before the logged restart (DC02d).
   Wait for the restart before measuring: run 1 did not, and three of its
-  rows look like restart overlaps.
+  rows look like restart overlaps (one of them, DC02b at timeout 4 s, was
+  taken across a sleep of the orchestrator Mac: void; host sleep audit,
+  #234). Run 4's figures spanned no sleep (its one sleep fell between
+  DC02d and DC02e): unaffected.
 - **The new pool is what Postgres sees**: `db_pool` 70 and 90 read back and
   measured 70 and 90 (DC02a). Bounds sent and refused with 400: `db_pool`
   1001 (`db_pool: Too big: expected number to be <=1000`), -1 (`db_pool: Too
@@ -498,7 +510,8 @@ from the next run on).
   `linesForUa` counts PostgREST access-log lines by User-Agent, polling until
   two reads agree. Resize waits for `max_connections` to read the target,
   then watches 300 s (run 2 "settled" at 41 s, then a Management API read
-  timed out and Data API calls failed on the client).
+  timed out and Data API calls failed on the client; both came at sleeps
+  of the orchestrator Mac, 23:48:34 to 23:52:48 UTC, #234).
 - **Request rate on Small stops at about 850 to 1,020 req/s** (DC04b,
   DC07; closed-loop `oha`, one indexed point read, anon key): DC04b 825
   req/s at c=128, 925 at 256, 918 at 512, 1020 at 1024 with 12.8 %
@@ -583,12 +596,14 @@ from the next run on).
   other refreshes, at c=2048 and in the pool-70 arm, read 0/70/70, at
   moments not recorded (see RUNLOG). Earlier steps' latency growth fits
   the same queue, but the edge and gateway were not instrumented.
-- **`db_pool` 150 and 250 did not raise throughput or lower p50 on 4XL at
-  that load** (DC08c, one step each at c=3072): p50 281 and 278 ms
+- **`db_pool` 250 did not raise throughput, and neither 150 nor 250
+  lowered p50, on 4XL at that load** (DC08c, one step each at c=3072; the
+  pool-150 arm's req/s is void, #234): p50 281 and 278 ms
   against 273 and 274 ms at pool 70; p95/p99 were higher (362/490 and
   353/462 against 320/384 and 328/379), one step per arm. req/s 4,830
-  (that arm lost about one round of clients) and 5,901, against 6,148 and
-  6,210. Most connections sat idle (133 to 149 idle at 150, 173 to 240 at
+  (void: that arm lost about one round of clients, which fits a sleep of
+  the orchestrator Mac inside DC08, #234; its in-region latencies stand)
+  and 5,901, against 6,148 and 6,210. Most connections sat idle (133 to 149 idle at 150, 173 to 240 at
   250). 250 is below the requests in flight, so issue #5336's workaround
   (pool at least the concurrent requests) was not tested. `db_pool` 250
   PATCHed 200 this time (DC04d's 500 not reproduced, not investigated).
@@ -3704,7 +3719,8 @@ because `harness/dist/pvlab` is a linux-x64 build.
   answering. A Data API read (`rest_read`, service_role, up on `200` only)
   answered `503 PGRST002` for 15 and 14 s in two small-database restores
   (RP06 R24, R25) and for 192 to 544 s in the 7 RP07 restores that carried
-  the probe (R18, R19, R22, R23; R15 had none).
+  the probe (R18, R19, R22, R23; R15 had none; R18's and R19's 3 GB windows
+  are upper bounds, a sleep of the orchestrator Mac inside them, #234).
   Use `restReadProbe` from `lib/rp.ts` for any "is the Data API up" claim.
 - **The PITR range's upper bound is the archiver's last archive time
   (2026-10-22/23, RP06).** The `restore-pitr` refusal's `<latest>`,
@@ -3714,7 +3730,10 @@ because `harness/dist/pvlab` is a linux-x64 build.
   directly (R24, R25); the backups field is not a physical-backup date.
   `archive_timeout=120`. With one INSERT per ~200 ms the bound's lag ran 1 to
   107 s in a 120 s sawtooth (80 samples, one 227 s first sample); idle it grew
-  to 752 s over 20 min (51 of 75 samples past 120 s).
+  to 752 s by the 75th sample (51 of 75 past 120 s), when a sleep of the
+  orchestrator Mac ended the 20 min phase 5 samples early (values
+  unaffected; 752 s is a lower bound on the maximum a full 20 min would have
+  reached; #234).
 - **A restore to the quoted latest instant is a restore to an LSN and drops
   the tail before it (RP06).** `postgres_logs`: `starting point-in-time
   recovery to WAL location (LSN) ...` (RP06 R24, RP07 R23) and `recovery
@@ -3726,8 +3745,10 @@ because `harness/dist/pvlab` is a linux-x64 build.
   the target and T, the bound's age at T (87 and 111 s in R24, R25). The API
   answers `201` and the project returns healthy either way.
 - **PITR restore time against size on Small (RP07, 2026-10-22/23).** Back to
-  `ACTIVE_HEALTHY` in 221 to 322 s at 3111 to 3210 MB (n=4) and 475 to 787 s
-  at 10441 to 10482 MB (n=5); `redo done ... elapsed` in `postgres_logs`
+  `ACTIVE_HEALTHY` at 3111 to 3210 MB in 222 and 232 s timed awake (R15,
+  R23); R18 and R19 came back between about 67 and 221 s and between about
+  59 and 322 s (first polls after a sleep of the orchestrator Mac, #234);
+  475 to 787 s at 10441 to 10482 MB (n=5, unaffected); `redo done ... elapsed` in `postgres_logs`
   166.13 s (R23, 3 GB), 278.96 s (R23, 10 GB), 512.03 s (R22, 10 GB). Pooler
   down 176 to 531 s, Storage 12 to 18 s. Disk pre-grown to 40 GB (`POST
   /config/disk`, applied after 302 s in R15, R18, R19, R22 and 301 s in
@@ -3776,7 +3797,8 @@ because `harness/dist/pvlab` is a linux-x64 build.
   resolution: a short stale window, not a measured duration. A restore target
   hours or days old was not run. RP07 R18's 3 GB restore (2026-10-22) ended
   with the current password refused (`cred_final_current` `refused`; pooler
-  down 322 s against 221 s to healthy). It did not recur in RP08's 10
+  down 322 s against 221 s to healthy); void as a finding, since that watch
+  spanned two sleeps of the orchestrator Mac (#234). It did not recur in RP08's 10
   restores (2026-10-23): 8 ended `ok` in the watch, 2 ended `down` when the
   watch stopped and the next login worked; the one-poll refusal showed in 7.
 - **Storage did not 500 after any restore or unpause** (list, download with
@@ -5223,7 +5245,10 @@ in the RUNLOG.
   age equal to the time since load end and the last `pg_sleep` as query
   text at every sample to 965 s, the same pids from 30 s on; all `hd_a`
   closed between 965 and 1182 s idle, `hd_c` between 965 and 1265 s
-  (samples at 965, 1182 and 1265 s only). No keepalive queries
+  (samples at 965, 1182 and 1265 s only; the gaps are two sleeps of the
+  orchestrator Mac, 09:50:15 to 09:53:46 and 09:53:57 to 09:55:10 UTC; the
+  ages are read on the server and the Mac is not on the
+  Worker-Hyperdrive-origin path, so the window is unaffected, #234). No keepalive queries
   (`state_change` never reset), no recycling (same pids), no floor with no
   Worker traffic (`hd_b`, terminated, never reconnected). H02 saw 60 idle at
   891 s. Cloudflare's limits page lists a 10 minute idle connection timeout
