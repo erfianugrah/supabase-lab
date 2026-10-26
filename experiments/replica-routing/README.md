@@ -37,6 +37,14 @@ setup gate hunt) and `medium-serverless` (MS06: same-region replica).
 | RR03h0-h3 | same-region split: GETs through the load balancer from this vantage and from Edge Functions in three regions, order of nodes |
 | RR03i | lag under 50 single-row inserts a second for 300 s: `stale_ms` per host, `replay_lag` |
 | RR03k | `edge_logs` per method and path on the load balancer host |
+| RR04a-c | same-region shape as RR03 (Small primary and Small replica in ap-southeast-1, `pitr_7`); `rr4_ryw`, `rr4_seen`, `rr4_where`, `rr4_spin` |
+| RR04d | raw HTTP/1.1 HEAD, GET, POST, OPTIONS and an Auth GET on the replica, load balancer and primary hosts: status, every header, body bytes |
+| RR04e-g | read-your-writes through the load balancer: POST a row, then at once GET it (raw fetch 200, supabase-js 50, raw 200 under 50 inserts/s) |
+| RR04h0-h2 | the split under 1, 8 and 32 concurrent readers |
+| RR04i1-i2 | the split while four busy loops hold the replica's, then the primary's CPU |
+| RR04j | the split while the replica's replay is stopped (RR02h's conflict method, three cycles) |
+| RR04k | `POST /restart` while reading: what `-all` serves while each node is down |
+| RR04l | `edge_logs` on the three hosts: method, status, redirect identifier |
 
 The node that served a request is read from `public.rr_whoami()`
 (`pg_is_in_recovery()`, postmaster start time) called as a GET, not inferred
@@ -49,8 +57,9 @@ from latency. RR02 reads `public.rr_node()` instead, which also returns
 SUPABASE_ACCESS_TOKEN=... PVLAB_ORG_PRO=<pro-org-slug> make run
 PVLAB_ORG_PRO=<pro-org-slug> make run-rr02   # RR02, about 25 to 35 minutes
 PVLAB_ORG_PRO=<pro-org-slug> make run-rr03   # RR03, about 10 to 12 minutes
+PVLAB_ORG_PRO=<pro-org-slug> make run-rr04   # RR04, about 14 to 16 minutes
 make leftovers        # nothing named rr-* should print
-make facts RUN=evidence/<ts>/run-<stamp>.json        # ONLY=RR02 for an RR02 run
+make facts RUN=evidence/<ts>/run-<stamp>.json        # ONLY=RR02 for an RR02 run (RR03, RR04 likewise)
 make publish RUN=evidence/<ts>/run-<stamp>.json
 ```
 
@@ -105,10 +114,24 @@ Full record: `RUNLOG.md`; artifacts `out/2026-10-26/`. supabase-js 2.118.0.
 | Same-region split, GETs through the load balancer | workstation 111/89 and 94/106 replica/primary of 200; Edge Function ap-southeast-1 100/100 and 115/85 of 200; 20/30 and 27/23 of 50 from us-east-1, 26/24 and 24/26 from eu-west-1 (chosen region `SIN` for the SIN, IAD and DUB colos, the only region available); order not alternating (run 2, workstation keep-alive: 92 switches in 199) | RR03h |
 | Staleness and lag at 50 inserts/s, same region | replica host `stale_ms` (includes the 20 ms insert period and clock skew) p50 17 and 21 ms, p95 28 and 30, max 91 and 99 (primary host p50 12 both runs); `replay_lag` p50 2.2 and 2.1 ms | RR03i |
 
-Not measured: other region pairs, read load or write rates above 50
-inserts/s, behaviour with `hot_standby_feedback` on, the load balancer's
-rule, a replica that is down while the primary is untouched (the Management
-API has no per-replica restart as of 2026-10-23), recovery of the load
-balancer endpoint after the last replica is removed beyond 1,200 s, the
-same-region spreading rule, read-your-writes through the load balancer in
-the same-region shape, Auth-issued HS256 or third-party user tokens.
+## Measured (2026-10-26, RR04, two projects, two runs, Singapore workstation, primary and replica both in ap-southeast-1)
+
+Full record: `RUNLOG.md`; artifacts `out/2026-10-26/run-2026-10-26T06-19-17-837Z.json` and `run-2026-10-26T06-34-17-863Z.json`.
+
+| finding | value | module |
+|---|---|---|
+| HEAD on the replica's own host | 400 `text/plain`, Content-Length 75 and the same header names as the POST 400 (`Read replica does not handle POST requests for the path /rest/v1/rr4_where.`, 75 bytes); no `x-envoy-*` or `content-profile`, so by inference refused by the gateway in front of the replica's REST service rather than by PostgREST | RR04d |
+| HEAD through the load balancer | 200 from both nodes (replica 5 and 2 of 10), so the method rule did not apply to load balancer HEADs; `edge_logs` names the replica for those and logs them only under `-all`, as it does every load balancer request | RR04d, RR04l |
+| Read-your-writes through `-all` (POST, then GET at once) | 0 misses (row not visible) of 108, 25 and 93 replica-served reads (run 1), 0 of 107, 28 and 95 (run 2); POST p50 about 21 to 24 ms against `replay_lag` p50 2.3 to 2.7 ms (max 33.5 and 34.7 ms in RR04e); 0 of 456 replica-served reads in all, from this vantage | RR04e-g |
+| Split under 1, 8 and 32 concurrent readers | replica share 46.5, 49.9, 50.4 % (run 1); 48.2, 51.1, 49.8 % (run 2); 0 errors | RR04h |
+| Split with four busy loops on one node | replica share 48.7 and 49.7 % with the replica loaded, 50.3 and 50.8 % with the primary loaded; the loops barely slowed REST reads | RR04i |
+| Split while the replica's replay is stopped | `-all` sent 46 of 102 (run 1, one stop; 46 stale) and 180 of 343 (run 2, three stops; 160 stale) reads in the stale window to the replica; largest heartbeat age (`stale_ms`) served 29,613 and 30,669 ms | RR04j |
+| Project restart | while only the primary was failing, `-all` served 14 and 13 reads from the replica and failed 12 and 9 (none moved wholesale); edge_logs show 521/522 to both nodes | RR04k |
+
+Not measured: other region pairs, write rates above 50 inserts/s,
+behaviour with `hot_standby_feedback` on, the load balancer's rule, a
+replica that is down while the primary is untouched (the Management API has
+no per-replica restart as of 2026-10-23), recovery of the load balancer
+endpoint after the last replica is removed beyond 1,200 s, read-your-writes
+for a client much closer to the database than this vantage, a node slowed
+at the REST layer, Auth-issued HS256 or third-party user tokens.
