@@ -15,7 +15,16 @@
  *   CK06-<target>  per path: reads ok, bytes equal, reads where the body was
  *                  exactly the covering-chunk length, total plaintext asked,
  *                  total body bytes, median and p95 ms (info: one vantage),
- *                  cf-cache-status counts where the CDN answers.
+ *                  cf-cache-status counts where the CDN answers. On the three
+ *                  HTTP paths (since 2026-10-26): time to response headers vs
+ *                  body, the sign call (signed-url), the edge colo from cf-ray,
+ *                  Age, the first read's header names and cache headers, the
+ *                  Spearman correlation of time-to-headers with the range's
+ *                  start offset and with its length, of body time with the
+ *                  start offset, and one token per read
+ *                  (`<start MiB>+<len KiB>=<ttfb>/<total ms>,<cache>[,age<n>]`,
+ *                  total from the ranged GET to its last body byte).
+ *                  `error_messages` keeps the first message per error key.
  *
  * Pass = 100 of 100 reads equal the fixture slice and every body is exactly
  * the covering chunks (the server honoured the Range). (The first onprem runs
@@ -56,6 +65,26 @@ export function ranges(size: number, n = N, seed = 20261012): [number, number][]
   return out;
 }
 
+/**
+ * Spearman rank correlation without tie correction (ties are rare in ms and byte offsets; `scripts/ck06-reads.ts`
+ * feeds it rounded MiB/KiB, where a few lengths tie - tie-corrected values differ by up to 0.02 on the 2026-10-26
+ * runs). -2 when n < 3.
+ */
+export function spearman(xs: number[], ys: number[]): number {
+  const n = xs.length;
+  if (n < 3 || ys.length !== n) return -2;
+  const rank = (v: number[]) => {
+    const idx = v.map((x, i) => [x, i] as const).sort((a, b) => a[0] - b[0]);
+    const r = new Array<number>(n);
+    idx.forEach(([, i], k) => (r[i] = k + 1));
+    return r;
+  };
+  const rx = rank(xs);
+  const ry = rank(ys);
+  const d2 = rx.reduce((acc, r, i) => acc + (r - ry[i]!) ** 2, 0);
+  return Math.round((1 - (6 * d2) / (n * (n * n - 1))) * 100) / 100;
+}
+
 const pct = (xs: number[], p: number) => {
   const s = [...xs].sort((a, b) => a - b);
   return s.length ? s[Math.min(s.length - 1, Math.ceil((p / 100) * s.length) - 1)]! : -1;
@@ -81,7 +110,22 @@ const mod: TestModule = {
       try {
         const res = await runClient({ cmd: "read-ranges", directory: directory(l), creds: credsFor(l, "viewer"), tenant: a.tenant, asset: a.id, file: l.run.fixtures.big.path, ranges: rs, paths: PATHS, spread: true });
         if (!res.result.ok) throw new Error(`${res.result.code} ${res.result.message}`);
-        const rows = res.result.rows as { path: string; s: number; e: number; ok: boolean; equal?: boolean; transferred?: number; need?: number; ms?: number; cache?: string; code?: string }[];
+        const rows = res.result.rows as {
+          path: string;
+          s: number;
+          e: number;
+          ok: boolean;
+          equal?: boolean;
+          transferred?: number;
+          need?: number;
+          ms?: number;
+          ttfb?: number;
+          fetch?: number;
+          sign?: number;
+          cache?: string;
+          hdr?: Record<string, string>;
+          code?: string;
+        }[];
         const m: Record<string, string | number> = { ranges: rs.length, reads: rows.length, plaintext_bytes_asked: rs.reduce((n, [s, e]) => n + (e - s), 0) };
         let bad = 0;
         const errs = new Map<string, number>();
@@ -102,6 +146,36 @@ const mod: TestModule = {
           const cache = new Map<string, number>();
           for (const r of ok) if (r.cache) cache.set(r.cache, (cache.get(r.cache) ?? 0) + 1);
           if (cache.size) m[`${p}.cf_cache_status`] = [...cache].map(([k, v]) => `${k}:${v}`).join(" ");
+          // Where the time went on the HTTP paths (2026-10-26): headers vs body, the edge colo, Age, and
+          // whether time-to-headers follows the range's start offset or its length.
+          const http = ok.filter((r) => r.ttfb !== undefined);
+          if (http.length) {
+            m[`${p}.info_ttfb_ms_p50`] = pct(http.map((r) => r.ttfb!), 50);
+            m[`${p}.info_ttfb_ms_p95`] = pct(http.map((r) => r.ttfb!), 95);
+            m[`${p}.info_body_ms_p50`] = pct(http.map((r) => r.fetch! - r.ttfb!), 50);
+            if (http.some((r) => r.sign !== undefined)) m[`${p}.info_sign_ms_p50`] = pct(http.map((r) => r.sign ?? 0), 50);
+            m[`${p}.ttfb_vs_start_spearman`] = spearman(http.map((r) => r.s), http.map((r) => r.ttfb!));
+            m[`${p}.ttfb_vs_len_spearman`] = spearman(http.map((r) => r.e - r.s), http.map((r) => r.ttfb!));
+            // Added after the 2026-10-26 runs: on signed-url MISS reads the wait was in the body and followed the start offset.
+            m[`${p}.body_vs_start_spearman`] = spearman(http.map((r) => r.s), http.map((r) => r.fetch! - r.ttfb!));
+            const count = (f: (h: Record<string, string>) => string | undefined) => {
+              const c = new Map<string, number>();
+              for (const r of http) {
+                const v = f(r.hdr ?? {}) ?? "-";
+                c.set(v, (c.get(v) ?? 0) + 1);
+              }
+              return [...c].map(([k, v]) => `${k}:${v}`).join(" ");
+            };
+            m[`${p}.colo`] = count((h) => h.colo);
+            m[`${p}.age_present`] = http.filter((r) => r.hdr?.age !== undefined).length;
+            const first = http[0]!.hdr ?? {};
+            m[`${p}.header_names`] = first.names ?? "";
+            for (const k of ["cache-control", "server-timing", "via", "x-cache", "x-served-by"]) if (first[k]) m[`${p}.first_${k.replace(/-/g, "_")}`] = first[k]!;
+            // One token per read, in read order: start MiB + length KiB = ttfb/total ms, cache, age.
+            m[`${p}.reads`] = http
+              .map((r) => `${(r.s / 1048576).toFixed(0)}+${Math.round((r.e - r.s) / 1024)}=${r.ttfb}/${r.fetch}${r.cache ? `,${r.cache}` : ""}${r.hdr?.age ? `,age${r.hdr.age}` : ""}`)
+              .join(" ");
+          }
           for (const r of pr.filter((x) => !x.ok)) {
             const d = (r as { detail?: { status?: number; code?: string } }).detail;
             const k = `${p}:${r.code}${d?.status ? ` ${d.status}` : ""}${d?.code ? ` ${d.code}` : ""}`;

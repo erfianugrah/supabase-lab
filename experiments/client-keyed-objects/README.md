@@ -100,4 +100,5 @@ keys, test users' passwords, the per-run KEKs (`work/keysvc/`, deleted by
 - `lib/sigv4.ts` - raw SigV4 for S3 requests whose XML error body CK12 keeps.
 - `scripts/ck.ts` - stack, key service, managed projects, setup, sweep.
 - `scripts/parity.ts` - the parity table from artifacts.
+- `scripts/ck06-reads.ts` - per-read view of a CK06 artifact's `<path>.reads` tokens (body time against range start and length).
 - `compose/` - the per-target compose overrides for the self-hosted stack.
