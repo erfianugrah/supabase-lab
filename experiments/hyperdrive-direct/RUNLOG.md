@@ -10,7 +10,10 @@ Run: `PVLAB_ORG_PRO=<slug> pvlab --where local --experiment hyperdrive-direct --
 about 21 minutes, most of it the 900 s recovery watch, `PVLAB_H02_RECOVERY_S`;
 H03: `--only H03`, about 36 minutes, most of it the 1800 s idle watch,
 `PVLAB_H03_WATCH_S`; `PVLAB_H03_SKIP_Q1=1` runs the Q2 arms only, about 6
-minutes)
+minutes; H04: `--only H04`, about 54 minutes, most of it the 2700 s idle
+watch, `PVLAB_H04_WATCH_S`, then a resize to `PVLAB_H04_Q2_SIZE`
+(`ci_medium`) for Q2; `PVLAB_H04_SKIP_Q1=1` / `PVLAB_H04_SKIP_Q2=1` skip a
+half)
 with `CLOUDFLARE_EMAIL` + `CLOUDFLARE_API_KEY` + `CLOUDFLARE_ACCOUNT_ID` in the
 env (the Global API Key trio; a scoped token fails wrangler's account lookup
 on this box). H01 self-skips without them.
@@ -36,6 +39,16 @@ on this box). H01 self-skips without them.
   free slots, and the first refused connection made PostgREST fail its
   schema-cache load, answer PGRST002 to the rest, and reinitialise its pool
   about 8 s later (three runs).
+- H04 (2026-10-26): with `log_disconnections` on, every idle origin
+  connection ended in a plain `disconnection` line with, by count, no FATAL
+  or error line (closed from the Hyperdrive end of the origin connection,
+  not by Postgres), after 903 to 1324 s idle, in batches per source address;
+  a request every 120 s through one config kept open only the connections it
+  ran on (one run). On Medium every client-visible 503 PGRST002 carried
+  `x-envoy-attempt-count: 6` and left 6 PostgREST access lines: an Envoy
+  (the API gateway's, per data-api-capacity DC12) sends the request again
+  after a 503 as after a 504; 200s again equalled pool connections plus free
+  slots (two runs).
 
 ## 2026-10-05 - IPv6-only origin and named prepared statements (H01)
 
@@ -472,3 +485,202 @@ Evidence: `out/2026-10-23/run-2026-10-23T09-28-56-267Z.json`,
 Worker and the three configs deleted in each run's `finally`; the project
 list no longer had the ref on the first read (0 s) and `wrangler hyperdrive
 list` held 0 of the run's config ids (all three runs).
+
+## 2026-10-26 - Who closes idle origin connections; the 503 resend on Medium (H04)
+
+Follow-ups from H03. Q1: who closes Hyperdrive's idle origin connections and
+after how long idle, sampled without gaps; does a request on one connection
+keep the config's other connections open; does the documented 10 minute idle
+timeout describe the Worker-to-Hyperdrive side instead. Q2: what sends each
+request to PostgREST six times when PostgREST answers 503 (H03: 6 access
+lines per client-visible 503), and does H03's count (200s = pool connections
+plus free slots) hold on a size other than Small.
+
+Setup: one fresh Pro-org project per run, `ap-southeast-1`, Postgres 17.11,
+Small for Q1, then resized to Medium (`ci_medium`, `max_connections` 90 to
+120) for Q2; wrangler 4.147.0, `pg` 8.23.1. Before any Hyperdrive
+connection, `PUT /config/database/postgres` with `log_connections` and
+`log_disconnections` true (200, read back true, sessions report `on`).
+Configs on `db.<ref>.supabase.co:5432`, caching disabled: A (`hd_a`, no limit
+flag, read back 60), B (`hd_b`, limit 5, the Q2 observer) and T (`hd_t`, no
+limit flag, read back 60). Observer `public.h04_snap`, the same as H03's
+`h03_snap` (client addresses become per-run labels such as `v6#3`).
+
+Runs, both in `out/2026-10-26/`: run 1 (`run-2026-10-26T05-58-42-911Z.json`)
+was the shakedown, with a 150 s Q1 watch (nothing closed in it; its Q1 log
+read, a `limit 5000` query ordered by timestamp, came back with exactly 1000
+rows starting 598 s before load end, so its Q1 log fields are not used) and
+the full Q2; run 2 (`run-2026-10-26T06-14-10-950Z.json`) ran the 2700 s Q1
+watch and Q2. Both ran from uncommitted code on base adc597c (the lab commit
+both artifacts record, which predates the module). Run 1 ran an earlier
+revision: its `postgres_logs` read used `limit 5000` over the last 3 hours
+instead of starting 5 s before load end, it did not fold session times
+before redaction (its grouped lines show them as `<ip>`), and it deployed
+the Worker without a retry. Run 2 ran the module as committed, apart from
+comment edits. An attempt between the two runs failed at `wrangler deploy`
+before measuring anything; the module deleted its project and configs, and
+its Worker, uploaded despite the error, was deleted by hand. The module now
+marks the Worker for deletion before deploying and retries the deploy.
+Vantage: the Singapore Mac under `caffeinate -i`, with other workloads on
+the same host at the same time.
+
+### Q1: who closes idle origin connections (run 2)
+
+Fill: 40 concurrent 20 s holds through A and 20 through T; mid-fill `hd_a`
+38, `hd_t` 20 and `hd_b` 6 (B's warm-up connections, last query end 32-38 s
+before load end; the warm-up as a whole ended 26 s before). A answered 38 x
+200 and 2 x `58000 Timed out while waiting for an open slot in the pool.`
+(15322-15323 ms), T 20 x 200. Then nothing through A or B; T got one
+`select` every 120 s, returning from 120 s to 1441 s after load end (12
+requests). 271 samples through the Management API on a fixed 10 s schedule
+over 2700 s: none failed, the largest gap between two samples was 11356 ms,
+and the host was suspended for 0 ms.
+
+Idle at close is the disconnection line's time minus the connection's last
+query end (sample time minus `state_change` age, latest seen).
+
+| connections | traffic after load end | closed (s after load end) | idle at close (s) |
+|---|---|---|---|
+| A, 38 | none | 1180-1221 | 1180-1222 (median 1205) |
+| B, 6 | none since warm-up | 1185-1220 | 1218-1252 |
+| T, 16 the trickle never used | none on them | 1238 (5) and 1323-1324 (11) | 1238-1324 |
+| T, 4 the trickle used | 2 to 5 requests each, last query end 1080-1440 s | 2224 (3) and 2674 (1) | 903-1233 |
+
+- Who closes: all 64 closes are `disconnection: session time ...` lines at
+  LOG severity (38 `hd_a`, 6 `hd_b`, 20 `hd_t`, every one matched by pid to
+  a watched backend). The query returned 122 `hd_*` rows from 5 s before
+  load end that were not connection lines: those 64 plus 58, the number of
+  20 s holds that answered 200 (38 + 20), whose `duration:` lines open the
+  grouped list (truncated in the artifact at 6000 characters). So, by count
+  (122 = 64 + 58), there was no FATAL line (a server-side close logs
+  `terminating connection due to ...`), no ERROR, no `SSL error` and no
+  `could not receive data from client`. `idle_session_timeout` 0,
+  `tcp_keepalives_idle` 1800. The sessions are TLS (`SSL enabled
+  (protocol=TLSv1.3` in the connection lines). In Postgres 17
+  (REL_17_STABLE at 3e914438), a TCP close or reset without a TLS
+  close_notify reaches `be_tls_read` as `SSL_ERROR_SYSCALL` or
+  `SSL_ERROR_SSL` (src/backend/libpq/be-secure-openssl.c:787-800, the
+  latter logging `SSL error: ...`, the former turned into ECONNRESET and
+  logged as `could not receive data from client`,
+  src/backend/libpq/pqcomm.c:938-941); only a TLS close_notify
+  (`SSL_ERROR_ZERO_RETURN`, be-secure-openssl.c:802-805) or a protocol
+  Terminate message ends the session with nothing above DEBUG1
+  (src/backend/tcop/postgres.c:379-394 and 4993-5000). Reading: each
+  connection was closed from the Hyperdrive end of the origin connection by
+  the TLS peer (Hyperdrive, or a proxy holding Hyperdrive's TLS session),
+  with a Terminate message or a TLS shutdown; Postgres did not close any.
+  This closer is not the Worker's `client.end()`, which ends the Worker's
+  connection to Hyperdrive after each request; the origin closes came 903 s
+  and more after the last request on each connection.
+- No connection was replaced or added: every config's `pids_seen` equals
+  the count present at load end (A 38 and T 20 from the fill, B 6 from the
+  warm-up), the 12 trickle requests ran on 4 of T's fill connections
+  (105-759 ms per request, measured at the harness), and the count of
+  `connection authorized` lines for `hd_*` after load end returned no rows.
+- Batches: every backend from one source address that nothing used after
+  load end closed in the same second. A's five addresses closed at 1180 s
+  (12 backends), 1204 s (7 and 5), 1215 s (5) and 1221 s (9); B's six
+  backends, one per address, at six different times from 1185 to 1220 s.
+  T's untouched backends on four of its five addresses closed together at
+  1323-1324 s and on the fifth at 1238 s.
+- One request does not reset the other connections' idle clock. The 16 T
+  connections the trickle never used closed at 1238-1324 s idle while T
+  served a request every 120 s, the same range as A and B with no traffic
+  at all. The 4 it used stayed open and closed later, at 903, 1024, 1143 and
+  1233 s after their own last query: a request keeps only the connection it
+  ran on, and restarts that connection's idle time.
+- Reading on the rule (inferred from batch times, not observed; one run): a
+  periodic sweep that closes connections idle past a threshold fits every
+  close. Three used connections on three addresses closed together at
+  2224 s with 903-1143 s idle. The fourth (`v6#4`, last query end 1440 s,
+  the request returned at 1441 s, so 784 s idle at 2224 s) stayed open until
+  2674 s; its address had closed together with the other three at
+  1323-1324 s, so if it shared the 2224 s sweep, the threshold lies between
+  784 and 903 s, and the untouched connections' 1180-1324 s idle at close
+  then implies a sweep period over 421 s (closes come up to one period after
+  the threshold). Under that premise the threshold is above the documented
+  10 minutes; without it, the closes (none below 903 s idle here, none
+  below 965 s in H03) cannot separate a 10-minute threshold with a sweep of
+  303 s or more from a longer threshold.
+- Against H03: H04's untouched closes (1180-1324 s idle) overlap H03's
+  brackets (`hd_a` 965-1182 s, `hd_c` 965-1265 s) without falling inside
+  them: 26 of A's 38 closed at 1204-1222 s idle, after H03's 1182 s bound,
+  and 11 of T's 16 at 1323-1324 s, after H03's 1265 s bound. H03's 217 s
+  and 83 s sample gaps were Mac sleeps of 211 s and 73 s
+  (experiments/platform-downtime/out/2026-10-26/host-sleep/, `overlap.txt`
+  and `pm-events.tsv`).
+- The documented 10 minutes: Cloudflare's limits page lists "Idle connection
+  timeout | 10 minutes" in the "Connection limits" table, which it introduces
+  with "These limits apply to connections between Hyperdrive and your origin
+  database." (https://developers.cloudflare.com/hyperdrive/platform/limits/,
+  "Last updated Jun 9, 2026", read 2026-10-26). The connection lifecycle page
+  says client connections inside a Worker "are only kept alive for the
+  duration of a single invocation"
+  (https://developers.cloudflare.com/hyperdrive/concepts/connection-lifecycle/).
+  So the docs put the 10 minutes on the origin side, not on Worker to
+  Hyperdrive; Worker-to-Hyperdrive idle was not probed. Measured origin
+  closes came after 903-1324 s idle.
+
+### Q2: the 503 resend, on Medium (runs 1 and 2)
+
+H03's arms on Medium, with free slots set by filling A (80 concurrent 45 s
+holds), reading free slots 6 s later through B, and filling T with as many
+35 s holds as leave a target of 6 (b), 3 (c) or 0 (d) free. Each arm: 30
+concurrent `dc_sleep_xl(5)` and one `dc_ping` (service_role key), with the
+response's `x-envoy-attempt-count` header kept for every answer. PostgREST:
+`db_pool` null, `db_pool_acquisition_timeout` 10. "Access lines" are
+PostgREST log lines carrying the arm's User-Agent, by status and body size.
+
+| arm | run | free slots before | pool before | `dc_sleep_xl` 200 / 503 PGRST002 | 503 latency ms | ping | client 503s | access lines (119 B / 234 B) |
+|---|---|---|---|---|---|---|---|---|
+| a: reset, no load | 1 | 108 | 1 | 30 / 0 | - | 200 a1 | 0 | 0 |
+| a | 2 | 108 | 1 | 30 / 0 | - | 200 a1 | 0 | 0 |
+| b: reset, to 6 free | 1 | 6 | 1 | 7 / 23 | 1166-2316 | 503 a6 | 24 | 144 (72 / 72) |
+| b | 2 | 6 | 1 | 7 / 23 | 1063-2366 | 200 a1 | 23 | 138 (79 / 59) |
+| c: warm 12, to 3 free | 1 | 5 | 12 | 17 / 13 | 744-2255 | 200 a1 | 13 | 78 (51 / 27) |
+| c | 2 | 3 | 12 | 15 / 15 | 1300-2426 | 200 a1 | 15 | 90 (56 / 34) |
+| d: reset, to 0 free | 1 | 2 | 1 | 3 / 27 | 1332-2772 | 200 a1 | 27 | 162 (81 / 81) |
+| d | 2 | 0 | 1 | 1 / 29 | 973-2174 | 503 a6 | 30 | 180 (90 / 90) |
+
+(`aN` is the `x-envoy-attempt-count` value.)
+
+- The resend is an Envoy's (the API gateway's, as placed by
+  data-api-capacity DC12). Measured: every 503 PGRST002 the client saw
+  carried `x-envoy-attempt-count: 6` (`503/PGRST002 a6` in all six loaded
+  arm-runs) and every 200 in a burst `1`; the access lines were exactly 6
+  per client 503 in all six (144 = 6 x 24, 138 = 6 x 23, 78 = 6 x 13, 90 =
+  6 x 15, 162 = 6 x 27, 180 = 6 x 30). In run 2's arm b reset, one ping
+  answered `200 a5`: the answer came from Envoy's fifth attempt (the first
+  four attempts' answers were not recorded; pings carry no User-Agent, so
+  their access lines were not counted). Same factor and header as
+  data-api-capacity DC12's 504 PGRST003 (`x-envoy-attempt-count: 6`;
+  DC01b's 6 log lines per 504), and DC03d saw a 500 that was not sent
+  again: observed, 503 and 504 resent, 500 not. The retry configuration was
+  not read.
+- 200s equalled pool connections before the burst plus free slots in all six
+  loaded arm-runs on Medium (7 = 1 + 6, 17 = 12 + 5, 3 = 1 + 2 in run 1; 7 =
+  1 + 6, 15 = 12 + 3, 1 = 1 + 0 in run 2), as in H03 on Small. The 503s came
+  in 744-2772 ms, without waiting for the 10 s acquisition timeout, and
+  `authenticator` read 1 at 10 s after every loaded burst, as in H03.
+- Access-line body sizes: 119 bytes is the PGRST002 body H03 saw on pings;
+  the 234-byte bodies were half of arm d's lines in both runs and of arm b's
+  in run 1 (72 of 144), and fewer in arm b run 2 (59 of 138) and arm c (27
+  of 78, 34 of 90). Their error code was not captured.
+- Arm b's reset (terminating 32 and 31 idle `authenticator` backends): 12
+  and 11 pings to 3 good in a row, 9 and 8 of them `503/PGRST002 a6`, as in
+  H03 on Small.
+
+Not settled: the sweep's period and threshold (inferred from batch times
+above, one Q1 run, one region, one Workers plan, not recorded); whether
+Hyperdrive or a proxy holding its TLS session sends the close;
+Worker-to-Hyperdrive idle (not probed); the code of the 234-byte 503 bodies;
+Q2 on Large and with other PostgREST settings.
+
+Evidence: `out/2026-10-26/run-2026-10-26T05-58-42-911Z.json` and
+`run-2026-10-26T06-14-10-950Z.json` (redacted, with facts.md; per-pid
+lifecycle and disconnection lines in run 2's evidence field). Project,
+Worker and the three configs deleted in each run's `finally`: the project
+list no longer had the ref on the first read (0 s) and `wrangler hyperdrive
+list` held 0 of the run's config ids (both runs); after run 2 the org had no
+`pvlab-h04` project and the account no `h04-probe` Worker or config (checked
+2026-10-26 07:09 UTC).
