@@ -1,0 +1,234 @@
+{
+  "startedAt": "2026-10-26T00:24:41.341Z",
+  "finishedAt": "2026-10-26T00:36:44.763Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "data-api-capacity",
+  "labCommit": "848b9f3",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "DC15a-patch45",
+      "title": "PATCH db_pool 45",
+      "status": "info",
+      "detail": "PATCH 200 ; restart 1.4 s after; read back 45",
+      "measurements": {
+        "arm": "custom",
+        "patch_status": 200,
+        "restart_delay_s": 1.4,
+        "db_pool_readback": "45"
+      },
+      "durationMs": 722146
+    },
+    {
+      "id": "DC15a-small",
+      "title": "custom: Small, db_pool 45",
+      "status": "info",
+      "detail": "db_pool 45; max_connections 90; pgrst_db_pool_max t+0:45; mid-burst PgSleep 45 / 45 (k 70/70); outcomes 200:70 | 200:70",
+      "measurements": {
+        "arm": "custom",
+        "step": "Small, db_pool 45",
+        "config_db_pool": "45",
+        "config_acquisition_timeout": "10",
+        "max_connections": 90,
+        "idle_authenticator_backends": 1,
+        "pgrst_db_pool_max_first": 45,
+        "pgrst_db_pool_max_last": 45,
+        "pgrst_db_pool_max_changes": "t+0:45",
+        "metrics_scrapes": 18,
+        "node_cpus": 2,
+        "burst1_k": 70,
+        "burst1_mid_pgsleep": 45,
+        "burst1_mid_authenticator_total": 46,
+        "burst1_mid_client_backends": 50,
+        "burst1_statuses": "200:70",
+        "burst1_codes": "none",
+        "burst2_k": 70,
+        "burst2_mid_pgsleep": 45,
+        "burst2_mid_authenticator_total": 46,
+        "burst2_mid_client_backends": 49,
+        "burst2_statuses": "200:70",
+        "burst2_codes": "none"
+      },
+      "durationMs": 722146
+    },
+    {
+      "id": "DC15b-resize",
+      "title": "custom: resize to ci_large",
+      "status": "info",
+      "detail": "PATCH 200 after 0 x 429; settled 53 s; max_connections 160; watch failures 1 of 60 (521:1) 521 <!DOCTYPE html> <!--[if lt IE 7]> <html class=\"no-js ie6 oldie\" lang=\"en-US\"> <![endif]--> <!--[if IE 7]> <html class=\"no-js ie7 oldie\" lang=\"en-US\"> <![endif]--> <!--[if IE 8]> <html class=\"no-js",
+      "measurements": {
+        "arm": "custom",
+        "variant": "ci_large",
+        "resize_status": 200,
+        "addon_429_retries": 0,
+        "settled_s": 53,
+        "max_connections": 160,
+        "watch_failed": 1,
+        "watch_samples": 60,
+        "watch_fail_statuses": "521:1"
+      },
+      "durationMs": 722146
+    },
+    {
+      "id": "DC15b-large",
+      "title": "custom: Large after resize, db_pool 45 set on Small",
+      "status": "info",
+      "detail": "db_pool 45; max_connections 160; pgrst_db_pool_max t+0:45; mid-burst PgSleep 45 / 45 (k 70/70); outcomes 200:70 | 200:70",
+      "measurements": {
+        "arm": "custom",
+        "step": "Large after resize, db_pool 45 set on Small",
+        "config_db_pool": "45",
+        "config_acquisition_timeout": "10",
+        "max_connections": 160,
+        "idle_authenticator_backends": 2,
+        "pgrst_db_pool_max_first": 45,
+        "pgrst_db_pool_max_last": 45,
+        "pgrst_db_pool_max_changes": "t+0:45",
+        "metrics_scrapes": 18,
+        "node_cpus": 2,
+        "burst1_k": 70,
+        "burst1_mid_pgsleep": 45,
+        "burst1_mid_authenticator_total": 46,
+        "burst1_mid_client_backends": 49,
+        "burst1_statuses": "200:70",
+        "burst1_codes": "none",
+        "burst2_k": 70,
+        "burst2_mid_pgsleep": 45,
+        "burst2_mid_authenticator_total": 46,
+        "burst2_mid_client_backends": 49,
+        "burst2_statuses": "200:70",
+        "burst2_codes": "none"
+      },
+      "durationMs": 722146
+    },
+    {
+      "id": "DC15c-patch120",
+      "title": "PATCH db_pool 120",
+      "status": "info",
+      "detail": "PATCH 200 ; restart 1 s after; read back 120",
+      "measurements": {
+        "arm": "custom",
+        "patch_status": 200,
+        "restart_delay_s": 1,
+        "db_pool_readback": "120"
+      },
+      "durationMs": 722146
+    },
+    {
+      "id": "DC15c-large",
+      "title": "custom: Large, db_pool 120",
+      "status": "info",
+      "detail": "db_pool 120; max_connections 160; pgrst_db_pool_max t+0:120; mid-burst PgSleep 120 / 120 (k 150/150); outcomes 0:1 200:149 | 200:150",
+      "measurements": {
+        "arm": "custom",
+        "step": "Large, db_pool 120",
+        "config_db_pool": "120",
+        "config_acquisition_timeout": "10",
+        "max_connections": 160,
+        "idle_authenticator_backends": 1,
+        "pgrst_db_pool_max_first": 120,
+        "pgrst_db_pool_max_last": 120,
+        "pgrst_db_pool_max_changes": "t+0:120",
+        "metrics_scrapes": 18,
+        "node_cpus": 2,
+        "burst1_k": 150,
+        "burst1_mid_pgsleep": 120,
+        "burst1_mid_authenticator_total": 121,
+        "burst1_mid_client_backends": 124,
+        "burst1_statuses": "0:1 200:149",
+        "burst1_codes": "client:1",
+        "burst2_k": 150,
+        "burst2_mid_pgsleep": 120,
+        "burst2_mid_authenticator_total": 121,
+        "burst2_mid_client_backends": 124,
+        "burst2_statuses": "200:150",
+        "burst2_codes": "none"
+      },
+      "durationMs": 722146
+    },
+    {
+      "id": "DC15d-resize",
+      "title": "custom: resize to ci_small",
+      "status": "info",
+      "detail": "PATCH 200 after 0 x 429; settled 92 s; max_connections 90; watch failures 0 of 60 (none) ",
+      "measurements": {
+        "arm": "custom",
+        "variant": "ci_small",
+        "resize_status": 200,
+        "addon_429_retries": 0,
+        "settled_s": 92,
+        "max_connections": 90,
+        "watch_failed": 0,
+        "watch_samples": 60,
+        "watch_fail_statuses": "none"
+      },
+      "durationMs": 722146
+    },
+    {
+      "id": "DC15d-small",
+      "title": "custom: Small after resize, db_pool 120 set on Large",
+      "status": "info",
+      "detail": "db_pool 120; max_connections 90; pgrst_db_pool_max t+0:120; mid-burst PgSleep -1 / -1 (k 150/150); outcomes 200:84 503:66 | 200:84 503:66",
+      "measurements": {
+        "arm": "custom",
+        "step": "Small after resize, db_pool 120 set on Large",
+        "config_db_pool": "120",
+        "config_acquisition_timeout": "10",
+        "max_connections": 90,
+        "idle_authenticator_backends": 2,
+        "pgrst_db_pool_max_first": 120,
+        "pgrst_db_pool_max_last": 120,
+        "pgrst_db_pool_max_changes": "t+0:120",
+        "metrics_scrapes": 18,
+        "node_cpus": 2,
+        "burst1_k": 150,
+        "burst1_mid_pgsleep": -1,
+        "burst1_mid_authenticator_total": -1,
+        "burst1_mid_client_backends": -1,
+        "burst1_statuses": "200:84 503:66",
+        "burst1_codes": "PGRST002:66",
+        "burst2_k": 150,
+        "burst2_mid_pgsleep": -1,
+        "burst2_mid_authenticator_total": -1,
+        "burst2_mid_client_backends": -1,
+        "burst2_statuses": "200:84 503:66",
+        "burst2_codes": "PGRST002:66"
+      },
+      "durationMs": 722146
+    },
+    {
+      "id": "DC15e-after",
+      "title": "custom: after the last read",
+      "status": "info",
+      "detail": "client backends 4/90 (authenticator/PostgREST 14.18:1 pgbouncer/-:1 postgres/mgmt-api:1 supabase_admin/postgres_exporter:1); Management query 201 ; 5 good pings after 4 s",
+      "measurements": {
+        "arm": "custom",
+        "client_backends": 4,
+        "max_connections": 90,
+        "by_role_app": "authenticator/PostgREST 14.18:1 pgbouncer/-:1 postgres/mgmt-api:1 supabase_admin/postgres_exporter:1",
+        "mgmt_query_status": 201,
+        "mgmt_query_error": "",
+        "healthy_after_s": 4
+      },
+      "durationMs": 722146
+    },
+    {
+      "id": "DC99",
+      "title": "DC99: project deleted and gone from the listing",
+      "status": "pass",
+      "detail": "DELETE 200; absent from GET /projects after 0 s",
+      "measurements": {
+        "delete_status": 200,
+        "gone_from_listing_s": 0
+      },
+      "durationMs": 1277
+    }
+  ]
+}

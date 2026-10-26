@@ -10,6 +10,10 @@ TS := $(shell date +%Y%m%d-%H%M%S)
 # Include DC99 in ONLY or the project is left running; `make clean` lists
 # leftovers by prefix and `make clean DELETE=1` removes them.
 # Runs from source with bun: harness/dist/pvlab is a linux-x64 build.
+# DC13,DC14 resize Small -> XL -> 2XL (PVLAB_DC13_SIZES) and run on 2XL,
+# about 70 minutes; PVLAB_DC_DBPASS lets realtime-surface RT05 reuse the
+# project (PVLAB_PEER_RT, PVLAB_RT_DBPASS). DC15 runs one project per
+# process: PVLAB_DC15_ARM=custom or control, with DC99.
 ONLY ?= DC01,DC02,DC03,DC99
 
 .PHONY: run clean publish-evidence

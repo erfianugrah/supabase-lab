@@ -20,6 +20,8 @@ export interface PoolScrape {
   /** node_cpu_seconds_total summed over busy modes / the idle mode. */
   busy: number;
   idle: number;
+  /** node_cpu_seconds_total series with mode="idle", i.e. the CPUs the node reports. */
+  cpus: number;
 }
 
 export interface ScrapeResult {
@@ -46,7 +48,7 @@ export async function scrapeMetrics(p: DcProject, timeoutMs = 8_000): Promise<Sc
       .join("; ");
     if (!res.ok) return { status: res.status, s: null, names: [], cacheHeaders, poolLines: [] };
     const text = await res.text();
-    const s: PoolScrape = { t: Date.now(), waiting: -1, available: -1, max: -1, timeouts: -1, busy: 0, idle: 0 };
+    const s: PoolScrape = { t: Date.now(), waiting: -1, available: -1, max: -1, timeouts: -1, busy: 0, idle: 0, cpus: 0 };
     const names = new Set<string>();
     const poolLines: string[] = [];
     const add = (k: "waiting" | "available" | "max" | "timeouts", v: number) => (s[k] = (s[k] < 0 ? 0 : s[k]) + v);
@@ -61,7 +63,10 @@ export async function scrapeMetrics(p: DcProject, timeoutMs = 8_000): Promise<Sc
       else if (name === "pgrst_db_pool_max") add("max", v);
       else if (name === "pgrst_db_pool_timeouts_total") add("timeouts", v);
       else if (name === "node_cpu_seconds_total") {
-        if (line.includes('mode="idle"')) s.idle += v;
+        if (line.includes('mode="idle"')) {
+          s.idle += v;
+          s.cpus++;
+        }
         else if (!line.includes('mode="steal"') && !line.includes('mode="guest')) s.busy += v;
       }
     }

@@ -163,6 +163,231 @@ Readings:
 Project time about 38 minutes (00:23:46 to 01:01:42 UTC, the artifact's
 start and finish stamps), Small throughout, one project.
 
+## 2026-10-26 - DC13-DC15, defaults per size up to 2XL, statements of a few seconds, a set pool across a resize (one run each)
+
+Lab commit 848b9f3 plus the uncommitted DC13-DC15 modules (`lib/tier.ts`,
+the `lib/dc.ts` changes). Three projects on the Pro org, ap-southeast-1,
+each created with `desired_instance_size: small`, Postgres 17.11, PostgREST
+14.18 (`application_name` of its connections). Vantage: this lab's Mac over
+the public internet (`dc_ping` through the Data API 38 to 47 ms, DC14a).
+
+- Main project: DC13 resized it Small -> XL -> 2XL, then DC14 ran on 2XL,
+  then realtime-surface RT05 (its RUNLOG, 2026-10-26) reused it at 2XL; it
+  was deleted after RT05. Published:
+  `out/2026-10-26/run-2026-10-26T00-24-26-283Z.json` (27 results; DC13
+  took 942 s, DC14 2,484 s).
+- Two DC15 projects (custom and control arms), each deleted by its DC99;
+  section below.
+- Two of the three `POST /v1/projects` calls returned a project whose
+  `created_at` was before the request (about 4 min and 3.7 min, read from
+  `GET /v1/projects` during the run, console only); DC13 logged it ready 4 s
+  after the POST, at Small (`max_connections` 90). The third project's
+  `created_at` matched its request. Read: the platform sometimes hands out
+  a project provisioned ahead of the request; not investigated further, and
+  nothing in the measurements depended on it.
+
+### DC13 - pool and Realtime connections with nothing configured, Small -> XL -> 2XL
+
+Per size: GET `/postgrest`, `pgrst_db_pool_max` scraped every 5 s for 90 s,
+two bursts of 150 concurrent 12 s `dc_sleep_xl` calls (service_role key)
+with the mid-burst PgSleep count of `authenticator`; then GET
+`/config/realtime` and one raw-protocol burst of 100 Postgres Changes joins
+(realtime-surface `lib/burst.ts`, a table with an `authenticated` select
+policy, settings as created), Realtime's connections sampled each second
+while it settled, and client backends by role and application afterwards.
+
+| Size | `max_connections` | node CPUs (metrics) | `db_pool` read | `pgrst_db_pool_max` (18 scrapes) | PgSleep mid-burst (150) | burst outcomes |
+| --- | --- | --- | --- | --- | --- | --- |
+| Small | 90 | 2 | null | 30 | 30 / 30 | 130 x 200 + 20 x 504 `PGRST003`, both |
+| XL | 240 | 4 | null | 60 | 60 / 60 | 150 x 200, both |
+| 2XL | 380 | 8 | null | 70 | 70 / 70 | 150 x 200, both |
+
+- **2XL default pool 70 held** (hypothesis: 70). XL reads 60, a figure not
+  measured before. With DC01 (Small 30, Large 50) and DC04 (4XL 70) the
+  unset pool reads 30 / 50 / 60 / 70 / 70 for Small / Large / XL / 2XL /
+  4XL; whether 8XL and above go higher was not measured. The metrics series
+  agreed with the burst count at every size (no change during the 90 s).
+- Resizes: Small -> XL settled 161 s after the add-on PATCH, XL -> 2XL
+  195 s; no 429 on either; 0 of 60 Data API pings failed in the 60 s watch
+  after each.
+- **Realtime config as created read the same at all three sizes:**
+  `connection_pool` 5, `postgres_changes_pool` null, `max_concurrent_users`
+  10000, `max_joins_per_second` 2500, `max_channels_per_client` 100,
+  `max_events_per_second` 2500. RT05 on 2026-10-22 read `connection_pool` 2
+  on a new project; this one read 5 from the start (Small).
+- **Realtime's connections around the 100-join burst (every burst 100 of
+  100 ready):**
+
+  | Size | `realtime_connect` | `realtime_subscription_manager_pub` | `realtime_subscription_manager` | `realtime_rls` | `realtime_replication_connection` |
+  | --- | --- | --- | --- | --- | --- |
+  | Small | 5 | 4 | 1 | 1 | 1 |
+  | XL | 5 | 7 | 1 | 1 | 1 |
+  | 2XL | 5 | 7 | 1 | 1 | 1 |
+
+  All `supabase_admin`. Before each burst only the 5 `realtime_connect`
+  connections were open; 30 s after it, the others were still open.
+- **2XL Realtime subscription pool 7 held** if `realtime_subscription_manager_pub`
+  is the "Subscription management" pool of the concepts page
+  (https://supabase.com/docs/guides/realtime/concepts, table of default
+  pool sizes: Small to Large 4, XL to 4XL 7). That name tracked
+  `postgres_changes_pool` in RT05 (2026-10-22), which is the basis for the
+  reading; it is not a documented mapping.
+- **The authorization pool did not follow the size.** The concepts table
+  gives an "Authorization Pool Size" of 5 for Small to Large and 10 for XL
+  to 4XL, "If not specified". `realtime_connect` held 5 at every size here
+  and `connection_pool` read 5 (an explicit value, not null) on XL and 2XL.
+  Two readings, not separated: the 5 was written at creation for Small and
+  is not re-derived on a resize (as `db_pool` 45 was kept in DC15), or the
+  table does not describe this project; a project created at XL or 2XL was
+  not run. That `realtime_connect` is the authorization pool is inferred
+  from it equalling `connection_pool`.
+
+### DC14 - statements of about 3 s against `db_pool` unset (70), 140, 200 on 2XL
+
+Two kinds of RPC, both declaring `set statement_timeout = '180s'`:
+`dc_sleep_xl(3)` (waits) and `dc14_cpu(n)`, a plpgsql loop of `sqrt`
+additions with n = 34464536 calibrated to 2966 / 2957 / 2941 ms alone
+in SQL (3060 and 3021 ms through the Data API). Arms in order: unset (the
+project as DC13 left it), PATCH 140, PATCH 200 (each read back, PostgREST
+restart 0.6 s after the PATCH, then 15 s). Per arm and kind: bursts of 1.5
+and 3 x the pool, then an open loop (requests sent on schedule whether or
+not earlier ones answered) of 40/s (sleep) or 4/s (CPU) for 120 s. Legacy
+service_role key, a fresh connection per request, 240 s client timeout.
+One run per cell. "ok/s" is 200s divided by the row's wall time (until the
+last answer). Backends: client backends sampled every ~3 s.
+
+Sleep (3 s `pg_sleep`):
+
+| `db_pool` | load | outcomes | wall s | p50 / p95 ms (all) | ok/s | max client backends (`authenticator`) |
+| --- | --- | --- | --- | --- | --- | --- |
+| unset (70) | burst 105 | 105 x 200 | 6 | 3367 / 6348 | 16.5 | 90 (71) |
+| unset (70) | burst 210 | 210 x 200 | 10 | 6480 / 9495 | 22.1 | 90 (71) |
+| unset (70) | 40/s x 120 s | 4800 x 200 | 208 | 45237 / 85443 | 23 | 88 (71) |
+| 140 | burst 210 | 198 x 200, 12 client | 6 | 3456 / 6421 | 30.7 | 144 (141) |
+| 140 | burst 420 | 346 x 200, 74 client | 9 | 3257 / 9253 | 37.3 | 144 (141) |
+| 140 | 40/s x 120 s | 4800 x 200 | 123 | 3045 / 3056 | 39 | 144 (141) |
+| 200 | burst 300 | 276 x 200, 24 client | 6 | 3560 / 6384 | 43 | 204 (201) |
+| 200 | burst 600 | 521 x 200, 79 client | 9 | 6142 / 9387 | 55.4 | 204 (201) |
+| 200 | 40/s x 120 s | 4800 x 200 | 123 | 3045 / 3057 | 39 | 204 (201) |
+
+CPU (`dc14_cpu`, about 3 s alone):
+
+| `db_pool` | load | outcomes | wall s | p50 / p95 ms (all) | p50 / p95 ms (200s) | ok/s | `authenticator` on CPU (max) | node CPU % (span s) |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| unset (70) | burst 105 | 105 x 200 | 74 | 50639 / 73943 | same | 1.4 | 70 | 42 (26) |
+| unset (70) | burst 210 | 140 x 200, 70 x 504 `PGRST003` | 99 | 51138 / 98650 | 95510 / 98675 | 1.4 | 70 | 99.8 (61) |
+| unset (70) | 4/s x 120 s | 290 x 200, 190 x 504 `PGRST003` | 205 | 61639 / 101078 | 69068 / 103628 | 1.4 | 70 | 92.4 (190) |
+| 140 | burst 210 | 140 x 200, 55 x 504 `PGRST003`, 15 client | 99 | 97226 / 98709 | 98005 / 98710 | 1.4 | 140 | 99.9 (61) |
+| 140 | burst 420 | 170 x 200, 116 x 504 `PGRST003`, 106 x 504 uncoded, 28 client | 194 | 98122 / 187816 | 100856 / 193875 | 0.9 | 140 | 91.5 (158) |
+| 140 | 4/s x 120 s | 254 x 200, 77 x 504 `PGRST003`, 44 x 504 uncoded, 105 x 503 `PGRST002` | 211 | 87156 / 125077 | 98294 / 127003 | 1.2 | 140 | 92.6 (210) |
+| 200 | burst 300 | 0 x 200, 200 x 504 uncoded, 51 x 504 `PGRST003`, 49 client | 125 | 125304 / 125407 | - | 0 | 200 | 99.8 (124) |
+| 200 | burst 600 | 0 x 200, 200 x 504 uncoded, 138 x 504 `PGRST003`, 262 client | 240 | 125274 / 240013 | - | 0 | 200 | 99 (188) |
+| 200 | 4/s x 120 s | 0 x 200, 400 x 504 uncoded, 80 x 504 `PGRST003` | 292 | 125062 / 172343 | - | 0 | 200 | 100 (233) |
+
+- **Waiting statements: a pool at or above the concurrent requests turned
+  queueing into 3 s answers.** At 40/s of 3 s sleeps (about 120 in flight)
+  the unset pool of 70 answered every request 200 but at p50 45 s and p95
+  85 s, completing 23 per second (70 / 3 s = 23.3); 140 and 200 answered at
+  p50 3045 ms, 39 per second (the offered rate, less the run's ramp). No
+  `PGRST003` at 70 even with requests waiting over 60 s, the 6 x
+  acquisition-timeout wait of DC01b. Postgres was idle in the open loops
+  (node CPU 0.9 to 1.5 % over 71 to 197 s windows; 0 to 1 `authenticator`
+  on CPU).
+- **CPU-bound statements: a larger pool made it worse, and at 200 no
+  request succeeded.** At 70, 70 `authenticator` backends were on CPU at
+  once (8 vCPUs, node CPU 92 to 100 %), 200s came at 1.4 per second, and
+  the excess got `PGRST003`. At 140, 140 were on CPU, each statement took
+  longer (p50 of 200s about 98 s), and two new answers appeared: 504
+  without a PostgREST code, body `upstream request timeout`, and 503
+  `PGRST002`. At 200, 200 were on CPU and every answer that came back was
+  an error: the uncoded 504s arrived at about 125 s (row p50 125062 to
+  125304 ms), so the timeout that produced them sits near 125 s, between
+  the client and PostgREST (component not identified; the body text is the
+  only evidence). Whether the statement kept running in Postgres after its
+  504 was not measured; node CPU stayed at 99 to 100 % in those rows.
+- Throughput ceiling, reasoned: 8 vCPUs at one 3 s statement each is about
+  2.7 statements per second; the best measured was 1.4 per second (200s
+  over wall time, including the drain). The vCPU-to-core mapping and the
+  per-statement cost under contention were not read, so the gap is not
+  explained.
+- **`PGRST002` appeared without `db_pool` exceeding `max_connections`**
+  (140 of 380, 144 client backends at most): 105 of 480 requests in the
+  140 CPU open loop. DC02 and DC15 saw it with the pool above
+  `max_connections`. Here it came with all cores busy; the schema-cache
+  query timing out under CPU saturation fits, not checked in the PostgREST
+  log.
+- **Client-side failures** (status 0, Bun's `Unable to connect. Is the
+  computer able to access the url?`, the first one's text): in every burst
+  at pool 140 and 200 (210 to 600 requests), none in the unset pool's
+  bursts of 105 and 210, none in any open loop. They are this Mac's connection
+  failures, not server answers; the 600-request CPU burst's 262 also
+  include the 240 s client timeout (only the first error's text is kept,
+  so the split is not recorded). Not investigated.
+- Not measured: CPU statements between 3 s and the 125 s timeout at other
+  pool sizes or rates; a pool below 70; the gateway timeout's exact value
+  and owner; statements that both compute and wait; another vantage.
+
+### DC15 - a set `db_pool` across a resize (two projects, one run each)
+
+Two projects in separate processes, both created Small in ap-southeast-1
+and deleted by their DC99. Published: custom arm
+`out/2026-10-26/run-2026-10-26T00-24-41-341Z.json` (10 results), control
+arm `out/2026-10-26/run-2026-10-26T00-37-13-794Z.json` (8 results). Each
+"read" is one GET `/postgrest`, `pgrst_db_pool_max` scraped every 5 s for
+90 s, and two bursts of K concurrent 12 s `dc_sleep_xl` calls with the
+mid-burst (6 s) count of `authenticator` backends in PgSleep.
+
+| Step | custom: `db_pool` read | custom: `pgrst_db_pool_max` | custom: PgSleep mid-burst (K) | custom: outcomes per burst | control: `db_pool` / max / PgSleep (K) |
+| --- | --- | --- | --- | --- | --- |
+| Small (90) | 45 after PATCH | 45 | 45 / 45 (70) | 70 x 200, both | null / 30 / 30, 30 (70) |
+| Large (160) after resize | 45 | 45 | 45 / 45 (70) | 70 x 200, both | null / 50 / 50, 50 (70) |
+| Large, custom PATCHed to 120 | 120 | 120 | 120 / 120 (150) | 149 x 200 + 1 client error; 150 x 200 | null / 50 / 50, 50 (150) |
+| Small (90) after resize | 120 | 120 | no row (150) | 84 x 200 + 66 x 503 `PGRST002`, both | null / 30 / 30, 30 (150) |
+
+- **A set `db_pool` survives a resize in both directions.** 45 set on Small
+  read 45 on Large, and Postgres saw 45 (Large's unset value is 50, control
+  and DC01). 120 set on Large read 120 on Small, and `pgrst_db_pool_max`
+  read 120 there. Nothing clamped it to the new `max_connections` and the
+  resize PATCH answered 200 with no warning in the response (body not
+  recorded beyond the status).
+- **On Small with `db_pool` 120, each burst of 150 got 84 x 200 and 66 x
+  503 `PGRST002`** (PostgREST's "Could not query the database for the
+  schema cache. Retrying.", as DC02's pool-1000 arm on Large). 84 is about
+  `max_connections` 90 less the other roles' backends (after the bursts 3
+  client backends belonged to other roles: `pgbouncer`, the Management
+  API's `postgres`, `supabase_admin` exporter; reserved superuser slots
+  were not read), so a fit, not a measured identity. The mid-burst Management API query returned no row
+  in both bursts (status and error not recorded), so the backend count at
+  the peak was not observed. After the bursts: 4 of 90 client backends, a
+  Management query answered 201, 5 good Data API pings within 4 s.
+- **The control arm repeats DC01**: unset reads null and follows the size,
+  30 / 50 / 50 / 30, and on Small a burst of 150 gave 130 x 200 and 20 x
+  504 (both bursts).
+- Resizes: custom Small to Large settled 53 s after the PATCH (1 of 60 watch
+  pings failed, HTTP 521 from the edge), Large to Small 92 s (0 of 60);
+  control 70 s and 50 s (0 of 60 each). No add-on 429 on either project.
+- Two earlier control-arm attempts failed before any read and are not
+  published: the first because a fresh project's first `POST
+  /auth/v1/admin/users` answered 500 and `lib/dc.ts` did not retry it (it
+  does now, 6 tries 10 s apart), the second on a bug in that retry (a
+  `Response` with status 0, which Bun rejects). Both projects were deleted
+  by DC99 (DELETE 200).
+
+### Cost and teardown
+
+Main project: requested 00:24:26 UTC, Small to about 00:31, XL to about
+00:35, 2XL from then until deleted at 01:42:50 UTC (about 68 minutes at 2XL;
+the size boundaries are from the console, the run stamps and DC13's
+settle times, not exact). The deletion came after realtime-surface RT05
+(01:21:52 to 01:33:06 UTC) and was done with `lib/cleanup.ts --delete`
+under the prefix `pvlab-dc243-` (DELETE 200); list mode then showed 0. DC15
+custom: 00:24:41 to 00:36:44 UTC, Small and Large. DC15 control: three
+projects in turn, the two failed attempts (00:24:56 to 00:27:12 and
+00:28:01 to 00:28:07 UTC, artifact stamps) and the published run (00:37:13
+to 00:48:10 UTC), Small and Large. At the compute page's hourly rates (2XL
+$0.562, XL $0.2877) that is about $0.65 of 2XL and under $0.10 for the rest;
+how billing rounds partial hours was not checked.
+
 ## 2026-10-23 - DC08, in-region clients and an application-like mix on 4XL (one run)
 
 Harness: `make run ONLY=DC08,DC99` with `PVLAB_DC_REGION=ap-northeast-2`
