@@ -4,8 +4,9 @@
  *
  *   bun scripts/check-doc-numbers.ts <doc.mdx|RUNLOG.md> <run.json> [<run.json> ...]
  *
- * Reads the prose, takes every table row or bullet that contains the word
- * "measured" or a module id (EF01, SH06, TD02, W13 ...), extracts its numbers, and
+ * Reads the prose, takes every line that contains the word "measured" or a
+ * module id (EF01, DC16, TPA08, OB03d ...; prefixes and digit widths come from
+ * the experiments/<name>/tests file names, see src/doc-numbers.ts), extracts its numbers, and
  * reports the ones that appear in no supplied artifact. Thousands separators
  * are ignored; a doc's "12,019" matches an artifact's 12019.
  *
@@ -16,6 +17,8 @@
  * are legitimately absent from artifacts (documented figures, dates, HTTP codes
  * quoted from docs) are listed for the author to judge, not failed.
  */
+import { resolve } from "node:path";
+import { figuresOnLine, isMeasuredLine, liveModuleBases, moduleIdPattern } from "../src/doc-numbers";
 import { numbersIn } from "../src/facts";
 import type { RunArtifact } from "../src/types";
 
@@ -29,18 +32,13 @@ for (const r of runs) {
   const run = JSON.parse(await Bun.file(r).text()) as RunArtifact;
   for (const n of numbersIn(run)) known.add(n);
 }
-// Dates, years and HTTP status codes are quoted from docs and calendars, not
-// from measurements; skip them so the report is about figures.
-const skip = (n: string) => /^(19|20)\d\d$/.test(n) || /^\d{1,2}$/.test(n) || /^(1\d\d|2\d\d|3\d\d|4\d\d|5\d\d)$/.test(n);
-
+const ids = moduleIdPattern(liveModuleBases(resolve(import.meta.dir, "../../experiments")));
 const text = await Bun.file(doc).text();
 const lines = text.split("\n");
 let flagged = 0;
 lines.forEach((line, i) => {
-  const measured = /\bmeasured\b/i.test(line) || /\b(EF|SH|TD|W|L|S|C|D|X|P|R|I|F|O|M)\d{2}[a-z]?\b/.test(line);
-  if (!measured) return;
-  const nums = [...new Set([...line.matchAll(/\d[\d,]*(?:\.\d+)?/g)].map((m) => m[0].replace(/,/g, "")))].filter((n) => !skip(n));
-  const missing = nums.filter((n) => !known.has(n));
+  if (!isMeasuredLine(line, ids)) return;
+  const missing = figuresOnLine(line).filter((n) => !known.has(n));
   if (missing.length) {
     flagged++;
     console.log(`${doc}:${i + 1}: not in any artifact: ${missing.join(", ")}`);

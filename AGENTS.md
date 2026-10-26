@@ -2517,7 +2517,16 @@ assumes prose quotes by paste.
 - `bun harness/scripts/check-doc-numbers.ts <doc> <run.json> ...` lists every
   number on a measured line of a doc that appears in none of the artifacts -
   the reviewer's hand check as a command. Judge each hit: a documented figure
-  is fine, a retyped measurement is the bug.
+  is fine, a retyped measurement is the bug. A line is "measured" when it
+  says so or names a module id; the id prefixes and digit widths come from
+  the `experiments/*/tests` file names (`harness/src/doc-numbers.ts`). Until
+  2026-10-26 a hard-coded list of one-letter prefixes plus EF/SH/TD missed
+  DC, RR, OB, TPA and every other multi-letter prefix, so the check passed
+  vacuously on most write-ups (#257). Commit ids with a hex letter, run file
+  names and dotted versions are not read as figures; an all-digit commit id,
+  a shortened file name (`...-626Z-`) and a comma list (`140,200`) still are,
+  and `durationMs` is not indexed, so a module duration quoted from the
+  artifact is listed too.
 - `harness/src/identifiers.test.ts` scans every tracked markdown file,
   every `out/` artifact and (since 2026-09-07) every tracked source, config
   and script file for the project-ref SHAPE (20 lowercase letters) and for
