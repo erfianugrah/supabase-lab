@@ -4956,7 +4956,7 @@ partitions, other durability policies, a contended pool.
   whether unlisted functions list later than +299 s, how long a destroyed
   function keeps answering.
 
-## experiments/client-keyed-objects - key facts (validated 2026-10-12, local self-hosted stack + two Pro-org micro projects, ap-southeast-1 and eu-central-1; region-b CK04/CK06 re-run 2026-10-23)
+## experiments/client-keyed-objects - key facts (validated 2026-10-12, local self-hosted stack + two Pro-org micro projects, ap-southeast-1 and eu-central-1; region-b CK04/CK06 re-run 2026-10-23 and twice on 2026-10-26)
 
 A reference application (catalogue + RLS + custom access token hook in
 Postgres, an operator-run key service in Docker, a TypeScript client doing
@@ -5010,8 +5010,30 @@ partial rows: `experiments/client-keyed-objects/RUNLOG.md`; generated table
   reads `MISS:25`, p50 50507 ms; `/object/authenticated` `HIT:24`, p50 983 ms.
   The 2026-10-12 CK04 timeout is still unexplained; the sleep reading fits,
   a platform cause is not excluded.
-- Not measured: an object past 2 GiB (`CK_BIG_MIB=2250` is wired, not run),
-  a second region-b run, repeat runs of the other managed cells, CK04-CK06 on
+- Region-b 2026-10-26 (`out/2026-10-26/`, two runs, under `caffeinate`): a
+  2.2 GiB object (`CK_BIG_MIB=2250`, 282 chunks; 17 of 100 CK06 ranges start
+  past 2^31 by the seeded `ranges()`, not read from the artifact) and a second
+  2 GiB run both pass CK04 and CK06 (100 of 100 reads equal). The 2026-10-23
+  `Thrown` read did not recur in 200 reads (50 `authenticated`, 2 of them
+  MISS); cause unknown. A failure in the `httpRange` body read is now
+  `StorageError BodyRead` with timings; other steps still throw `Thrown`, with
+  the message in `error_messages`.
+- On region-b (2026-10-26, run 1 / run 2) signed-URL reads were slow in the
+  body, not the headers: `info_ttfb_ms_p50` 700 / 725, `info_body_ms_p50`
+  49679 / 44296, all `MISS`, colo `SIN`. Body time follows the range's start
+  offset (Spearman 0.97 / 0.92 by `scripts/ck06-reads.ts`, median 34.1 / 33.4
+  MiB of offset per second) and not its length. The first
+  `/object/authenticated` read (the one MISS) shows the same rate; the 24
+  HITs took a median 237 / 155 ms of body (`info_body_ms_p50` over all 25,
+  MISS included: 243 / 157). Inference, not shown: on a ranged MISS something
+  reads the object from byte 0 and the range is served when the read reaches
+  it - the edge from the origin, or the origin's REST path itself; the run
+  does not separate the two. A fresh signed URL is a new cache key every time
+  (storage-surface SS08a/b: 12 of 12 reads `MISS` with a new URL per read;
+  cache status only).
+- Not measured: region-a with the timing columns, a timed large-offset read
+  of one signed URL twice, a probe separating edge from origin for the MISS,
+  repeat runs of the other managed cells, CK04-CK06 on
   onprem-file (Docker VM disk), CK10 on both self-hosted targets (needs two
   regions in one run), other vantages, Linux amd64.
 - Ops: own compose project `ck-<name>` on 8100/5532/6643 beside the
