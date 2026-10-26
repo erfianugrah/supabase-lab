@@ -2694,6 +2694,17 @@ git commit -m "fix: explicit Data API grants on SQL-created tables before the 20
 > sequence GRANT is not needed under that revoke (UPDATE stays, `nextval`
 > accepts it). M01, D09, O03 and T22 were not run under the revoke
 > (M01/D09/O03 inferred from the code).
+>
+> **2026-10-26 (#173):** O03 ran green in 2 of 2 runs that waited for the
+> RFC 8414 discovery document to answer 200 after the auth config PATCH;
+> the 2 runs without the wait failed at client registration with `404
+> feature_disabled`. The 2026-10-13 `consent=404` was most likely the same
+> registration 404 (inferred from matching timing; the 2026-10-13 artifacts
+> cannot separate it). O03c's setup SQL, which includes the explicit grant,
+> answered 201 (`policy_status`) and both OAuth tokens' Data API reads
+> returned rows as scoped; the platform's default grants were not revoked
+> first, so this does not show the grant is needed. Not run under DD01c's
+> revoke. byo-oauth RUNLOG, 2026-10-26.
 
 Before 2026-10-30, on a PAT and the lab Pro org: edge-resilience W12 (one
 project), compute-disk D09, s2z-wake Z01 (about 35 min), usage-metering M01

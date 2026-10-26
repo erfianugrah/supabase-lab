@@ -7,7 +7,10 @@
  * "documented, not tested". This module runs the whole flow headless on a
  * throwaway project:
  *
- *   O03-control  provision + enable oauth_server via the auth config PATCH.
+ *   O03-control  provision + enable oauth_server via the auth config PATCH,
+ *                then poll the RFC 8414 discovery document until it answers
+ *                200 (on 2026-10-26 discovery answered 404 right after the
+ *                PATCH and 200 within 4322 ms).
  *   O03a         register an OAuth client (admin API) + create a user.
  *   O03b         authorization code flow with PKCE, headless: password-login
  *                user token -> GET authorize (302 -> authorization_id) ->
@@ -27,6 +30,7 @@ import { createHash } from "node:crypto";
 import { Buffer } from "node:buffer";
 import type { Ctx, TestModule, TestResult } from "../../../harness/src/types.js";
 import { mgmt } from "../../../harness/src/mgmt.js";
+import { errorSummary, failedStep, stepMeasurements, type FlowStep } from "../lib/flow-steps.js";
 
 let PRO_ORG = ""; // from PVLAB_ORG_PRO via ctx.orgs.pro; set in run()
 const REGION = "ap-southeast-1";
@@ -100,22 +104,32 @@ function b64url(bytes: Buffer): string {
   return Buffer.from(bytes).toString("base64url");
 }
 
-/** Register a client and run the full headless code flow; token claims out. */
+/** Register a client and run the full headless code flow; token claims out. Every step's status is kept. */
 async function runFlow(
   sc: SessionCreds,
   name: string,
   pass: string,
   email: string,
-): Promise<{ reg: ClientReg; flow?: FlowResult; consentStatus: number; tokenStatus: number }> {
+): Promise<{ reg: ClientReg; flow?: FlowResult; steps: FlowStep[] }> {
+  const steps: FlowStep[] = [];
+  const noReg = { clientId: "", clientSecret: "" };
   const regJson = await gocall(`${sc.baseUrl}/auth/v1/admin/oauth/clients`, {
     anonKey: sc.serviceKey,
     bearerToken: sc.serviceKey,
     body: { name, redirect_uris: [REDIRECT], client_type: "confidential" },
   });
-  const reg = JSON.parse(regJson.text) as { client_id?: string; client_secret?: string };
-  if (!reg.client_id || !reg.client_secret) {
-    return { reg: { clientId: "", clientSecret: "" }, consentStatus: regJson.status, tokenStatus: 0 };
+  let reg: { client_id?: string; client_secret?: string } = {};
+  try {
+    reg = JSON.parse(regJson.text) as typeof reg;
+  } catch {
+    reg = {};
   }
+  if (!reg.client_id || !reg.client_secret) {
+    steps.push({ step: "register", status: regJson.status, ok: false, error: errorSummary(regJson.text) });
+    return { reg: noReg, steps };
+  }
+  steps.push({ step: "register", status: regJson.status, ok: true });
+  const client = { clientId: reg.client_id, clientSecret: reg.client_secret };
 
   // fresh verifier per client
   const verifier = b64url(Buffer.from(cryptoRandomBytes(48)));
@@ -127,14 +141,19 @@ async function runFlow(
   );
   const aidMatch = /authorization_id=([a-z0-9]+)/.exec(authz.text);
   if (!aidMatch) {
-    return { reg: { clientId: reg.client_id, clientSecret: reg.client_secret }, consentStatus: authz.status, tokenStatus: 0 };
+    steps.push({ step: "authorize", status: authz.status, ok: false, error: `no authorization_id in body; ${errorSummary(authz.text)}` });
+    return { reg: client, steps };
   }
+  steps.push({ step: "authorize", status: authz.status, ok: true });
   const aid = aidMatch[1];
   // GET binds the user (required by the consent route)
-  await gocall(`${sc.baseUrl}/auth/v1/oauth/authorizations/${aid}`, {
+  const bind = await gocall(`${sc.baseUrl}/auth/v1/oauth/authorizations/${aid}`, {
     anonKey: sc.anonKey,
     bearerToken: userToken(sc, email, pass),
   });
+  const bindOk = bind.status >= 200 && bind.status < 300;
+  steps.push({ step: "authorization", status: bind.status, ok: bindOk, error: bindOk ? undefined : errorSummary(bind.text) });
+  if (!bindOk) return { reg: client, steps };
   const consent = await gocall(`${sc.baseUrl}/auth/v1/oauth/authorizations/${aid}/consent`, {
     anonKey: sc.anonKey,
     bearerToken: userToken(sc, email, pass),
@@ -143,8 +162,10 @@ async function runFlow(
   const codeMatch = /code=([a-z0-9-]+)/.exec(consent.text);
   const code = codeMatch?.[1];
   if (!code) {
-    return { reg: { clientId: reg.client_id, clientSecret: reg.client_secret }, consentStatus: consent.status, tokenStatus: 0 };
+    steps.push({ step: "consent", status: consent.status, ok: false, error: `no code in body; ${errorSummary(consent.text)}` });
+    return { reg: client, steps };
   }
+  steps.push({ step: "consent", status: consent.status, ok: true });
   const basic = btoa(`${reg.client_id}:${reg.client_secret}`);
   const token = await fetch(`${sc.baseUrl}/auth/v1/oauth/token`, {
     method: "POST",
@@ -166,20 +187,17 @@ async function runFlow(
     parsed = {};
   }
   if (!parsed.access_token) {
-    return { reg: { clientId: reg.client_id, clientSecret: reg.client_secret }, consentStatus: consent.status, tokenStatus: token.status };
+    steps.push({ step: "token", status: token.status, ok: false, error: errorSummary(tokenText) });
+    return { reg: client, steps };
   }
+  steps.push({ step: "token", status: token.status, ok: true });
   const claims = JSON.parse(Buffer.from(parsed.access_token.split(".")[1] ?? "", "base64url").toString()) as {
     client_id?: string;
     aud?: string;
     scope?: string;
     sub?: string;
   };
-  return {
-    reg: { clientId: reg.client_id, clientSecret: reg.client_secret },
-    flow: { token: parsed.access_token, claims },
-    consentStatus: consent.status,
-    tokenStatus: token.status,
-  };
+  return { reg: client, flow: { token: parsed.access_token, claims }, steps };
 }
 
 const userTokenCache = new Map<string, string>();
@@ -233,15 +251,45 @@ const mod: TestModule = {
         oauth_server_enabled: true,
         oauth_server_authorization_path: "/oauth/consent",
       });
+      // Same span as 2026-08-18 and 2026-10-13: create to PATCH response. The
+      // four 2026-10-26 runs computed it after the discovery read/poll instead.
+      const provisionS = Math.round((Date.now() - t0) / 1000);
+      const baseUrl = `https://${ref}.supabase.co`;
+      // Has Auth applied the PATCH yet? The RFC 8414 discovery document answers
+      // 404 feature_disabled while the OAuth server is off (cross-project-auth X09).
+      const discoveryUrl = `${baseUrl}/.well-known/oauth-authorization-server/auth/v1`;
+      const tPatch = performance.now();
+      const disc0 = await gocall(discoveryUrl, {});
+      // Wait for it: in the two no-wait runs of 2026-10-26 the client
+      // registration seconds later answered the same 404 and the flow never
+      // started (2026-10-13's `consent=404` is most likely the same, inferred).
+      // Poll every 2 s, budget 300 s.
+      let ready = disc0.status === 200;
+      let polls = 1;
+      while (!ready && performance.now() - tPatch < 300_000) {
+        await sleep(2_000);
+        polls++;
+        ready = (await gocall(discoveryUrl, {})).status === 200;
+      }
+      const readyMs = ready ? Math.round(performance.now() - tPatch) : -1;
       results.push({
         id: "O03-control",
         title: "O03-control: provision + enable OAuth server",
-        status: status === "ACTIVE_HEALTHY" && (conf.status === 200 || conf.status === 202) ? "pass" : "fail",
-        detail: status !== "ACTIVE_HEALTHY" ? `not healthy (status=${status})` : undefined,
-        measurements: { provision_s: Math.round((Date.now() - t0) / 1000), config_status: conf.status },
+        status: status === "ACTIVE_HEALTHY" && (conf.status === 200 || conf.status === 202) && ready ? "pass" : "fail",
+        detail:
+          status !== "ACTIVE_HEALTHY"
+            ? `not healthy (status=${status})`
+            : `discovery right after the PATCH: HTTP ${disc0.status}${disc0.status === 200 ? "" : ` (${errorSummary(disc0.text)})`}; ` +
+              (ready ? `first 200 after ${readyMs} ms (${polls} polls, 2 s apart)` : `no 200 within 300 s (${polls} polls)`),
+        measurements: {
+          provision_s: provisionS,
+          config_status: conf.status,
+          discovery_after_patch_status: disc0.status,
+          oauth_ready_ms: readyMs,
+          oauth_ready_polls: polls,
+        },
       });
 
-      const baseUrl = `https://${ref}.supabase.co`;
       const keysRes = await mgmt(ctx, "GET", `/projects/${ref}/api-keys?reveal=true`);
       const keys = Array.isArray(keysRes.json) ? (keysRes.json as ApiKeyRow[]) : [];
       const sc: SessionCreds = {
@@ -293,8 +341,9 @@ const mod: TestModule = {
         id: "O03b",
         title: "O03b: headless authorization code flow, claim shape",
         status: flowA.flow ? "pass" : "fail",
-        detail: flowA.flow ? undefined : `flow failed: consent=${flowA.consentStatus} token=${flowA.tokenStatus}`,
+        detail: flowA.flow ? undefined : `flow failed at ${failedStep(flowA.steps)}`,
         measurements: {
+          ...stepMeasurements(flowA.steps),
           client_id_claim: claim?.client_id ? 1 : 0,
           aud: claim?.aud ?? "absent",
           scope: claim?.scope ?? "absent",
@@ -357,6 +406,7 @@ const mod: TestModule = {
           visible_with_matching_client: visibleWithA,
           hidden_with_other_client: hiddenWithB,
           client_b_token: flowB.flow ? 1 : 0,
+          ...(flowB.flow ? {} : { client_b_failed_at: failedStep(flowB.steps) ?? "" }),
         },
       });
     } catch (e) {
