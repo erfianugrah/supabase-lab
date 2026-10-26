@@ -363,7 +363,7 @@ client can poll. See RUNLOG.md; artifacts in `out/2026-09-24/` and
   extension. privatelink-aws T22 carries the same change, not run (needs the
   AWS PrivateLink rig).
 
-## experiments/data-api-capacity - key facts (validated 2026-10-22/23/26, Pro org; DC01-03 ap-southeast-1 Small then Large, DC04 ap-northeast-2 Small then 4XL, DC05-07 ap-northeast-2 Small, DC08 ap-northeast-2 Small then 4XL, in-region clients; DC09 and DC12 ap-southeast-1 Small; DC13 ap-southeast-1 Small to XL to 2XL, DC14 the same project at 2XL, DC15 ap-southeast-1 Small to Large to Small)
+## experiments/data-api-capacity - key facts (validated 2026-10-22/23/26, Pro org; DC01-03 ap-southeast-1 Small then Large, DC04 ap-northeast-2 Small then 4XL, DC05-07 ap-northeast-2 Small, DC08 ap-northeast-2 Small then 4XL, in-region clients; DC09 and DC12 ap-southeast-1 Small; DC13 ap-southeast-1 Small to XL to 2XL, DC14 the same project at 2XL, DC15 ap-southeast-1 Small to Large to Small; DC16 ap-southeast-1 created 2XL and created Small; DC17 ap-southeast-1 Small)
 
 The Data API's connection pool, what a full pool looks like to a client, the
 pool settings' PATCH, statement timeouts per role, throughput under request
@@ -380,7 +380,10 @@ versions not recorded. PostgREST 14.18 and Postgres 17.11: console for
 DC01-DC03, the DC04a and DC08a artifacts; not recorded for DC05-DC07 (DC04a,
 same day and region, read 14.18). DC13-DC14: one run
 (`out/2026-10-26/run-2026-10-26T00-24-26-283Z.json`), DC15 one run per arm;
-Postgres 17.11 and PostgREST 14.18 from those artifacts. The artifacts'
+Postgres 17.11 and PostgREST 14.18 from those artifacts. DC16: one run
+per arm (`run-2026-10-26T05-48-18-228Z` created 2XL,
+`run-2026-10-26T05-48-29-561Z` created Small); DC17: one run of two rounds
+(`run-2026-10-26T05-48-07-761Z`), Postgres 17.11, PostgREST 14.18. The artifacts'
 top-level `region` is the harness default; the project region came from
 `PVLAB_DC_REGION` (recorded as `project_region_requested` in DC04a and DC05a
 from the next run on).
@@ -465,13 +468,14 @@ from the next run on).
   0.2 s after the ALTER still failed at 8 s.
 - **The Data API answered a 70 s request** (DC09g, 3 of 3 at about 70.1 s,
   function `set 120s`), against the timeouts guide's 60 s for client
-  queries. The gateway's whole-request limit measured about 125 s (DC12d:
+  queries. The gateway's limit measured about 125 s (DC12d:
   Envoy's `upstream request timeout` 504 at 125055-125066 ms, `text/plain`,
   no PGRST003, after two 60 s pool attempts; holders still running at about
   125 s (requested sleeps 240, 480 and 150 s in DC12c, d, e) got 504;
   DC12b's 150 s holders were cancelled after the last probe answer, about 70
   s in, and got 500 57014), and the holders' `dc12_hold` queries kept
   running in Postgres after their 504 until cancelled (ordering-inferred).
+  DC17 pinned the value and the owner (bullet below).
   Successful requests left no PostgREST access-log line (0 for the three
   200s, n = 3); 5xx answers that reached PostgREST did (64 of 66 in DC12).
 - **`pgrst_db_pool_timeouts_total` counts attempts, not client requests**
@@ -628,9 +632,44 @@ from the next run on).
   requests that wait and hurt requests that compute (every pool tested was
   far above the 8 vCPUs; a pool near the core count was not run); one run
   per cell; the uncoded 504s match DC12d's Envoy `upstream request timeout`
-  (about 125 s) by body and time, and DC14 kept no headers.
+  (about 125 s) by body and time, and DC14 kept no headers (DC17 below
+  measured that 504 with headers on Small).
+- **The API gateway's Envoy ends a Data API request at 125 s, and the
+  statement keeps running and commits** (DC17, one run of two rounds, Small,
+  `run-2026-10-26T05-48-07-761Z`; single `pg_sleep` RPCs of 100 to 180 s
+  sent concurrently, pool far above them). Sleeps up to 124 s answered 200
+  (`x-envoy-upstream-service-time` up to 124214 ms); every sleep of 125 s or
+  more (125, 126, 127, 130, 150, 180 with the legacy service_role key; the
+  legacy anon key and GET /rpc at 150 s) answered 504 at 125062 to 125310 ms at the client, body
+  `upstream request timeout`, `text/plain`, `server: cloudflare`,
+  `x-envoy-attempt-count: 1`, no `x-envoy-upstream-service-time`, no
+  `proxy-status`, no `via`; 1 `edge_logs` row each, 0 PostgREST lines.
+  Cloudflare passed it through (no 524). Every 504'd POST statement's row
+  (12 of 12) committed with its finish at the full requested time, up to
+  55.2 s after the client's 504 (the GET /rpc twin writes no row; its
+  backend ran to 150 s), and `postgres_logs` held a completion line for each and
+  no cancel or lost-client line: a write behind a request that times out at
+  the gateway is applied. The same 180 s call over the session pooler
+  returned after 180098 and 180099 ms; a direct connection did not resolve
+  from this Mac (`getaddrinfo ENOTFOUND`), not measured. Request-vs-idle
+  timeout not separable (PostgREST sends nothing before the end).
+- **Realtime's authorisation pool is set from the size a project is created
+  at, and a resize keeps it** (DC16, one project per arm, created with
+  `desired_instance_size` `2xlarge` and `small` in the same minute):
+  `connection_pool` read 10 and 5 before any Realtime client connected, and
+  `realtime_connect` held 10 and 5 around a 100-join burst, as the concepts
+  table's "Authorization Pool Size" gives for 2XL and Small
+  (https://supabase.com/docs/guides/realtime/concepts). DC13's project,
+  created Small, read 5 at XL and 2XL. `realtime_subscription_manager_pub`
+  followed the current size on DC13's resized project (4 / 7 / 7) and read 7
+  at 2XL and 4 at Small in DC16, where creation and current size are the
+  same. The unset Data
+  API pool on the project created at 2XL was 70, as after a resize (DC13).
+  Not run: XL, 4XL, 8XL at creation; setting `connection_pool` after a
+  resize.
 - Harness: `lib/tier.ts` `readPool` reads the pool four ways at the current
-  size; DC13 imports realtime-surface `lib/burst.ts` for its 100-join burst
+  size; DC13 and DC16 read Realtime through `lib/rt-read.ts`, which imports
+  realtime-surface `lib/burst.ts` for its 100-join burst
   and needs the project's database password (`PVLAB_DC_DBPASS`, also how
   RT05 reuses the project through `PVLAB_PEER_RT`). `create()` now retries
   the first admin user create (a 500 on a fresh project failed a DC15 run).
@@ -3148,8 +3187,12 @@ Numbers: `RUNLOG.md`, artifacts `out/2026-10-08/`.
   size): `realtime_subscription_manager_pub` 4 / 7 / 7, the concepts table's
   "Subscription management" 4 (Small) and 7 (XL to 4XL); `realtime_connect`
   5 at all three and `connection_pool` read 5 at all three, where the table's
-  "Authorization Pool Size" is 10 from XL. Whether a value fixed at creation
-  (Small) explains the 5 was not separated (no project created at XL or 2XL).
+  "Authorization Pool Size" is 10 from XL. DC16 (2026-10-26 05:48 UTC, after DC13 the same day)
+  separated it: a project created at 2XL read `connection_pool` 10 and held
+  10 `realtime_connect`, one created Small alongside 5, so the value comes
+  from the creation size and a resize keeps it. The 2026-10-22 RT05 project
+  (created with no `desired_instance_size`, then resized to Small) reading 2
+  fits the same rule (creation size not read back).
 
 ## experiments/auth-providers - key facts (AU01-AU04 2026-10-10, self-provisioned throwaway projects)
 
