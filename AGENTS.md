@@ -4234,7 +4234,7 @@ projects (feature battery, two conversion probes), all `small`,
   cannot call them), so the blog's "tracked" is untested for the dashboard;
   `migration_version`; the dashboard merge-request screen.
 
-## experiments/replica-routing - key facts (validated 2026-10-10, Pro org; RR02 2026-10-23, two runs)
+## experiments/replica-routing - key facts (validated 2026-10-10, Pro org; RR02 2026-10-23, two runs; RR03 2026-10-26, two runs)
 
 - **The API load balancer's host is `<ref>-all.supabase.co` and the Management
   API does not return it** (RR01e, 2026-10-10): the Dashboard route
@@ -4302,7 +4302,46 @@ projects (feature battery, two conversion probes), all `small`,
   refused, 400 for POST and GET; Auth, Storage, Realtime (join, Postgres
   Changes, broadcast echo) and Edge Functions answer as on the primary.
   `edge_logs` names the primary for Auth and carries no redirect identifier
-  for Storage or Realtime. The replica's own host serves REST GETs only.
+  for Storage or Realtime. The replica's own host serves REST GETs only; a
+  `HEAD` there answers 400 `text/plain`, though the load balancer delivers
+  HEADs to the replica (RR03g, 2026-10-26).
+- **With the primary and the replica in the SAME region the load balancer
+  spreads GETs over both** (RR03h, 2026-10-26, two runs, both nodes in
+  ap-southeast-1): replica/primary 111/89 and 94/106 of 200 from the Singapore
+  workstation, 100/100 and 115/85 of 200 from an Edge Function in
+  ap-southeast-1, about half of 50 from us-east-1 and eu-west-1 (all colos
+  chose `SIN`, the only region available). Run 2's order switched node at 92
+  of 199 transitions: not alternation; per-request choice is the inference,
+  the rule is not visible. The cross-region "GET goes to the near region"
+  facts above hold for a pair in two regions only. Any GET through `-all` can
+  land on the primary or the replica, so a client cannot rely on either.
+- **RLS, `auth.uid()` and keys behave the same on the replica** (RR03d/e,
+  two runs, supabase-js 2.118.0): an ES256 user token read the user's rows
+  only (3 and 5, 0 of another tenant) on the replica host and through `-all`;
+  legacy anon JWT, `sb_publishable_` (with or without Bearer), legacy
+  service_role JWT, `sb_secret_` and an HS256 user token (minted with the
+  legacy secret that `GET /v1/projects/{ref}/postgrest` returns as
+  `jwt_secret`) all answered on the replica host as on the primary. A
+  supabase-js client on the replica host carries the token with
+  `accessToken: async () => token` or `global.headers.Authorization`;
+  `auth.setSession` there fails (`Failed to parse JSON`, the replica host
+  answers `/auth/v1/user` with 400) and the next read goes out as anon: 0
+  rows, no error. `setSession` and `signInWithPassword` through `-all` work
+  (Auth goes to the primary; the token's `iss` is the primary host).
+- **Volatility does not route; method does** (RR03f): through `-all`,
+  `rpc(fn, {}, { get: true })` served stable, security-definer and volatile
+  read-only functions from either node (200); a writing function by GET
+  answered 405 SQLSTATE `25006` from either node (PostgREST runs GET read
+  only); `rpc(fn)` (POST) went to the primary 5 of 5 for every function.
+  supabase-js 2.118.0 sends HEAD for `{ count: 'exact', head: true }`, and
+  postgrest-js retries GET/HEAD on 503/520 by default: two replica 503s in
+  run 1's `edge_logs` never reached the module's results.
+- **Lag at 50 single-row inserts a second, same region** (RR03i, 300 s, two
+  runs): replica host `stale_ms` p50 17 and 21 ms, p95 28 and 30, max 91 and
+  99, against the primary host's p50 12 (the 20 ms insert period and clock
+  skew are inside both); `pg_stat_replication.replay_lag` p50 2.2 and 2.1 ms,
+  max 2.5 and 3.4 ms. Not measured: read-your-writes through `-all` in this
+  shape, heavier write rates, two replicas.
 - **`max_standby_streaming_delay` through `PUT config/database/postgres`**
   (RR02d): HTTP 200 and config `600s` both runs, but the replica's
   `pg_settings` read `600000ms` in run 1 and `30000ms (default)` in run 2 at

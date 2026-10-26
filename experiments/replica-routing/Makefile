@@ -12,7 +12,7 @@
 ROOT := $(abspath ../..)
 TS := $(shell date +%Y%m%d-%H%M%S)
 
-.PHONY: run run-rr02 facts publish list
+.PHONY: run run-rr02 run-rr03 facts publish list
 
 # RR02: re-routing on a lagging or unhealthy replica, non-REST traffic through
 # the load balancer. Same billing shape as RR01; 24 and 33 minutes in the
@@ -25,6 +25,18 @@ run-rr02:
 	@test -n "$(PVLAB_ORG_PRO)" || (echo "PVLAB_ORG_PRO not set" && exit 1)
 	cd $(ROOT) && bun harness/src/run.ts --where local --tests experiments/replica-routing/tests \
 	  --experiment replica-routing --only RR02 --destructive \
+	  --out experiments/replica-routing/evidence/$(TS)
+
+# RR03: user JWTs, RLS, API keys, RPC volatility and HEAD routing on a replica,
+# the load balancer's split with primary and replica in the same region, lag
+# under steady writes. Small primary + Small replica + pitr_7, same region. Knobs:
+#   PVLAB_RR3_REGION (ap-southeast-1) / PVLAB_RR3_REPLICA_REGION (same)
+#   PVLAB_RR3_LAG_S (300) / PVLAB_RR3_LAG_RATE (50 rows/s)
+#   PVLAB_RR_REFS_FILE=<path outside git>  appends the created ref
+run-rr03:
+	@test -n "$(PVLAB_ORG_PRO)" || (echo "PVLAB_ORG_PRO not set" && exit 1)
+	cd $(ROOT) && bun harness/src/run.ts --where local --tests experiments/replica-routing/tests \
+	  --experiment replica-routing --only RR03 --destructive \
 	  --out experiments/replica-routing/evidence/$(TS)
 
 run:

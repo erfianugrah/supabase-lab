@@ -470,10 +470,262 @@ with no identifier (the RR02j tail); in run 2, 1,549 and 4,077.
   not visible; these runs show what it did not do (move reads off a stale or
   unreachable replica), not how it chooses.
 
+## 2026-10-26 - RR03, user JWTs, RLS, keys and RPC routing on a replica; same-region split; lag under steady writes
+
+Shape: two throwaway Pro-org projects, one per run, the same day. Each: primary
+in ap-southeast-1 (Singapore) on Small compute, `pitr_7`, one Small read
+replica in the SAME region, ap-southeast-1. Vantage: the Singapore
+workstation (Cloudflare colo `SIN`) and Edge Functions invoked with
+`x-region`. Client library: `@supabase/supabase-js` 2.118.0 (the npm latest
+on 2026-10-26; the repo's dependency moved from 2.112.3). Artifacts (module
+rows quoted from the facts files beside them):
+
+- run 1: `out/2026-10-26/run-2026-10-26T00-23-57-221Z.json`, 00:23:57 to
+  00:34:14 UTC, 14 rows, 4 pass, 10 info, 0 fail
+- run 2: `out/2026-10-26/run-2026-10-26T00-34-24-787Z.json`, 00:34:24 to
+  00:45:43 UTC, 15 rows, 4 pass, 11 info, 0 fail
+
+Run 2 differs from run 1 in three module changes made between the runs: no
+`signOut` after sign-in (see RR03d), the RR03h order of nodes recorded as a
+sequence plus a `Connection: close` variant, and the RR03k log poll waiting
+until the row total stops growing. Replica setup answered 204 on the first
+attempt; the first session-pooler connection to the replica came 166 s (run
+1) and 170 s (run 2) after the call. The load balancer host was `<ref>-all`
+again.
+
+### Schema and how a read is classified
+
+`rr3_docs` has RLS on, one policy `for select to authenticated using
+(tenant_id = (select auth.uid()))`, seeded with 3 rows for user A, 5 for user
+B and 2 for a third tenant. Both users were created through the Auth admin
+API on the primary host and signed in with a password grant there; their
+access tokens are ES256 with a `kid`, `iss https://<ref>.supabase.co/auth/v1`
+(RR03b). The node that ran a request is read from `pg_is_in_recovery()` in
+the response:
+
+- `rr3_docs_v`: a `security_invoker` view over `rr3_docs` adding
+  `pg_is_in_recovery()` and `auth.uid()` per row, so RLS applies.
+- `rr3_node()` (stable): node, `auth.uid()`, `current_user`.
+- `list_docs_invoker()` (stable), `list_docs_volatile()` (volatile, reads
+  only): node, `auth.uid()`, `current_user`, rows visible (`n`) and rows of
+  another tenant visible (`foreign`).
+- `list_docs_definer()` (stable, `security definer`, `set search_path = ''`):
+  rows with `tenant_id = auth.uid()` (`n`) and all rows (`all_rows`).
+- `touch()` (volatile, plpgsql): inserts a row into `rr3_touch`; on error it
+  re-raises with the same SQLSTATE and message and a detail
+  `in_recovery=<t|f>`, so the node that refused the write is named.
+- `rr3_where`: a one-row view `select pg_is_in_recovery() as in_recovery`.
+  A `HEAD` carries no body, so `HEAD ... rr3_where?in_recovery=eq.true` with
+  `Prefer: count=exact` reads count 1 on the replica and 0 on the primary.
+
+`edge_logs` on the load balancer host (RR03k) is the second, independent
+record of where each request went.
+
+### RR03d: user JWTs and RLS on the replica
+
+For each user, on each host (load balancer, replica host, primary host), four
+client patterns read `rr3_docs_v` and `rpc/rr3_node` (`get: true`): a
+supabase-js client created with the `accessToken` option returning the user's
+token; a client with `global.headers.Authorization: Bearer <token>`; a client
+on which `auth.setSession({ access_token, refresh_token })` was called; raw
+`fetch` with `apikey: <legacy anon JWT>` and the user's token as Bearer. A
+capturing `fetch` recorded what supabase-js sent: `apikey` the legacy anon
+JWT, `Authorization` the user's ES256 token, for both the `accessToken` and
+the header pattern.
+
+| read | load balancer | replica host | primary host |
+|---|---|---|---|
+| user A, `accessToken`, header or raw | 3 rows, uid A, 0 foreign | 3 rows, replica, uid A, 0 foreign | 3 rows, primary, uid A, 0 foreign |
+| user B, same | 5 rows, uid B, 0 foreign | 5 rows, replica, uid B, 0 foreign | 5 rows, primary, uid B, 0 foreign |
+| anon key only | 0 rows; `rr3_node` uid null, role anon | same, on the replica | same, on the primary |
+
+Both runs, the three patterns in the table (`setSession` below). Through the load balancer the node varied from
+read to read (RR03h), and the rows and `auth.uid()` were the same whichever
+node served. So RLS and `auth.uid()` behaved identically on the replica for
+an ES256 user token.
+
+- `auth.setSession`: run 2 `ok` on the load balancer host and the primary
+  host, and the next read returned the user's rows. On the replica host it
+  failed in both runs with `Failed to parse JSON` (the replica host answers
+  `GET /auth/v1/user` with 400 and a non-JSON body), and the read after it
+  went out with the anon key as Bearer and returned 0 rows with no error.
+  Run 1 failed on every host with `400 Auth session missing!`: the module had
+  called `signOut({ scope: "local" })` after each sign-in, which sends `POST
+  /auth/v1/logout` and ends the session on the server, and `edge_logs`
+  recorded `GET /auth/v1/user` 403 for the two load balancer attempts. That
+  was a module bug, fixed for run 2; the run 1 `setSession` rows are not a
+  platform finding.
+- `signInWithPassword` on a client created on the load balancer host: ok
+  both runs, the token's `iss` is the primary host
+  (`https://<ref>.supabase.co/auth/v1`), and that token read as user B on the
+  replica host. On the replica host: `Failed to parse JSON` both runs.
+
+### RR03e: keys and token types
+
+`GET rpc/list_docs_invoker` with each header combination on each host. Every
+combination answered 200 on all three hosts in both runs, with the same role
+on each:
+
+| apikey | Authorization | role, rows seen |
+|---|---|---|
+| legacy anon JWT (HS256) | same | anon, 0 |
+| `sb_publishable_` | none | anon, 0 |
+| `sb_publishable_` | `Bearer sb_publishable_...` | anon, 0 |
+| `sb_publishable_` or legacy anon JWT | user A's ES256 token | authenticated, uid A, 3 |
+| `sb_publishable_` or legacy anon JWT | user A's claims signed HS256 with the legacy JWT secret | authenticated, uid A, 3 |
+| legacy service_role JWT | same | service_role, 10 |
+| `sb_secret_` | none | service_role, 10 |
+
+The HS256 token was minted by the module from user A's claims with the
+legacy secret, which `GET /v1/projects/{ref}/postgrest` returned as
+`jwt_secret` in both runs; an HS256 token issued by Auth itself was not
+tested (new projects sign with ES256). supabase-js 2.118.0 created with the
+publishable key sent `apikey` and `Authorization: Bearer` both set to the
+publishable key with no session, and the user's token as Bearer with the
+`accessToken` option; both answered as above on all three hosts.
+
+### RR03f: RPC routing by volatility and method
+
+supabase-js on the load balancer host, user A by `accessToken`, 5 calls each
+with `rpc(fn, {}, { get: true })` (GET) and `rpc(fn)` (POST). Node counts are
+replica / primary:
+
+| function | GET run 1 | GET run 2 | POST (both runs) |
+|---|---|---|---|
+| `rr3_node` (stable) | 1 / 4 | 1 / 4 | 0 / 5 |
+| `list_docs_invoker` (stable) | 3 / 2 | 2 / 3 | 0 / 5 |
+| `list_docs_definer` (stable, definer) | 3 / 2 | 2 / 3 | 0 / 5 |
+| `list_docs_volatile` (volatile, read only) | 1 / 4 | 2 / 3 | 0 / 5 |
+| `touch` (volatile, writes) | 405 `25006` 3 / 2 | 405 `25006` 3 / 2 | 0 / 5, HTTP 200 |
+
+- Every GET answered 200 except `touch`, and on whichever node served it.
+  The volatile read-only function served by GET on the replica as well as
+  the primary; volatility did not decide routing. `touch` by GET answered
+  HTTP 405, SQLSTATE `25006`, `cannot execute INSERT in a read-only
+  transaction`, on the replica (`in_recovery=t`) and on the primary
+  (`in_recovery=f`): PostgREST runs a GET read-only on either node, so the
+  error does not tell which node a client reached.
+- Every POST went to the primary and `touch` by POST wrote: `rr3_touch` went
+  from 0 to 6 rows each run (5 through the load balancer, 1 on the primary
+  host).
+- `list_docs_definer` ran as `postgres` on both nodes: `n` 3 (filtered by
+  `auth.uid()` inside the function) and `all_rows` 10 (the table owner is not
+  subject to RLS), the same on the replica as on the primary.
+- Raw fetch on the replica's own host: every GET answered as above, `touch`
+  405 `25006` `in_recovery=t`, and every POST 400 `Read replica does not
+  handle POST requests for the path /res...` (the module's 70-character cut).
+
+### RR03g: HEAD and count=exact
+
+Through the load balancer, 10 calls each (replica / primary):
+
+| request | run 1 | run 2 |
+|---|---|---|
+| `HEAD rr3_where`, `count=exact`, `in_recovery=eq.true` | 6 / 4, all 200 | 3 / 7, all 200 |
+| `GET rr3_where`, `count=exact` | 8 / 2, all 200, count 1 | 5 / 5, all 200, count 1 |
+| `HEAD rr3_docs`, `count=exact`, user A | 200, count 3, x10 | 200, count 3, x10 |
+
+supabase-js sent `HEAD` for `select('*', { count: 'exact', head: true })`
+(captured). `edge_logs` agrees that the load balancer sent HEADs to both
+nodes: HEAD to the replica 9 (run 1) and 6 (run 2), to the primary 11 and 14,
+all 200. On the replica's OWN host a `HEAD` answered 400 with
+`content-type text/plain` and no `content-range` (both runs; content type
+recorded in run 2), while a `GET` with `Prefer: count=exact` there answered
+200, `content-range 0-0/1` (run 2). So the replica host refuses HEAD and the
+load balancer still delivers a HEAD to the replica; how it reaches the
+replica was not looked at.
+
+### RR03h: the split with primary and replica in the same region
+
+`GET rpc/rr_whoami` with the anon key through the load balancer, sequential:
+
+| vantage (Cloudflare colo) | run 1 replica / primary | run 2 replica / primary | run 2 switches / transitions | run 2 longest run |
+|---|---|---|---|---|
+| workstation, keep-alive, n = 200 (SIN) | 111 / 89 | 94 / 106 | 92 / 199 | 14 |
+| workstation, `Connection: close`, n = 50 (SIN) | not run | 28 / 22 | 26 / 49 | 4 |
+| Edge Function `x-region ap-southeast-1`, n = 200 (SIN) | 100 / 100 | 115 / 85 | 108 / 199 | 7 |
+| Edge Function `x-region us-east-1`, n = 50 (IAD) | 20 / 30 | 27 / 23 | 25 / 49 | 7 |
+| Edge Function `x-region eu-west-1`, n = 50 (DUB) | 26 / 24 | 24 / 26 | 21 / 49 | 6 |
+
+0 errors in every row. `edge_logs` on the load balancer host: available
+regions `["SIN"]` on every GET and HEAD row (POST rows carry none), chosen
+region `SIN` for the SIN, IAD and DUB colos, and over all of a run's load balancer rows GET to the primary 845 and
+to the replica 813 (run 1), 841 and 860 (run 2).
+
+- With both databases in one region the load balancer spread GETs over the
+  primary and the replica, roughly half each, from every vantage. In the
+  cross-region shape (RR01f, RR02e) the same vantage got 100 % replica; there
+  the choice is between regions, here there is one region and two databases
+  in it. Docs (read-replicas page, read 2026-10-26): the load balancer "balances
+  requests between your Primary database and Read Replicas", and geo-routing
+  sends a GET "to the closest available database (all read replicas +
+  primary)"; its load balancer section says nothing about two databases
+  equally close. The spread here is consistent with geo-routing picking the
+  region and a second step choosing a database inside it.
+- The order is not a strict alternation: a strict alternation would switch
+  at all 199 (or 49) transitions; the run 2 sequences switched at roughly
+  half, about what independent 50/50 draws give. Inference: a per-request
+  choice between the two, not tied to the client's connection (the
+  `Connection: close` row spread the same way). The run cannot tell a random
+  choice from another rule, and whether the weights move with load or health
+  was not tested.
+- Latency from the workstation, keep-alive, run 2 medians: 20.9 ms when the
+  primary served, 19.2 ms when the replica served.
+
+### RR03i: lag under steady writes (same region)
+
+A session-pooler connection on the primary inserted one heartbeat row into
+`rr_marker` every 20 ms for 300 s: 15,096 rows, 50 a second, 0 errors, both
+runs. Meanwhile `GET rpc/rr_node` (anon) every 250 ms on each host returned
+`stale_ms`, the serving node's clock minus the newest row's `written_at`; a
+node keeping up therefore reads up to the 20 ms insert period plus delay,
+and the two hosts' clock skew is inside every replica figure.
+`pg_stat_replication.replay_lag` was read on the primary every 5 s.
+
+| source | run | n | stale_ms p50 | p95 | max |
+|---|---|---|---|---|---|
+| replica host | 1 | 1,091 | 17 | 28 | 91 |
+| replica host | 2 | 1,092 | 21 | 30 | 99 |
+| primary host | 1 | 1,093 | 12 | 20 | 79 |
+| primary host | 2 | 1,083 | 12 | 21 | 28 |
+| load balancer (523 / 541 by the replica) | 1 | 1,090 | 15 | 27 | 122 |
+| load balancer | 2 | 1,086 | 17 | 29 | 144 |
+
+`replay_lag`: p50 2.2 ms, p95 2.4 ms, max 2.5 ms (n 61, run 1); 2.1, 2.5 and
+3.4 ms (n 59, run 2). 0 read errors on any host. At this write rate the
+replica's median was 5 ms (run 1) and 9 ms (run 2) above the primary's own
+median, with clock skew inside that difference.
+
+### edge_logs and supabase-js retries
+
+Run 1's `edge_logs` hold two load balancer GETs answered 503 by the replica
+(`rr3_docs_v` and `rpc/rr3_node`) that none of the module's results show; run
+2 has none. postgrest-js 2.118.0 retries a GET or HEAD answered 503 or 520 by
+default (`src/fetchWithRetry.ts`, with an `X-Retry-Count` header), so those
+two were most likely retried by supabase-js and answered on the retry. The
+503 bodies were not recorded, so their cause is unknown.
+
+### Not settled by RR03
+
+- A cross-region arm was not run: RR01 and RR02 cover a Tokyo primary with a
+  Singapore replica from this vantage.
+- The load balancer's rule inside a region: spread observed, mechanism not
+  visible; behaviour under load, with two replicas, or when one same-region
+  node is stale or down was not run.
+- Read-your-writes through the load balancer in the same-region shape (a GET
+  right after a POST can land on either node) was not measured as such; the
+  lag figures above bound it at this write rate only.
+- Auth-issued HS256 user tokens, third-party-auth tokens, Realtime and
+  Storage with a user token through the load balancer.
+- Why the replica host refuses HEAD while the load balancer delivers HEAD to
+  the replica.
+- Cost: not metered. Each run kept a Small primary, a Small replica and
+  `pitr_7` for about 10 and 11 minutes.
+
 ## Not measured
 
-- Any second primary region, a second replica, or a replica larger than
-  Small.
+- Any second primary region outside RR03's same-region pair, a second
+  replica, or a replica larger than Small.
 - Load: every probe is one client at a few requests per second.
 - Replication delay for a large write (the largest transaction here is a
   50,000-row update; the RR02g bulk insert filled the disk before it
@@ -482,7 +734,9 @@ with no identifier (the RR02j tail); in run 2, 1,549 and 4,077.
   through the load balancer is RR02f/RR02k; the replica's behaviour on a
   project restart is RR02i.
 - The load balancer's rule. Whether it re-routes off a lagging or unhealthy
-  replica is RR02h-RR02j (it did not, in two runs).
+  replica is RR02h-RR02j (it did not, in two runs); with the primary and the
+  replica in one region it spread GETs over both (RR03h), by a rule not
+  visible from outside.
 - Cost: not metered. The final run kept a Small primary, a Small replica and
   `pitr_7` for about 27 minutes; the exploratory runs kept one project and
   one replica for roughly an hour and a half.
