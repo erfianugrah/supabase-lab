@@ -5280,7 +5280,7 @@ and PT02g rows are probe artefacts (named in the RUNLOG); other run 1 / run
   partitions. The Postgres version was queried at setup but not written to
   the artifact; the PostgREST version was not read.
 
-## experiments/hyperdrive-direct - key facts (H01 2026-10-05 Micro; H02 and H03 2026-10-23 Small, ap-southeast-1, Pro org; H02 two runs, H03 three)
+## experiments/hyperdrive-direct - key facts (H01 2026-10-05 Micro; H02 and H03 2026-10-23 Small, ap-southeast-1, Pro org; H02 two runs, H03 three; H04 2026-10-26 Small then Medium, two runs, Q1 from one)
 
 Self-provisioning (one throwaway project per module, Worker and Hyperdrive
 configs made with wrangler, all deleted in `finally`). Wrangler needs the
@@ -5324,23 +5324,34 @@ in the RUNLOG.
   of 30 Data API calls answered 200 and 11 plus a ping answered `503
   PGRST002 Could not query the database for the schema cache. Retrying.`
   (no PGRST000/001/003); H03 separates the two readings (below).
-- **Idle origin connections were closed between 16 and 21 minutes idle
-  (H03, one run; Hyperdrive or something on its path, sender not
-  measured):** after 20 s holds, 54 `hd_a` (default limit) and 13 `hd_c`
-  (`--origin-connection-limit 15`) backends sat idle with `state_change`
-  age equal to the time since load end and the last `pg_sleep` as query
-  text at every sample to 965 s, the same pids from 30 s on; all `hd_a`
-  closed between 965 and 1182 s idle, `hd_c` between 965 and 1265 s
-  (samples at 965, 1182 and 1265 s only; the gaps are two sleeps of the
-  orchestrator Mac, 09:50:15 to 09:53:46 and 09:53:57 to 09:55:10 UTC; the
-  ages are read on the server and the Mac is not on the
-  Worker-Hyperdrive-origin path, so the window is unaffected, #234). No keepalive queries
-  (`state_change` never reset), no recycling (same pids), no floor with no
-  Worker traffic (`hd_b`, terminated, never reconnected). H02 saw 60 idle at
-  891 s. Cloudflare's limits page lists a 10 minute idle connection timeout
-  for connections between Hyperdrive and the origin database. Budget a
-  config at its origin connection limit for at least 21 minutes after its
-  last burst; one run.
+- **Idle origin connections are closed from Hyperdrive's end (Postgres's
+  client end of the origin connection) after 903 to 1324 s idle (H04, one
+  run; H03, from samples: between 965 and 1182-1265 s;
+  its sample gaps were two sleeps of the orchestrator Mac, #234):** with
+  `log_disconnections` on, all 64 closes were plain `disconnection: session
+  time` lines, and by count (122 rows = 64 disconnections + 58 hold
+  `duration:` lines) there was no FATAL, ERROR, `SSL error` or `could not
+  receive data` line, so Postgres did not terminate them. The sessions are
+  TLS, and Postgres 17 logs a TCP close without a TLS close_notify as one
+  of those errors (be-secure-openssl.c, pqcomm.c; RUNLOG H04), so the TLS
+  peer (Hyperdrive, or a proxy holding its TLS session) closed them cleanly.
+  Untouched connections closed at 1180-1324 s idle, in batches per source
+  address (every untouched backend of one address in the same second). A
+  `select` every 120 s through config T kept open only the 4 connections it
+  ran on; T's other 16 closed at 1238-1324 s idle like A's with no traffic,
+  and the 4 closed 903-1233 s after their own last query. No connection was
+  opened or replaced while idle. Reading, from batch times only: a periodic
+  sweep with an idle threshold; if one connection shared a sweep with three
+  others, the threshold is 784-903 s and the period over 421 s; without that
+  premise a 10-minute threshold with a sweep of 303 s or more fits too.
+  Cloudflare's limits page lists a 10 minute idle connection timeout and
+  says the table applies to connections between Hyperdrive and the origin
+  (not Worker to Hyperdrive, which the lifecycle page says lives for one
+  invocation; not probed); no close came below 903 s idle. Budget a
+  config's origin connections for about 22 minutes (1324 s here) after the
+  last request on each connection; light traffic keeps the connections it
+  lands on (T held 4 of 20 until 2224-2674 s after load end). H04 sampled
+  every 10 s with no gap over 11356 ms.
 - **PGRST002 under Hyperdrive slot pressure (H03, 4 arms x 3 runs):** in
   the 9 arm-runs with Hyperdrive load, `dc_sleep_xl` answered 200 exactly as
   often as PostgREST's pool connections before the burst plus free slots
@@ -5355,10 +5366,17 @@ in the RUNLOG.
   not dropped (12 of 12 served); a reset is not needed, and a reset with
   free slots gives 30 x 200. Each 503 the client saw left exactly 6
   PostgREST access lines (runs 2 and 3, 6 arm-runs), the same factor as
-  data-api-capacity DC01b's 504s: a resend in front of PostgREST (reading;
-  not identified). Terminating 31 idle `authenticator` backends gave 503
-  PGRST002 on pings (run 3 logs: 503s from 43.0 to 16.6 s before the burst;
-  11-12 pings to 3 good in all three runs); terminating 2 did not.
+  data-api-capacity DC01b's 504s. H04 names the resender by its header: on
+  Medium every 503 PGRST002 carried `x-envoy-attempt-count: 6` and left
+  exactly 6 access lines (6 arm-runs, two runs), and one reset ping
+  answered `200` with attempt count 5, so an Envoy on the Data API path (the
+  API gateway's, per data-api-capacity DC12) resends 503 PGRST002 as it
+  does 504 PGRST003 (its retry configuration not read). H04 also found
+  200s equal to pool connections plus free slots on Medium (6 arm-runs). In
+  H03, terminating 31 idle `authenticator` backends gave 503 PGRST002 on
+  pings (H03 run 3 logs: 503s from 43.0 to 16.6 s before the burst; 11-12
+  pings to 3 good in all three H03 runs; H04 on Medium: 12 and 11 pings
+  after terminating 32 and 31); terminating 2 did not.
 - Config B (`--origin-connection-limit 5`) read up to 9 backends after the
   warm-up alone and 11 later (H03 run 3), 6 in run 1: the soft limit can be
   exceeded by more than one (the limits page's footnote 2 says counts "may
@@ -5378,7 +5396,13 @@ in the RUNLOG.
   after a Worker deploy: run 1 got 9 `404` HTML answers from workers.dev
   after its first good one. Data API requests end with `504 upstream
   request timeout` at about 125 s (run 1, one burst) while the statement
-  keeps running, so hold for under 120 s.
+  keeps running, so hold for under 120 s. `log_connections` and
+  `log_disconnections` are settable through `PUT /config/database/postgres`
+  (H04: 200, read back, sessions report `on`). The logs endpoint returned
+  exactly 1000 rows for a `limit 5000` query ordered by timestamp (H04 run
+  1, an earlier revision of the module; the cap is the endpoint's), mostly
+  warm-up connection lines, so read `postgres_logs` from a start time and
+  leave out `connection %` lines.
 
 ## experiments/advisor-coverage - key facts (validated 2026-10-23, two runs, one Pro-org project each, ap-southeast-1, Postgres 17.11)
 
