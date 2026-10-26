@@ -16,6 +16,23 @@ commit a5fc7d6, which predates this directory: the module ran from an
 uncommitted tree (the one committed with this RUNLOG), and the `region` field
 is the harness default, not part of the rig.
 
+**Host sleep audit (2026-10-26, #234): run 1's timings are void.** Run 1
+ran across five sleeps of the Mac, 1085 s of its 1449.5 s wall span
+(05:45:00 to 06:03:45 UTC, 10 s dark wakes between them), and its module
+ran 374.6 s of monotonic time
+(`../platform-downtime/out/2026-10-26/host-sleep/overlap.txt`). The rig is
+on the same Mac, so the Docker VM, the S3 server and the cluster slept with
+the client, and the module is one duration, so no case can be placed
+against the sleeps. Void: run 1's CHECKPOINT time, eviction wait,
+point-read times, full `count(*)` times and pgbench rates and latencies
+(WS01a, WS01d, WS01e). Run 2
+spanned no sleep; its cells stand and every reading below rests on them.
+Unaffected: the restore outcomes, bucket contents and row counts of both
+runs, which are not timings and agree between runs. WS01c's lock-copied
+restore in run 1 (`ws3-pg2 not ready in 90000 ms`, where run 2 got `could
+not open file "global/2672"`) fits a sleep inside that 90 s wall-clock wait
+(reading).
+
 Four earlier runs the same day used earlier versions of the module and are not
 published: the first aborted at start (cluster initialised without S3 mode),
 and none had WS01f. In the other three, WS01a, WS01b and WS01c gave the same
@@ -128,15 +145,16 @@ server, then read.
 | local kB before each count | 134208, 3036, 134040 | 134280, 3024, 134176 |
 | `count(*)` result | 50000 (pass) | 50000 (pass) |
 
-The first read after the restart took 17111.1 ms (run 1) and 15049.6 ms
-(run 2); reads two to seven took 113.5 to 131.2 ms (run 1) and 91.6 to 132.8
-ms (run 2), and the eighth 1.3 and 0.6 ms. On the second pass, after a first
-read of 52.0 and 108.0 ms, reads took 0.6 to 1.2 ms. By the first count the
+Run 1's timings here are void (host sleep audit above); its sizes and its
+`count(*)` result stand. The first read after the restart took 15049.6 ms in
+run 2 (run 1's 17111.1 ms is void); reads two to seven took 91.6 to 132.8 ms
+and the eighth 0.6 ms. On run 2's second pass, after a first read of 108.0
+ms, reads took 0.6 to 1.2 ms. By the first count the
 local `orioledb_data` was back at 134208 and 134280 kB; whether reads two to
 seven fetched parts from S3 or read local files was not measured. The full
 counts do not separate cold from warm: the local size swung between about
 3000 kB and 134000 kB (`du -k`) between counts as data was evicted and loaded
-back, and the second count took 12174 ms in run 1 and 247730 ms in run 2 (an
+back, and the second count took 247730 ms in run 2 (run 1's 12174 ms is void; an
 unpublished earlier run also had a 247107 ms second count). Why was not
 isolated.
 
@@ -150,8 +168,8 @@ container; S3 mode on, then a new cluster with it off.
 | S3 mode on | 24186.209406 tps, 0.165 ms average | 23706.629666 tps, 0.169 ms |
 | S3 mode off | 24175.451334 tps, 0.165 ms | 24042.922573 tps, 0.166 ms |
 
-The commit rate with S3 mode on was within 1.5% of the rate with it off in
-both runs, which fits the docs ("Data are synced with S3 asynchronously"); the
+The commit rate with S3 mode on was 1.4% lower than with it off in run 2
+(run 1's rates are void, host sleep audit above), which fits the docs ("Data are synced with S3 asynchronously"); the
 local RustFS PUT latency was not measured, and one of the three earlier runs
 was 6.8% lower with S3 mode on.
 

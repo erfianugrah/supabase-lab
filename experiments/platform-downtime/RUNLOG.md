@@ -686,3 +686,56 @@ on where the sleep fell. The lifecycle-ops LO05 artifact
 wait before the first measured restart, so its restart windows are not
 affected. LO05f, timed for +300 s, went out at +489 s because the sleep
 froze its timer; the 489 s acceptance is real wall time.
+Audited 2026-10-26, with five more found (next section).
+
+## 2026-10-26 - host sleep audit of the other experiments' artifacts (#234)
+
+Question: which committed figures were taken across a sleep of the
+orchestrator Mac, now that #211 showed `performance.now()` stops during one
+and outage windows can absorb it. Offline: no cloud run.
+
+Input: `pmset -g log` as copied on 2026-10-26 (reaches back to 2026-10-19
+06:05 UTC and forward to 2026-10-26 05:33 UTC), its Sleep, Wake and DarkWake
+lines converted to UTC (2084 events), then trimmed with
+`harness/scripts/sleep-overlap.ts --trim` to 76 events within 5 min of a
+scanned artifact's run window: `out/2026-10-26/host-sleep/pm-events.tsv`.
+Scanned: every pvlab run artifact under `experiments/*/out/2026-10-19/` to
+`out/2026-10-26/` (147; none is dated 10-24 or 10-25), so the list also
+covers the runs of 10-26, which postdate #211's list. Not scanned: 8 `.project.json`
+files, the cipherstash-eql, partitioned-tenancy ACL-probe and
+client-keyed-objects parity files (no run timing in them), and anything
+before 2026-10-19 06:05 UTC, which the log does not reach. Output: `out/2026-10-26/host-sleep/overlap.txt` (all 147;
+the trimmed and the full log give the same output) and
+`artifacts-spanning-sleep.txt` (the 20 with a sleep inside).
+
+Script fix found on the way: `sleep-overlap.ts` grouped a module's results
+by equal `durationMs`, but `run.ts` reads `performance.now()` once per result
+after the module returns, between console lines, so one module's results can
+differ by 1 ms (data-api-capacity run 1: DC02a 650760, DC02b 650761). The tool counted such a module twice and its
+reconstruction missed `finishedAt` by up to 6923 s (realtime-surface RT05).
+It now treats durations within 5 ms as one module; every one of the 20
+reconstructions lands 2 to 11 s from `finishedAt`. #211's placements in this
+experiment did not change (D01 to D04 have distinct durations). Its LO05
+reading also stands: LO05 is one module, now placed as one, with both sleeps
+before the first measured restart by its own field.
+
+Twenty artifacts span a sleep: the 15 in #211's list and five it could not
+see: four 2026-10-23 artifacts whose sleeps (09:17:22, 09:50:15, 09:53:57)
+fall after #211's sleep log ends (07:35:49 UTC; data-api-capacity DC08,
+hyperdrive-direct H03 run 1, restore-paths RP08 R27 and R29) and one dated
+2026-10-21, outside its dates (wal-on-s3 WS01 run 1). None from 2026-10-26
+does. Outcome
+per figure is written beside the figure in each RUNLOG; in short:
+
+| experiment, artifacts | outcome |
+|---|---|
+| data-api-capacity DC01-DC03 runs 1, 2, 4 | run 4 (the reference) unaffected; run 1's DC02b timeout-4 s row void; run 2's DC01 timeout, DC02 failure and DC03 client failures came at sleeps; the "durations do not add up" gap is the sleeps |
+| data-api-capacity DC08 | pool-150 arm's req/s, clients answered and Postgres rates void; its latencies and every other step unaffected (by reading) |
+| realtime-surface RT05 (2026-10-22) | unaffected: no row's wall-clock timing holds a sleep |
+| restore-paths RP06 R14, R20, R21 | unaffected values; R14's idle phase cut 5 samples short |
+| restore-paths RP07 R18, R19, R22, R23 | 3 GB times to healthy (R18, R19) and their `rest_read` and pooler windows bounded; their 144 s Auth/Realtime and 6 s `rest`/Realtime windows void; R18's refused password void; R22's fill time and rate void; R23's 3 GB bound wait void |
+| restore-paths RP08 R27, R29 | R29 cycle 3's 354 s bounded (226 to 354 s), its `rest_http` window void; R27 unaffected |
+| hyperdrive-direct H03 run 1 | unaffected; the Q1 sample gaps are the sleeps |
+| wal-on-s3 WS01 run 1 | timings void (rig and client slept together, cases not placeable); outcomes unaffected; run 2 carries the findings |
+| lifecycle-ops LO05, platform-downtime (#211) | as written in the #211 section |
+

@@ -328,8 +328,15 @@ failed, none needed the B fallback).
 - There is no sample between 965 s and 1182 s (217 s), and the next came at
   1265 s (83 s). Each Management API call aborts at 30 s with no retry, and
   none failed, so the gaps are in the loop's 30 s sleep, which fits the Mac
-  pausing the process (not checked; the per-sample wall clock was not
-  recorded). All 54 `hd_a` backends closed in the first gap, after
+  pausing the process (the per-sample wall clock was not recorded). Host
+  sleep audit (2026-10-26, #234): the sleep log has the orchestrator Mac
+  asleep 09:50:15 to 09:53:46 (211 s) and 09:53:57 to 09:55:10 (73 s) UTC,
+  both inside H03 by placement
+  (`../platform-downtime/out/2026-10-26/host-sleep/overlap.txt`; walking
+  the module across them lands 3 s from `finishedAt`), each 6 s and 10 s
+  shorter than the Q1 sample gap it falls in (217 s, 83 s). The ages are read on the server and the Mac is not on the
+  Worker-Hyperdrive-origin path, so the close window below is unaffected;
+  the sleeps removed the samples that would have narrowed it. All 54 `hd_a` backends closed in the first gap, after
   965-1182 s idle. `hd_c` closed 7 of 13 in it and the other 6 between
   1182 s and 1265 s. None reopened up to 1777 s.
 - Client addresses (labels): `hd_a` came from 5 addresses (12, 11, 12, 12
@@ -453,7 +460,7 @@ API). "Pool" below is `authenticator` backends other than the `LISTEN
 Not settled: who closes the idle origin connections and with what message
 (postgres_logs not read); Q1 has one run, one region, one Workers plan (not
 recorded), and a 217 s gap in its samples exactly where the closes
-happened; whether a request on one connection resets the others' idle
+happened (the Mac asleep, #234); whether a request on one connection resets the others' idle
 clocks; why A stopped at 54 in the Q1 fill; what resends the 503s in front
 of PostgREST, and `x-envoy-attempt-count` on the 503s; the code of the
 first 503s (234-byte bodies); Q2 on sizes other than Small and with other

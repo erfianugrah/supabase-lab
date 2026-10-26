@@ -1,0 +1,351 @@
+
+experiments/advisor-coverage/out/2026-10-23/run-2026-10-23T07-58-18-094Z.json  2026-10-23T07:58:18.094Z -> 2026-10-23T08:00:37.196Z  sleeps inside: 0, 0 s; wall 139.1 s, summed durationMs 139.1 s
+
+experiments/advisor-coverage/out/2026-10-23/run-2026-10-23T08-01-46-405Z.json  2026-10-23T08:01:46.405Z -> 2026-10-23T08:03:44.945Z  sleeps inside: 0, 0 s; wall 118.5 s, summed durationMs 118.5 s
+
+experiments/auth-rate-limits/out/2026-10-26/run-2026-10-26T00-24-19-000Z.json  2026-10-26T00:24:19.000Z -> 2026-10-26T00:25:58.462Z  sleeps inside: 0, 0 s; wall 99.5 s, summed durationMs 99.5 s
+
+experiments/auth-rate-limits/out/2026-10-26/run-2026-10-26T00-26-19-212Z.json  2026-10-26T00:26:19.212Z -> 2026-10-26T00:45:51.722Z  sleeps inside: 0, 0 s; wall 1172.5 s, summed durationMs 1172.5 s
+
+experiments/auth-rate-limits/out/2026-10-26/run-2026-10-26T00-46-13-771Z.json  2026-10-26T00:46:13.771Z -> 2026-10-26T00:52:40.147Z  sleeps inside: 0, 0 s; wall 386.4 s, summed durationMs 386.4 s
+
+experiments/auth-rate-limits/out/2026-10-26/run-2026-10-26T00-53-13-344Z.json  2026-10-26T00:53:13.344Z -> 2026-10-26T00:55:30.083Z  sleeps inside: 0, 0 s; wall 136.7 s, summed durationMs 136.7 s
+
+experiments/auth-rate-limits/out/2026-10-26/run-2026-10-26T00-56-08-056Z.json  2026-10-26T00:56:08.056Z -> 2026-10-26T01:01:35.077Z  sleeps inside: 0, 0 s; wall 327.0 s, summed durationMs 327.0 s
+
+experiments/auth-rate-limits/out/2026-10-26/run-2026-10-26T01-01-50-039Z.json  2026-10-26T01:01:50.039Z -> 2026-10-26T01:08:42.003Z  sleeps inside: 0, 0 s; wall 412.0 s, summed durationMs 412.0 s
+
+experiments/auth-rate-limits/out/2026-10-26/run-2026-10-26T01-09-20-327Z.json  2026-10-26T01:09:20.327Z -> 2026-10-26T01:09:22.041Z  sleeps inside: 0, 0 s; wall 1.7 s, summed durationMs 1.7 s
+
+experiments/cli-surface/out/2026-10-23/run-2026-10-23T11-18-38-851Z.json  2026-10-23T11:18:38.851Z -> 2026-10-23T11:19:31.673Z  sleeps inside: 0, 0 s; wall 52.8 s, summed durationMs 52.8 s
+
+experiments/client-keyed-objects/out/2026-10-23/run-2026-10-23T10-34-14-905Z.json  2026-10-23T10:34:14.905Z -> 2026-10-23T11:05:26.304Z  sleeps inside: 0, 0 s; wall 1871.4 s, summed durationMs 1871.4 s
+
+experiments/compute-disk/out/2026-10-23/run-2026-10-23T07-56-13-302Z.json  2026-10-23T07:56:13.302Z -> 2026-10-23T08:13:14.908Z  sleeps inside: 0, 0 s; wall 1021.6 s, summed durationMs 1021.6 s
+
+experiments/compute-surface/out/2026-10-23/run-2026-10-23T08-34-04-355Z.json  2026-10-23T08:34:04.355Z -> 2026-10-23T08:34:19.793Z  sleeps inside: 0, 0 s; wall 15.4 s, summed durationMs 15.4 s
+
+experiments/cross-project-auth/out/2026-10-23/run-2026-10-23T07-57-57-742Z.json  2026-10-23T07:57:57.742Z -> 2026-10-23T08:06:31.768Z  sleeps inside: 0, 0 s; wall 514.0 s, summed durationMs 514.0 s
+
+experiments/cross-project-auth/out/2026-10-23/run-2026-10-23T08-07-16-031Z.json  2026-10-23T08:07:16.031Z -> 2026-10-23T08:15:45.815Z  sleeps inside: 0, 0 s; wall 509.8 s, summed durationMs 509.8 s
+
+experiments/cross-project-auth/out/2026-10-23/run-2026-10-23T08-21-02-092Z.json  2026-10-23T08:21:02.092Z -> 2026-10-23T08:25:24.272Z  sleeps inside: 0, 0 s; wall 262.2 s, summed durationMs 262.2 s
+
+experiments/cross-project-auth/out/2026-10-23/run-2026-10-23T10-38-25-783Z.json  2026-10-23T10:38:25.783Z -> 2026-10-23T10:39:20.362Z  sleeps inside: 0, 0 s; wall 54.6 s, summed durationMs 54.6 s
+
+experiments/cross-project-auth/out/2026-10-23/run-2026-10-23T10-39-59-520Z.json  2026-10-23T10:39:59.520Z -> 2026-10-23T10:40:57.784Z  sleeps inside: 0, 0 s; wall 58.3 s, summed durationMs 58.3 s
+
+experiments/cross-project-auth/out/2026-10-23/run-2026-10-23T10-41-16-105Z.json  2026-10-23T10:41:16.105Z -> 2026-10-23T10:42:11.538Z  sleeps inside: 0, 0 s; wall 55.4 s, summed durationMs 55.4 s
+
+experiments/data-api-capacity/out/2026-10-22/run-2026-10-22T23-02-55-371Z.json  2026-10-22T23:02:55.371Z -> 2026-10-22T23:41:10.628Z  sleeps inside: 4, 898 s; wall 2295.3 s, summed durationMs 1404.0 s
+  DC01a,DC01b,DC01c,DC01d wall 23:02:55-23:09:54 (419 s, monotonic 419 s) no sleep
+  DC02a,DC02b,DC02c,DC02d wall 23:09:54-23:35:43 (1549 s, monotonic 651 s) sleep 23:17:28-23:21:23 (235 s) at +454 s; sleep 23:21:33-23:24:37 (184 s) at +699 s; sleep 23:24:47-23:29:09 (262 s) at +893 s; sleep 23:30:10-23:33:47 (217 s) at +1216 s
+  DC03a,DC03b,DC03c,DC03d wall 23:35:43-23:41:15 (333 s, monotonic 333 s) no sleep
+  DC99 wall 23:41:15-23:41:17 (1 s, monotonic 1 s) no sleep
+  reconstructed end 23:41:17 vs finishedAt 23:41:10 (diff -7 s)
+
+experiments/data-api-capacity/out/2026-10-22/run-2026-10-22T23-43-28-093Z.json  2026-10-22T23:43:28.093Z -> 2026-10-22T23:56:48.637Z  sleeps inside: 2, 244 s; wall 800.5 s, summed durationMs 561.0 s
+  DC01a,DC01b,DC01c,DC01 wall 23:43:28-23:51:00 (453 s, monotonic 309 s) sleep 23:48:34-23:50:58 (144 s) at +306 s
+  DC02 wall 23:51:00-23:51:06 (6 s, monotonic 6 s) no sleep
+  DC03a,DC03b,DC03c,DC03d wall 23:51:06-23:56:51 (345 s, monotonic 245 s) sleep 23:51:08-23:52:48 (100 s) at +1 s
+  DC99 wall 23:56:51-23:56:53 (1 s, monotonic 1 s) no sleep
+  reconstructed end 23:56:53 vs finishedAt 23:56:48 (diff -4 s)
+
+experiments/data-api-capacity/out/2026-10-23/run-2026-10-23T00-37-06-485Z.json  2026-10-23T00:37:06.485Z -> 2026-10-23T01:17:25.112Z  sleeps inside: 1, 97 s; wall 2418.6 s, summed durationMs 2323.2 s
+  DC01a,DC01b,DC01c,DC01d wall 00:37:06-00:49:15 (729 s, monotonic 729 s) no sleep
+  DC02a,DC02b,DC02c,DC02d,DC02e wall 00:49:15-01:12:11 (1376 s, monotonic 1279 s) sleep 01:10:01-01:11:38 (97 s) at +1246 s
+  DC03a,DC03b,DC03c,DC03d wall 01:12:11-01:17:25 (314 s, monotonic 314 s) no sleep
+  DC99 wall 01:17:25-01:17:26 (1 s, monotonic 1 s) no sleep
+  reconstructed end 01:17:26 vs finishedAt 01:17:25 (diff -2 s)
+
+experiments/data-api-capacity/out/2026-10-23/run-2026-10-23T07-13-34-754Z.json  2026-10-23T07:13:34.754Z -> 2026-10-23T07:31:20.243Z  sleeps inside: 0, 0 s; wall 1065.5 s, summed durationMs 1065.5 s
+
+experiments/data-api-capacity/out/2026-10-23/run-2026-10-23T07-49-11-858Z.json  2026-10-23T07:49:11.858Z -> 2026-10-23T08:09:57.482Z  sleeps inside: 0, 0 s; wall 1245.6 s, summed durationMs 1245.6 s
+
+experiments/data-api-capacity/out/2026-10-23/run-2026-10-23T09-37-44-863Z.json  2026-10-23T09:37:44.863Z -> 2026-10-23T09:59:21.006Z  sleeps inside: 2, 284 s; wall 1296.1 s, summed durationMs 1015.5 s
+  DC08a,DC08a,DC08b,DC08b,DC08b,DC08b,DC08b,DC08b,DC08b,DC08c,DC08c,DC08c wall 09:37:44-09:59:23 (1298 s, monotonic 1014 s) sleep 09:50:15-09:53:46 (211 s) at +750 s; sleep 09:53:57-09:55:10 (73 s) at +972 s
+  DC99 wall 09:59:23-09:59:24 (1 s, monotonic 1 s) no sleep
+  reconstructed end 09:59:24 vs finishedAt 09:59:21 (diff -3 s)
+
+experiments/data-api-capacity/out/2026-10-26/run-2026-10-26T00-23-46-863Z.json  2026-10-26T00:23:46.863Z -> 2026-10-26T01:01:42.536Z  sleeps inside: 0, 0 s; wall 2275.7 s, summed durationMs 2275.7 s
+
+experiments/data-api-capacity/out/2026-10-26/run-2026-10-26T00-24-26-283Z.json  2026-10-26T00:24:26.283Z -> 2026-10-26T01:21:32.029Z  sleeps inside: 0, 0 s; wall 3425.7 s, summed durationMs 3425.7 s
+
+experiments/data-api-capacity/out/2026-10-26/run-2026-10-26T00-24-41-341Z.json  2026-10-26T00:24:41.341Z -> 2026-10-26T00:36:44.763Z  sleeps inside: 0, 0 s; wall 723.4 s, summed durationMs 723.4 s
+
+experiments/data-api-capacity/out/2026-10-26/run-2026-10-26T00-37-13-794Z.json  2026-10-26T00:37:13.794Z -> 2026-10-26T00:48:10.358Z  sleeps inside: 0, 0 s; wall 656.6 s, summed durationMs 656.6 s
+
+experiments/data-api-defaults/out/2026-10-23/run-2026-10-23T08-06-02-454Z.json  2026-10-23T08:06:02.454Z -> 2026-10-23T08:06:47.635Z  sleeps inside: 0, 0 s; wall 45.2 s, summed durationMs 45.2 s
+
+experiments/data-api-defaults/out/2026-10-23/run-2026-10-23T08-07-48-510Z.json  2026-10-23T08:07:48.510Z -> 2026-10-23T08:08:33.960Z  sleeps inside: 0, 0 s; wall 45.5 s, summed durationMs 45.5 s
+
+experiments/data-api-reenable/out/2026-10-23/run-2026-10-23T07-55-04-028Z.json  2026-10-23T07:55:04.028Z -> 2026-10-23T07:56:23.813Z  sleeps inside: 0, 0 s; wall 79.8 s, summed durationMs 79.8 s
+
+experiments/edge-function-limits/out/2026-10-19/run-2026-10-19T06-18-50-032Z.json  2026-10-19T06:18:50.032Z -> 2026-10-19T06:19:45.905Z  sleeps inside: 0, 0 s; wall 55.9 s, summed durationMs 55.9 s
+
+experiments/edge-function-limits/out/2026-10-19/run-2026-10-19T07-37-20-468Z.json  2026-10-19T07:37:20.468Z -> 2026-10-19T07:38:15.064Z  sleeps inside: 0, 0 s; wall 54.6 s, summed durationMs 54.6 s
+
+experiments/edge-function-limits/out/2026-10-23/run-2026-10-23T08-13-07-398Z.json  2026-10-23T08:13:07.398Z -> 2026-10-23T08:15:06.048Z  sleeps inside: 0, 0 s; wall 118.7 s, summed durationMs 118.6 s
+
+experiments/edge-function-limits/out/2026-10-23/run-2026-10-23T08-13-07-430Z.json  2026-10-23T08:13:07.430Z -> 2026-10-23T08:21:17.970Z  sleeps inside: 0, 0 s; wall 490.5 s, summed durationMs 490.5 s
+
+experiments/edge-function-limits/out/2026-10-23/run-2026-10-23T08-15-52-095Z.json  2026-10-23T08:15:52.095Z -> 2026-10-23T08:21:30.940Z  sleeps inside: 0, 0 s; wall 338.8 s, summed durationMs 338.8 s
+
+experiments/edge-function-limits/out/2026-10-23/run-2026-10-23T08-21-31-417Z.json  2026-10-23T08:21:31.417Z -> 2026-10-23T08:27:19.686Z  sleeps inside: 0, 0 s; wall 348.3 s, summed durationMs 348.3 s
+
+experiments/edge-function-limits/out/2026-10-23/run-2026-10-23T08-21-50-368Z.json  2026-10-23T08:21:50.368Z -> 2026-10-23T08:42:30.135Z  sleeps inside: 0, 0 s; wall 1239.8 s, summed durationMs 1239.8 s
+
+experiments/edge-runtime-auth/out/2026-10-23/run-2026-10-23T08-40-04-847Z.json  2026-10-23T08:40:04.847Z -> 2026-10-23T08:46:35.716Z  sleeps inside: 0, 0 s; wall 390.9 s, summed durationMs 390.9 s
+
+experiments/edge-runtime-auth/out/2026-10-23/run-2026-10-23T08-47-08-955Z.json  2026-10-23T08:47:08.955Z -> 2026-10-23T08:53:27.722Z  sleeps inside: 0, 0 s; wall 378.8 s, summed durationMs 378.8 s
+
+experiments/hyperdrive-direct/out/2026-10-23/run-2026-10-23T07-51-57-032Z.json  2026-10-23T07:51:57.032Z -> 2026-10-23T08:09:42.205Z  sleeps inside: 0, 0 s; wall 1065.2 s, summed durationMs 1065.2 s
+
+experiments/hyperdrive-direct/out/2026-10-23/run-2026-10-23T08-12-55-905Z.json  2026-10-23T08:12:55.905Z -> 2026-10-23T08:34:20.410Z  sleeps inside: 0, 0 s; wall 1284.5 s, summed durationMs 1284.5 s
+
+experiments/hyperdrive-direct/out/2026-10-23/run-2026-10-23T09-28-56-267Z.json  2026-10-23T09:28:56.267Z -> 2026-10-23T10:04:26.721Z  sleeps inside: 2, 284 s; wall 2130.5 s, summed durationMs 1849.9 s
+  H03 wall 09:28:56-10:04:30 (2134 s, monotonic 1850 s) sleep 09:50:15-09:53:46 (211 s) at +1279 s; sleep 09:53:57-09:55:10 (73 s) at +1501 s
+  reconstructed end 10:04:30 vs finishedAt 10:04:26 (diff -3 s)
+
+experiments/hyperdrive-direct/out/2026-10-23/run-2026-10-23T10-06-17-500Z.json  2026-10-23T10:06:17.500Z -> 2026-10-23T10:11:57.112Z  sleeps inside: 0, 0 s; wall 339.6 s, summed durationMs 339.6 s
+
+experiments/hyperdrive-direct/out/2026-10-23/run-2026-10-23T10-12-40-066Z.json  2026-10-23T10:12:40.066Z -> 2026-10-23T10:18:29.330Z  sleeps inside: 0, 0 s; wall 349.3 s, summed durationMs 349.3 s
+
+experiments/identity-transfer/out/2026-10-23/run-2026-10-23T08-17-21-218Z.json  2026-10-23T08:17:21.218Z -> 2026-10-23T08:17:51.697Z  sleeps inside: 0, 0 s; wall 30.5 s, summed durationMs 30.5 s
+
+experiments/identity-transfer/out/2026-10-23/run-2026-10-23T08-19-09-467Z.json  2026-10-23T08:19:09.467Z -> 2026-10-23T08:19:31.954Z  sleeps inside: 0, 0 s; wall 22.5 s, summed durationMs 22.5 s
+
+experiments/identity-transfer/out/2026-10-23/run-2026-10-23T08-19-57-569Z.json  2026-10-23T08:19:57.569Z -> 2026-10-23T08:20:28.005Z  sleeps inside: 0, 0 s; wall 30.4 s, summed durationMs 30.4 s
+
+experiments/lifecycle-ops/out/2026-10-23/run-2026-10-23T02-47-19-611Z.json  2026-10-23T02:47:19.611Z -> 2026-10-23T03:10:56.358Z  sleeps inside: 2, 217 s; wall 1416.7 s, summed durationMs 1203.2 s
+  LO05a,LO05f,LO05b,LO05c,LO05d wall 02:47:19-03:10:59 (1420 s, monotonic 1203 s) sleep 02:52:17-02:55:27 (190 s) at +297 s; sleep 02:55:37-02:56:04 (27 s) at +497 s
+  reconstructed end 03:10:59 vs finishedAt 03:10:56 (diff -3 s)
+
+experiments/lifecycle-ops/out/2026-10-23/run-2026-10-23T08-45-26-339Z.json  2026-10-23T08:45:26.339Z -> 2026-10-23T09:15:09.111Z  sleeps inside: 0, 0 s; wall 1782.8 s, summed durationMs 1782.8 s
+
+experiments/medium-serverless/out/2026-10-23/run-2026-10-23T07-53-41-215Z.json  2026-10-23T07:53:41.215Z -> 2026-10-23T07:55:20.657Z  sleeps inside: 0, 0 s; wall 99.4 s, summed durationMs 99.4 s
+
+experiments/medium-serverless/out/2026-10-23/run-2026-10-23T07-54-21-985Z.json  2026-10-23T07:54:21.985Z -> 2026-10-23T07:55:55.799Z  sleeps inside: 0, 0 s; wall 93.8 s, summed durationMs 93.8 s
+
+experiments/medium-serverless/out/2026-10-23/run-2026-10-23T07-57-23-944Z.json  2026-10-23T07:57:23.944Z -> 2026-10-23T08:07:57.605Z  sleeps inside: 0, 0 s; wall 633.7 s, summed durationMs 633.7 s
+
+experiments/medium-serverless/out/2026-10-23/run-2026-10-23T07-57-57-816Z.json  2026-10-23T07:57:57.816Z -> 2026-10-23T08:08:08.165Z  sleeps inside: 0, 0 s; wall 610.3 s, summed durationMs 610.3 s
+
+experiments/medium-serverless/out/2026-10-23/run-2026-10-23T08-53-30-971Z.json  2026-10-23T08:53:30.971Z -> 2026-10-23T09:02:39.771Z  sleeps inside: 0, 0 s; wall 548.8 s, summed durationMs 548.8 s
+
+experiments/medium-serverless/out/2026-10-23/run-2026-10-23T08-54-10-992Z.json  2026-10-23T08:54:10.992Z -> 2026-10-23T09:04:28.705Z  sleeps inside: 0, 0 s; wall 617.7 s, summed durationMs 617.7 s
+
+experiments/mgmt-api-faults/out/2026-10-23/run-2026-10-23T08-26-58-210Z.json  2026-10-23T08:26:58.210Z -> 2026-10-23T08:27:17.165Z  sleeps inside: 0, 0 s; wall 19.0 s, summed durationMs 19.0 s
+
+experiments/mgmt-api-faults/out/2026-10-23/run-2026-10-23T08-28-46-346Z.json  2026-10-23T08:28:46.346Z -> 2026-10-23T08:29:05.785Z  sleeps inside: 0, 0 s; wall 19.4 s, summed durationMs 19.4 s
+
+experiments/mgmt-api-faults/out/2026-10-23/run-2026-10-23T08-29-08-425Z.json  2026-10-23T08:29:08.425Z -> 2026-10-23T08:29:30.146Z  sleeps inside: 0, 0 s; wall 21.7 s, summed durationMs 21.7 s
+
+experiments/mgmt-api-faults/out/2026-10-23/run-2026-10-23T08-29-47-990Z.json  2026-10-23T08:29:47.990Z -> 2026-10-23T08:30:31.279Z  sleeps inside: 0, 0 s; wall 43.3 s, summed durationMs 43.3 s
+
+experiments/mgmt-api-faults/out/2026-10-23/run-2026-10-23T08-32-56-569Z.json  2026-10-23T08:32:56.569Z -> 2026-10-23T08:33:36.606Z  sleeps inside: 0, 0 s; wall 40.0 s, summed durationMs 40.0 s
+
+experiments/observability-surface/out/2026-10-23/run-2026-10-23T10-34-27-519Z.json  2026-10-23T10:34:27.519Z -> 2026-10-23T10:44:40.975Z  sleeps inside: 0, 0 s; wall 613.5 s, summed durationMs 613.5 s
+
+experiments/observability-surface/out/2026-10-23/run-2026-10-23T10-45-54-614Z.json  2026-10-23T10:45:54.614Z -> 2026-10-23T11:02:22.763Z  sleeps inside: 0, 0 s; wall 988.1 s, summed durationMs 988.1 s
+
+experiments/orioledb/out/2026-10-21/run-2026-10-21T04-50-25-155Z.json  2026-10-21T04:50:25.155Z -> 2026-10-21T04:53:29.470Z  sleeps inside: 0, 0 s; wall 184.3 s, summed durationMs 184.3 s
+
+experiments/partitioned-tenancy/out/2026-10-22/run-2026-10-22T22-42-07-054Z.json  2026-10-22T22:42:07.054Z -> 2026-10-22T22:48:13.003Z  sleeps inside: 0, 0 s; wall 365.9 s, summed durationMs 365.9 s
+
+experiments/partitioned-tenancy/out/2026-10-22/run-2026-10-22T22-53-31-200Z.json  2026-10-22T22:53:31.200Z -> 2026-10-22T22:59:48.269Z  sleeps inside: 0, 0 s; wall 377.1 s, summed durationMs 377.1 s
+
+experiments/partitioned-tenancy/out/2026-10-22/run-2026-10-22T23-03-58-973Z.json  2026-10-22T23:03:58.973Z -> 2026-10-22T23:05:17.246Z  sleeps inside: 0, 0 s; wall 78.3 s, summed durationMs 78.3 s
+
+experiments/partitioned-tenancy/out/2026-10-23/run-2026-10-23T03-07-40-623Z.json  2026-10-23T03:07:40.623Z -> 2026-10-23T03:08:38.403Z  sleeps inside: 0, 0 s; wall 57.8 s, summed durationMs 57.8 s
+
+experiments/partitioned-tenancy/out/2026-10-23/run-2026-10-23T10-34-36-550Z.json  2026-10-23T10:34:36.550Z -> 2026-10-23T10:36:58.893Z  sleeps inside: 0, 0 s; wall 142.3 s, summed durationMs 142.3 s
+
+experiments/partitioned-tenancy/out/2026-10-23/run-2026-10-23T10-34-38-394Z.json  2026-10-23T10:34:38.394Z -> 2026-10-23T10:37:00.378Z  sleeps inside: 0, 0 s; wall 142.0 s, summed durationMs 142.0 s
+
+experiments/pgnet-under-load/out/2026-10-26/run-2026-10-26T00-24-41-120Z.json  2026-10-26T00:24:41.120Z -> 2026-10-26T00:27:27.868Z  sleeps inside: 0, 0 s; wall 166.7 s, summed durationMs 166.7 s
+
+experiments/pgnet-under-load/out/2026-10-26/run-2026-10-26T00-28-01-744Z.json  2026-10-26T00:28:01.744Z -> 2026-10-26T00:41:58.188Z  sleeps inside: 0, 0 s; wall 836.4 s, summed durationMs 836.4 s
+
+experiments/pgnet-under-load/out/2026-10-26/run-2026-10-26T00-30-17-690Z.json  2026-10-26T00:30:17.690Z -> 2026-10-26T00:55:24.324Z  sleeps inside: 0, 0 s; wall 1506.6 s, summed durationMs 1506.6 s
+
+experiments/pgnet-under-load/out/2026-10-26/run-2026-10-26T00-42-43-410Z.json  2026-10-26T00:42:43.410Z -> 2026-10-26T00:56:26.231Z  sleeps inside: 0, 0 s; wall 822.8 s, summed durationMs 822.8 s
+
+experiments/pgnet-under-load/out/2026-10-26/run-2026-10-26T00-57-29-512Z.json  2026-10-26T00:57:29.512Z -> 2026-10-26T01:01:46.554Z  sleeps inside: 0, 0 s; wall 257.0 s, summed durationMs 257.0 s
+
+experiments/platform-downtime/out/2026-10-23/run-2026-10-23T01-43-22-996Z.json  2026-10-23T01:43:22.996Z -> 2026-10-23T02:05:02.834Z  sleeps inside: 2, 306 s; wall 1299.8 s, summed durationMs 998.5 s
+  D01 wall 01:43:22-01:51:46 (503 s, monotonic 503 s) no sleep
+  D02 wall 01:51:46-01:52:59 (73 s, monotonic 73 s) no sleep
+  D03 wall 01:52:59-02:00:45 (466 s, monotonic 203 s) sleep 01:56:21-02:00:44 (263 s) at +202 s
+  D04 wall 02:00:45-02:05:07 (262 s, monotonic 219 s) sleep 02:00:54-02:01:37 (43 s) at +9 s
+  reconstructed end 02:05:07 vs finishedAt 02:05:02 (diff -5 s)
+
+experiments/platform-downtime/out/2026-10-23/run-2026-10-23T01-43-23-054Z.json  2026-10-23T01:43:23.054Z -> 2026-10-23T01:45:37.759Z  sleeps inside: 0, 0 s; wall 134.7 s, summed durationMs 134.7 s
+
+experiments/platform-downtime/out/2026-10-23/run-2026-10-23T01-47-38-287Z.json  2026-10-23T01:47:38.287Z -> 2026-10-23T01:54:52.493Z  sleeps inside: 0, 0 s; wall 434.2 s, summed durationMs 434.2 s
+
+experiments/platform-downtime/out/2026-10-23/run-2026-10-23T01-55-35-451Z.json  2026-10-23T01:55:35.451Z -> 2026-10-23T02:05:03.275Z  sleeps inside: 2, 306 s; wall 567.8 s, summed durationMs 266.5 s
+  D03 wall 01:55:35-02:00:53 (318 s, monotonic 55 s) sleep 01:56:21-02:00:44 (263 s) at +46 s
+  D04 wall 02:00:53-02:05:07 (255 s, monotonic 212 s) sleep 02:00:54-02:01:37 (43 s) at +1 s
+  reconstructed end 02:05:07 vs finishedAt 02:05:03 (diff -5 s)
+
+experiments/platform-downtime/out/2026-10-23/run-2026-10-23T02-07-03-305Z.json  2026-10-23T02:07:03.305Z -> 2026-10-23T02:29:42.345Z  sleeps inside: 3, 539 s; wall 1359.0 s, summed durationMs 826.4 s
+  D01 wall 02:07:03-02:21:55 (892 s, monotonic 353 s) sleep 02:12:07-02:15:20 (193 s) at +304 s; sleep 02:15:51-02:19:54 (243 s) at +528 s; sleep 02:20:04-02:21:47 (103 s) at +781 s
+  D02 wall 02:21:55-02:23:11 (77 s, monotonic 77 s) no sleep
+  D03 wall 02:23:11-02:27:03 (232 s, monotonic 232 s) no sleep
+  D04 wall 02:27:03-02:29:48 (165 s, monotonic 165 s) no sleep
+  reconstructed end 02:29:48 vs finishedAt 02:29:42 (diff -6 s)
+
+experiments/platform-downtime/out/2026-10-23/run-2026-10-23T07-54-24-330Z.json  2026-10-23T07:54:24.330Z -> 2026-10-23T08:01:35.521Z  sleeps inside: 0, 0 s; wall 431.2 s, summed durationMs 431.2 s
+
+experiments/platform-downtime/out/2026-10-23/run-2026-10-23T08-03-36-243Z.json  2026-10-23T08:03:36.243Z -> 2026-10-23T08:05:06.272Z  sleeps inside: 0, 0 s; wall 90.0 s, summed durationMs 90.0 s
+
+experiments/pooler-checkout/out/2026-10-23/run-2026-10-23T08-11-43-542Z.json  2026-10-23T08:11:43.542Z -> 2026-10-23T08:35:55.862Z  sleeps inside: 0, 0 s; wall 1452.3 s, summed durationMs 1452.3 s
+
+experiments/pooler-checkout/out/2026-10-23/run-2026-10-23T08-11-48-633Z.json  2026-10-23T08:11:48.633Z -> 2026-10-23T08:36:01.381Z  sleeps inside: 0, 0 s; wall 1452.7 s, summed durationMs 1452.7 s
+
+experiments/realtime-surface/out/2026-10-22/run-2026-10-22T22-53-26-669Z.json  2026-10-22T22:53:26.669Z -> 2026-10-23T00:00:42.471Z  sleeps inside: 6, 1142 s; wall 4035.8 s, summed durationMs 2905.0 s
+  RT05-setup,RT05a-read,RT05b-def-pc-100-r1,RT05b-def-pc-100-r2,RT05b-def-bc-100-r1,RT05b-def-bc-100-r2,RT05b-def-pc-500-r1,RT05b-def-pc-500-r2,RT05b-def-bc-500-r1,RT05b-def-bc-500-r2,RT05b-def-pc-1000-r1,RT05b-def-pc-1000-r2,RT05b-def-bc-1000-r1,RT05b-def-bc-1000-r2,RT05b-def-pc-2000-r1,RT05b-def-pc-2000-r2,RT05b-def-bc-2000-r1,RT05b-def-bc-2000-r2,RT05b-def-pc-5000-r1,RT05b-def-pc-5000-r2,RT05b-def-bc-5000-r1,RT05b-def-bc-5000-r2,RT05a-pool1,RT05b-pool1-pc-100-r1,RT05b-pool1-pc-100-r2,RT05b-pool1-pc-500-r1,RT05b-pool1-pc-500-r2,RT05b-pool1-pc-1000-r1,RT05b-pool1-pc-1000-r2,RT05b-pool1-pc-2000-r1,RT05b-pool1-pc-2000-r2,RT05b-pool1-pc-5000-r1,RT05b-pool1-pc-5000-r2,RT05a-pool20,RT05b-pool20-pc-100-r1,RT05b-pool20-pc-100-r2,RT05b-pool20-pc-500-r1,RT05b-pool20-pc-500-r2,RT05b-pool20-pc-1000-r1,RT05b-pool20-pc-1000-r2,RT05b-pool20-pc-2000-r1,RT05b-pool20-pc-2000-r2,RT05b-pool20-pc-5000-r1,RT05b-pool20-pc-5000-r2,RT05c-100,RT05c-500,RT05c-1000,RT05c-2000,RT05c-5000,RT05a-bound21,RT05b-bound21-pc-500-r1,RT05a-bound21-conns,RT05a-bound100,RT05b-bound100-pc-500-r1,RT05a-bound100-conns wall 22:53:26-00:00:53 (4047 s, monotonic 2905 s) sleep 23:17:28-23:21:23 (235 s) at +1441 s; sleep 23:21:33-23:24:37 (184 s) at +1686 s; sleep 23:24:47-23:29:09 (262 s) at +1880 s; sleep 23:30:10-23:33:47 (217 s) at +2203 s; sleep 23:48:34-23:50:58 (144 s) at +3307 s; sleep 23:51:08-23:52:48 (100 s) at +3461 s
+  reconstructed end 00:00:53 vs finishedAt 00:00:42 (diff -11 s)
+
+experiments/realtime-surface/out/2026-10-26/run-2026-10-26T01-21-52-456Z.json  2026-10-26T01:21:52.456Z -> 2026-10-26T01:33:06.069Z  sleeps inside: 0, 0 s; wall 673.6 s, summed durationMs 673.6 s
+
+experiments/replica-routing/out/2026-10-23/run-2026-10-23T07-57-32-539Z.json  2026-10-23T07:57:32.539Z -> 2026-10-23T08:21:29.590Z  sleeps inside: 0, 0 s; wall 1437.1 s, summed durationMs 1437.0 s
+
+experiments/replica-routing/out/2026-10-23/run-2026-10-23T08-22-50-864Z.json  2026-10-23T08:22:50.864Z -> 2026-10-23T08:56:19.327Z  sleeps inside: 0, 0 s; wall 2008.5 s, summed durationMs 2008.4 s
+
+experiments/replica-routing/out/2026-10-26/run-2026-10-26T00-23-57-221Z.json  2026-10-26T00:23:57.221Z -> 2026-10-26T00:34:14.449Z  sleeps inside: 0, 0 s; wall 617.2 s, summed durationMs 617.2 s
+
+experiments/replica-routing/out/2026-10-26/run-2026-10-26T00-34-24-787Z.json  2026-10-26T00:34:24.787Z -> 2026-10-26T00:45:43.858Z  sleeps inside: 0, 0 s; wall 679.1 s, summed durationMs 679.1 s
+
+experiments/restore-paths/out/2026-10-20/run-2026-10-20T09-49-42-217Z.json  2026-10-20T09:49:42.217Z -> 2026-10-20T09:53:03.635Z  sleeps inside: 0, 0 s; wall 201.4 s, summed durationMs 201.4 s
+
+experiments/restore-paths/out/2026-10-20/run-2026-10-20T09-52-11-293Z.json  2026-10-20T09:52:11.293Z -> 2026-10-20T09:52:27.143Z  sleeps inside: 0, 0 s; wall 15.8 s, summed durationMs 15.8 s
+
+experiments/restore-paths/out/2026-10-20/run-2026-10-20T09-53-31-105Z.json  2026-10-20T09:53:31.105Z -> 2026-10-20T09:54:34.775Z  sleeps inside: 0, 0 s; wall 63.7 s, summed durationMs 63.7 s
+
+experiments/restore-paths/out/2026-10-20/run-2026-10-20T09-53-54-870Z.json  2026-10-20T09:53:54.870Z -> 2026-10-20T09:57:15.495Z  sleeps inside: 0, 0 s; wall 200.6 s, summed durationMs 200.6 s
+
+experiments/restore-paths/out/2026-10-22/run-2026-10-22T22-38-06-919Z-rp06-r1.json  2026-10-22T22:38:06.919Z -> 2026-10-22T23:29:11.805Z  sleeps inside: 3, 681 s; wall 3064.9 s, summed durationMs 2389.3 s
+  RP06a,RP06b,RP06c,RP06,RP06e wall 22:38:06-23:29:17 (3070 s, monotonic 2389 s) sleep 23:17:28-23:21:23 (235 s) at +2361 s; sleep 23:21:33-23:24:37 (184 s) at +2606 s; sleep 23:24:47-23:29:09 (262 s) at +2800 s
+  reconstructed end 23:29:17 vs finishedAt 23:29:11 (diff -5 s)
+
+experiments/restore-paths/out/2026-10-22/run-2026-10-22T22-38-06-919Z-rp07-r1.json  2026-10-22T22:38:06.919Z -> 2026-10-22T23:14:42.406Z  sleeps inside: 0, 0 s; wall 2195.5 s, summed durationMs 2195.5 s
+
+experiments/restore-paths/out/2026-10-22/run-2026-10-22T23-37-21-953Z-rp07-r2.json  2026-10-22T23:37:21.953Z -> 2026-10-23T00:16:05.762Z  sleeps inside: 2, 244 s; wall 2323.8 s, summed durationMs 2084.3 s
+  RP07a,RP07b1,RP07b2,RP07z wall 23:37:21-00:16:10 (2328 s, monotonic 2084 s) sleep 23:48:34-23:50:58 (144 s) at +672 s; sleep 23:51:08-23:52:48 (100 s) at +826 s
+  reconstructed end 00:16:10 vs finishedAt 00:16:05 (diff -4 s)
+
+experiments/restore-paths/out/2026-10-22/run-2026-10-22T23-37-21-953Z-rp07-r3-control.json  2026-10-22T23:37:21.953Z -> 2026-10-23T00:15:40.578Z  sleeps inside: 2, 244 s; wall 2298.6 s, summed durationMs 2059.1 s
+  RP07a,RP07b1,RP07b2,RP07z wall 23:37:21-00:15:45 (2303 s, monotonic 2059 s) sleep 23:48:34-23:50:58 (144 s) at +672 s; sleep 23:51:08-23:52:48 (100 s) at +826 s
+  reconstructed end 00:15:45 vs finishedAt 00:15:40 (diff -4 s)
+
+experiments/restore-paths/out/2026-10-23/run-2026-10-23T00-17-23-626Z-rp06-t2.json  2026-10-23T00:17:23.626Z -> 2026-10-23T00:54:36.103Z  sleeps inside: 4, 664 s; wall 2232.5 s, summed durationMs 1577.0 s
+  RP06a,RP06d,RP06e wall 00:17:23-00:54:44 (2241 s, monotonic 1577 s) sleep 00:24:39-00:27:56 (197 s) at +435 s; sleep 00:28:06-00:32:28 (262 s) at +642 s; sleep 00:32:38-00:34:19 (101 s) at +914 s; sleep 00:34:29-00:36:13 (104 s) at +1025 s
+  reconstructed end 00:54:44 vs finishedAt 00:54:36 (diff -9 s)
+
+experiments/restore-paths/out/2026-10-23/run-2026-10-23T00-17-23-628Z-rp06-t1.json  2026-10-23T00:17:23.628Z -> 2026-10-23T00:54:36.955Z  sleeps inside: 4, 664 s; wall 2233.3 s, summed durationMs 1577.9 s
+  RP06a,RP06d,RP06e wall 00:17:23-00:54:45 (2242 s, monotonic 1578 s) sleep 00:24:39-00:27:56 (197 s) at +435 s; sleep 00:28:06-00:32:28 (262 s) at +642 s; sleep 00:32:38-00:34:19 (101 s) at +914 s; sleep 00:34:29-00:36:13 (104 s) at +1025 s
+  reconstructed end 00:54:45 vs finishedAt 00:54:36 (diff -9 s)
+
+experiments/restore-paths/out/2026-10-23/run-2026-10-23T00-17-23-645Z.json  2026-10-23T00:17:23.645Z -> 2026-10-23T01:00:53.943Z  sleeps inside: 4, 664 s; wall 2610.3 s, summed durationMs 1954.9 s
+  RP07a,RP07b1,RP07z wall 00:17:23-01:01:02 (2619 s, monotonic 1955 s) sleep 00:24:39-00:27:56 (197 s) at +435 s; sleep 00:28:06-00:32:28 (262 s) at +642 s; sleep 00:32:38-00:34:19 (101 s) at +914 s; sleep 00:34:29-00:36:13 (104 s) at +1025 s
+  reconstructed end 01:01:02 vs finishedAt 01:00:53 (diff -9 s)
+
+experiments/restore-paths/out/2026-10-23/run-2026-10-23T00-17-23-754Z.json  2026-10-23T00:17:23.754Z -> 2026-10-23T01:03:55.994Z  sleeps inside: 4, 664 s; wall 2792.2 s, summed durationMs 2136.8 s
+  RP07a,RP07b1,RP07b2,RP07z wall 00:17:23-01:04:04 (2801 s, monotonic 2137 s) sleep 00:24:39-00:27:56 (197 s) at +435 s; sleep 00:28:06-00:32:28 (262 s) at +642 s; sleep 00:32:38-00:34:19 (101 s) at +914 s; sleep 00:34:29-00:36:13 (104 s) at +1025 s
+  reconstructed end 01:04:04 vs finishedAt 01:03:55 (diff -9 s)
+
+experiments/restore-paths/out/2026-10-23/run-2026-10-23T00-55-48-026Z.json  2026-10-23T00:55:48.026Z -> 2026-10-23T01:01:35.085Z  sleeps inside: 0, 0 s; wall 347.1 s, summed durationMs 347.1 s
+
+experiments/restore-paths/out/2026-10-23/run-2026-10-23T00-56-12-266Z.json  2026-10-23T00:56:12.266Z -> 2026-10-23T01:03:10.424Z  sleeps inside: 0, 0 s; wall 418.2 s, summed durationMs 418.2 s
+
+experiments/restore-paths/out/2026-10-23/run-2026-10-23T07-56-08-998Z.json  2026-10-23T07:56:08.998Z -> 2026-10-23T08:41:18.230Z  sleeps inside: 0, 0 s; wall 2709.2 s, summed durationMs 2709.2 s
+
+experiments/restore-paths/out/2026-10-23/run-2026-10-23T07-56-29-050Z.json  2026-10-23T07:56:29.050Z -> 2026-10-23T10:04:18.525Z  sleeps inside: 3, 402 s; wall 7669.5 s, summed durationMs 7273.0 s
+  RP08a,RP08b1,RP08b2,RP08z wall 07:56:29-10:04:24 (7675 s, monotonic 7273 s) sleep 09:17:22-09:19:20 (118 s) at +4853 s; sleep 09:50:15-09:53:46 (211 s) at +6826 s; sleep 09:53:57-09:55:10 (73 s) at +7048 s
+  reconstructed end 10:04:24 vs finishedAt 10:04:18 (diff -6 s)
+
+experiments/restore-paths/out/2026-10-23/run-2026-10-23T07-58-01-360Z.json  2026-10-23T07:58:01.360Z -> 2026-10-23T08:16:31.219Z  sleeps inside: 0, 0 s; wall 1109.9 s, summed durationMs 1109.9 s
+
+experiments/restore-paths/out/2026-10-23/run-2026-10-23T08-17-52-950Z.json  2026-10-23T08:17:52.950Z -> 2026-10-23T08:35:39.347Z  sleeps inside: 0, 0 s; wall 1066.4 s, summed durationMs 1066.4 s
+
+experiments/restore-paths/out/2026-10-23/run-2026-10-23T08-37-26-434Z.json  2026-10-23T08:37:26.434Z -> 2026-10-23T08:54:35.135Z  sleeps inside: 0, 0 s; wall 1028.7 s, summed durationMs 1028.7 s
+
+experiments/restore-paths/out/2026-10-23/run-2026-10-23T08-50-41-278Z.json  2026-10-23T08:50:41.278Z -> 2026-10-23T09:20:47.285Z  sleeps inside: 1, 118 s; wall 1806.0 s, summed durationMs 1690.2 s
+  RP08a,RP08b1,RP08b2,RP08b3,RP08z wall 08:50:41-09:20:49 (1808 s, monotonic 1690 s) sleep 09:17:22-09:19:20 (118 s) at +1601 s
+  reconstructed end 09:20:49 vs finishedAt 09:20:47 (diff -2 s)
+
+experiments/restore-paths/out/2026-10-23/run-2026-10-23T09-21-24-819Z.json  2026-10-23T09:21:24.819Z -> 2026-10-23T09:49:47.652Z  sleeps inside: 0, 0 s; wall 1702.8 s, summed durationMs 1702.8 s
+
+experiments/security-lockdown/out/2026-10-23/run-2026-10-23T08-17-05-467Z.json  2026-10-23T08:17:05.467Z -> 2026-10-23T08:21:07.049Z  sleeps inside: 0, 0 s; wall 241.6 s, summed durationMs 241.6 s
+
+experiments/security-lockdown/out/2026-10-23/run-2026-10-23T08-21-39-730Z.json  2026-10-23T08:21:39.730Z -> 2026-10-23T08:25:59.088Z  sleeps inside: 0, 0 s; wall 259.4 s, summed durationMs 259.4 s
+
+experiments/self-hosted-auth/out/2026-10-23/run-2026-10-23T08-46-09-461Z.json  2026-10-23T08:46:09.461Z -> 2026-10-23T08:57:25.288Z  sleeps inside: 0, 0 s; wall 675.8 s, summed durationMs 675.8 s
+
+experiments/self-hosted-auth/out/2026-10-23/run-2026-10-23T08-48-10-179Z.json  2026-10-23T08:48:10.179Z -> 2026-10-23T08:59:36.383Z  sleeps inside: 0, 0 s; wall 686.2 s, summed durationMs 686.2 s
+
+experiments/self-hosted-auth/out/2026-10-23/run-2026-10-23T08-48-15-089Z.json  2026-10-23T08:48:15.089Z -> 2026-10-23T08:59:30.847Z  sleeps inside: 0, 0 s; wall 675.8 s, summed durationMs 675.8 s
+
+experiments/self-hosted-defaults/out/2026-10-23/run-2026-10-23T08-44-06-658Z.json  2026-10-23T08:44:06.658Z -> 2026-10-23T08:44:24.457Z  sleeps inside: 0, 0 s; wall 17.8 s, summed durationMs 17.8 s
+
+experiments/self-hosted-defaults/out/2026-10-23/run-2026-10-23T08-50-20-551Z.json  2026-10-23T08:50:20.551Z -> 2026-10-23T08:54:21.460Z  sleeps inside: 0, 0 s; wall 240.9 s, summed durationMs 240.9 s
+
+experiments/self-hosted-defaults/out/2026-10-23/run-2026-10-23T08-58-48-533Z.json  2026-10-23T08:58:48.533Z -> 2026-10-23T09:01:11.724Z  sleeps inside: 0, 0 s; wall 143.2 s, summed durationMs 143.2 s
+
+experiments/self-hosted-defaults/out/2026-10-23/run-2026-10-23T09-02-37-193Z.json  2026-10-23T09:02:37.193Z -> 2026-10-23T09:06:26.550Z  sleeps inside: 0, 0 s; wall 229.4 s, summed durationMs 229.4 s
+
+experiments/self-hosted-defaults/out/2026-10-23/run-2026-10-23T09-07-05-541Z.json  2026-10-23T09:07:05.541Z -> 2026-10-23T09:08:46.603Z  sleeps inside: 0, 0 s; wall 101.1 s, summed durationMs 101.1 s
+
+experiments/self-hosted-defaults/out/2026-10-23/run-2026-10-23T09-09-47-902Z.json  2026-10-23T09:09:47.902Z -> 2026-10-23T09:10:26.165Z  sleeps inside: 0, 0 s; wall 38.3 s, summed durationMs 38.3 s
+
+experiments/self-hosted-defaults/out/2026-10-23/run-2026-10-23T09-11-43-286Z.json  2026-10-23T09:11:43.286Z -> 2026-10-23T09:11:46.446Z  sleeps inside: 0, 0 s; wall 3.2 s, summed durationMs 3.2 s
+
+experiments/self-hosted-defaults/out/2026-10-23/run-2026-10-23T09-46-42-669Z.json  2026-10-23T09:46:42.669Z -> 2026-10-23T09:47:35.718Z  sleeps inside: 0, 0 s; wall 53.0 s, summed durationMs 53.0 s
+
+experiments/self-hosted-defaults/out/2026-10-23/run-2026-10-23T09-57-29-678Z.json  2026-10-23T09:57:29.678Z -> 2026-10-23T09:58:04.001Z  sleeps inside: 0, 0 s; wall 34.3 s, summed durationMs 34.3 s
+
+experiments/storage-surface/out/2026-10-21/run-2026-10-21T04-10-39-084Z.json  2026-10-21T04:10:39.084Z -> 2026-10-21T04:12:11.533Z  sleeps inside: 0, 0 s; wall 92.4 s, summed durationMs 92.4 s
+
+experiments/storage-surface/out/2026-10-21/run-2026-10-21T04-12-12-527Z.json  2026-10-21T04:12:12.527Z -> 2026-10-21T04:13:51.107Z  sleeps inside: 0, 0 s; wall 98.6 s, summed durationMs 98.6 s
+
+experiments/storage-surface/out/2026-10-21/run-2026-10-21T07-00-59-289Z.json  2026-10-21T07:00:59.289Z -> 2026-10-21T07:01:18.049Z  sleeps inside: 0, 0 s; wall 18.8 s, summed durationMs 18.8 s
+
+experiments/storage-surface/out/2026-10-21/run-2026-10-21T07-01-41-627Z.json  2026-10-21T07:01:41.627Z -> 2026-10-21T07:02:00.405Z  sleeps inside: 0, 0 s; wall 18.8 s, summed durationMs 18.8 s
+
+experiments/storage-surface/out/2026-10-21/run-2026-10-21T07-02-09-105Z.json  2026-10-21T07:02:09.105Z -> 2026-10-21T07:03:17.822Z  sleeps inside: 0, 0 s; wall 68.7 s, summed durationMs 68.7 s
+
+experiments/storage-surface/out/2026-10-22/run-2026-10-22T05-23-24-115Z.json  2026-10-22T05:23:24.115Z -> 2026-10-22T05:29:42.926Z  sleeps inside: 0, 0 s; wall 378.8 s, summed durationMs 378.8 s
+
+experiments/storage-surface/out/2026-10-22/run-2026-10-22T05-30-34-291Z.json  2026-10-22T05:30:34.291Z -> 2026-10-22T05:37:19.707Z  sleeps inside: 0, 0 s; wall 405.4 s, summed durationMs 405.4 s
+
+experiments/storage-surface/out/2026-10-22/run-2026-10-22T05-37-20-539Z.json  2026-10-22T05:37:20.539Z -> 2026-10-22T05:43:44.981Z  sleeps inside: 0, 0 s; wall 384.4 s, summed durationMs 384.4 s
+
+experiments/storage-surface/out/2026-10-23/run-2026-10-23T08-36-10-723Z.json  2026-10-23T08:36:10.723Z -> 2026-10-23T08:40:56.299Z  sleeps inside: 0, 0 s; wall 285.6 s, summed durationMs 285.6 s
+
+experiments/storage-surface/out/2026-10-23/run-2026-10-23T08-41-52-008Z.json  2026-10-23T08:41:52.008Z -> 2026-10-23T08:46:24.476Z  sleeps inside: 0, 0 s; wall 272.5 s, summed durationMs 272.5 s
+
+experiments/storage-surface/out/2026-10-23/run-2026-10-23T08-47-08-957Z.json  2026-10-23T08:47:08.957Z -> 2026-10-23T08:47:09.283Z  sleeps inside: 0, 0 s; wall 0.3 s, summed durationMs 0.3 s
+
+experiments/storage-surface/out/2026-10-23/run-2026-10-23T08-47-59-431Z.json  2026-10-23T08:47:59.431Z -> 2026-10-23T08:52:58.507Z  sleeps inside: 0, 0 s; wall 299.1 s, summed durationMs 299.1 s
+
+experiments/storage-surface/out/2026-10-23/run-2026-10-23T08-53-28-034Z.json  2026-10-23T08:53:28.034Z -> 2026-10-23T08:58:28.998Z  sleeps inside: 0, 0 s; wall 301.0 s, summed durationMs 301.0 s
+
+experiments/storage-surface/out/2026-10-23/run-2026-10-23T08-58-46-286Z.json  2026-10-23T08:58:46.286Z -> 2026-10-23T09:08:39.367Z  sleeps inside: 0, 0 s; wall 593.1 s, summed durationMs 593.1 s
+
+experiments/terraform-edge-functions/out/2026-10-23/run-2026-10-23T08-28-55-230Z.json  2026-10-23T08:28:55.230Z -> 2026-10-23T08:39:27.216Z  sleeps inside: 0, 0 s; wall 632.0 s, summed durationMs 632.0 s
+
+experiments/terraform-edge-functions/out/2026-10-23/run-2026-10-23T08-41-12-874Z.json  2026-10-23T08:41:12.874Z -> 2026-10-23T08:56:45.713Z  sleeps inside: 0, 0 s; wall 932.8 s, summed durationMs 932.8 s
+
+experiments/third-party-auth/out/2026-10-23/run-2026-10-23T08-04-15-019Z.json  2026-10-23T08:04:15.019Z -> 2026-10-23T08:04:32.886Z  sleeps inside: 0, 0 s; wall 17.9 s, summed durationMs 17.9 s
+
+experiments/third-party-auth/out/2026-10-23/run-2026-10-23T08-05-56-795Z.json  2026-10-23T08:05:56.795Z -> 2026-10-23T08:07:59.526Z  sleeps inside: 0, 0 s; wall 122.7 s, summed durationMs 122.7 s
+
+experiments/third-party-auth/out/2026-10-23/run-2026-10-23T08-08-13-268Z.json  2026-10-23T08:08:13.268Z -> 2026-10-23T08:10:35.939Z  sleeps inside: 0, 0 s; wall 142.7 s, summed durationMs 142.7 s
+
+experiments/wal-on-s3/out/2026-10-21/run-2026-10-21T05-42-10-259Z.json  2026-10-21T05:42:10.259Z -> 2026-10-21T06:06:19.766Z  sleeps inside: 5, 1085 s; wall 1449.5 s, summed durationMs 374.6 s
+  WS01a,WS01b,WS01c,WS01f,WS01d,WS01e wall 05:42:10-06:06:29 (1460 s, monotonic 375 s) sleep 05:45:00-05:48:07 (187 s) at +170 s; sleep 05:48:17-05:52:39 (262 s) at +367 s; sleep 05:52:49-05:54:41 (112 s) at +639 s; sleep 05:54:51-05:59:13 (262 s) at +761 s; sleep 05:59:23-06:03:45 (262 s) at +1033 s
+  reconstructed end 06:06:29 vs finishedAt 06:06:19 (diff -10 s)
+
+experiments/wal-on-s3/out/2026-10-21/run-2026-10-21T06-06-20-830Z.json  2026-10-21T06:06:20.830Z -> 2026-10-21T06:19:52.903Z  sleeps inside: 0, 0 s; wall 812.1 s, summed durationMs 812.1 s
