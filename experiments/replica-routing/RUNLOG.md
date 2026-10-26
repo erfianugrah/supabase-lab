@@ -731,24 +731,303 @@ were not recorded, so their cause is unknown.
 - Cost: not metered. Each run kept a Small primary, a Small replica and
   `pitr_7` for about 10 and 11 minutes.
 
+## 2026-10-26 - RR04, same-region load balancer: read-your-writes, a loaded, stale or restarting node, and HEAD on the replica host
+
+Shape: two throwaway Pro-org projects, one per run, the same day. Each: primary
+in ap-southeast-1 (Singapore) on Small compute, `pitr_7`, one Small read
+replica in the same region (the RR03 shape). Vantage: the Singapore
+workstation (`edge_logs` chosen region `SIN`, `cf-ray` suffix `SIN`); other
+agents ran live work from the same machine during both runs, and run 2's
+latencies are higher than run 1's for every host (RR04h0 replica-served p95
+81.3 ms against 35.5 ms), so latency is not compared across the runs. supabase-js 2.118.0.
+Artifacts (module rows quoted from the facts files beside them):
+
+- run 1: `out/2026-10-26/run-2026-10-26T06-19-17-837Z.json`, 06:19:17 to
+  06:33:04 UTC, 4 pass, 12 info, 0 fail
+- run 2: `out/2026-10-26/run-2026-10-26T06-34-17-863Z.json`, 06:34:17 to
+  06:50:39 UTC, 4 pass, 12 info, 0 fail
+
+Both artifacts record lab commit adc597c; the module was uncommitted, and it
+changed between the runs in two places: RR04j waits for the replica to catch
+up between conflict cycles (in run 1 cycle 2 was cancelled 0.1 s after cycle
+1 and cycle 3 never ran, see RR04j), and RR04j/RR04k record the load
+balancer's error texts by count. After run 2 only the module's comments were
+edited (06:55 UTC and later); no logic changed.
+An earlier attempt the same day (06:15 UTC, not published) stopped at RR04c
+because the schema lacked `rr_whoami`, which the load balancer discovery
+probes; its project and replica were removed by the module's teardown.
+
+Replica setup answered 204 on the first attempt; the first session-pooler
+connection to the replica came 182 s after the call in both runs. The load
+balancer host was `<ref>-all` again.
+
+### Schema and how a read is classified
+
+As RR03 (`rr_node`, `rr_whoami`, the heartbeat table `rr_marker`, the
+50,000-row `rr_conflict` from RR02), plus:
+
+- `rr4_ryw`: a table without RLS, insert and select granted to `anon`.
+- `rr4_seen(p_id)` (stable, plpgsql): `pg_is_in_recovery()`, whether row
+  `p_id` of `rr4_ryw` is visible on the node that ran it, and on a replica
+  the age of the last replayed commit (`pg_last_xact_replay_timestamp()`).
+- `rr4_where`: a one-row view `select pg_is_in_recovery()`, as RR03's
+  `rr3_where`: a HEAD with `Prefer: count=exact` and `in_recovery=eq.true`
+  answers `content-range */1` on the replica and `*/0` on the primary.
+- `rr4_spin(s)`: a plpgsql busy loop for `s` seconds that returns its
+  iteration count; execute revoked from the API roles.
+
+### RR04d: what answers 400 to a HEAD on the replica's host
+
+RR03g saw `HEAD` answered 400 `text/plain` on the replica's own host while the
+load balancer delivered HEADs to the replica. RR04d sent raw HTTP/1.1 requests
+over TLS (`Connection: close`, so every byte the server sent was read) to the
+three hosts with the anon key. The replica host, both runs:
+
+| request | status | content-type | Content-Length | body bytes |
+|---|---|---|---|---|
+| `HEAD rr4_where` (with or without `Prefer: count=exact`) | 400 | `text/plain;charset=UTF-8` | 75 | 0 |
+| `POST rr4_where` | 400 | `text/plain;charset=UTF-8` | 75 | 75: `Read replica does not handle POST requests for the path /rest/v1/rr4_where.` |
+| `GET rr4_where`, `count=exact` | 200 | `application/json; charset=utf-8` | 22 | 22, `content-range 0-0/1` |
+| `GET /auth/v1/health` | 400 | `text/plain;charset=UTF-8` | 71 | 71: `Read replica does not handle GET requests for the path /auth/v1/health.` |
+| `HEAD /rest/v1/` | 401 | `application/json;charset=UTF-8` | 101 | 0 |
+| `OPTIONS rr4_where` (CORS preflight) | 200 | none | 0 | 0 |
+
+- The HEAD 400 and the POST 400 carry the same header names
+  (`replica_head400_names_not_in_post400` and the reverse both `none`):
+  `sb-gateway-version`, `sb-request-id`, `sb-project-ref`, `sb-jwt-alg`,
+  `sb-jwt-iss`, `server: cloudflare`. The GET 200 adds `cf-cache-status`,
+  `content-profile`, `content-range`, `content-location`,
+  `preference-applied`, `x-envoy-attempt-count` and
+  `x-envoy-upstream-service-time`; the primary host's `count=exact` HEAD 200
+  carries them too, and neither 400 does.
+- The HEAD 400's Content-Length is 75, the POST 400's body length
+  (`replica_head400_len_if_post_template` 75; `HEAD` and `POST` are both four
+  bytes, so the substitution does not change the length and the check fits
+  the template without testing it).
+- Inference from that shape: the 400 comes from the layer that writes
+  `sb-gateway-version` and decodes the apikey (it set `sb-jwt-alg`), before
+  the request reaches Envoy or PostgREST, and the same rule refuses HEAD as
+  refuses POST; no response names the component. The body HEAD may not carry
+  would then read `Read replica does not handle HEAD requests for the path
+  /rest/v1/rr4_where.`; the run cannot see it.
+- `HEAD /rest/v1/` answered 401 with `sb-error-code
+  UNAUTHORIZED_INVALID_API_KEY_TYPE` on all three hosts, so on that path the
+  key check answers before the method check.
+- The CORS preflight on the replica host answered 200 with
+  `access-control-allow-methods:
+  GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS,TRACE,CONNECT`, the same list as on
+  the load balancer and primary hosts, including methods the replica host
+  then refuses (both runs).
+
+Through the load balancer, 10 raw HEADs each: replica 5 and primary 5 (run 1),
+replica 2 and primary 8 (run 2), all 200 with `content-range`, and no header
+name seen only when the replica served (`lb_head_names_replica_only` `none`).
+So the method rule that refuses HEAD on the replica's own host did not apply
+to a HEAD the load balancer sent to the replica. `edge_logs` (RR04l) names
+the replica as the redirect identifier for 5 (run 1) and 2 (run 2) load
+balancer HEADs that answered 200, and the replica host's own rows hold
+exactly the two direct HEADs (400) per run; load balancer GETs to the replica
+(18,699 and 14,603) leave no replica-host row either, so `edge_logs` logs one
+row per client request under the host the client addressed. Whether the
+forward skips the replica host's front or passes a gateway that applies the
+method rule only to the replica hostname is not visible from outside (not
+separated).
+
+### RR04e-g: read-your-writes through the load balancer
+
+Each try: `POST /rest/v1/rr4_ryw` with `Prefer: return=representation`
+through `-all` (always served by the primary: `edge_logs` POST `rr4_ryw` 201
+to the primary, 449 and 450 rows for 450 inserts per run), then, as soon as the response arrived,
+`GET rpc/rr4_seen?p_id=<id>` through `-all` on the same keep-alive client. A
+miss is a GET the replica served that did not see the row (row visibility,
+unrelated to RR04j's `stale_ms`); a miss would have been retried through
+`-all` for up to 3 s to time the gap.
+`pg_stat_replication` was read on the primary every second meanwhile.
+
+| arm | run | replica / primary | misses | POST p50 | GET p50 | replay_lag p50, max |
+|---|---|---|---|---|---|---|
+| RR04e raw fetch, 200 tries | 1 | 108 / 92 | 0 of 108 | 21.6 ms | 20.8 ms | 2.3, 33.5 ms |
+| | 2 | 107 / 93 | 0 of 107 | 21.4 ms | 23.4 ms | 2.5, 34.7 ms |
+| RR04f supabase-js `insert().select().single()` then `rpc(..., { get: true })`, 50 tries | 1 | 25 / 25 | 0 of 25 | 21.3 ms | 21.1 ms | 2.7, 5.3 ms |
+| | 2 | 28 / 22 | 0 of 28 | 22.6 ms | 23.5 ms | 2.4, 2.5 ms |
+| RR04g as RR04e, primary taking 50 inserts/s on another connection | 1 | 93 / 107 | 0 of 93 | 20.8 ms | 20.1 ms | 2.4, 5.2 ms |
+| | 2 | 95 / 105 | 0 of 95 | 24 ms | 26.8 ms | 2.5, 3.3 ms |
+
+0 errors in every arm; 0 misses of 456 replica-served reads over both runs.
+Likely mechanism (inferred, not separated): the client sends its GET only
+after the POST's response has come back (POST p50 about 21 to 24 ms from
+this vantage), and when `rr4_seen` ran on the replica the last replayed
+commit was already 29 to 31 ms old at p50 in RR04e/f
+(`replica_replay_age_p50_ms`, the replica's clock minus the primary's commit
+time, so clock skew is inside it; 20 and 16 ms in RR04g, where background
+inserts move it), while `replay_lag` p50 was 2 to 3 ms (one sample a second
+on the primary; max 33.5 and 34.7 ms in RR04e, above the POST p50, with no
+miss). What would make it false: a client much
+closer to the database than the replica's replay time (not run; Edge
+Functions in the same region were not used here), or a replica whose replay
+has stopped, which RR04j shows the load balancer keeps sending about half the
+reads to.
+
+### RR04h: the split under concurrent read load
+
+`GET rpc/rr_node` with the anon key through `-all`, back to back, 20 s per
+level:
+
+| clients | run | requests (per s) | replica / primary | replica share | errors |
+|---|---|---|---|---|---|
+| 1 | 1 | 876 (43.8) | 407 / 469 | 46.5 % | 0 |
+| | 2 | 587 (29.3) | 283 / 304 | 48.2 % | 0 |
+| 8 | 1 | 6,480 (323.6) | 3,233 / 3,247 | 49.9 % | 0 |
+| | 2 | 3,966 (198.1) | 2,028 / 1,938 | 51.1 % | 0 |
+| 32 | 1 | 22,536 (1,125.1) | 11,349 / 11,187 | 50.4 % | 0 |
+| | 2 | 17,074 (852.4) | 8,510 / 8,564 | 49.8 % | 0 |
+
+The share stayed at about half from 1 to 32 clients. Worker 0's sequence
+switched node at 411 of 875 (run 1) and 287 of 586 (run 2) transitions with
+one client, the same order-less pattern as RR03h.
+
+### RR04i: the split while one node's CPU is held
+
+Four session connections ran `rr4_spin(60)` on one node (the replica, then
+the primary) while one client read `rpc/rr_node` through `-all` back to back
+and the replica and primary hosts were read every 500 ms; 20 s before the
+load as the baseline.
+
+| loaded node | run | `-all` replica / primary before | during | replica share during | loaded host's p50 before, during |
+|---|---|---|---|---|---|
+| replica | 1 | 443 / 426 | 1,142 / 1,204 | 48.7 % | 24.1, 28.1 ms |
+| replica | 2 | 315 / 321 | 1,165 / 1,178 | 49.7 % | 30.5, 28.7 ms |
+| primary | 1 | 438 / 396 | 1,156 / 1,140 | 50.3 % | 26.9, 29.3 ms |
+| primary | 2 | 405 / 434 | 1,199 / 1,161 | 50.8 % | 25, 28 ms |
+
+0 errors. Each loop ran 41.8 to 44.1 million iterations in 60 s, the four
+within 1.5 % of each other in every arm (`spin_iterations`). The load barely
+moved the loaded node's REST latency (at most 4 ms at the median, and down
+in run 2's replica arm), so this arm shows the split does not follow four
+busy plpgsql loops on that node (their effect on CPU utilisation was not
+read); it does not show what happens when a node answers slowly. The
+Small instance's vCPU count was not read.
+
+### RR04j: the split while the replica's replay is stopped
+
+`select pg_wal_replay_pause()` on the replica as `postgres` answered SQLSTATE
+42501 `permission denied for function pg_wal_replay_pause` (both runs), so the
+module used RR02h's method: a repeatable-read transaction on the replica
+holding a `pg_sleep`, then `UPDATE` and `VACUUM` of `rr_conflict` on the
+primary, which stops replay until `max_standby_streaming_delay` (30 s, not
+changed here) cancels the replica query (SQLSTATE 40001), three cycles. A
+heartbeat row was inserted on the primary every 250 ms; `rr_node` was read
+every 250 ms on `-all`, the replica host and the primary host; a read is stale
+when its `stale_ms` (the node's clock minus the newest heartbeat row it can
+see, so it includes the 250 ms heartbeat period and clock skew between the
+hosts) exceeds 2,000, a threshold chosen in RR02, not measured.
+
+| | run 1 | run 2 |
+|---|---|---|
+| stops (cycles that held) | 1 (cycle 2's replica query was cancelled 0.1 s after cycle 1's, before its update; the replica connection then failed at +50.8 s and cycle 3 never ran; fixed for run 2) | 3 |
+| first to last replica-host read with `stale_ms` > 2,000 (the window) | 28.1 s, max 30,314 ms | 95.3 s (three stops and two catch-ups), max 31,061 ms |
+| `-all` in that window, replica (stale) / primary | 46 (46) / 56 | 180 (160) / 163 |
+| first half / second half, replica / primary | 27 / 24, 19 / 32 | 92 / 80, 88 / 83 |
+| `-all` 15 s before, replica / primary | 20 / 34 | 31 / 24 |
+| largest `stale_ms` served through `-all` | 29,613 ms | 30,669 ms |
+
+0 errors. In run 2 the window spans the three stops and the catch-ups between
+them, so 20 of the 180 replica reads in it were fresh. The load balancer sent
+46 of 102 (run 1) and 180 of 343 (run 2) reads in the window to a replica
+whose `stale_ms` rose from 2,000 to as much as 30,314 and 31,061 ms. In run 2
+the replica share held from the first half of the window to the second (92 /
+80, then 88 / 83); in run 1 it fell (27 / 24, then 19 / 32), on one stop and
+about 51 reads per half. This is RR02h's result
+(cross-region) with a same-region primary as the alternative.
+
+### RR04k: project restart
+
+`POST /restart` at +15 s while `rr_node` was read every 250 ms (5 s timeout)
+on each host and the heartbeat writer ran. Run 2's 5 s buckets show the order:
+the primary host failed from +17.4 s and served again from about +80 s
+(span of failures to +95 s); the replica host kept serving until about
++65 s, then failed until about +135 s (span to +148.6 s).
+
+| | run 1 | run 2 |
+|---|---|---|
+| primary host failing (first to last failure) | 17.2 to 78.8 s, 39 failures | 17.4 to 95 s, 28 |
+| replica host failing | 49.6 to 112.5 s, 28 failures | 68.4 to 148.6 s, 37 |
+| `-all` while only the primary was failing, replica / primary / errors | 14 / 0 / 12 | 13 / 0 / 9 |
+| `-all` while only the replica was failing | 21 / 27 / 9 | 24 / 20 / 12 |
+| `-all` total | 128 / 121 / 29 | 125 / 103 / 28 |
+
+- While the primary was down, reads through `-all` that went to the replica
+  succeeded and the rest failed; none were moved to the replica wholesale.
+  The replica's `stale_ms` grew in that time because the heartbeat writer
+  could not write, not because the replica lagged.
+- In run 2, from the +85 s to the +125 s bucket (after the primary's return
+  at about +80 s), the `-all` reader got 1 primary-served read (+100 s
+  bucket) and one failure per 5 s bucket, each a 5 s client timeout; a
+  timed-out read names no node, but the primary host answered its own reads
+  from +100 s, so by inference a single sequential reader spent that span
+  mostly waiting on the replica.
+- Run 2's error texts (`lb_error_modes`): 20 client timeouts, 7 HTTP 521
+  (Cloudflare's origin-down page), 1 HTTP 503 `PGRST002`. `edge_logs` on
+  `-all` for run 2: 522 to the primary 9 and to the replica 9, 521 to the
+  replica 6 and to the primary 2, 503 to the replica 2; run 1: 521 to the
+  primary 9 and to the replica 6, 522 to the primary 6 and to the replica 5,
+  503 to the replica 3. Node attribution comes from `edge_logs` alone (a
+  client timeout names no node; the class counts differ from the client's
+  by one or two): the load balancer kept choosing a node that was down,
+  either way round, as RR02i saw cross-region.
+- The "only one failing" rows count every read between that host's first and
+  last failure while the other host was outside its own span; a host that
+  answered between failures (run 2's replica at +135 to +148 s) is inside
+  its span, which is why replica-served reads appear in the "only the
+  replica" row.
+
+### RR04l: edge_logs
+
+Grouped by host, method, path family, status and redirect identifier: 40,363
+rows (run 1) and 32,768 (run 2) on the three hosts. Besides the
+figures quoted above: `-all` GET `rr_node` 200 to the replica 18,699 and to
+the primary 18,616 (run 1); 14,603 and 14,550 (run 2). `HEAD rr4_where` rows on `-all`
+carry `load_balancer_geo_aware_info.status=true`, chosen region `SIN`, and
+`load_balancer_redirect_identifier` naming a node; the replica host's HEAD
+rows carry `response.origin_time` 2 to 5 ms and no redirect identifier. The
+row attribute names are in the artifact; their values were left out because
+the request side carries client details.
+
+### Not settled by RR04
+
+- Read-your-writes for a client closer to the database than about 20 ms
+  (an Edge Function or server in the same region), or with a replica that
+  replays slower than the client's round trip short of a stopped replay.
+- The split when a node answers slowly at the REST layer: the CPU loops did
+  not slow REST reads. Two replicas, larger compute, other regions.
+- A replica down while the primary is untouched: still no per-replica
+  restart in the Management API; RR04k's spans come from a project restart.
+- Where the load balancer's forward enters the replica's REST service, and
+  the HEAD 400's body (a HEAD response carries none; its length matches the
+  POST 400's but cannot tell the two texts apart).
+- Cost: not metered. Each run kept a Small primary, a Small replica and
+  `pitr_7` for about 14 and 16 minutes; the aborted attempt about 4 minutes.
+
 ## Not measured
 
 - Any primary region other than ap-northeast-1 (RR01, RR02) and
-  ap-southeast-1 (RR03), a second replica, or a replica larger than Small.
-- Load: probes are one client each; the heaviest are RR03h0 (200 sequential
-  GETs, p50 19.8 ms in run 1, 20.9 and 19.2 ms by node in run 2) and RR03i
-  (50 single-row inserts a second for 300 s plus three readers every 250
-  ms).
+  ap-southeast-1 (RR03, RR04), a second replica, or a replica larger than Small.
+- Load beyond RR04h (32 concurrent readers for 20 s through `-all`, 1,125.1
+  and 852.4 requests a second) and RR03i/RR04g (50 single-row inserts a
+  second); a node slowed at the REST layer (RR04i's CPU loops did not slow
+  it).
 - Replication delay for a large write (the largest transaction here is a
   50,000-row update; the RR02g bulk insert filled the disk before it
   committed).
 - Custom domains. Auth, Storage, Realtime, GraphQL and Edge Function traffic
   through the load balancer is RR02f/RR02k; the replica's behaviour on a
-  project restart is RR02i.
+  project restart is RR02i (cross-region) and RR04k (same region).
 - The load balancer's rule. Whether it re-routes off a lagging or unhealthy
   replica is RR02h-RR02j (it did not, in two runs); with the primary and the
   replica in one region it spread GETs over both (RR03h), by a rule not
-  visible from outside.
+  visible from outside, and kept spreading them over both under read load,
+  under CPU load on either node, while the replica's replay was stopped and
+  while either node was down in a restart (RR04h-k).
 - Cost: not metered. The RR01 final run (2026-10-10) kept a Small primary, a
   Small replica and `pitr_7` for about 27 minutes; the exploratory runs kept
   one project and one replica for roughly an hour and a half.
