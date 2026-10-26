@@ -1,0 +1,28 @@
+{
+  "startedAt": "2026-10-26T01:09:20.327Z",
+  "finishedAt": "2026-10-26T01:09:22.041Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "auth-rate-limits",
+  "labCommit": "848b9f3",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "AR99",
+      "title": "AR99: project deleted and gone from the listing",
+      "status": "pass",
+      "detail": "DELETE 200; absent from GET /projects after 0 s",
+      "measurements": {
+        "delete_status": 200,
+        "gone_from_listing_s": 0
+      },
+      "durationMs": 1714
+    }
+  ]
+}

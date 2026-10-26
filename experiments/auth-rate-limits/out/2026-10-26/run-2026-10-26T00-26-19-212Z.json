@@ -1,0 +1,308 @@
+{
+  "startedAt": "2026-10-26T00:26:19.212Z",
+  "finishedAt": "2026-10-26T00:45:51.722Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "auth-rate-limits",
+  "labCommit": "848b9f3",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "AR06d",
+      "title": "rate_limit_* values read back from config/auth (project as created)",
+      "status": "info",
+      "detail": "mfa_max_enrolled_factors=10, rate_limit_anonymous_users=30, rate_limit_email_sent=2, rate_limit_otp=30, rate_limit_sms_sent=30, rate_limit_token_refresh=150, rate_limit_verify=30, rate_limit_web3=30, security_sb_forwarded_for_enabled=false",
+      "measurements": {
+        "mfa_max_enrolled_factors": "10",
+        "rate_limit_anonymous_users": "30",
+        "rate_limit_email_sent": "2",
+        "rate_limit_otp": "30",
+        "rate_limit_sms_sent": "30",
+        "rate_limit_token_refresh": "150",
+        "rate_limit_verify": "30",
+        "rate_limit_web3": "30",
+        "security_sb_forwarded_for_enabled": "false",
+        "mailer_autoconfirm": "false",
+        "project_create_ms": 341
+      },
+      "durationMs": 1172507
+    },
+    {
+      "id": "AR06a.1",
+      "title": "shared token bucket at rate_limit_token_refresh=60: password then refresh",
+      "status": "info",
+      "detail": "drain 429 at request 31 (200:30 429:1); the other grant right after: 429 over_request_rate_limit; passes after a 30 s wait: 6",
+      "measurements": {
+        "order": "password then refresh",
+        "drain_first_429": 31,
+        "drain_statuses": "200:30 429:1",
+        "cross_status": 429,
+        "cross_code": "over_request_rate_limit",
+        "refill_30s_passes": 6,
+        "body_429": "{\"code\":429,\"error_code\":\"over_request_rate_limit\",\"msg\":\"Request rate limit reached\"}"
+      },
+      "durationMs": 1172507
+    },
+    {
+      "id": "AR06a.2",
+      "title": "shared token bucket at rate_limit_token_refresh=60: refresh then password",
+      "status": "info",
+      "detail": "drain 429 at request 31 (200:30 429:1); the other grant right after: 429 over_request_rate_limit; passes after a 30 s wait: 6",
+      "measurements": {
+        "order": "refresh then password",
+        "drain_first_429": 31,
+        "drain_statuses": "200:30 429:1",
+        "cross_status": 429,
+        "cross_code": "over_request_rate_limit",
+        "refill_30s_passes": 6,
+        "body_429": "{\"code\":429,\"error_code\":\"over_request_rate_limit\",\"msg\":\"Request rate limit reached\"}"
+      },
+      "durationMs": 1172507
+    },
+    {
+      "id": "AR06a.3",
+      "title": "shared token bucket at rate_limit_token_refresh=60: password then refresh",
+      "status": "info",
+      "detail": "drain 429 at request 31 (200:30 429:1); the other grant right after: 429 over_request_rate_limit; passes after a 30 s wait: 6",
+      "measurements": {
+        "order": "password then refresh",
+        "drain_first_429": 31,
+        "drain_statuses": "200:30 429:1",
+        "cross_status": 429,
+        "cross_code": "over_request_rate_limit",
+        "refill_30s_passes": 6,
+        "body_429": "{\"code\":429,\"error_code\":\"over_request_rate_limit\",\"msg\":\"Request rate limit reached\"}"
+      },
+      "durationMs": 1172507
+    },
+    {
+      "id": "AR06a.4",
+      "title": "shared token bucket at rate_limit_token_refresh=60: refresh then password",
+      "status": "info",
+      "detail": "drain 429 at request 31 (200:30 429:1); the other grant right after: 429 over_request_rate_limit; passes after a 30 s wait: 6",
+      "measurements": {
+        "order": "refresh then password",
+        "drain_first_429": 31,
+        "drain_statuses": "200:30 429:1",
+        "cross_status": 429,
+        "cross_code": "over_request_rate_limit",
+        "refill_30s_passes": 6,
+        "body_429": "{\"code\":429,\"error_code\":\"over_request_rate_limit\",\"msg\":\"Request rate limit reached\"}"
+      },
+      "durationMs": 1172507
+    },
+    {
+      "id": "AR06a.cfg",
+      "title": "rate_limit_token_refresh=60 PATCH: readback and auth log",
+      "status": "info",
+      "detail": "PATCH 200, read back after 0.6 s, health gaps 0; 0 auth log lines matching RATE_LIMIT_TOKEN (logs 200 \"Table \\\"auth_logs\\\" does not exist.\")",
+      "measurements": {
+        "patch_status": 200,
+        "readback_s": 0.6,
+        "health_gaps": 0,
+        "log_lines": 0
+      },
+      "evidence": "",
+      "durationMs": 1172507
+    },
+    {
+      "id": "AR06b.1",
+      "title": "GET /auth/v1/user: 60 sequential + 100 concurrent with one user token",
+      "status": "info",
+      "detail": "sequential 200:60 (p50 23 ms); concurrent 200:100 (p50 463 ms); password grants after: first 429 at 32 (200:31 429:1)",
+      "measurements": {
+        "get_seq": "200:60",
+        "get_conc": "200:100",
+        "grants_after_first_429": 32,
+        "grant_before_get": 200
+      },
+      "durationMs": 1172507
+    },
+    {
+      "id": "AR06b.2",
+      "title": "PUT /auth/v1/user drained, then email sign-up (autoconfirm): one bucket or two",
+      "status": "info",
+      "detail": "PUT first 429 at 31 (200:30 429:1) {\"code\":429,\"error_code\":\"over_request_rate_limit\",\"msg\":\"Request rate limit reached\"}; sign-ups right after: first 429 at 31 (200:30 429:1); PUT passes 10 s later at rate_limit_otp=30: 1",
+      "measurements": {
+        "put_first_429": 31,
+        "signup_after_first_429": 31,
+        "signup_statuses": "200:30 429:1",
+        "put_refill_10s_default": 1
+      },
+      "durationMs": 1172507
+    },
+    {
+      "id": "AR06b.3",
+      "title": "PUT /auth/v1/user refill with rate_limit_otp=3000 (10/s)",
+      "status": "info",
+      "detail": "PATCH 200; PUT first 429 at 40; passes 10 s after the drain: 41 (default gave 1)",
+      "measurements": {
+        "patch_status": 200,
+        "put_first_429_fresh": 40,
+        "put_refill_10s_otp3000": 41
+      },
+      "durationMs": 1172507
+    },
+    {
+      "id": "AR06c.0",
+      "title": "rate_limit_token_refresh=10000 took effect (100 grants paced at 20/s)",
+      "status": "pass",
+      "detail": "PATCH 200, readback 0.5 s; 400:100, first 429 at 0; mean 22 ms per request",
+      "measurements": {
+        "patch_status": 200,
+        "first_429": 0,
+        "statuses": "400:100"
+      },
+      "durationMs": 1172507
+    },
+    {
+      "id": "AR06c.25",
+      "title": "steady 25/s password grants for 90 s at rate_limit_token_refresh=10000",
+      "status": "info",
+      "detail": "2250 sent over 90.0 s; 400:2250; first 429 at request 0 (- s); passed 2250 = 25.0/s; non-429 p50 19 ms",
+      "measurements": {
+        "rate_per_s": 25,
+        "sent": 2250,
+        "send_span_s": 90,
+        "statuses": "400:2250",
+        "n429": 0,
+        "first_429_req": 0,
+        "first_429_s": -1,
+        "passed_per_s": 25,
+        "p50_ms": 19,
+        "p95_ms": 27
+      },
+      "durationMs": 1172507
+    },
+    {
+      "id": "AR06c.33",
+      "title": "steady 33/s password grants for 90 s at rate_limit_token_refresh=10000",
+      "status": "info",
+      "detail": "2970 sent over 90.0 s; 400:2970; first 429 at request 0 (- s); passed 2970 = 33.0/s; non-429 p50 19 ms",
+      "measurements": {
+        "rate_per_s": 33,
+        "sent": 2970,
+        "send_span_s": 90,
+        "statuses": "400:2970",
+        "n429": 0,
+        "first_429_req": 0,
+        "first_429_s": -1,
+        "passed_per_s": 33,
+        "p50_ms": 19,
+        "p95_ms": 26
+      },
+      "durationMs": 1172507
+    },
+    {
+      "id": "AR06c.45",
+      "title": "steady 45/s password grants for 90 s at rate_limit_token_refresh=10000",
+      "status": "info",
+      "detail": "4050 sent over 90.0 s; 400:3029 429:1021; first 429 at request 113 (2.49 s); passed 3029 = 33.7/s; non-429 p50 20 ms",
+      "measurements": {
+        "rate_per_s": 45,
+        "sent": 4050,
+        "send_span_s": 90,
+        "statuses": "400:3029 429:1021",
+        "n429": 1021,
+        "first_429_req": 113,
+        "first_429_s": 2.49,
+        "passed_per_s": 33.7,
+        "p50_ms": 20,
+        "p95_ms": 30
+      },
+      "durationMs": 1172507
+    },
+    {
+      "id": "AR06c.60",
+      "title": "steady 60/s password grants for 90 s at rate_limit_token_refresh=10000",
+      "status": "info",
+      "detail": "5400 sent over 90.0 s; 400:3029 429:2371; first 429 at request 67 (1.10 s); passed 3029 = 33.7/s; non-429 p50 19 ms",
+      "measurements": {
+        "rate_per_s": 60,
+        "sent": 5400,
+        "send_span_s": 90,
+        "statuses": "400:3029 429:2371",
+        "n429": 2371,
+        "first_429_req": 67,
+        "first_429_s": 1.1,
+        "passed_per_s": 33.7,
+        "p50_ms": 19,
+        "p95_ms": 26
+      },
+      "durationMs": 1172507
+    },
+    {
+      "id": "AR06c.burst.10000-#1",
+      "title": "300 concurrent grants against a full bucket, rate_limit_token_refresh=10000",
+      "status": "info",
+      "detail": "0:46 400:47 429:207; passed 47; client send span 1 ms, response span 588 ms",
+      "measurements": {
+        "limit": 10000,
+        "statuses": "0:46 400:47 429:207",
+        "passed": 47,
+        "send_span_ms": 1,
+        "response_span_ms": 588,
+        "p50_ms": 483
+      },
+      "durationMs": 1172507
+    },
+    {
+      "id": "AR06c.burst.10000-#2",
+      "title": "300 concurrent grants against a full bucket, rate_limit_token_refresh=10000",
+      "status": "info",
+      "detail": "400:37 429:263; passed 37; client send span 5 ms, response span 163 ms",
+      "measurements": {
+        "limit": 10000,
+        "statuses": "400:37 429:263",
+        "passed": 37,
+        "send_span_ms": 5,
+        "response_span_ms": 163,
+        "p50_ms": 212
+      },
+      "durationMs": 1172507
+    },
+    {
+      "id": "AR06c.burst.150-control",
+      "title": "300 concurrent grants against a full bucket, rate_limit_token_refresh=150",
+      "status": "info",
+      "detail": "400:30 429:270; passed 30; client send span 6 ms, response span 583 ms",
+      "measurements": {
+        "limit": 150,
+        "statuses": "400:30 429:270",
+        "passed": 30,
+        "send_span_ms": 6,
+        "response_span_ms": 583,
+        "p50_ms": 307
+      },
+      "durationMs": 1172507
+    },
+    {
+      "id": "AR06c.burst.100000",
+      "title": "300 concurrent grants against a full bucket, rate_limit_token_refresh=100000",
+      "status": "info",
+      "detail": "400:130 429:170; passed 130; client send span 6 ms, response span 236 ms",
+      "measurements": {
+        "limit": 100000,
+        "statuses": "400:130 429:170",
+        "passed": 130,
+        "send_span_ms": 6,
+        "response_span_ms": 236,
+        "p50_ms": 276
+      },
+      "durationMs": 1172507
+    },
+    {
+      "id": "AR06z",
+      "title": "restore auth config",
+      "status": "pass",
+      "detail": "PATCH 200 {\"rate_limit_token_refresh\":150,\"rate_limit_otp\":30,\"mailer_autoconfirm\":false}",
+      "durationMs": 1172507
+    }
+  ]
+}
