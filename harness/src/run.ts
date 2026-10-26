@@ -17,6 +17,7 @@ import { diffArtifacts, renderDiffMarkdown } from "./diff";
 import { renderFacts } from "./facts";
 import { renderMarkdown } from "./report";
 import { preventIdleSleep, suspendedMs, withHostSuspension } from "./host-pause";
+import { createDrainWatch, settleModule, unsettledDetail } from "./settle";
 import type { RunArtifact, TestModule, TestResult, Where } from "./types";
 
 function arg(name: string, fallback?: string): string | undefined {
@@ -169,30 +170,37 @@ const main = async () => {
   const startedAt = new Date().toISOString();
   const results: TestResult[] = [...skipped];
 
+  // A module whose promise never settles must not end the run with exit 0
+  // and no artifact (settle.ts): it is recorded as failed and the run goes on.
+  const unsettled: string[] = [];
   for (const m of run) {
     console.log(`\n[${m.id}] ${m.title}${m.destructive ? " (destructive)" : ""}`);
     const t0 = performance.now();
     const w0 = Date.now();
-    try {
-      const r = await m.run(ctx);
-      const arr = Array.isArray(r) ? r : [r];
-      const suspended = suspendedMs(w0, Date.now(), t0, performance.now());
+    const outcome = await settleModule(() => m.run(ctx), drainWatch, m.timeoutMs);
+    const suspended = suspendedMs(w0, Date.now(), t0, performance.now());
+    if (outcome.kind === "settled") {
+      const arr = Array.isArray(outcome.value) ? outcome.value : [outcome.value];
       for (const raw of arr) {
         const one = withHostSuspension(raw, suspended);
         one.durationMs = Math.round(performance.now() - t0);
         results.push(one);
         console.log(`  -> ${one.status}${one.detail ? `: ${one.detail}` : ""}`);
       }
-    } catch (e) {
-      // A thrown error is a harness/test bug, distinct from a measured failure.
-      const threw = withHostSuspension(
-        { id: m.id, title: m.title, status: "fail", detail: `test threw: ${e instanceof Error ? e.message : String(e)}` },
-        suspendedMs(w0, Date.now(), t0, performance.now()),
-      );
-      threw.durationMs = Math.round(performance.now() - t0);
-      results.push(threw);
-      console.log(`  -> threw: ${e instanceof Error ? e.message : String(e)}`);
+      continue;
     }
+    // A thrown error is a harness/test bug, distinct from a measured failure;
+    // so is a module that never settled.
+    const e = outcome.kind === "threw" ? outcome.error : undefined;
+    const detail =
+      outcome.kind === "threw"
+        ? `test threw: ${e instanceof Error ? e.message : String(e)}`
+        : unsettledDetail(outcome);
+    if (outcome.kind !== "threw") unsettled.push(m.id);
+    const failed = withHostSuspension({ id: m.id, title: m.title, status: "fail", detail }, suspended);
+    failed.durationMs = Math.round(performance.now() - t0);
+    results.push(failed);
+    console.log(`  -> ${outcome.kind === "threw" ? "threw" : outcome.kind}: ${detail.replace(/^test threw: /, "")}`);
   }
 
   const artifact: RunArtifact = {
@@ -219,11 +227,30 @@ const main = async () => {
       `${results.filter((r) => r.status === "pass").length} pass, ${failed} fail, ` +
       `${results.filter((r) => r.status === "skip").length} skip`,
   );
-  // Exit 0 even with measured failures: they are data. Non-zero only if the
-  // harness itself could not produce an artifact.
+  // Exit 0 even with measured failures: they are data. 1 if the harness
+  // itself could not produce an artifact; 2 if it did, but a module never
+  // settled. Explicit exit: a timed-out module may still hold a handle that
+  // would keep the process alive.
+  if (unsettled.length) {
+    console.error(`pvlab: ${unsettled.join(", ")} did not settle (recorded as fail) - exit 2`);
+    process.exit(2);
+  }
 };
 
-main().catch((e) => {
-  console.error("harness error:", e);
-  process.exit(1);
+let mainDone = false;
+// A drain while no module is pending and main() unfinished means the harness
+// itself hung outside a module (ctx, an artifact write): no artifact, not exit 0.
+const drainWatch = createDrainWatch(undefined, () => {
+  if (mainDone) return;
+  console.error("harness error: the event loop drained before the run finished (outside any module); no artifact");
+  process.exitCode = 1;
 });
+
+main()
+  .then(() => {
+    mainDone = true;
+  })
+  .catch((e) => {
+    console.error("harness error:", e);
+    process.exit(1);
+  });
