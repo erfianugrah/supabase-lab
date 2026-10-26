@@ -335,7 +335,7 @@ client can poll. See RUNLOG.md; artifacts in `out/2026-09-24/` and
   extension. privatelink-aws T22 carries the same change, not run (needs the
   AWS PrivateLink rig).
 
-## experiments/data-api-capacity - key facts (validated 2026-10-22/23/26, Pro org; DC01-03 ap-southeast-1 Small then Large, DC04 ap-northeast-2 Small then 4XL, DC05-07 ap-northeast-2 Small, DC08 ap-northeast-2 Small then 4XL, in-region clients; DC09 and DC12 ap-southeast-1 Small; DC13-15 ap-southeast-1, Small to XL to 2XL and Small/Large)
+## experiments/data-api-capacity - key facts (validated 2026-10-22/23/26, Pro org; DC01-03 ap-southeast-1 Small then Large, DC04 ap-northeast-2 Small then 4XL, DC05-07 ap-northeast-2 Small, DC08 ap-northeast-2 Small then 4XL, in-region clients; DC09 and DC12 ap-southeast-1 Small; DC13 ap-southeast-1 Small to XL to 2XL, DC14 the same project at 2XL, DC15 ap-southeast-1 Small to Large to Small)
 
 The Data API's connection pool, what a full pool looks like to a client, the
 pool settings' PATCH, statement timeouts per role, throughput under request
@@ -343,17 +343,19 @@ rate, the pool metrics and pool size under load. DC01-DC03: four runs; run 4
 (`out/2026-10-23/run-2026-10-23T00-37-06-485Z.json`) is the reference, runs
 1-2 published for their repeats; their figures are run 4 unless a run is
 named (RUNLOG.md says why runs 1-3 differ). DC04 and DC05-DC07: one run each
-(`run-2026-10-23T07-13-34-754Z`, `run-2026-10-23T07-49-11-858Z`), from a
-Mac in Singapore, so every latency includes the Singapore-Seoul round trip.
+(`run-2026-10-23T07-13-34-754Z`, `run-2026-10-23T07-49-11-858Z`), from a Mac
+in Singapore, so every latency includes the Singapore-Seoul round trip.
 DC08: one run (`run-2026-10-23T09-37-44-863Z`) with clients in
 ap-northeast-2 (Edge Functions). DC09 and DC12: one run
-(`out/2026-10-26/run-2026-10-26T00-23-46-863Z.json`), Singapore Mac, versions
-not recorded. PostgREST 14.18 and Postgres 17.11:
-console for DC01-DC03, the DC04a and DC08a artifacts; not recorded for
-DC05-DC07 (DC04a, same day and region, read 14.18). The
-artifacts' top-level `region` is the harness default; the project region
-came from `PVLAB_DC_REGION` (recorded as `project_region_requested` in DC04a
-and DC05a from the next run on).
+(`out/2026-10-26/run-2026-10-26T00-23-46-863Z.json`), Singapore Mac,
+versions not recorded. PostgREST 14.18 and Postgres 17.11: console for
+DC01-DC03, the DC04a and DC08a artifacts; not recorded for DC05-DC07 (DC04a,
+same day and region, read 14.18). DC13-DC14: one run
+(`out/2026-10-26/run-2026-10-26T00-24-26-283Z.json`), DC15 one run per arm;
+Postgres 17.11 and PostgREST 14.18 from those artifacts. The artifacts'
+top-level `region` is the harness default; the project region came from
+`PVLAB_DC_REGION` (recorded as `project_region_requested` in DC04a and DC05a
+from the next run on).
 
 - **Pool with `db_pool` unset: Small 30, Large 50** (mid-burst count of
   `authenticator` backends in `PgSleep`; Small 30/30 in runs 1, 2 and 4,
@@ -367,15 +369,18 @@ and DC05a from the next run on).
   (DC12a-c, 8 / 8 / 4 requests). At 4 s one request answered after 25007 ms
   and the other got no answer by the client's 105001 ms timeout and left 0
   log lines (see the DC12 bullet on requests that never reach PostgREST).
-  Each request answered PGRST003 is on 6 PostgREST access-log lines and 1
-  `edge_logs` row, and the sampled answers carry `x-envoy-attempt-count: 6`
-  (DC12): the API gateway's Envoy resends after each 504, GET, HEAD, PATCH
-  and POST alike, with no pause beyond the acquisition timeout, so the wait
-  is 6 x the timeout plus about 1-2 s. Under a 220-request burst at pool 50 the 70
-  PGRST003 answers came after 10923 to 20903 ms (median 20855), shorter than
-  a lone request's wait; attempts were not counted there, so that is
-  inferred from latency only. A 500 (statement timeout after a side effect,
-  anon key plus an authenticated user token) was not sent again: one
+  Each request answered PGRST003 is on 6 PostgREST access-log lines and, in
+  60 of 61, 1 `edge_logs` row (DC12c's PATCH: 6 lines, 0 edge rows, likely
+  an ingestion gap), and the sampled answers carry `x-envoy-attempt-count:
+  6` (DC12): the API gateway's Envoy resends after each 504 PGRST003, GET,
+  HEAD, PATCH and POST alike, with no back-off beyond the acquisition
+  timeout (gaps of the timeout plus 0.0 to 1.0 s), so at 1, 5 and 20 s the
+  wait is 6 x the timeout plus about 0.4-2.1 s; at 60 s Envoy's own limit of
+  about 125 s ends it first (DC12d). Under a 220-request burst at pool 50
+  the 70 PGRST003 answers came after 10923 to 20903 ms (median 20855),
+  shorter than a lone request's wait; attempts were not counted there, so
+  that is inferred from latency only. A 500 (statement timeout after a side
+  effect, anon key plus an authenticated user token) was not sent again: one
   execution, one log line (DC03d).
 - **Bursts that drain within that window come back as waves of 200s:** 100
   concurrent 12 s requests on a pool of 30 all answered 200 (DC01a), 140 on
@@ -431,24 +436,28 @@ and DC05a from the next run on).
   no NOTIFY from the module (sender not identified); one call sent about
   0.2 s after the ALTER still failed at 8 s.
 - **The Data API answered a 70 s request** (DC09g, 3 of 3 at about 70.1 s,
-  function `set 120s`), against the timeouts guide's 60 s for client queries.
-  The gateway's whole-request limit measured about 125 s (DC12d: Envoy's
-  `upstream request timeout` 504 at 125055-125066 ms, `text/plain`, no
-  PGRST003, after two 60 s pool attempts; holders sleeping 150 s and longer
-  got 504), and the query kept running in Postgres after that 504 until
-  cancelled (ordering-inferred). Successful requests leave no PostgREST
-  access-log line (0 for the three 200s); 5xx answers do.
+  function `set 120s`), against the timeouts guide's 60 s for client
+  queries. The gateway's whole-request limit measured about 125 s (DC12d:
+  Envoy's `upstream request timeout` 504 at 125055-125066 ms, `text/plain`,
+  no PGRST003, after two 60 s pool attempts; holders still running at about
+  125 s (requested sleeps 240, 480 and 150 s in DC12c, d, e) got 504;
+  DC12b's 150 s holders were cancelled after the last probe answer, about 70
+  s in, and got 500 57014), and the holders' `dc12_hold` queries kept
+  running in Postgres after their 504 until cancelled (ordering-inferred).
+  Successful requests left no PostgREST access-log line (0 for the three
+  200s, n = 3); 5xx answers that reached PostgREST did (64 of 66 in DC12).
 - **`pgrst_db_pool_timeouts_total` counts attempts, not client requests**
   (DC12): +6 per client 504 PGRST003 (48 for 8, 24 for 4, 246 for 41). The
   counter resets with each PostgREST restart (0 after every PATCH). Its
   snapshot refreshed 60-61 s apart in DC12 (5 s reads), which bounds DC05's
   "at least about 40 s".
-- **Some requests never reach PostgREST under a held pool** (DC12, 2 of 66,
-  and DC02b's 4 s probe): 0 PostgREST lines, 1 edge row, Envoy's 504 after
-  about 125 s; the timeout counter agrees, so not lost log lines. Where they
-  wait is not identified. A burst of 42 with the pool held throughout did not
-  shorten the wait (41 x PGRST003, minimum 30.8 s, median 31.5 s, 6 lines
-  each).
+- **Some requests never reach PostgREST under a held pool** (DC12, 2 of 66:
+  0 PostgREST lines, 1 edge row, Envoy's 504 after about 125 s); the timeout
+  counter agrees, so not lost log lines. DC02b's 4 s probe (0 PostgREST
+  lines, no answer by the client's 105001 ms timeout) fits the same pattern.
+  Where they wait is not identified. A burst of 42 with the pool held
+  throughout did not shorten the wait (41 x PGRST003, minimum 30.8 s, median
+  of all 42 31.5 s, 6 lines each).
 - Harness: bursts use `dc_sleep_xl` (function timeout 180 s) so the 8 s
   login default does not end the sleep; requests go out with `keepalive:
   false` (client-side failures before run 4: "socket closed" text on 218 of
@@ -579,24 +588,28 @@ and DC05a from the next run on).
   table in RUNLOG). Waiting statements (`pg_sleep(3)`) at 40/s: pool 70
   answered all 4800 with 200 at p50 45237 ms and p95 85443 ms (23 per
   second, the pool's 70 / 3 s), pools 140 and 200 at p50 3045 ms; no
-  `PGRST003` at 70. CPU-bound statements (a plpgsql loop calibrated to
-  about 3 s alone) on 8 vCPUs: every pool connection was on CPU at once and
-  node CPU read 92 to 100 %; 200s at 1.4 per second at pool 70, 0.9 to 1.4
-  at 140, and none at 200, where every answer was a 504 (`PGRST003`, or
-  uncoded with body `upstream request timeout` at about 125 s at the
-  client) or a client-side failure. 503 `PGRST002` (105 of 480) appeared in
-  the pool-140 CPU open loop with 144 of 380 connections in use. Raising
-  `db_pool` helps requests that wait, and past the core count hurts
-  requests that compute; one run per cell, the 125 s timeout's owner not
-  identified.
+  `PGRST003` at 70. CPU-bound statements (a plpgsql loop calibrated to about
+  3 s alone) on 8 vCPUs: every pool connection was active with no wait event
+  at once (8 vCPUs) and node CPU read 92 to 100 % (42 % in the shortest
+  window); 200s at 1.4 per second at pool 70, 0.9 to 1.4 at 140, and none at
+  200, where every answer was a 504 (`PGRST003`, or uncoded with body
+  `upstream request timeout` at about 125 s at the client) or a client-side
+  failure. 503 `PGRST002` (105 of 480) appeared in the pool-140 CPU open
+  loop with at most 144 client backends (of 380 `max_connections`) in any 3
+  s sample of that row. Raising `db_pool` from 70 to 140 and 200 helped
+  requests that wait and hurt requests that compute (every pool tested was
+  far above the 8 vCPUs; a pool near the core count was not run); one run
+  per cell; the uncoded 504s match DC12d's Envoy `upstream request timeout`
+  (about 125 s) by body and time, and DC14 kept no headers.
 - Harness: `lib/tier.ts` `readPool` reads the pool four ways at the current
   size; DC13 imports realtime-surface `lib/burst.ts` for its 100-join burst
   and needs the project's database password (`PVLAB_DC_DBPASS`, also how
   RT05 reuses the project through `PVLAB_PEER_RT`). `create()` now retries
   the first admin user create (a 500 on a fresh project failed a DC15 run).
-  Two of three `POST /v1/projects` on 2026-10-26 returned a project whose
-  `created_at` predated the request by about 4 min (ready 4 s after the
-  POST); the third did not.
+  Two of the three published DC13-DC15 projects' `POST /v1/projects`
+  returned a project whose `created_at` predated the request by about 4 and
+  3.7 min (console only; the main project was ready 4 s after the POST); the
+  third did not.
 
 ## Provisioning: ACTIVE_HEALTHY is not readiness (validated 2026-08-03)
 
@@ -1512,62 +1525,73 @@ Open work lives on the task board (project work-supabase-lab); this section keep
 
 ## experiments/auth-rate-limits - key facts (AR01-AR04 2026-09-08; AR05/AR06 2026-10-26, one self-provisioned Pro-org project, ap-southeast-1, Small then Large then 2XL)
 
-GoTrue's per-IP limits on the managed `/auth/v1/*` endpoints, measured from
-one Mac in Singapore (one egress IPv4, `/auth/v1/health` p50 18 to 20 ms).
-RUNLOG.md has every row; AR05/AR06 artifacts in `out/2026-10-26/`
-(reference AR06 run `run-2026-10-26T00-26-19-212Z`).
+GoTrue's per-IP limits on the managed `/auth/v1/*` endpoints. AR05/AR06
+measured from one Mac in Singapore (one egress IPv4, `/auth/v1/health` p50
+18 to 20 ms in the AR05 `rtt` rows, 2026-10-26). RUNLOG.md has every row;
+AR05/AR06 artifacts in `out/2026-10-26/` (reference AR06 run
+`run-2026-10-26T00-26-19-212Z`).
 
-- **Defaults on a fresh project** (AR06d, 2026-10-26): `rate_limit_token_refresh`
-  150, `rate_limit_otp` 30, `rate_limit_verify` 30, `rate_limit_web3` 30,
-  `rate_limit_anonymous_users` 30, `rate_limit_email_sent` 2,
-  `rate_limit_sms_sent` 30, Sb-Forwarded-For off. Values are per 5 minutes
-  (anonymous per hour): at `rate_limit_token_refresh` 60 a drained bucket
-  refilled 6 tokens in 30 s (AR06a, n=4). The 2026-09-08 "150 vs 1800/hour
-  discrepancy" was the same rate in two units.
+- **Defaults on a fresh project** (AR06d, 2026-10-26):
+  `rate_limit_token_refresh` 150, `rate_limit_otp` 30, `rate_limit_verify`
+  30, `rate_limit_web3` 30, `rate_limit_anonymous_users` 30,
+  `rate_limit_email_sent` 2, `rate_limit_sms_sent` 30, Sb-Forwarded-For off.
+  `rate_limit_token_refresh` and `rate_limit_otp` are per 5 minutes: at
+  `rate_limit_token_refresh` 60 a drained bucket refilled 6 tokens in 30 s
+  (AR06a, n=4), and `rate_limit_otp` 30 gave 1 PUT pass 10 s after a drain
+  (AR06b.2). `rate_limit_email_sent` 2 is per hour (AR01b, 2026-09-08),
+  anonymous is per hour (docs); the `rate_limit_sms_sent` unit was not
+  measured. The 2026-09-08 "150 vs 1800/hour discrepancy" was the same rate
+  in two units.
 - **Password and refresh grants share one bucket** (AR06a, 2 trials per
   order): draining with either grant to its first 429 (request 31) made the
   other grant 429 at once. ID-token and PKCE grants were not sent (the
   docs and the GoTrue source put them on the same limiter; `web3` has its own).
-- **The burst is 30 at any limit; the limit only sets the refill** (AR06c,
-  `rate_limit_token_refresh` 10000 = 33.3/s): open-loop grants at 25/s and
-  33/s for 90 s drew no 429; at 45/s the first 429 came at 2.49 s and at
-  60/s at 1.10 s (fixed-bucket prediction 2.56 s and 1.12 s), and both
-  passed exactly 3029 in 90 s = 30 + 33.3 x 90. 300 concurrent grants at a
-  full bucket passed 30 at 150 (twice), 37 to 68 at 10000 (four bursts), 130
-  and 160 at 100000. So one IP gets about limit/300 grants per second
-  sustained plus a one-off 30 (derived from these rows). A spike from one
-  NAT address larger than 30 plus the refill over its arrival window gets
-  429s; raising the limit raises the refill, not the 30. Spreading the
-  requests out or Sb-Forwarded-For (AR02) are the other levers.
-- **`GET /auth/v1/user` is not rate limited** (AR06b, 160 GETs, 0 x 429, and
+- **The burst is 30 at every limit tried (150, 10000, 100000); the limit
+  only sets the refill** (AR06c, `rate_limit_token_refresh` 10000 = 33.3/s):
+  open-loop grants at 25/s and 33/s for 90 s drew no 429; at 45/s the first
+  429 came at 2.49 s and at 60/s at 1.10 s (fixed-bucket prediction 2.56 s
+  and 1.12 s), and both passed 3029, which is 30 + 33.33/s x 89.98 s (first
+  to last send). 300 concurrent grants at a full bucket passed 30 at 150
+  (twice), 37 to 68 at 10000 (four bursts), 130 and 160 at 100000. So one IP
+  gets about limit/300 grants per second sustained plus a one-off 30
+  (derived from these rows). A spike from one NAT address larger than 30
+  plus the refill over its arrival window gets 429s; raising the limit
+  raises the refill and leaves the 30 unchanged. Spreading the requests out
+  or Sb-Forwarded-For (AR02) are the other levers.
+- **`GET /auth/v1/user` drew no 429 in 160 GETs** (AR06b, 0 x 429, n=1, and
   it did not draw on the token bucket). `PUT /auth/v1/user` is, on its own
   bucket (separate from email sign-up's), at `rate_limit_otp`'s rate:
   raising `rate_limit_otp` to 3000 raised its refill (41 vs 1 passes 10 s
   after a drain). The docs' "Sign-ups and sign-ins" row lists `/user`; read
-  it as `PUT /user`, one bucket per endpoint at a shared rate. n=1.
-- **Password grants per second scale with vCPUs and nothing else in the way**
-  (AR05, valid grants, closed loop to c=128, limiter at 1,000,000): Small
-  18.9/s, Large 28/s, 2XL 113.7/s at saturation, no 5xx or 429. At
-  saturation the Auth process used 1.7 / 1.72 / 6.89 cores of 2 / 2 / 8 with
-  node CPU 89 to 91 %. Reading the two series together (inference): Auth
-  runs on the database instance and its bcrypt (cost 10, about 61 ms CPU
-  per grant on Large and 2XL) is the ceiling.
-  Auth's DB pool is 10 on every size and queued only once CPU was saturated
-  (2XL c=16: 111/s, 21 waits). One sweep per size.
+  it as `PUT /user`, one bucket per endpoint; the rate is measured for PUT
+  only. n=1.
+- **Password grants per second rise with the CPU available to Auth** (AR05,
+  valid grants, closed loop to c=128, limiter at 1,000,000): Small 18.9/s,
+  Large 28/s, 2XL 113.7/s at saturation, no 5xx or 429. Small and Large both
+  report 2 vCPUs, so the count alone does not set the rate (about 90 vs 61
+  ms of Auth CPU per grant). At saturation the Auth process used 1.7 / 1.72
+  / 6.89 cores of 2 / 2 / 8 with node CPU 89 to 91 %. Reading the two series
+  together (inference): Auth runs on the database instance and its CPU is
+  the ceiling (about 61 ms of Auth process CPU per grant on Large and 2XL,
+  bcrypt included; bcrypt cost 10 read by hand from the metrics payload, not
+  in the artifact). Auth's DB pool is 10 on every size and queued only once
+  CPU was saturated (2XL c=16: 111/s, 21 waits). One sweep per size.
 - **Auth slows when Postgres burns the CPU** (AR05 placement, Small and 2XL,
-  n=1 each): with 2 x vCPU `generate_series` sessions running, valid-grant
-  p50 rose 112 -> 275 ms (Small) and 83 -> 174 ms (2XL), c=16 throughput fell
-  18.9 -> 6.6 and 112 -> 54 grants/s, while `/auth/v1/health` and a
-  no-account grant (lookup only) stayed within 2 ms at p50. Heavy SQL and
-  sign-in storms compete for the same cores.
-- Harness: AR05/AR06 self-provision (`make run-self`, `PVLAB_AR_REF` to reuse
-  across invocations, `make clean DELETE=1` by prefix `pvlab-ar-`); the
-  tofu state for AR01-AR04 is empty. `make publish-evidence` needs `ONLY=`
-  set to the module ids: the Makefile's default ONLY is AR01-AR03 and
-  publishes 0 results for an AR05/AR06 run. The metrics endpoint exposes
+  n=1 each): with 2 x vCPU `generate_series` sessions started (4 of 4 seen
+  active on Small, 13 of 16 on 2XL, 10 s in), valid-grant p50 rose 112 ->
+  275 ms (Small) and 83 -> 174 ms (2XL), c=16 throughput fell 18.9 -> 6.6
+  and 112 -> 54 grants/s, while `/auth/v1/health` and a no-account grant
+  (lookup only) stayed within 2 ms at p50. Reading (inference): heavy SQL
+  and sign-in storms compete for the same cores.
+- Harness: AR05/AR06 self-provision (`make run-self`, `PVLAB_AR_REF` to
+  reuse across invocations, `make clean DELETE=1` by prefix `pvlab-ar-`);
+  the tofu state for AR01-AR04 is empty. `make publish-evidence` needs
+  `ONLY=` set to the module ids: the Makefile's default ONLY is AR01-AR03
+  and publishes 0 results for an AR05/AR06 run. The metrics endpoint exposes
   GoTrue's own series (`process_cpu_seconds_total{service_type="gotrue"}`,
   `db_sql_connection_wait_total`, `http_status_codes_total` per route and
-  code); they refresh with the payload, rarely (DC05).
+  code, the last read by hand from the metrics payload, not in the
+  artifact); they refresh with the payload, rarely (data-api-capacity DC05).
 - Not measured: ID-token/PKCE grants, the edge's notion of client IP,
   `/recover` `/resend` `/magiclink` `/otp` buckets, whether an unrelated
   auth PATCH resets buckets, Medium/XL/4XL, repeats of the sweeps, and the
@@ -3003,7 +3027,7 @@ Numbers: `RUNLOG.md`, artifacts `out/2026-10-08/`.
   that also takes UPDATE). Not run under the revoke: M01, D09, O03, T22.
   Run DD05 as `ONLY=DD05,DD99`; W12's `run(ctx, grants)` takes the variant.
 
-## experiments/realtime-surface - key facts (validated 2026-10-10, Pro org, n = 1 per row; RT05 2026-10-22, two reps per burst row)
+## experiments/realtime-surface - key facts (validated 2026-10-10, Pro org, n = 1 per row; RT05 2026-10-22 on Small and 2026-10-26 on 2XL, two reps per burst row; data-api-capacity DC13 2026-10-26, one 100-join burst per size)
 
 - **Postgres Changes filters and `select` against Postgres's own evaluation**
   (RT01): 19 filters (AND over two and three columns, two conditions on one
@@ -4307,41 +4331,46 @@ projects (feature battery, two conversion probes), all `small`,
   HEADs to the replica (RR03g, 2026-10-26).
 - **With the primary and the replica in the SAME region the load balancer
   spreads GETs over both** (RR03h, 2026-10-26, two runs, both nodes in
-  ap-southeast-1): replica/primary 111/89 and 94/106 of 200 from the Singapore
-  workstation, 100/100 and 115/85 of 200 from an Edge Function in
-  ap-southeast-1, about half of 50 from us-east-1 and eu-west-1 (all colos
-  chose `SIN`, the only region available). Run 2's order switched node at 92
-  of 199 transitions: not alternation; per-request choice is the inference,
-  the rule is not visible. The cross-region "GET goes to the near region"
-  facts above hold for a pair in two regions only. Any GET through `-all` can
-  land on the primary or the replica, so a client cannot rely on either.
+  ap-southeast-1): replica/primary 111/89 and 94/106 of 200 from the
+  Singapore workstation, 100/100 and 115/85 of 200 from an Edge Function in
+  ap-southeast-1, 20/30 and 27/23 of 50 from us-east-1, 26/24 and 24/26 from
+  eu-west-1 (chosen region `SIN` for the SIN, IAD and DUB colos, the only
+  region available). Run 2's workstation keep-alive order switched node at
+  92 of 199 transitions (the Edge Function ap-southeast-1 order at 108 of
+  199); per-request choice is the inference, the rule is not visible. The
+  cross-region "GET goes to the near region" facts above hold for a pair in
+  two regions only. Any GET through `-all` can land on the primary or the
+  replica, so a client cannot rely on either.
 - **RLS, `auth.uid()` and keys behave the same on the replica** (RR03d/e,
   two runs, supabase-js 2.118.0): an ES256 user token read the user's rows
-  only (3 and 5, 0 of another tenant) on the replica host and through `-all`;
-  legacy anon JWT, `sb_publishable_` (with or without Bearer), legacy
-  service_role JWT, `sb_secret_` and an HS256 user token (minted with the
-  legacy secret that `GET /v1/projects/{ref}/postgrest` returns as
+  only (3 and 5, 0 of another tenant) on the replica host and through
+  `-all`; legacy anon JWT, `sb_publishable_` (with or without Bearer),
+  legacy service_role JWT, `sb_secret_` and an HS256 user token (minted with
+  the legacy secret that `GET /v1/projects/{ref}/postgrest` returns as
   `jwt_secret`) all answered on the replica host as on the primary. A
   supabase-js client on the replica host carries the token with
   `accessToken: async () => token` or `global.headers.Authorization`;
-  `auth.setSession` there fails (`Failed to parse JSON`, the replica host
-  answers `/auth/v1/user` with 400) and the next read goes out as anon: 0
-  rows, no error. `setSession` and `signInWithPassword` through `-all` work
+  `auth.setSession` there fails (`Failed to parse JSON`; RR02f: the replica
+  host answers Auth paths with 400) and the next read goes out as anon: 0
+  rows, no error. `signInWithPassword` through `-all` works (both runs) and
+  `setSession` through `-all` works (run 2; run 1 failed from a module bug)
   (Auth goes to the primary; the token's `iss` is the primary host).
-- **Volatility does not route; method does** (RR03f): through `-all`,
-  `rpc(fn, {}, { get: true })` served stable, security-definer and volatile
-  read-only functions from either node (200); a writing function by GET
-  answered 405 SQLSTATE `25006` from either node (PostgREST runs GET read
-  only); `rpc(fn)` (POST) went to the primary 5 of 5 for every function.
-  supabase-js 2.118.0 sends HEAD for `{ count: 'exact', head: true }`, and
-  postgrest-js retries GET/HEAD on 503/520 by default: two replica 503s in
-  run 1's `edge_logs` never reached the module's results.
+- **Method decides routing** (RR03f): through `-all`, `rpc(fn, {}, { get:
+  true })` served stable, security-definer and volatile read-only functions
+  from either node (200); a writing function by GET answered 405 SQLSTATE
+  `25006` from either node (PostgREST runs GET read only); `rpc(fn)` (POST)
+  went to the primary 5 of 5 for every function. supabase-js 2.118.0 sends
+  HEAD for `{ count: 'exact', head: true }` (RR03g). postgrest-js 2.118.0
+  retries GET/HEAD answered 503/520 by default; two replica 503s in run 1's
+  `edge_logs` (RR03k) do not appear in the module's results, most likely
+  answered on the retry.
 - **Lag at 50 single-row inserts a second, same region** (RR03i, 300 s, two
   runs): replica host `stale_ms` p50 17 and 21 ms, p95 28 and 30, max 91 and
-  99, against the primary host's p50 12 (the 20 ms insert period and clock
-  skew are inside both); `pg_stat_replication.replay_lag` p50 2.2 and 2.1 ms,
-  max 2.5 and 3.4 ms. Not measured: read-your-writes through `-all` in this
-  shape, heavier write rates, two replicas.
+  99, against the primary host's p50 12 (the 20 ms insert period is inside
+  both; clock skew between the two hosts only in the replica figures);
+  `pg_stat_replication.replay_lag` p50 2.2 and 2.1 ms, max 2.5 and 3.4 ms.
+  Not measured: read-your-writes through `-all` in this shape, heavier write
+  rates, two replicas.
 - **`max_standby_streaming_delay` through `PUT config/database/postgres`**
   (RR02d): HTTP 200 and config `600s` both runs, but the replica's
   `pg_settings` read `600000ms` in run 1 and `30000ms (default)` in run 2 at
@@ -5215,7 +5244,7 @@ was the same in both runs. See RUNLOG.md; artifacts in `out/2026-10-23/`.
   (`WITH CHECK (body is not null)`) as CRITICAL "Policy open to anon",
   because it reads `USING` only and coalesces the null to `true`.
 
-## experiments/pgnet-under-load - key facts (validated 2026-10-26, Pro org, ap-southeast-1; NL01/NL02 Micro, NL03-NL05 Large; Postgres 17.11, pg_net 0.20.4)
+## experiments/pgnet-under-load - key facts (validated 2026-10-26, Pro org, ap-southeast-1; NL01/NL02 Micro, NL03-NL05 Large; Postgres 17.11, pg_net 0.20.4 in the NL01 and NL03 artifacts, not recorded for NL04/NL05)
 
 Self-provisioning (one project per `make micro` / `make large` process,
 NL99 deletes it) plus a workers.dev receiver Worker whose Durable Object
@@ -5225,19 +5254,23 @@ ledger records every arrival before answering. n = 1 per module except NL04
 - **Do not read pg_net's timeout `error_msg` phases as a location.** The
   text has the shape `Timeout of 5000 ms reached. Total time: ... (DNS time:
   ..., TCP/SSL handshake time: ..., HTTP Request/Response time: ...)`. All 8
-  timeouts in NL01 put the whole ~5001 ms under "DNS time" although every
-  one of those requests had reached the receiver (so DNS, TCP and TLS had
-  completed); NL03's one timeout did the same (5000.566 ms, arrival of that
-  call not recorded); NL02c's 30 s timeout put it under "HTTP
-  Request/Response" with a negative handshake time (-0.294 ms). Locate a
-  timeout from the receiver's side (arrival log) or from timing, never from
-  this split. NL05's cold-burst timeouts split plausibly (DNS 35.321 ms, TCP/SSL
-  112.676 ms, HTTP 4888.822 ms) for requests that had equally arrived, so the split
-  is inconsistent across runs. Why was not investigated.
+  timeouts in NL01 put the whole total time under "DNS time" (about 5001 ms
+  for the six 5000 ms timeouts, about 30002 ms for the two 30000 ms ones)
+  although every one of those requests had reached the receiver (so DNS, TCP
+  and TLS had completed); NL03's one timeout did the same (5000.566 ms,
+  arrival of that call not recorded); NL02c's 30 s timeout put it under
+  "HTTP Request/Response" with a negative handshake time (-0.294 ms). Locate
+  a timeout from the receiver's side (arrival log) or from timing, never
+  from this split. NL05's two sampled cold-burst timeouts, one per cold
+  burst, split plausibly (burst 1: DNS 35.321 ms, TCP/SSL 112.676 ms, HTTP
+  4888.822 ms) for requests that had equally arrived, so the split is
+  inconsistent across runs. Why was not investigated.
 - **`net._http_response.created` is the batch pickup time, not the response
   time**: a call that timed out after 30 s had `created` 48 ms after its
-  enqueue (NL02c), and 27 calls picked up together share one `created`
-  (NL01). Do not compute response latency from it.
+  enqueue (NL02c), and the 27 calls enqueued behind call 1 show
+  created-minus-enqueue falling from 4500 to 1607 ms in enqueue order,
+  consistent with one pickup (NL01; per-call enqueue times not published).
+  Do not compute response latency from it.
 - **Timeout default and ceiling (NL01)**: `timeout_milliseconds` defaults to
   5000 in the hosted `http_post` signature and omitted-timeout calls time
   out at 5000 ms; the Supabase pg_net guide shows `default 2000` (wrong for
@@ -5247,7 +5280,7 @@ ledger records every arrival before answering. n = 1 per module except NL04
   and 0 are accepted at enqueue; 0 means no timeout (a 90 s call returned
   200); 30 s and 90 s calls complete when the timeout allows. Nothing ran
   600 s, so a cap above 600000 is unmeasured.
-- **Head-of-line blocking (NL02)**: the worker takes up to 200 queued
+- **Head-of-line blocking (NL02)**: the pg_net worker takes up to 200 queued
   requests and starts the next batch only when the whole batch is done. One
   4.5 s call delayed the next 200 calls to 6010-6065 ms after enqueue; one
   call timing out at 30 s delayed them to 31031-31083 ms. None of the
@@ -5258,33 +5291,42 @@ ledger records every arrival before answering. n = 1 per module except NL04
   backends spinning (CPU busy 0.954, 1.0 in 9 of 10 samples), 0 of 3009
   calls timed out across a Cloudflare Worker, a trivial Edge Function and an
   Edge Function querying the same database (about 100 calls/min each,
-  timeout 5000, 600 s); pickup p50 4 -> 14 ms, Worker arrival p50 8 -> 19 ms.
-  The one timeout (idle arm, 1 of 1020) was the function querying the same
-  database, whose query took 1326 ms p50 / 3870 ms max idle and 1692 / 4482
-  ms saturated, mostly its own 17-at-once concurrency (181 ms alone). Cold
-  start was not the cause: Boot rows for most invocations (833-865 per about
-  1000 calls), arrival max 2.6 s. Untested: heavier saturation, I/O or lock
+  timeout 5000, 600 s); pickup p50 4 -> 14 ms (Worker target; 4 -> 13 ms for
+  both functions), Worker arrival p50 8 -> 19 ms. The one timeout (idle arm,
+  1 of 1020) was the function querying the same database, whose query took
+  1326 ms p50 / 3870 ms max idle and 1692 / 4482 ms saturated, probably
+  mostly its own 17-at-once concurrency (inferred: nl_work() takes 181 ms
+  alone by EXPLAIN ANALYZE; the function's figure also includes the Data API
+  round trip). Cold starts happened but did not cause timeouts: Boot rows
+  for 833-865 of about 1000 calls per function and arm, yet arrival max 2.6
+  s, under the 5000 ms timeout. Untested: heavier saturation, I/O or lock
   pressure, Micro's shared CPU.
 - **Delivery (NL04, 1,000 messages, receiver 20% 503 and 10% held 8 s,
-  timeout 5000, two runs x idle/saturated)**: raw pg_net lost exactly the
-  refused messages (194-274 per arm). A pg_cron retry job re-enqueuing on
-  5xx/timeout and a pgmq 1.5.1 queue with a pg_cron consumer (vt 30 s, ack
-  on 2xx) lost 0 in all 8 rows and processed 11-14% of messages twice or
-  more: each held request that timed out at 5 s had been processed and was
-  sent again (extra deliveries = held requests in every retry row). Retry
-  confirmed all 1,000 in 73-103 s, pgmq in about 186-187 s (run 1 stopped at
-  180 s with 1 and 2 already-delivered messages still invisible). CPU
-  saturation changed no count. Receivers of either at-least-once path must
-  be idempotent.
+  timeout 5000, two runs x idle/saturated)**: raw pg_net lost every refused
+  message (194-239 per arm); in run 1's idle arm it also lost the 35 calls
+  that never reached the receiver (274 lost against 239 refused). A pg_cron
+  retry job re-enqueuing on 5xx/timeout and a pgmq 1.5.1 queue with a
+  pg_cron consumer (vt 30 s, ack on 2xx) lost 0 in all 8 rows and processed
+  11-14% of messages twice or more: each held request that timed out at 5 s
+  had been processed and was sent again (extra deliveries = held requests in
+  every retry row). Retry confirmed all 1,000 in 73-103 s, pgmq in about
+  186-187 s (run 1 stopped at 180 s with 1 and 2 already-delivered messages
+  still invisible). CPU saturation changed no count beyond the receiver's
+  random fault mix (retry and pgmq lost 0 in both arms). Receivers of either
+  at-least-once path must be idempotent.
 - **A cold burst times out calls the receiver already got (NL05)**: 200
-  calls sent after the worker had sent nothing for a while (the project's
-  first outbound calls, or after 120 s idle) lost 89 and 139 of 200 to the
-  5000 ms timeout although every one reached the receiver within 825 ms;
-  the two bursts sent straight after lost 0 (arrival p50 55 and 44 ms vs 484
-  and 493 ms cold, consistent with 200 new TLS connections). The same
-  receiver answered 200 concurrent requests from the lab Mac after 150 s
-  idle in under 0.9 s, so the stall sits on the database host's side or the
-  path to Cloudflare (not separated). This is what inflated NL04's idle raw
-  timeouts (240 for 81 held, 277 for 97). Treat a pg_net `timed_out` as
-  "maybe delivered", and give the first calls after a quiet period headroom
-  (a smaller batch or a longer timeout - neither tested).
+  calls sent after the pg_net worker had sent nothing for a while (the
+  project's first outbound calls, or after 120 s idle) timed out 89 and 139
+  of 200 at the 5000 ms timeout although every one reached the receiver
+  within 825 ms; the two bursts sent straight after burst 1 had 0 timeouts
+  (arrival p50 55 and 44 ms vs 484 and 493 ms cold, consistent with 200 new
+  TLS connections). The same receiver answered 200 concurrent requests from
+  the lab Mac after 150 s idle in under 0.9 s (curl from the lab Mac, not in
+  the published artifact), so the stall sits on the database host's side,
+  the path to Cloudflare, or a receiver stall specific to the colo serving
+  the database (not separated). NL04's idle raw timeouts (240 for 81 held,
+  277 for 97) fit this cold-burst effect; NL05 (0 never arrived in all four
+  bursts) does not explain run 1's 35 calls that never reached the receiver.
+  Treat a pg_net `timed_out` as "maybe delivered", and give the first calls
+  after a quiet period headroom (a smaller batch or a longer timeout -
+  neither tested).

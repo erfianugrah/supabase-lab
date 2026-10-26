@@ -485,13 +485,14 @@ rows quoted from the facts files beside them):
 - run 2: `out/2026-10-26/run-2026-10-26T00-34-24-787Z.json`, 00:34:24 to
   00:45:43 UTC, 15 rows, 4 pass, 11 info, 0 fail
 
-Run 2 differs from run 1 in three module changes made between the runs: no
-`signOut` after sign-in (see RR03d), the RR03h order of nodes recorded as a
-sequence plus a `Connection: close` variant, and the RR03k log poll waiting
-until the row total stops growing. Replica setup answered 204 on the first
-attempt; the first session-pooler connection to the replica came 166 s (run
-1) and 170 s (run 2) after the call. The load balancer host was `<ref>-all`
-again.
+Run 2 differs from run 1 in three module changes made between the runs (both
+artifacts record lab commit 848b9f3; the module was uncommitted, so the
+commit does not identify either version): no `signOut` after sign-in (see
+RR03d), the RR03h order of nodes recorded as a sequence plus a `Connection:
+close` variant, and the RR03k log poll waiting until the row total stops
+growing. Replica setup answered 204 on the first attempt; the first
+session-pooler connection to the replica came 166 s (run 1) and 170 s (run
+2) after the call. The load balancer host was `<ref>-all` again.
 
 ### Schema and how a read is classified
 
@@ -546,15 +547,18 @@ an ES256 user token.
 
 - `auth.setSession`: run 2 `ok` on the load balancer host and the primary
   host, and the next read returned the user's rows. On the replica host it
-  failed in both runs with `Failed to parse JSON` (the replica host answers
-  `GET /auth/v1/user` with 400 and a non-JSON body), and the read after it
-  went out with the anon key as Bearer and returned 0 rows with no error.
-  Run 1 failed on every host with `400 Auth session missing!`: the module had
-  called `signOut({ scope: "local" })` after each sign-in, which sends `POST
-  /auth/v1/logout` and ends the session on the server, and `edge_logs`
-  recorded `GET /auth/v1/user` 403 for the two load balancer attempts. That
-  was a module bug, fixed for run 2; the run 1 `setSession` rows are not a
-  platform finding.
+  failed in both runs with `Failed to parse JSON` (the body was not JSON;
+  RR02f recorded 400 for Auth paths on the replica host, and RR03 did not
+  record the status), and the read after it went out with the anon key as
+  Bearer and returned 0 rows with no error. Run 1 failed on the load
+  balancer and primary hosts with `Auth session missing!` (status 400 on the
+  supabase-js error object; `edge_logs` recorded HTTP 403 for the two load
+  balancer attempts) and on the replica host with `Failed to parse JSON` as
+  in run 2: the module had called `signOut({ scope: "local" })` after each
+  sign-in, which sends `POST /auth/v1/logout` and ends the session on the
+  server (`edge_logs` recorded `GET /auth/v1/user` 403 for the two load
+  balancer attempts). That was a module bug, fixed for run 2; the run 1
+  `setSession` rows are not a platform finding.
 - `signInWithPassword` on a client created on the load balancer host: ok
   both runs, the token's `iss` is the primary host
   (`https://<ref>.supabase.co/auth/v1`), and that token read as user B on the
@@ -598,13 +602,13 @@ replica / primary:
 | `list_docs_volatile` (volatile, read only) | 1 / 4 | 2 / 3 | 0 / 5 |
 | `touch` (volatile, writes) | 405 `25006` 3 / 2 | 405 `25006` 3 / 2 | 0 / 5, HTTP 200 |
 
-- Every GET answered 200 except `touch`, and on whichever node served it.
-  The volatile read-only function served by GET on the replica as well as
-  the primary; volatility did not decide routing. `touch` by GET answered
-  HTTP 405, SQLSTATE `25006`, `cannot execute INSERT in a read-only
-  transaction`, on the replica (`in_recovery=t`) and on the primary
-  (`in_recovery=f`): PostgREST runs a GET read-only on either node, so the
-  error does not tell which node a client reached.
+- Every GET except `touch` answered 200 on whichever node served it. The
+  volatile read-only function served by GET on the replica as well as the
+  primary; volatility did not decide routing. `touch` by GET answered HTTP
+  405, SQLSTATE `25006`, `cannot execute INSERT in a read-only transaction`,
+  on the replica (`in_recovery=t`) and on the primary (`in_recovery=f`):
+  PostgREST runs a GET read-only on either node, so the error does not tell
+  which node a client reached.
 - Every POST went to the primary and `touch` by POST wrote: `rr3_touch` went
   from 0 to 6 rows each run (5 through the load balancer, 1 on the primary
   host).
@@ -613,7 +617,8 @@ replica / primary:
   subject to RLS), the same on the replica as on the primary.
 - Raw fetch on the replica's own host: every GET answered as above, `touch`
   405 `25006` `in_recovery=t`, and every POST 400 `Read replica does not
-  handle POST requests for the path /res...` (the module's 70-character cut).
+  handle POST requests for the path /res...` (the module's 60-character cut
+  of a non-JSON body).
 
 ### RR03g: HEAD and count=exact
 
@@ -648,9 +653,10 @@ replica was not looked at.
 | Edge Function `x-region eu-west-1`, n = 50 (DUB) | 26 / 24 | 24 / 26 | 21 / 49 | 6 |
 
 0 errors in every row. `edge_logs` on the load balancer host: available
-regions `["SIN"]` on every GET and HEAD row (POST rows carry none), chosen
-region `SIN` for the SIN, IAD and DUB colos, and over all of a run's load balancer rows GET to the primary 845 and
-to the replica 813 (run 1), 841 and 860 (run 2).
+regions `["SIN"]` or empty (the artifact keeps the set, not the row); chosen
+region `SIN` on every REST GET and HEAD row, empty on POST and Auth rows,
+for the SIN, IAD and DUB colos; and over all of a run's load balancer rows
+GET to the primary 845 and to the replica 813 (run 1), 841 and 860 (run 2).
 
 - With both databases in one region the load balancer spread GETs over the
   primary and the replica, roughly half each, from every vantage. In the
@@ -666,9 +672,10 @@ to the replica 813 (run 1), 841 and 860 (run 2).
   at all 199 (or 49) transitions; the run 2 sequences switched at roughly
   half, about what independent 50/50 draws give. Inference: a per-request
   choice between the two, not tied to the client's connection (the
-  `Connection: close` row spread the same way). The run cannot tell a random
-  choice from another rule, and whether the weights move with load or health
-  was not tested.
+  keep-alive row switched at 92 of 199 and the `Connection: close` row
+  spread the same way; connection reuse was not recorded). The run cannot
+  tell a random choice from another rule, and whether the weights move with
+  load or health was not tested.
 - Latency from the workstation, keep-alive, run 2 medians: 20.9 ms when the
   primary served, 19.2 ms when the replica served.
 
@@ -676,11 +683,12 @@ to the replica 813 (run 1), 841 and 860 (run 2).
 
 A session-pooler connection on the primary inserted one heartbeat row into
 `rr_marker` every 20 ms for 300 s: 15,096 rows, 50 a second, 0 errors, both
-runs. Meanwhile `GET rpc/rr_node` (anon) every 250 ms on each host returned
-`stale_ms`, the serving node's clock minus the newest row's `written_at`; a
-node keeping up therefore reads up to the 20 ms insert period plus delay,
-and the two hosts' clock skew is inside every replica figure.
-`pg_stat_replication.replay_lag` was read on the primary every 5 s.
+runs. Meanwhile `GET rpc/rr_node` (anon), with a 250 ms pause after each
+response on each host, returned `stale_ms`, the serving node's clock minus
+the newest row's `written_at`; a node keeping up therefore reads up to the
+20 ms insert period plus delay, and the two hosts' clock skew is inside
+every replica figure. `pg_stat_replication.replay_lag` was read on the
+primary every 5 s.
 
 | source | run | n | stale_ms p50 | p95 | max |
 |---|---|---|---|---|---|
@@ -688,8 +696,8 @@ and the two hosts' clock skew is inside every replica figure.
 | replica host | 2 | 1,092 | 21 | 30 | 99 |
 | primary host | 1 | 1,093 | 12 | 20 | 79 |
 | primary host | 2 | 1,083 | 12 | 21 | 28 |
-| load balancer (523 / 541 by the replica) | 1 | 1,090 | 15 | 27 | 122 |
-| load balancer | 2 | 1,086 | 17 | 29 | 144 |
+| load balancer (523 of 1,090 by the replica) | 1 | 1,090 | 15 | 27 | 122 |
+| load balancer (541 of 1,086 by the replica) | 2 | 1,086 | 17 | 29 | 144 |
 
 `replay_lag`: p50 2.2 ms, p95 2.4 ms, max 2.5 ms (n 61, run 1); 2.1, 2.5 and
 3.4 ms (n 59, run 2). 0 read errors on any host. At this write rate the
@@ -698,12 +706,13 @@ median, with clock skew inside that difference.
 
 ### edge_logs and supabase-js retries
 
-Run 1's `edge_logs` hold two load balancer GETs answered 503 by the replica
-(`rr3_docs_v` and `rpc/rr3_node`) that none of the module's results show; run
-2 has none. postgrest-js 2.118.0 retries a GET or HEAD answered 503 or 520 by
-default (`src/fetchWithRetry.ts`, with an `X-Retry-Count` header), so those
-two were most likely retried by supabase-js and answered on the retry. The
-503 bodies were not recorded, so their cause is unknown.
+Run 1's `edge_logs` hold two load balancer GETs routed to the replica
+(redirect identifier) that answered 503 (`rr3_docs_v` and `rpc/rr3_node`)
+that none of the module's results show; run 2 has none. postgrest-js 2.118.0
+retries a GET or HEAD answered 503 or 520 by default
+(`src/fetchWithRetry.ts`, with an `X-Retry-Count` header), so those two were
+most likely retried by supabase-js and answered on the retry. The 503 bodies
+were not recorded, so their cause is unknown.
 
 ### Not settled by RR03
 
@@ -714,7 +723,7 @@ two were most likely retried by supabase-js and answered on the retry. The
   node is stale or down was not run.
 - Read-your-writes through the load balancer in the same-region shape (a GET
   right after a POST can land on either node) was not measured as such; the
-  lag figures above bound it at this write rate only.
+  lag figures above indicate its size at this write rate only.
 - Auth-issued HS256 user tokens, third-party-auth tokens, Realtime and
   Storage with a user token through the load balancer.
 - Why the replica host refuses HEAD while the load balancer delivers HEAD to
@@ -724,9 +733,12 @@ two were most likely retried by supabase-js and answered on the retry. The
 
 ## Not measured
 
-- Any second primary region outside RR03's same-region pair, a second
-  replica, or a replica larger than Small.
-- Load: every probe is one client at a few requests per second.
+- Any primary region other than ap-northeast-1 (RR01, RR02) and
+  ap-southeast-1 (RR03), a second replica, or a replica larger than Small.
+- Load: probes are one client each; the heaviest are RR03h0 (200 sequential
+  GETs, p50 19.8 ms in run 1, 20.9 and 19.2 ms by node in run 2) and RR03i
+  (50 single-row inserts a second for 300 s plus three readers every 250
+  ms).
 - Replication delay for a large write (the largest transaction here is a
   50,000-row update; the RR02g bulk insert filled the disk before it
   committed).
@@ -737,6 +749,6 @@ two were most likely retried by supabase-js and answered on the retry. The
   replica is RR02h-RR02j (it did not, in two runs); with the primary and the
   replica in one region it spread GETs over both (RR03h), by a rule not
   visible from outside.
-- Cost: not metered. The final run kept a Small primary, a Small replica and
-  `pitr_7` for about 27 minutes; the exploratory runs kept one project and
-  one replica for roughly an hour and a half.
+- Cost: not metered. The RR01 final run (2026-10-10) kept a Small primary, a
+  Small replica and `pitr_7` for about 27 minutes; the exploratory runs kept
+  one project and one replica for roughly an hour and a half.

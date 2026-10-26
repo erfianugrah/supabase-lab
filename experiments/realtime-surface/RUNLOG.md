@@ -262,10 +262,11 @@ Shape per burst as in the 2026-10-22 section below.
   5000 (two reps each), `pc` at `postgres_changes_pool` 20 the same, `bc`
   5000 of 5000 (two reps). No `Too many database timeouts`, no join error,
   no rate-limit reply, 2000 or 5000 of the sockets opened every time,
-  `realtime.subscription` held the ready count, `pg_postmaster_start_time`
-  unchanged. On Small (2026-10-22) the default pool gave the timeout to 1421
-  and 1611 of 5000; on 2XL it gave it to 0 and 0. H1 (RT05c-2000,
-  RT05c-5000) was therefore not exercised on 2XL: `info`, [0,0] at both.
+  `realtime.subscription` held the ready count on every `pc` row (not read
+  on `bc` rows), `pg_postmaster_start_time` unchanged. On Small (2026-10-22)
+  the default pool gave the timeout to 1421 and 1611 of 5000; on 2XL it gave
+  it to 0 and 0. H1 (RT05c-2000, RT05c-5000) was therefore not exercised on
+  2XL: `info`, [0,0] at both.
 - **Pool connections:** `realtime_subscription_manager_pub` peaked at 7 on
   every default-pool row (Small: 4) and 20 on every pool-20 row;
   `realtime_connect` at 5 on every row.
