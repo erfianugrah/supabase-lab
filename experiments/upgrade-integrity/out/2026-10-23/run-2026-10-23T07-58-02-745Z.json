@@ -1,0 +1,359 @@
+{
+  "startedAt": "2026-10-23T07:58:02.745Z",
+  "finishedAt": "2026-10-23T08:09:18.916Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "upgrade-integrity",
+  "labCommit": "661afdf",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "UI01a",
+      "title": "UI01a: POST /v1/projects with postgres_engine \"15\" (micro, ap-southeast-1)",
+      "status": "pass",
+      "detail": "create 201; healthy and answering after 3 s; database.version 15.19.0.003, postgres_engine 15, server_version 15.19",
+      "measurements": {
+        "create_status": 201,
+        "create_to_ready_s": 3,
+        "app_version": "15.19.0.003",
+        "postgres_engine": "15",
+        "release_channel": "ga",
+        "server_version": "15.19"
+      },
+      "evidence": "create response: {\"id\":\"<ref>\",\"ref\":\"<ref>\",\"name\":\"pvlab-ui-1792742282746\",\"region\":\"ap-southeast-1\",\"created_at\":\"2026-10-22T20:27:25.129144Z\",\"status\":\"ACTIVE_HEALTHY\"}\nGET /projects/{ref} database: {\"host\":\"db.<ref>.supabase.co\",\"version\":\"15.19.0.003\",\"postgres_engine\":\"15\",\"release_channel\":\"ga\"}",
+      "durationMs": 3348
+    },
+    {
+      "id": "UI01b",
+      "title": "UI01b: upgrade eligibility of the fresh project",
+      "status": "info",
+      "detail": "HTTP 200; eligible true; current supabase-postgres-15.19.0.003; targets 17:supabase-postgres-17.11.0.003; estimate 1 h",
+      "measurements": {
+        "status": 200,
+        "eligible": "true",
+        "targets": "17:supabase-postgres-17.11.0.003",
+        "duration_estimate_hours": 1
+      },
+      "evidence": "{\"eligible\":true,\"current_app_version\":\"supabase-postgres-15.19.0.003\",\"current_app_version_release_channel\":\"ga\",\"latest_app_version\":\"supabase-postgres-17.11.0.003\",\"target_upgrade_versions\":[{\"postgres_version\":\"17\",\"release_channel\":\"ga\",\"app_version\":\"supabase-postgres-17.11.0.003\"}],\"duration_estimate_hours\":1,\"legacy_auth_custom_roles\":[],\"objects_to_be_dropped\":[],\"unsupported_extensions\":[],\"user_defined_objects_in_internal_schemas\":[],\"validation_errors\":[],\"warnings\":[]}",
+      "durationMs": 3348
+    },
+    {
+      "id": "UI02a",
+      "title": "UI02a: fixture up, cron firing, queue moving",
+      "status": "pass",
+      "detail": "15.19; amcheck 1.3, pg_cron 1.6.4, pgmq 1.5.1; '5 seconds' accepted (jobid 1); ui-minute accepted; after 180 s: 36 ticks (median gap 5.01 s), 3 minute rows, archive 54, queue 0, job_run_details 39 (succeeded=39)",
+      "measurements": {
+        "server_version": "15.19",
+        "extensions": "amcheck 1.3, pg_cron 1.6.4, pgmq 1.5.1",
+        "sql_user": "postgres (superuser false)",
+        "tick_schedule": "5 seconds",
+        "ticks": 36,
+        "tick_median_gap_s": 5.01,
+        "minute_rows": 3,
+        "events": 540,
+        "archive_rows": 54,
+        "queue_rows": 0,
+        "job_run_details": 39,
+        "run_status": "succeeded=39"
+      },
+      "evidence": "{\n \"cronJobs\": [\n  {\n   \"jobid\": 1,\n   \"jobname\": \"ui-tick\",\n   \"schedule\": \"5 seconds\",\n   \"active\": true,\n   \"username\": \"postgres\"\n  },\n  {\n   \"jobid\": 2,\n   \"jobname\": \"ui-minute\",\n   \"schedule\": \"* * * * *\",\n   \"active\": true,\n   \"username\": \"postgres\"\n  }\n ],\n \"cronTables\": \"job:r, job_pkey:i, job_run_details:r, job_run_details_pkey:i, jobid_seq:S, jobname_username_uniq:i, runid_seq:S\",\n \"pgmqTables\": \"a_ui_q:r, meta:r, q_ui_q:r\",\n \"counts\": {\n  \"ui_events\": 540,\n  \"ui_ticks\": 36,\n  \"ui_minute\": 3,\n  \"ui_client\": 0,\n  \"queue\": 0,\n  \"archive\": 54,\n  \"job_run_details\": 39\n },\n \"maxIds\": {\n  \"ticks\": \"36\",\n  \"runid\": \"39\",\n  \"events\": \"720\",\n  \"archive\": \"108\"\n }\n}",
+      "durationMs": 190886
+    },
+    {
+      "id": "UI02b",
+      "title": "UI02b: amcheck before the upgrade",
+      "status": "pass",
+      "detail": "amcheck 1.3 in pg_catalog: heap 9/9, bt_index_check 16/16, bt_index_parent_check 16/16 clean",
+      "measurements": {
+        "amcheck_version": "1.3",
+        "heap_ok": "9/9",
+        "btree_ok": "16/16",
+        "btree_parent_ok": "16/16"
+      },
+      "evidence": "heap cron.job: ok\nheap cron.job_run_details: ok\nheap pgmq.a_ui_q: ok\nheap pgmq.meta: ok\nheap pgmq.q_ui_q: ok\nheap ui_client: ok\nheap ui_events: ok\nheap ui_minute: ok\nheap ui_ticks: ok\nbtree cron.jobname_username_uniq: ok\nbtree_parent cron.jobname_username_uniq: ok\nbtree cron.job_pkey: ok\nbtree_parent cron.job_pkey: ok\nbtree cron.job_run_details_pkey: ok\nbtree_parent cron.job_run_details_pkey: ok\nbtree pgmq.archived_at_idx_ui_q: ok\nbtree_parent pgmq.archived_at_idx_ui_q: ok\nbtree pgmq.a_ui_q_pkey: ok\nbtree_parent pgmq.a_ui_q_pkey: ok\nbtree pgmq.meta_queue_name_key: ok\nbtree_parent pgmq.meta_queue_name_key: ok\nbtree pgmq.q_ui_q_pkey: ok\nbtree_parent pgmq.q_ui_q_pkey: ok\nbtree pgmq.q_ui_q_vt_idx: ok\nbtree_parent pgmq.q_ui_q_vt_idx: ok\nbtree ui_client_pkey: ok\nbtree_parent ui_client_pkey: ok\nbtree ui_client_seq_key: ok\nbtree_parent ui_client_seq_key: ok\nbtree ui_events_created_at_idx: ok\nbtree_parent ui_events_created_at_idx: ok\nbtree ui_events_payload_idx: ok\nbtree_parent ui_events_payload_idx: ok\nbtree ui_events_pkey: ok\nbtree_parent ui_events_pkey: ok\nbtree ui_minute_pkey: ok\nbtree_parent ui_minute_pkey: ok\nbtree ui_ticks_at_idx: ok\nbtree_parent ui_ticks_at_idx: ok\nbtree ui_ticks_pkey: ok\nbtree_parent ui_ticks_pkey: ok",
+      "durationMs": 190886
+    },
+    {
+      "id": "UI02c",
+      "title": "UI02c: sequences at or above max(column) before the upgrade",
+      "status": "pass",
+      "detail": "8/8 sequences at or above their column max",
+      "measurements": {
+        "seq_ok": "8/8"
+      },
+      "evidence": "cron.job.jobid <- cron.jobid_seq: last_value 2, max 2\ncron.job_run_details.runid <- cron.runid_seq: last_value 40, max 40\npgmq.q_ui_q.msg_id <- pgmq.q_ui_q_msg_id_seq: last_value 111, max null\npublic.ui_client.id <- ui_client_id_seq: last_value null, max null\npublic.ui_events.id <- ui_events_id_seq: last_value 740, max 740\npublic.ui_minute.id <- ui_minute_id_seq: last_value 3, max 3\npublic.ui_ticks.id <- ui_ticks_id_seq: last_value 37, max 37\npgmq.a_ui_q.msg_id <- pgmq.q_ui_q_msg_id_seq (queue sequence): last_value 111, max 110",
+      "durationMs": 190886
+    },
+    {
+      "id": "UI02d",
+      "title": "UI02d: relfrozenxid / relminmxid ages before the upgrade",
+      "status": "info",
+      "detail": "cron.job_run_details age 255 (owner supabase_admin); pgmq.a_ui_q age 254 (owner postgres); pgmq.q_ui_q age 49 (owner postgres); ui_events age 245 (owner postgres); ui_ticks age 255 (owner postgres)",
+      "measurements": {
+        "age_cron.job_run_details": 255,
+        "age_pgmq.a_ui_q": 254,
+        "age_pgmq.q_ui_q": 49,
+        "age_ui_events": 245,
+        "age_ui_ticks": 255
+      },
+      "evidence": "cron.job_run_details: relfrozenxid 1196 age 255; relminmxid 1 mxid_age 0; owner supabase_admin\npgmq.a_ui_q: relfrozenxid 1197 age 254; relminmxid 1 mxid_age 0; owner postgres\npgmq.q_ui_q: relfrozenxid 1402 age 49; relminmxid 1 mxid_age 0; owner postgres\nui_events: relfrozenxid 1206 age 245; relminmxid 1 mxid_age 0; owner postgres\nui_ticks: relfrozenxid 1196 age 255; relminmxid 1 mxid_age 0; owner postgres",
+      "durationMs": 190886
+    },
+    {
+      "id": "UI03a",
+      "title": "UI03a: eligibility with pg_cron, pgmq and amcheck enabled",
+      "status": "pass",
+      "detail": "HTTP 200; eligible true; target 17 (supabase-postgres-17.11.0.003); unsupported_extensions []; objects_to_be_dropped 0; warnings 0",
+      "measurements": {
+        "eligible": "true",
+        "target_app_version": "supabase-postgres-17.11.0.003"
+      },
+      "evidence": "{\"eligible\":true,\"current_app_version\":\"supabase-postgres-15.19.0.003\",\"current_app_version_release_channel\":\"ga\",\"latest_app_version\":\"supabase-postgres-17.11.0.003\",\"target_upgrade_versions\":[{\"postgres_version\":\"17\",\"release_channel\":\"ga\",\"app_version\":\"supabase-postgres-17.11.0.003\"}],\"duration_estimate_hours\":1,\"legacy_auth_custom_roles\":[],\"objects_to_be_dropped\":[],\"unsupported_extensions\":[],\"user_defined_objects_in_internal_schemas\":[],\"validation_errors\":[],\"warnings\":[]}",
+      "durationMs": 330757
+    },
+    {
+      "id": "UI03b",
+      "title": "UI03b: upgrade 15.19 -> 17",
+      "status": "pass",
+      "detail": "POST 201; ACTIVE_HEALTHY and answering on 17.11 after 289 s; final app version 17.11.0.003",
+      "measurements": {
+        "post_status": 201,
+        "from_version": "15.19",
+        "to_version": "17.11",
+        "app_version_after": "17.11.0.003",
+        "post_to_healthy_on_new_s": 289,
+        "final_progress": "null"
+      },
+      "evidence": "+0 s POST /upgrade {\"target_version\":\"17\",\"release_channel\":\"ga\"} -> 201 {\"tracking_id\":\"a4baabb3-af00-4272-87a9-c22180717bf6\"}\n+16 s upgrade/status progress null status null; project UPGRADING; database.version 15.19.0.003\n+31 s upgrade/status progress 1_started status 0; project UPGRADING; database.version 15.19.0.003\n+122 s upgrade/status progress 2_launched_upgraded_instance status 0; project UPGRADING; database.version 15.19.0.003\n+137 s upgrade/status progress 4_attached_volume_to_original_instance status 0; project UPGRADING; database.version 15.19.0.003\n+152 s upgrade/status progress 5_initiated_data_upgrade status 0; project UPGRADING; database.version 15.19.0.003\n+243 s upgrade/status progress 6_completed_data_upgrade status 0; project UPGRADING; database.version 15.19.0.003\n+259 s upgrade/status progress 8_attached_volume_to_upgraded_instance status 0; project UPGRADING; database.version 15.19.0.003\n+274 s upgrade/status progress 9_completed_upgrade status 0; project UPGRADING; database.version 17.11.0.003\n+272 s first acknowledged write on 17.11\n+289 s upgrade/status progress null status null; project ACTIVE_HEALTHY; database.version 17.11.0.003\nversion(): PostgreSQL 17.11 on x86_64-pc-linux-gnu, compiled by gcc (GCC) 15.2.0, 64-bit",
+      "durationMs": 330757
+    },
+    {
+      "id": "UI03c",
+      "title": "UI03c: client writes through the Management API across the window",
+      "status": "info",
+      "detail": "110 attempts, 106 acknowledged, 4 failed; largest gap between acknowledged writes 12 s (seq 76 -> 80)",
+      "measurements": {
+        "attempts": 110,
+        "acknowledged": 106,
+        "failed": 4,
+        "max_ack_gap_s": 12,
+        "first_fail_after_post_s": 209,
+        "gap_start_after_post_s": 215
+      },
+      "evidence": "1x 400 FATAL:  57P03: the database system is shutting down\n3x 400 connect ECONNREFUSED <id>:5432",
+      "durationMs": 330757
+    },
+    {
+      "id": "UI04a",
+      "title": "UI04a: amcheck after the upgrade",
+      "status": "pass",
+      "detail": "amcheck 1.4 in pg_catalog: heap 9/9, bt_index_check 16/16, bt_index_parent_check 16/16 clean (before: heap 9/9, btree 16/16)",
+      "measurements": {
+        "amcheck_version": "1.4",
+        "heap_ok": "9/9",
+        "btree_ok": "16/16",
+        "btree_parent_ok": "16/16"
+      },
+      "evidence": "heap cron.job: ok\nheap cron.job_run_details: ok\nheap pgmq.a_ui_q: ok\nheap pgmq.meta: ok\nheap pgmq.q_ui_q: ok\nheap ui_client: ok\nheap ui_events: ok\nheap ui_minute: ok\nheap ui_ticks: ok\nbtree cron.jobname_username_uniq: ok\nbtree_parent cron.jobname_username_uniq: ok\nbtree cron.job_pkey: ok\nbtree_parent cron.job_pkey: ok\nbtree cron.job_run_details_pkey: ok\nbtree_parent cron.job_run_details_pkey: ok\nbtree pgmq.archived_at_idx_ui_q: ok\nbtree_parent pgmq.archived_at_idx_ui_q: ok\nbtree pgmq.a_ui_q_pkey: ok\nbtree_parent pgmq.a_ui_q_pkey: ok\nbtree pgmq.meta_queue_name_key: ok\nbtree_parent pgmq.meta_queue_name_key: ok\nbtree pgmq.q_ui_q_pkey: ok\nbtree_parent pgmq.q_ui_q_pkey: ok\nbtree pgmq.q_ui_q_vt_idx: ok\nbtree_parent pgmq.q_ui_q_vt_idx: ok\nbtree ui_client_pkey: ok\nbtree_parent ui_client_pkey: ok\nbtree ui_client_seq_key: ok\nbtree_parent ui_client_seq_key: ok\nbtree ui_events_created_at_idx: ok\nbtree_parent ui_events_created_at_idx: ok\nbtree ui_events_payload_idx: ok\nbtree_parent ui_events_payload_idx: ok\nbtree ui_events_pkey: ok\nbtree_parent ui_events_pkey: ok\nbtree ui_minute_pkey: ok\nbtree_parent ui_minute_pkey: ok\nbtree ui_ticks_at_idx: ok\nbtree_parent ui_ticks_at_idx: ok\nbtree ui_ticks_pkey: ok\nbtree_parent ui_ticks_pkey: ok",
+      "durationMs": 6012
+    },
+    {
+      "id": "UI04b",
+      "title": "UI04b: sequences at or above max(column) after the upgrade",
+      "status": "pass",
+      "detail": "8/8 at or above their column max",
+      "measurements": {
+        "seq_ok": "8/8"
+      },
+      "evidence": "cron.job.jobid <- cron.jobid_seq: last_value 2, max 2\ncron.job_run_details.runid <- cron.runid_seq: last_value 99, max 99\npgmq.q_ui_q.msg_id <- pgmq.q_ui_q_msg_id_seq: last_value 276, max null\npublic.ui_client.id <- ui_client_id_seq: last_value 91, max 91\npublic.ui_events.id <- ui_events_id_seq: last_value 1840, max 1840\npublic.ui_minute.id <- ui_minute_id_seq: last_value 7, max 7\npublic.ui_ticks.id <- ui_ticks_id_seq: last_value 92, max 92\npgmq.a_ui_q.msg_id <- pgmq.q_ui_q_msg_id_seq (queue sequence): last_value 276, max 276",
+      "durationMs": 6012
+    },
+    {
+      "id": "UI04c",
+      "title": "UI04c: acknowledged writes and baseline rows kept",
+      "status": "fail",
+      "detail": "91/106 acknowledged client writes present (91 rows in ui_client); baseline rows still present: ticks 36/36, archive 54/54, job_run_details 39/39",
+      "measurements": {
+        "acked": 106,
+        "acked_lost": 15,
+        "baseline_ticks_kept": "36/36",
+        "baseline_archive_kept": "54/54",
+        "baseline_job_runs_kept": "39/39"
+      },
+      "evidence": "lost seqs: 80,81,82,83,84,85,86,87,88,89,90,91,92,93,94",
+      "durationMs": 6012
+    },
+    {
+      "id": "UI04d",
+      "title": "UI04d: cron and pgmq catalog before and after",
+      "status": "info",
+      "detail": "17.11; amcheck 1.4, pg_cron 1.6.4, pgmq 1.5.1; cron.job identical; cron relations identical; pgmq tables identical",
+      "measurements": {
+        "server_version": "17.11",
+        "extensions": "amcheck 1.4, pg_cron 1.6.4, pgmq 1.5.1",
+        "cron_jobs_identical": "yes"
+      },
+      "evidence": "before cron.job: [{\"jobid\":1,\"jobname\":\"ui-tick\",\"schedule\":\"5 seconds\",\"active\":true,\"username\":\"postgres\"},{\"jobid\":2,\"jobname\":\"ui-minute\",\"schedule\":\"* * * * *\",\"active\":true,\"username\":\"postgres\"}]\nafter  cron.job: [{\"jobid\":1,\"jobname\":\"ui-tick\",\"schedule\":\"5 seconds\",\"active\":true,\"username\":\"postgres\"},{\"jobid\":2,\"jobname\":\"ui-minute\",\"schedule\":\"* * * * *\",\"active\":true,\"username\":\"postgres\"}]\nbefore cron: job:r, job_pkey:i, job_run_details:r, job_run_details_pkey:i, jobid_seq:S, jobname_username_uniq:i, runid_seq:S\nafter  cron: job:r, job_pkey:i, job_run_details:r, job_run_details_pkey:i, jobid_seq:S, jobname_username_uniq:i, runid_seq:S\nbefore pgmq: a_ui_q:r, meta:r, q_ui_q:r\nafter  pgmq: a_ui_q:r, meta:r, q_ui_q:r\nbefore extensions: amcheck 1.3, pg_cron 1.6.4, pgmq 1.5.1\nafter counts: {\"ui_events\":1380,\"ui_ticks\":92,\"ui_minute\":7,\"ui_client\":91,\"queue\":0,\"archive\":138,\"job_run_details\":99} runs succeeded=99",
+      "durationMs": 6012
+    },
+    {
+      "id": "UI05-cron.job_run_details",
+      "title": "UI05: VACUUM (FREEZE, VERBOSE) cron.job_run_details",
+      "status": "pass",
+      "detail": "age 1133 -> 1, relfrozenxid 1196 -> 2335, mxid_age 0 -> 0; 12 ms via session pooler; 4 notices; owner supabase_admin",
+      "measurements": {
+        "age_before": 1133,
+        "age_after": 1,
+        "relfrozenxid_before": "1196",
+        "relfrozenxid_after": "2335",
+        "mxid_age_before": 0,
+        "mxid_age_after": 0,
+        "vacuum_ms": 12,
+        "owner": "supabase_admin"
+      },
+      "evidence": "INFO: aggressively vacuuming \"postgres.cron.job_run_details\"\nINFO: finished vacuuming \"postgres.cron.job_run_details\": index scans: 1\npages: 0 removed, 2 remain, 2 scanned (100.00% of total)\ntuples: 10 removed, 100 remain, 0 are dead but not yet removable\nremovable cutoff: 2335, which was 0 XIDs old when operation ended\nnew relfrozenxid: 2335, which is 1139 XIDs ahead of previous value\nfrozen: 2 pages from table (100.00% of total) had 100 tuples frozen\nindex scan needed: 1 pages from table (50.00% of total) had 1 dead item identifiers removed\nindex \"job_run_details_pkey\": pages: 2 in total, 0 newly deleted, 0 currently deleted, 0 reusable\navg read rate: 24.150 MB/s, avg write rate: 72.450 MB/s\nbuffer usage: 61 hits, 2 misses, 6 dirtied\nWAL usage: 11 records, 6 full page images, 5071 bytes\nsystem usage: CPU: user: 0.00 s, system: 0.00 s, elapsed: 0.00 s\nINFO: aggressively vacuuming \"postgres.pg_toast.pg_toast_17629\"\nINFO: finished vacuuming \"postgres.pg_toast.pg_toast_17629\": index scans: 0\npages: 0 removed, 0 remain, 0 scanned (100.00% of total)\ntuples: 0 removed, 0 remain, 0 are dead but not yet removable\nremovable cutoff: 2335, which was 0 XIDs old when operation ended\nnew relfrozenxid: 2335, which is 1139 XIDs ahead of previous value\nfrozen: 0 pages from table (100.00% of total) had 0 tuples frozen\nindex scan not needed: 0 pages from table (100.00% of total) had 0 dead item identifiers removed\navg read rate: 52.083 MB/s, avg write rate: 0.000 MB/s\nbuffer usage: 32 hits, 1 misses, 0 dirtied\nWAL usage: 1 records, 0 full page images, 188 bytes\nsystem usage: CPU: user: 0.00 s, system: 0.00 s, elapsed: 0.00 s",
+      "durationMs": 446
+    },
+    {
+      "id": "UI05-pgmq.q_ui_q",
+      "title": "UI05: VACUUM (FREEZE, VERBOSE) pgmq.q_ui_q",
+      "status": "pass",
+      "detail": "age 8 -> 1, relfrozenxid 2321 -> 2335, mxid_age 0 -> 0; 11 ms via session pooler; 5 notices; owner postgres",
+      "measurements": {
+        "age_before": 8,
+        "age_after": 1,
+        "relfrozenxid_before": "2321",
+        "relfrozenxid_after": "2335",
+        "mxid_age_before": 0,
+        "mxid_age_after": 0,
+        "vacuum_ms": 11,
+        "owner": "postgres"
+      },
+      "evidence": "INFO: aggressively vacuuming \"postgres.pgmq.q_ui_q\"\nINFO: finished vacuuming \"postgres.pgmq.q_ui_q\": index scans: 1\npages: 1 removed, 0 remain, 1 scanned (100.00% of total)\ntuples: 12 removed, 0 remain, 0 are dead but not yet removable\nremovable cutoff: 2335, which was 1 XIDs old when operation ended\nnew relfrozenxid: 2335, which is 14 XIDs ahead of previous value\nfrozen: 0 pages from table (0.00% of total) had 0 tuples frozen\nindex scan needed: 1 pages from table (100.00% of total) had 12 dead item identifiers removed\nindex \"q_ui_q_pkey\": pages: 2 in total, 0 newly deleted, 0 currently deleted, 0 reusable\nindex \"q_ui_q_vt_idx\": pages: 2 in total, 0 newly deleted, 0 currently deleted, 0 reusable\navg read rate: 0.000 MB/s, avg write rate: 7.648 MB/s\nbuffer usage: 60 hits, 0 misses, 2 dirtied\nWAL usage: 9 records, 2 full page images, 921 bytes\nsystem usage: CPU: user: 0.00 s, system: 0.00 s, elapsed: 0.00 s\nINFO: aggressively vacuuming \"postgres.pg_toast.pg_toast_17775\"\nINFO: finished vacuuming \"postgres.pg_toast.pg_toast_17775\": index scans: 0\npages: 0 removed, 0 remain, 0 scanned (100.00% of total)\ntuples: 0 removed, 0 remain, 0 are dead but not yet removable\nremovable cutoff: 2336, which was 0 XIDs old when operation ended\nnew relfrozenxid: 2336, which is 1139 XIDs ahead of previous value\nfrozen: 0 pages from table (100.00% of total) had 0 tuples frozen\nindex scan not needed: 0 pages from table (100.00% of total) had 0 dead item identifiers removed\navg read rate: 46.228 MB/s, avg write rate: 0.000 MB/s\nbuffer usage: 25 hits, 1 misses, 0 dirtied\nWAL usage: 1 records, 0 full page images, 188 bytes\nsystem usage: CPU: user: 0.00 s, system: 0.00 s, elapsed: 0.00 s",
+      "durationMs": 446
+    },
+    {
+      "id": "UI05-pgmq.a_ui_q",
+      "title": "UI05: VACUUM (FREEZE, VERBOSE) pgmq.a_ui_q",
+      "status": "pass",
+      "detail": "age 1132 -> 0, relfrozenxid 1197 -> 2336, mxid_age 0 -> 0; 10 ms via session pooler; 4 notices; owner postgres",
+      "measurements": {
+        "age_before": 1132,
+        "age_after": 0,
+        "relfrozenxid_before": "1197",
+        "relfrozenxid_after": "2336",
+        "mxid_age_before": 0,
+        "mxid_age_after": 0,
+        "vacuum_ms": 10,
+        "owner": "postgres"
+      },
+      "evidence": "INFO: aggressively vacuuming \"postgres.pgmq.a_ui_q\"\nINFO: finished vacuuming \"postgres.pgmq.a_ui_q\": index scans: 0\npages: 0 removed, 2 remain, 2 scanned (100.00% of total)\ntuples: 0 removed, 139 remain, 0 are dead but not yet removable\nremovable cutoff: 2336, which was 0 XIDs old when operation ended\nnew relfrozenxid: 2336, which is 1139 XIDs ahead of previous value\nfrozen: 2 pages from table (100.00% of total) had 139 tuples frozen\nindex scan not needed: 0 pages from table (0.00% of total) had 0 dead item identifiers removed\navg read rate: 39.358 MB/s, avg write rate: 98.394 MB/s\nbuffer usage: 45 hits, 2 misses, 5 dirtied\nWAL usage: 8 records, 5 full page images, 4296 bytes\nsystem usage: CPU: user: 0.00 s, system: 0.00 s, elapsed: 0.00 s\nINFO: aggressively vacuuming \"postgres.pg_toast.pg_toast_17784\"\nINFO: finished vacuuming \"postgres.pg_toast.pg_toast_17784\": index scans: 0\npages: 0 removed, 0 remain, 0 scanned (100.00% of total)\ntuples: 0 removed, 0 remain, 0 are dead but not yet removable\nremovable cutoff: 2336, which was 0 XIDs old when operation ended\nnew relfrozenxid: 2336, which is 1139 XIDs ahead of previous value\nfrozen: 0 pages from table (100.00% of total) had 0 tuples frozen\nindex scan not needed: 0 pages from table (100.00% of total) had 0 dead item identifiers removed\navg read rate: 59.637 MB/s, avg write rate: 0.000 MB/s\nbuffer usage: 25 hits, 1 misses, 0 dirtied\nWAL usage: 1 records, 0 full page images, 188 bytes\nsystem usage: CPU: user: 0.00 s, system: 0.00 s, elapsed: 0.00 s",
+      "durationMs": 446
+    },
+    {
+      "id": "UI05-public.ui_events",
+      "title": "UI05: VACUUM (FREEZE, VERBOSE) public.ui_events",
+      "status": "fail",
+      "detail": "age ? -> ?, relfrozenxid ? -> ?, mxid_age ? -> ?; 8 ms via session pooler; 4 notices; owner ?",
+      "measurements": {
+        "age_before": -1,
+        "age_after": -1,
+        "relfrozenxid_before": "?",
+        "relfrozenxid_after": "?",
+        "mxid_age_before": -1,
+        "mxid_age_after": -1,
+        "vacuum_ms": 8,
+        "owner": "?"
+      },
+      "evidence": "INFO: aggressively vacuuming \"postgres.public.ui_events\"\nINFO: finished vacuuming \"postgres.public.ui_events\": index scans: 1\npages: 0 removed, 20 remain, 20 scanned (100.00% of total)\ntuples: 80 removed, 1395 remain, 0 are dead but not yet removable\nremovable cutoff: 2336, which was 0 XIDs old when operation ended\nnew relfrozenxid: 2336, which is 1130 XIDs ahead of previous value\nfrozen: 20 pages from table (100.00% of total) had 1395 tuples frozen\nindex scan needed: 10 pages from table (50.00% of total) had 168 dead item identifiers removed\nindex \"ui_events_pkey\": pages: 7 in total, 0 newly deleted, 0 currently deleted, 0 reusable\nindex \"ui_events_created_at_idx\": pages: 7 in total, 0 newly deleted, 0 currently deleted, 0 reusable\nindex \"ui_events_payload_idx\": pages: 17 in total, 0 newly deleted, 0 currently deleted, 0 reusable\navg read rate: 7.526 MB/s, avg write rate: 112.897 MB/s\nbuffer usage: 159 hits, 1 misses, 15 dirtied\nWAL usage: 79 records, 15 full page images, 54789 bytes\nsystem usage: CPU: user: 0.00 s, system: 0.00 s, elapsed: 0.00 s\nINFO: aggressively vacuuming \"postgres.pg_toast.pg_toast_17728\"\nINFO: finished vacuuming \"postgres.pg_toast.pg_toast_17728\": index scans: 0\npages: 0 removed, 0 remain, 0 scanned (100.00% of total)\ntuples: 0 removed, 0 remain, 0 are dead but not yet removable\nremovable cutoff: 2336, which was 0 XIDs old when operation ended\nnew relfrozenxid: 2336, which is 1140 XIDs ahead of previous value\nfrozen: 0 pages from table (100.00% of total) had 0 tuples frozen\nindex scan not needed: 0 pages from table (100.00% of total) had 0 dead item identifiers removed\navg read rate: 47.637 MB/s, avg write rate: 47.637 MB/s\nbuffer usage: 25 hits, 1 misses, 1 dirtied\nWAL usage: 1 records, 1 full page images, 977 bytes\nsystem usage: CPU: user: 0.00 s, system: 0.00 s, elapsed: 0.00 s",
+      "durationMs": 446
+    },
+    {
+      "id": "UI05-public.ui_ticks",
+      "title": "UI05: VACUUM (FREEZE, VERBOSE) public.ui_ticks",
+      "status": "fail",
+      "detail": "age ? -> ?, relfrozenxid ? -> ?, mxid_age ? -> ?; 8 ms via session pooler; 4 notices; owner ?",
+      "measurements": {
+        "age_before": -1,
+        "age_after": -1,
+        "relfrozenxid_before": "?",
+        "relfrozenxid_after": "?",
+        "mxid_age_before": -1,
+        "mxid_age_after": -1,
+        "vacuum_ms": 8,
+        "owner": "?"
+      },
+      "evidence": "INFO: aggressively vacuuming \"postgres.public.ui_ticks\"\nINFO: finished vacuuming \"postgres.public.ui_ticks\": index scans: 0\npages: 0 removed, 1 remain, 1 scanned (100.00% of total)\ntuples: 1 removed, 93 remain, 0 are dead but not yet removable\nremovable cutoff: 2336, which was 0 XIDs old when operation ended\nnew relfrozenxid: 2336, which is 1140 XIDs ahead of previous value\nfrozen: 1 pages from table (100.00% of total) had 93 tuples frozen\nindex scan not needed: 0 pages from table (0.00% of total) had 0 dead item identifiers removed\navg read rate: 0.000 MB/s, avg write rate: 65.104 MB/s\nbuffer usage: 43 hits, 0 misses, 4 dirtied\nWAL usage: 6 records, 4 full page images, 1173 bytes\nsystem usage: CPU: user: 0.00 s, system: 0.00 s, elapsed: 0.00 s\nINFO: aggressively vacuuming \"postgres.pg_toast.pg_toast_17741\"\nINFO: finished vacuuming \"postgres.pg_toast.pg_toast_17741\": index scans: 0\npages: 0 removed, 0 remain, 0 scanned (100.00% of total)\ntuples: 0 removed, 0 remain, 0 are dead but not yet removable\nremovable cutoff: 2336, which was 0 XIDs old when operation ended\nnew relfrozenxid: 2336, which is 1140 XIDs ahead of previous value\nfrozen: 0 pages from table (100.00% of total) had 0 tuples frozen\nindex scan not needed: 0 pages from table (100.00% of total) had 0 dead item identifiers removed\navg read rate: 62.500 MB/s, avg write rate: 0.000 MB/s\nbuffer usage: 25 hits, 1 misses, 0 dirtied\nWAL usage: 1 records, 0 full page images, 188 bytes\nsystem usage: CPU: user: 0.00 s, system: 0.00 s, elapsed: 0.00 s",
+      "durationMs": 446
+    },
+    {
+      "id": "UI06a",
+      "title": "UI06a: ui-tick (5 seconds) across the window",
+      "status": "pass",
+      "detail": "POST at 2026-10-23T08:01:27.379Z; last tick on 15 2026-10-23 08:04:55.950982+00, first on 17 2026-10-23 08:05:48.325306+00; gap 52.4 s = about 9 runs never started; 40 ticks on 17 so far (median gap 5.01 s); first new tick -28 s after UI03 saw it healthy",
+      "measurements": {
+        "ticks_old": 81,
+        "ticks_new": 40,
+        "tick_gap_s": 52.4,
+        "tick_runs_missed": 9,
+        "tick_median_gap_new_s": 5.01,
+        "last_old_after_post_s": 208.6,
+        "first_new_after_healthy_s": -28
+      },
+      "durationMs": 143373
+    },
+    {
+      "id": "UI06b",
+      "title": "UI06b: ui-minute ('* * * * *') across the window",
+      "status": "pass",
+      "detail": "last on 15 2026-10-23 08:05:00.171887+00, first on 17 2026-10-23 08:07:00.179721+00; gap 120.0 s = about 1 minutes skipped; 3 runs on 17",
+      "measurements": {
+        "minute_old": 7,
+        "minute_new": 3,
+        "minute_gap_s": 120
+      },
+      "durationMs": 143373
+    },
+    {
+      "id": "UI06c",
+      "title": "UI06c: cron.job_run_details around the window",
+      "status": "info",
+      "detail": "since POST-60s: ui-minute succeeded=8, ui-tick succeeded=94; non-succeeded rows overall 0; rows started inside the tick gap: succeeded=2",
+      "measurements": {
+        "non_succeeded_runs": 0,
+        "runs_in_gap": 2
+      },
+      "evidence": "{\n \"byStatus\": [\n  {\n   \"jobname\": \"ui-minute\",\n   \"status\": \"succeeded\",\n   \"n\": 8,\n   \"first\": \"2026-10-23 08:01:00.033179+00\",\n   \"last\": \"2026-10-23 08:09:00.071357+00\"\n  },\n  {\n   \"jobname\": \"ui-tick\",\n   \"status\": \"succeeded\",\n   \"n\": 94,\n   \"first\": \"2026-10-23 08:00:29.928697+00\",\n   \"last\": \"2026-10-23 08:09:14.240051+00\"\n  }\n ],\n \"failures\": [],\n \"inGap\": [\n  {\n   \"status\": \"succeeded\",\n   \"n\": 2\n  }\n ]\n}",
+      "durationMs": 143374
+    },
+    {
+      "id": "UI06d",
+      "title": "UI06d: pgmq on the new major",
+      "status": "pass",
+      "detail": "40/40 new-major ticks sent and read (archived 60, deleted 60); direct send 364, read 364, archive true; metrics length 0, total 364",
+      "measurements": {
+        "new_ticks": 40,
+        "new_ticks_moved": 40,
+        "direct_round_trip": "ok"
+      },
+      "durationMs": 143374
+    },
+    {
+      "id": "UI99",
+      "title": "UI99: project deleted and gone from the listing",
+      "status": "pass",
+      "detail": "DELETE 200; absent from GET /projects after 0 s",
+      "measurements": {
+        "delete_status": 200,
+        "gone_from_listing_s": 0
+      },
+      "durationMs": 1346
+    }
+  ]
+}
