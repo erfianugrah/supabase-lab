@@ -12,6 +12,167 @@ means the source named in the module header; "measured" means the artifact.
 DC08 is the exception to that vantage: its clients run in the project's
 region (section below).
 
+## 2026-10-27 - DC18 recovery after a write stall under a fixed rate, DC19 bursts against the gateway's 503 overflow (two runs)
+
+Harness: lab commit af374bd plus the uncommitted DC18 and DC19 modules and
+`lib/oha.ts` (run 2 also has DC18's drain column, added between the runs).
+Two Pro-org projects in ap-southeast-1, one per run, run one after the
+other from this lab's Mac in Singapore (10 cores) with `caffeinate -is` (no
+host sleep inside either run); each deleted by its own DC99 (DELETE 200).
+oha 1.16.0 (read locally, not in the artifact).
+
+- Run 1: created `small` (pool 30),
+  `out/2026-10-27/run-2026-10-27T03-32-49-289Z.json` (12 results), 03:32:49
+  to 03:59:24 UTC; PostgreSQL 17.11 (DC18a).
+- Run 2: created `4xlarge` (`PVLAB_DC_SIZE=4xlarge`, pool 70 in DC18's
+  `pool_max`), DC18 arms control and lock only at `PVLAB_DC18_RATE=1500`,
+  DC19 steps 3000, 6000, 10000, 20000,
+  `out/2026-10-27/run-2026-10-27T04-00-57-062Z.json` (8 results), 04:00:57
+  to 04:21:07 UTC; Postgres version not recorded (run 2 has no DC18a).
+
+### DC18 - does Data API latency come back after a write stall at a fixed rate?
+
+Question: under a steady request rate, when a short write stall (a lock, a
+batch UPDATE, both sent through the Management API's SQL endpoint, outside
+the Data API) ends, does Data API latency come back once the stall is over,
+or does the queue it built outlive it? The second reading is what the
+pool-wait CPU cost in PostgREST issue #5336
+(https://github.com/PostgREST/postgrest/issues/5336) would predict: its
+repro lost throughput from 4 PostgREST cores up with 80 requests waiting on
+`db-pool` 20.
+
+Method: `oha -q RATE -c 1024 -t 30s -z 270s` GET point reads on `dc_items`
+(anon key): 60 s before the stall, then the stall (30 s for control and
+lock, the UPDATE's own length for batch, 54.6 s), then the rest of the 270
+s. Every answered request is recorded (`lib/oha.ts`; client-side errors are
+counted, not timed); 5 s buckets of 2xx per second by end time, and p50/p95
+of the requests sent in each bucket. Arms: control (sleep), lock (`access
+exclusive` on `dc_items` held 30 s), batch (one UPDATE incrementing a
+bigint column on every row of `dc18_users`, 2,000,000 rows, 204 MB, a table
+no request reads; run 1 only). Recovery: the start of the first 5 s bucket
+after the stall end with 2xx per second at least 0.9 x RATE and p50 at most
+max(2 x pre p50, pre p50 + 50 ms), so 5 s resolution. oha's rate limiter
+sends the requests it owes once a slot frees, so after a stall the client
+runs at its 1024-in-flight cap until it has caught up; the backlog over
+(drain rate - RATE) is the derived figure the recovery time is checked
+against.
+
+| run, size, rate | arm | stall | pre p50 | worst bucket (p50 of requests sent then; 2xx/s ended then) | 2xx/s after the stall, before recovery | recovery bucket after stall end | statuses (pre / stall / post) |
+|---|---|---|---|---|---|---|---|
+| 1, Small, 500 | control | none, 30 s | 29 ms | p50 35 ms; 500.6 | - | first bucket (5 s) | 200:30001 / 200:15001 / 200:89999 |
+| 1, Small, 500 | lock | 30.1 s | 27 ms | p50 22093 ms of the 60 sent 5 to 10 s into the lock; 0 | 718 to 868.8 over 9 buckets (no drain column in run 1; 815.2 median over the code's 7-bucket drain window, from `evidence`) | 44.9 s | 200:29889 500:45 / 200:1003 500:225 / 200:103527 |
+| 1, Small, 500 | batch | 54.6 s (the UPDATE) | 28 ms | p50 43 ms; 529 | - | first bucket (0.4 s) | 200:29946 / 200:27318 / 200:77682 |
+| 2, 4XL, 1500 | control | none, 30 s | 23 ms | p50 37 ms; 1500.8 | - | first bucket (5 s) | 200:90003 / 200:45002 / 200:269995 |
+| 2, 4XL, 1500 | lock | 30.2 s | 24 ms | p50 21816 ms of the 140 sent 5 to 10 s into the lock; 0 | 3367.2 to 4018.6 over 4 buckets; 3996 the median of the code's 2-bucket drain window | 19.8 s | 200:89733 500:152 / 200:1055 500:486 / 200:313138 |
+
+- No queue collapse on either size (drain below the arrival rate): after
+  the lock, Small served 718 to 868.8 2xx per second against 500 arriving,
+  at p50 1174 to 1293 ms, and 4XL 3367.2 to 4018.6 against 1500, at p50 245
+  to 261 ms. Small's overlaps the low end of DC04b's closed-loop range (825
+  to 1020 req/s, a different project in ap-northeast-2), below its c=1024
+  figure of 1020. 4XL's is what it drained with the client at its 1024 cap
+  and at most 2 of 71 `authenticator` backends `active` in any drain
+  sample; whether a
+  higher cap drains faster, and where the 250 ms was spent, was not
+  measured.
+- The recovery times fit the client's backlog. Small: about 30 s x 500 owed
+  over about 830 - 500 a second is about 45 s, measured 44.9 s (recovery
+  bucket p50 32 ms, 613.4 2xx per second; 27 ms one bucket later); 4XL:
+  about 30 s x 1500 over about 4000 - 1500 is about 18 s, measured 19.8 s
+  (p50 23 ms). Derived, not separated from other causes.
+- During the first 25 s of the lock: 0 2xx per second; in its last bucket
+  21.8 (Small) and 9.4 (4XL). 500s at 6 to 12 per second on Small and 14 to
+  28 on 4XL, the rate anon's 3 s statement timeout over pool 30 or 70
+  predicts (DC03a; bodies not recorded). `pgrst_db_pool_waiting` read 962
+  (Small, available 14 of 30 in the same snapshot) and 1024 (4XL, available
+  0 of 70) after the stall started; `authenticator` samples during the lock
+  read 30 active of 31 (Small) and 68 to 70 active of 71 (4XL); one 4XL
+  sample, 12.2 s into the lock, also read 1 `idle in transaction
+  (aborted)` (DC06 saw none; whether a later request met it as 25P02 was
+  not checked, and the post-lock statuses hold no non-200). The drain-phase
+  pool series is not published, and no Small sample after the lock had an
+  `active` backend (idle 14 to 29 and idle in transaction 2 to 17, of 31),
+  so it is not shown that requests waited for a connection during the
+  drain.
+- The batch arm slowed reads on another table a little and did not cut
+  throughput: p50 34 to 43 ms during the 54.6 s UPDATE of 2,000,000 rows
+  against 28 ms before, 2xx per second at the rate, pool waiting at most 4.
+- Client-side: 297 timeouts and 15 `Network is unreachable (os error 51)`
+  in run 1's lock arm, 55 os error 51 in its batch arm, 436 timeouts in run
+  2's lock arm; client load1 at most 5.6 (run 1 control arm; 4.2 to 4.8 in
+  the other arms) on 10 cores.
+
+Reading: on Small and on 4XL, PostgREST drained the backlog after a 30 s
+lock faster than the arrival rate (718 to 868.8 against 500; 3367.2 to
+4018.6 against 1500), so the stall cost a backlog that cleared on its own.
+Issue #5336's collapse was not reproduced here. Its repro had 80 requests
+waiting on `db-pool` 20 (4 per connection) and lost throughput from 4
+PostgREST cores up; DC18's lock had up to 1024 waiting on 70 (4XL) and 962
+on 30 (Small). PostgREST's own core count on these instances was not read.
+8XL and above, a client cap above 1024, an open loop without a cap, and
+client retries were not run.
+
+### DC19 - when does the gateway answer 503 "reset reason: overflow"?
+
+Question: how many requests can be in flight to one project before the API
+gateway answers 503 `upstream connect error or disconnect/reset before
+headers. reset reason: overflow`, Envoy's answer when an upstream circuit
+breaker is full? Envoy's cluster breakers default to 1024 each for
+max_connections, max_pending_requests and max_requests
+(https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/cluster/v3/circuit_breaker.proto,
+read 2026-10-27); the gateway's own values are not readable.
+
+Method: `db_pool_acquisition_timeout` PATCHed to 60 (200; restart line 1.3
+s (run 1) and 0.7 s (run 2) after the PATCH), so requests queued for the
+pool wait 60 s inside PostgREST before PGRST003; one oha run per step of K
+`POST /rpc/dc_sleep_xl {"s": 1}` sent at once (anon key) over HTTP/2,
+ceil(K / 100) connections with K spread over them (100 streams each from
+K=500; 3 x 84 at 250), client timeout 20 s; three HTTP/1.1 probes 3 s in.
+K is what was sent at once; how many were in flight at the gateway was not
+measured (Cloudflare terminates the HTTP/2 connections).
+
+| run, size | K | answered (all 200) | within 2 s | 503 | unanswered at 20 s | authenticator 5 s in |
+|---|---|---|---|---|---|---|
+| 1, Small | 250 | 250 | 30 | 0 | 0 | 13 active of 31 |
+| 1, Small | 500 | 500 | 30 | 0 | 0 | 30 active of 31 |
+| 1, Small | 1000 | 569 | 30 | 0 | 431 | 30 active of 31 |
+| 1, Small | 1500 | 568 | 30 | 0 | 932 | 30 active of 31 |
+| 1, Small | 2000 | 569 | 30 | 0 | 1431 | 30 active of 31 |
+| 1, Small | 3000 | 569 | 0 | 0 | 2431 | 30 active of 31 |
+| 2, 4XL | 3000 | 1329 | 70 | 0 | 1671 | 69 active of 71 |
+| 2, 4XL | 6000 | 1287 | 31 | 0 | 4713 | 68 active of 71 |
+| 2, 4XL | 10000 | 1132 | 41 | 0 | 8868 | 68 active of 71 |
+| 2, 4XL | 20000 | 966 | 0 | 0 | 19034 | 68 active of 71 |
+
+- No 503 at any step, up to K = 20,000 requests sent at once from one
+  client. Every answer was a 200: 569 in the 20 s at every Small step from
+  1000 (about 30 one-second sleeps a second), and on 4XL 1329 at 3000
+  falling to 966 at 20000; the rest were unanswered when the client gave up.
+- Where the unanswered requests waited (Cloudflare, the gateway, PostgREST's
+  queue) is not visible from the client. The fall on 4XL from 1329 to 966
+  fits both the time oha took to open up to 200 connections and a slower
+  PostgREST under more waiters; not separated.
+- Reading: with the pool busy (30 active of 31, 68 to 69 active of 71) and
+  every answer a 200, the gateway did not refuse; whether the unanswered
+  requests were queued in PostgREST is not visible. A PostgREST that
+  answers slowly while most pool connections sit idle is a different shape:
+  a breaker that counts upstream connections or pending connection requests
+  could fill there and not here (reasoned from Envoy's breaker definitions,
+  not measured). Not run: a slow PostgREST with free pool slots, other
+  regions, other clients.
+
+### Not run
+
+- DC18 on 8XL or above, with a client cap above 1024, without a cap, with
+  retries, or with a stall on a table the reads use only partly; DC18's
+  batch arm on 4XL.
+- DC19 against a slow PostgREST with free pool connections, and from more
+  than one client vantage.
+
+### Cost
+
+Two Pro-org projects: Small for about 27 minutes, 4XL for about 20 minutes.
+
 ## 2026-10-26 - DC16 Realtime pool on a project created at 2XL, DC17 the gateway's long-request timeout (one run each)
 
 Harness: lab commit adc597c plus the uncommitted DC16 and DC17 modules (and

@@ -1,0 +1,199 @@
+{
+  "startedAt": "2026-10-27T04:00:57.062Z",
+  "finishedAt": "2026-10-27T04:21:07.761Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "data-api-capacity",
+  "labCommit": "af374bd",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "DC18",
+      "title": "control arm: 1500 req/s, at most 1024 in flight, stall at 60 s",
+      "status": "info",
+      "detail": "stall none (sleep), 30 s; oha 1495 req/s, success 1, client errors none; pre-stall p50 23 ms, 2xx/s 1500.6; worst bucket 149.997 s p50 37 ms 2xx/s 1500.8; recovery 5 s after the stall ended, median 2xx/s while draining -1 (0 buckets); statuses pre 200:90003, stall 200:45002, post 200:269995; pool waiting max after stall start 3 (available 27 of 70); healthy 5 s after the load stopped",
+      "measurements": {
+        "arm": "control",
+        "rate": 1500,
+        "max_in_flight": 1024,
+        "stall_s": 30,
+        "stall_status": 0,
+        "oha_rps": 1495,
+        "success_rate": 1,
+        "client_errors": "none",
+        "pre_p50_ms": 23,
+        "pre_ok_per_s": 1500.6,
+        "worst_p50_ms": 37,
+        "worst_bucket_s": 149.997,
+        "recovery_s": 5,
+        "drain_ok_per_s": -1,
+        "drain_buckets": 0,
+        "statuses_pre": "200:90003",
+        "statuses_stall": "200:45002",
+        "statuses_post": "200:269995",
+        "pool_waiting_max": 3,
+        "pool_available_at_waiting_max": 27,
+        "pool_max": 70,
+        "healthy_after_load_s": 5,
+        "client_load1_max": 4.2
+      },
+      "evidence": "5 s buckets (t from stall start): -60.003s ok/s 1487.6 other/s 0 sent/s 1499.8 p50 33 p95 1145 | -55.003s ok/s 1498.8 other/s 0 sent/s 1500 p50 27 p95 60 | -50.003s ok/s 1504.4 other/s 0 sent/s 1500 p50 25 p95 54 | -45.003s ok/s 1500.2 other/s 0 sent/s 1500 p50 25 p95 52 | -40.003s ok/s 1500.4 other/s 0 sent/s 1499.6 p50 24 p95 39 | -35.003s ok/s 1500.6 other/s 0 sent/s 1500.4 p50 24 p95 36 | -30.003s ok/s 1501.2 other/s 0 sent/s 1500 p50 24 p95 38 | -25.003s ok/s 1499.2 other/s 0 sent/s 1500 p50 23 p95 37 | -20.003s ok/s 1498.8 other/s 0 sent/s 1500 p50 23 p95 38 | -15.003s ok/s 1501.2 other/s 0 sent/s 1500 p50 23 p95 37 | -10.003s ok/s 1500.6 other/s 0 sent/s 1500 p50 23 p95 38 | -5.003s ok/s 1497.8 other/s 0 sent/s 1500 p50 23 p95 37 | -0.0030000000000001137s ok/s 1502.6 other/s 0 sent/s 1500 p50 23 p95 37 | 4.997s ok/s 1497.8 other/s 0 sent/s 1500 p50 24 p95 38 | 9.997s ok/s 1499.8 other/s 0 sent/s 1500 p50 23 p95 36 | 14.997s ok/s 1501.6 other/s 0 sent/s 1500 p50 23 p95 38 | 19.997s ok/s 1499.4 other/s 0 sent/s 1500 p50 24 p95 37 | 24.997s ok/s 1500.2 other/s 0 sent/s 1500 p50 24 p95 38 | 29.997s ok/s 1499.8 other/s 0 sent/s 1500 p50 24 p95 37 | 34.997s ok/s 1500.2 other/s 0 sent/s 1500 p50 24 p95 38 | 39.997s ok/s 1500 other/s 0 sent/s 1500 p50 23 p95 36 | 44.997s ok/s 1495.6 other/s 0 sent/s 1500 p50 23 p95 39 | 49.997s ok/s 1503 other/s 0 sent/s 1500 p50 23 p95 36 | 54.997s ok/s 1500.6 other/s 0 sent/s 1500 p50 23 p95 35 | 59.997s ok/s 1502 other/s 0 sent/s 1500 p50 23 p95 35 | 64.997s ok/s 1496.4 other/s 0 sent/s 1500 p50 24 p95 37 | 69.997s ok/s 1499.8 other/s 0 sent/s 1500 p50 23 p95 37 | 74.997s ok/s 1503.2 other/s 0 sent/s 1500 p50 23 p95 36 | 79.997s ok/s 1498.4 other/s 0 sent/s 1500 p50 24 p95 38 | 84.997s ok/s 1500.4 other/s 0 sent/s 1500 p50 24 p95 39 | 89.997s ok/s 1499.2 other/s 0 sent/s 1500 p50 24 p95 39 | 94.997s ok/s 1501.6 other/s 0 sent/s 1500 p50 24 p95 36 | 99.997s ok/s 1497 other/s 0 sent/s 1500 p50 26 p95 41 | 104.997s ok/s 1498.4 other/s 0 sent/s 1500 p50 31 p95 53 | 109.997s ok/s 1503.2 other/s 0 sent/s 1500 p50 33 p95 55 | 114.997s ok/s 1496 other/s 0 sent/s 1500 p50 31 p95 52 | 119.997s ok/s 1502.2 other/s 0 sent/s 1500 p50 31 p95 50 | 124.997s ok/s 1501.4 other/s 0 sent/s 1500 p50 32 p95 53 | 129.997s ok/s 1495.8 other/s 0 sent/s 1500 p50 31 p95 50 | 134.997s ok/s 1502 other/s 0 sent/s 1499.6 p50 33 p95 55 | 139.997s ok/s 1500.8 other/s 0 sent/s 1500.4 p50 33 p95 55 | 144.997s ok/s 1498 other/s 0 sent/s 1500 p50 35 p95 61 | 149.997s ok/s 1500.8 other/s 0 sent/s 1500 p50 37 p95 63 | 154.997s ok/s 1500 other/s 0 sent/s 1500 p50 35 p95 58 | 159.997s ok/s 1499.8 other/s 0 sent/s 1500 p50 34 p95 55 | 164.997s ok/s 1496.8 other/s 0 sent/s 1500 p50 36 p95 60 | 169.997s ok/s 1506.2 other/s 0 sent/s 1500 p50 35 p95 58 | 174.997s ok/s 1498 other/s 0 sent/s 1500 p50 33 p95 54 | 179.997s ok/s 1500.8 other/s 0 sent/s 1500 p50 33 p95 56 | 184.997s ok/s 1496.6 other/s 0 sent/s 1500 p50 33 p95 57 | 189.997s ok/s 1503.4 other/s 0 sent/s 1500 p50 32 p95 54 | 194.997s ok/s 1497 other/s 0 sent/s 1500 p50 33 p95 57 | 199.997s ok/s 1502.8 other/s 0 sent/s 1500 p50 34 p95 57 | 204.997s ok/s 1498 other/s 0 sent/s 1500 p50 34 p95 58 | 209.997s ok/s 12.6 other/s 0 sent/s 0.2 p50 35 p95 35 || authenticator (t from stall start): -59.9s idle:2 | -54.7s idle:30 | -49.7s idle:31 | -44.6s idle:31 | -39.5s idle:30 idle in transaction:1 | -34.2s idle:31 | -29.1s idle:31 | -24s idle:31 | -18.8s idle:31 | -13.6s idle:31 | -8.5s idle:31 | -3.4s idle:31 | 1.7s idle:31 | 6.8s idle:30 idle in transaction:1 | 12s idle:31 | 17.1s active:1 idle:30 | 22.2s idle:30 idle in transaction:1 | 27.3s idle:31 | 32.5s idle:30 idle in transaction:1 | 37.6s idle:31 | 42.7s idle:30 idle in transaction:1 | 47.8s idle:30 idle in transaction:1 | 52.9s idle:31 | 58s idle:31 | 63.2s idle:29 idle in transaction:2 | 68.3s idle:30 idle in transaction:1 | 73.4s idle:30 idle in transaction:1 | 78.5s idle:31 | 83.6s idle:31 | 88.8s idle:31 | 93.9s active:1 idle:30 | 99.2s idle:31 | 104.3s idle:31 | 109.4s idle:31 | 114.5s idle:31 | 119.6s idle:30 idle in transaction:1 | 125.3s idle:30 idle in transaction:1 | 130.4s idle:31 | 135.8s idle:30 idle in transaction:1 | 141s idle:29 idle in transaction:2 | 146.2s idle:31 | 151.3s idle:31 | 156.5s idle:31 | 161.6s idle:31 | 166.7s idle:30 idle in transaction:1 | 171.9s active:1 idle:28 idle in transaction:2 | 177s idle:31 | 182.1s idle:29 idle in transaction:2 | 187.3s idle:31 | 192.4s idle:29 idle in transaction:2 | 197.5s active:1 idle:27 idle in transaction:3 | 202.6s idle:31 | 207.7s idle:29 idle in transaction:2",
+      "durationMs": 732651
+    },
+    {
+      "id": "DC18",
+      "title": "lock arm: 1500 req/s, at most 1024 in flight, stall at 60 s",
+      "status": "info",
+      "detail": "stall lock query 201, 30.2 s; oha 1498 req/s, success 0.999, client errors timeout:436; pre-stall p50 24 ms, 2xx/s 1499.8; worst bucket 4.999000000000002 s p50 21816 ms 2xx/s 0; recovery 19.8 s after the stall ended, median 2xx/s while draining 3996 (2 buckets); statuses pre 200:89733 500:152, stall 200:1055 500:486, post 200:313138; pool waiting max after stall start 1024 (available 0 of 70); healthy 4 s after the load stopped",
+      "measurements": {
+        "arm": "lock",
+        "rate": 1500,
+        "max_in_flight": 1024,
+        "stall_s": 30.2,
+        "stall_status": 201,
+        "oha_rps": 1498,
+        "success_rate": 0.999,
+        "client_errors": "timeout:436",
+        "pre_p50_ms": 24,
+        "pre_ok_per_s": 1499.8,
+        "worst_p50_ms": 21816,
+        "worst_bucket_s": 4.999000000000002,
+        "recovery_s": 19.8,
+        "drain_ok_per_s": 3996,
+        "drain_buckets": 2,
+        "statuses_pre": "200:89733 500:152",
+        "statuses_stall": "200:1055 500:486",
+        "statuses_post": "200:313138",
+        "pool_waiting_max": 1024,
+        "pool_available_at_waiting_max": 0,
+        "pool_max": 70,
+        "healthy_after_load_s": 4,
+        "client_load1_max": 4.6
+      },
+      "evidence": "5 s buckets (t from stall start): -60.001s ok/s 1489.2 other/s 0 sent/s 1499.8 p50 26 p95 1181 | -55.001s ok/s 1502.6 other/s 0 sent/s 1500 p50 24 p95 37 | -50.001s ok/s 1499.2 other/s 0 sent/s 1499.6 p50 25 p95 40 | -45.001s ok/s 1501 other/s 0 sent/s 1500.4 p50 24 p95 36 | -40.001s ok/s 1500.8 other/s 0 sent/s 1500 p50 24 p95 34 | -35.001s ok/s 1499.8 other/s 0 sent/s 1500 p50 24 p95 37 | -30.000999999999998s ok/s 1498.2 other/s 0 sent/s 1500 p50 24 p95 41 | -25.000999999999998s ok/s 1501.2 other/s 0 sent/s 1500 p50 24 p95 38 | -20.000999999999998s ok/s 1499.8 other/s 0 sent/s 1500 p50 24 p95 37 | -15.000999999999998s ok/s 1501.2 other/s 0 sent/s 1500 p50 24 p95 37 | -10.000999999999998s ok/s 1499 other/s 0 sent/s 1500.2 p50 23 p95 35 | -5.000999999999998s ok/s 1454.6 other/s 0 sent/s 1476.8 p50 24 p95 44 | -0.0009999999999976694s ok/s 0 other/s 14 sent/s 101.4 p50 17893 p95 29879 | 4.999000000000002s ok/s 0 other/s 28 sent/s 28 p50 21816 p95 24900 | 9.999000000000002s ok/s 0 other/s 18.2 sent/s 18.2 p50 18195 p95 18950 | 14.999000000000002s ok/s 0 other/s 23.8 sent/s 23.8 p50 12819 p95 15844 | 19.999000000000002s ok/s 0 other/s 28 sent/s 28 p50 6954 p95 9934 | 24.999000000000002s ok/s 9.4 other/s 15.6 sent/s 47.6 p50 1103 p95 3892 | 29.999000000000002s ok/s 3439.4 other/s 0 sent/s 3504 p50 245 p95 457 | 34.999s ok/s 4018.6 other/s 0 sent/s 4018.6 p50 253 p95 296 | 39.999s ok/s 3996 other/s 0 sent/s 3996 p50 261 p95 301 | 44.999s ok/s 3367.2 other/s 0 sent/s 3170.2 p50 251 p95 294 | 49.999s ok/s 1499.8 other/s 0 sent/s 1500 p50 23 p95 34 | 54.999s ok/s 1499.8 other/s 0 sent/s 1500 p50 23 p95 35 | 59.999s ok/s 1500.4 other/s 0 sent/s 1500.2 p50 24 p95 45 | 64.999s ok/s 1498.8 other/s 0 sent/s 1499.8 p50 23 p95 36 | 69.999s ok/s 1500.8 other/s 0 sent/s 1500.2 p50 24 p95 37 | 74.999s ok/s 1500.6 other/s 0 sent/s 1499.8 p50 23 p95 35 | 79.999s ok/s 1500.4 other/s 0 sent/s 1500 p50 23 p95 35 | 84.999s ok/s 1500 other/s 0 sent/s 1499.8 p50 23 p95 36 | 89.999s ok/s 1499.2 other/s 0 sent/s 1500.2 p50 23 p95 37 | 94.999s ok/s 1500.6 other/s 0 sent/s 1500 p50 23 p95 36 | 99.999s ok/s 1500.8 other/s 0 sent/s 1500 p50 23 p95 34 | 104.999s ok/s 1498.2 other/s 0 sent/s 1500 p50 23 p95 36 | 109.999s ok/s 1499.6 other/s 0 sent/s 1500 p50 24 p95 38 | 114.999s ok/s 1501.4 other/s 0 sent/s 1500 p50 23 p95 36 | 119.999s ok/s 1498.2 other/s 0 sent/s 1500 p50 23 p95 36 | 124.999s ok/s 1502.8 other/s 0 sent/s 1500 p50 23 p95 35 | 129.999s ok/s 1498 other/s 0 sent/s 1500 p50 25 p95 39 | 134.999s ok/s 1501 other/s 0 sent/s 1500 p50 24 p95 36 | 139.999s ok/s 1499.2 other/s 0 sent/s 1499.6 p50 23 p95 37 | 144.999s ok/s 1500.2 other/s 0 sent/s 1500.4 p50 24 p95 40 | 149.999s ok/s 1499.8 other/s 0 sent/s 1500.2 p50 23 p95 36 | 154.999s ok/s 1500 other/s 0 sent/s 1499.8 p50 25 p95 41 | 159.999s ok/s 1497.6 other/s 0 sent/s 1500 p50 26 p95 42 | 164.999s ok/s 1500.4 other/s 0 sent/s 1500.2 p50 27 p95 41 | 169.999s ok/s 1497.6 other/s 0 sent/s 1499.8 p50 26 p95 41 | 174.999s ok/s 1503.6 other/s 0 sent/s 1500.2 p50 27 p95 43 | 179.999s ok/s 1498.4 other/s 0 sent/s 1500 p50 27 p95 42 | 184.999s ok/s 1502 other/s 0 sent/s 1500 p50 27 p95 41 | 189.999s ok/s 1499.2 other/s 0 sent/s 1499.8 p50 27 p95 44 | 194.999s ok/s 1499.2 other/s 0 sent/s 1500 p50 27 p95 42 | 199.999s ok/s 1495.8 other/s 0 sent/s 1500 p50 27 p95 44 | 204.999s ok/s 1496.2 other/s 0 sent/s 1500 p50 30 p95 51 | 209.999s ok/s 18.4 other/s 0 sent/s 0.2 p50 33 p95 33 || authenticator (t from stall start): -59.9s idle:31 | -54.8s idle:31 | -49.6s idle:30 idle in transaction:1 | -44.5s active:2 idle:28 idle in transaction:1 | -39.4s active:1 idle:28 idle in transaction:2 | -34.3s idle:29 idle in transaction:2 | -29.2s active:1 idle:30 | -24s idle:31 | -18.8s idle:31 | -13.7s idle:30 idle in transaction:1 | -8.6s idle:31 | -3.5s idle:29 idle in transaction:2 | 1.9s active:70 idle:1 | 7s active:70 idle:1 | 12.2s active:68 idle:2 idle in transaction (aborted):1 | 17.3s active:70 idle:1 | 22.4s active:70 idle:1 | 27.5s active:70 idle:1 | 32.7s idle:65 idle in transaction:6 | 38s idle:70 idle in transaction:1 | 43.1s active:2 idle:67 idle in transaction:2 | 48.2s active:2 idle:67 idle in transaction:2 | 53.3s idle:67 idle in transaction:4 | 58.5s active:1 idle:69 idle in transaction:1 | 63.7s idle:70 idle in transaction:1 | 68.8s idle:71 | 74s idle:71 | 79.1s idle:68 idle in transaction:3 | 84.4s idle:68 idle in transaction:3 | 89.5s idle:69 idle in transaction:2 | 94.7s idle:70 idle in transaction:1 | 99.9s idle:71 | 105s idle:70 idle in transaction:1 | 110.1s active:1 idle:70 | 115.3s idle:71 | 120.4s idle:71 | 125.7s active:1 idle:70 | 130.8s idle:70 idle in transaction:1 | 135.9s idle:71 | 141.1s active:1 idle:70 | 146.2s idle:70 idle in transaction:1 | 151.3s idle:70 idle in transaction:1 | 156.5s idle:70 idle in transaction:1 | 161.6s idle:71 | 166.8s active:1 idle:69 idle in transaction:1 | 171.9s idle:70 idle in transaction:1 | 177s active:2 idle:69 | 182.2s idle:70 idle in transaction:1 | 187.3s idle:69 idle in transaction:2 | 192.4s idle:71 | 197.5s active:2 idle:69 | 202.7s idle:71 | 208.3s idle:69 idle in transaction:2",
+      "durationMs": 732651
+    },
+    {
+      "id": "DC19a",
+      "title": "Acquisition timeout 60 s",
+      "status": "info",
+      "detail": "PATCH 200; restart line 0.7 s after; read back db_pool null, acquisition timeout 60; healthy after 5 s",
+      "measurements": {
+        "patch_status": 200,
+        "restart_delay_s": 0.7,
+        "db_pool": "null",
+        "acquisition_timeout": "60"
+      },
+      "durationMs": 476282
+    },
+    {
+      "id": "DC19",
+      "title": "3000 concurrent requests (30 HTTP/2 connections x 100 streams)",
+      "status": "info",
+      "detail": "answered 1329 of 3000: 200:1329; within 2000 ms 200:70; 503 p50 -1 ms (n 0); unanswered 1671 (client errors timeout:1671); authenticator 69 active of 71 5 s in; probes 0/25003ms 200/4565ms 0/25002ms",
+      "measurements": {
+        "k": 3000,
+        "connections": 30,
+        "streams_per_connection": 100,
+        "answered": 1329,
+        "statuses": "200:1329",
+        "fast_statuses": "200:70",
+        "fast_503": 0,
+        "fast_503_share": 0,
+        "p50_503_ms": -1,
+        "unanswered": 1671,
+        "client_errors": "timeout:1671",
+        "authenticator_5s": "69 active of 71",
+        "probes": "0/25003ms 200/4565ms 0/25002ms"
+      },
+      "evidence": "probe: 0 25003 ms client body \"\" headers {}",
+      "durationMs": 476282
+    },
+    {
+      "id": "DC19",
+      "title": "6000 concurrent requests (60 HTTP/2 connections x 100 streams)",
+      "status": "info",
+      "detail": "answered 1287 of 6000: 200:1287; within 2000 ms 200:31; 503 p50 -1 ms (n 0); unanswered 4713 (client errors timeout:4713); authenticator 68 active of 71 5 s in; probes 0/25002ms 0/25001ms 200/23985ms",
+      "measurements": {
+        "k": 6000,
+        "connections": 60,
+        "streams_per_connection": 100,
+        "answered": 1287,
+        "statuses": "200:1287",
+        "fast_statuses": "200:31",
+        "fast_503": 0,
+        "fast_503_share": 0,
+        "p50_503_ms": -1,
+        "unanswered": 4713,
+        "client_errors": "timeout:4713",
+        "authenticator_5s": "68 active of 71",
+        "probes": "0/25002ms 0/25001ms 200/23985ms"
+      },
+      "evidence": "probe: 0 25002 ms client body \"\" headers {}",
+      "durationMs": 476282
+    },
+    {
+      "id": "DC19",
+      "title": "10000 concurrent requests (100 HTTP/2 connections x 100 streams)",
+      "status": "info",
+      "detail": "answered 1132 of 10000: 200:1132; within 2000 ms 200:41; 503 p50 -1 ms (n 0); unanswered 8868 (client errors timeout:8868); authenticator 68 active of 71 5 s in; probes 0/25002ms 0/25002ms 200/10361ms",
+      "measurements": {
+        "k": 10000,
+        "connections": 100,
+        "streams_per_connection": 100,
+        "answered": 1132,
+        "statuses": "200:1132",
+        "fast_statuses": "200:41",
+        "fast_503": 0,
+        "fast_503_share": 0,
+        "p50_503_ms": -1,
+        "unanswered": 8868,
+        "client_errors": "timeout:8868",
+        "authenticator_5s": "68 active of 71",
+        "probes": "0/25002ms 0/25002ms 200/10361ms"
+      },
+      "evidence": "probe: 0 25002 ms client body \"\" headers {}",
+      "durationMs": 476282
+    },
+    {
+      "id": "DC19",
+      "title": "20000 concurrent requests (200 HTTP/2 connections x 100 streams)",
+      "status": "info",
+      "detail": "answered 966 of 20000: 200:966; within 2000 ms none; 503 p50 -1 ms (n 0); unanswered 19034 (client errors timeout:19034); authenticator 68 active of 71 5 s in; probes 0/25001ms 0/25001ms 0/25001ms",
+      "measurements": {
+        "k": 20000,
+        "connections": 200,
+        "streams_per_connection": 100,
+        "answered": 966,
+        "statuses": "200:966",
+        "fast_statuses": "none",
+        "fast_503": 0,
+        "fast_503_share": 0,
+        "p50_503_ms": -1,
+        "unanswered": 19034,
+        "client_errors": "timeout:19034",
+        "authenticator_5s": "68 active of 71",
+        "probes": "0/25001ms 0/25001ms 0/25001ms"
+      },
+      "evidence": "probe: 0 25001 ms client body \"\" headers {}",
+      "durationMs": 476282
+    },
+    {
+      "id": "DC99",
+      "title": "DC99: project deleted and gone from the listing",
+      "status": "pass",
+      "detail": "DELETE 200; absent from GET /projects after 0 s",
+      "measurements": {
+        "delete_status": 200,
+        "gone_from_listing_s": 0
+      },
+      "durationMs": 1758
+    }
+  ]
+}

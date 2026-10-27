@@ -372,7 +372,7 @@ client can poll. See RUNLOG.md; artifacts in `out/2026-09-24/` and
   extension. privatelink-aws T22 carries the same change, not run (needs the
   AWS PrivateLink rig).
 
-## experiments/data-api-capacity - key facts (validated 2026-10-22/23/26, Pro org; DC01-03 ap-southeast-1 Small then Large, DC04 ap-northeast-2 Small then 4XL, DC05-07 ap-northeast-2 Small, DC08 ap-northeast-2 Small then 4XL, in-region clients; DC09 and DC12 ap-southeast-1 Small; DC13 ap-southeast-1 Small to XL to 2XL, DC14 the same project at 2XL, DC15 ap-southeast-1 Small to Large to Small; DC16 ap-southeast-1 created 2XL and created Small; DC17 ap-southeast-1 Small)
+## experiments/data-api-capacity - key facts (validated 2026-10-22/23/26, Pro org; DC01-03 ap-southeast-1 Small then Large, DC04 ap-northeast-2 Small then 4XL, DC05-07 ap-northeast-2 Small, DC08 ap-northeast-2 Small then 4XL, in-region clients; DC09 and DC12 ap-southeast-1 Small; DC13 ap-southeast-1 Small to XL to 2XL, DC14 the same project at 2XL, DC15 ap-southeast-1 Small to Large to Small; DC16 ap-southeast-1 created 2XL and created Small; DC17 ap-southeast-1 Small; DC18-DC19 2026-10-27 ap-southeast-1 created Small and created 4XL)
 
 The Data API's connection pool, what a full pool looks like to a client, the
 pool settings' PATCH, statement timeouts per role, throughput under request
@@ -682,6 +682,36 @@ from the next run on).
   API pool on the project created at 2XL was 70, as after a resize (DC13).
   Not run: XL, 4XL, 8XL at creation; setting `connection_pool` after a
   resize.
+- **A 30 s lock under a fixed request rate cost a backlog that cleared on
+  its own, on Small and on 4XL** (DC18, 2026-10-27, one run per arm,
+  `out/2026-10-27/run-2026-10-27T03-32-49-289Z.json` Small at 500 req/s and
+  `out/2026-10-27/run-2026-10-27T04-00-57-062Z.json` 4XL at 1500, `oha -q
+  RATE -c 1024`, anon point reads). During the first 25 s of the lock 0 2xx
+  per second, and 500s at the rate anon's 3 s statement timeout over the
+  pool predicts (bodies not recorded); `pgrst_db_pool_waiting` peaked at 962
+  and 1024 after the stall started. After it the client sat at its 1024 cap
+  catching up what it owed while the project served 718 to 868.8 (Small)
+  and 3367.2 to 4018.6 (4XL) 2xx per second, above the arrival rate; the
+  first 5 s bucket within the recovery bar (2xx/s at least 0.9 x rate, p50
+  at most pre p50 + 50 ms) started 44.9 s (Small, p50 32 ms) and 19.8 s
+  (4XL, p50 23 ms) after the lock ended, which the backlog over (drain rate
+  - rate) accounts for (derived). No queue collapse (drain below the
+  arrival rate) at either size; the drain-phase pool series is not
+  published and `authenticator` backends were mostly not `active` while
+  draining, and 4XL's drain was measured with the client at its cap. A 54.6
+  s `UPDATE` of 2,000,000 rows on a table no request read slowed reads on
+  Small a little and did not cut throughput (p50 34 to 43 ms against 28
+  ms). Not run: 8XL and above, a cap above 1024, client retries.
+- **No 503 "reset reason: overflow" up to K = 20,000 requests sent at once
+  from one client** (DC19, same two runs; acquisition timeout 60, `POST
+  /rpc/dc_sleep_xl` 1 s over HTTP/2, client timeout 20 s; in flight at the
+  gateway not measured): Small 250 to 3000, 4XL 3000 to 20000; every answer
+  a 200: 569 in the 20 s at every Small step from 1000, and on 4XL 1329 at
+  3000 falling to 966 at 20000; the rest unanswered at 20 s. Envoy's
+  breakers default to 1024
+  (https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/cluster/v3/circuit_breaker.proto);
+  where the unanswered requests waited is not visible, and a slow PostgREST
+  with idle pool connections was not run.
 - Harness: `lib/tier.ts` `readPool` reads the pool four ways at the current
   size; DC13 and DC16 read Realtime through `lib/rt-read.ts`, which imports
   realtime-surface `lib/burst.ts` for its 100-join burst
