@@ -16,7 +16,10 @@ TS := $(shell date +%Y%m%d-%H%M%S)
 # process: PVLAB_DC15_ARM=custom or control, with DC99. DC16 reads Realtime
 # on a project created at PVLAB_DC_SIZE (2xlarge, small control), one
 # project per process, with DC99. DC17 (Small, about 15 minutes) brackets
-# the gateway's long-request timeout, with DC99.
+# the gateway's long-request timeout, with DC99. DC18 (Small, about 20
+# minutes) times recovery after a write stall under a fixed rate; DC19 (about
+# 10 minutes) bursts requests at each step, stopping early once the gateway
+# answers 503 overflow. Both need oha; DC18 also sqlite3.
 ONLY ?= DC01,DC02,DC03,DC99
 
 .PHONY: run clean publish-evidence
