@@ -3170,7 +3170,7 @@ Numbers: `RUNLOG.md`, artifacts `out/2026-10-08/`.
   that also takes UPDATE). Not run under the revoke: M01, D09, O03, T22.
   Run DD05 as `ONLY=DD05,DD99`; W12's `run(ctx, grants)` takes the variant.
 
-## experiments/realtime-surface - key facts (validated 2026-10-10, Pro org, n = 1 per row; RT05 2026-10-22 on Small and 2026-10-26 on 2XL, two reps per burst row; data-api-capacity DC13 2026-10-26, one 100-join burst per size)
+## experiments/realtime-surface - key facts (validated 2026-10-10, Pro org, n = 1 per row; RT05 2026-10-22 on Small and 2026-10-26 on 2XL, two reps per burst row; data-api-capacity DC13 2026-10-26, one 100-join burst per size; RT06 2026-10-28, three projects created Small, Large, Small)
 
 - **Postgres Changes filters and `select` against Postgres's own evaluation**
   (RT01): 19 filters (AND over two and three columns, two conditions on one
@@ -3263,6 +3263,28 @@ Numbers: `RUNLOG.md`, artifacts `out/2026-10-08/`.
   from the creation size and a resize keeps it. The 2026-10-22 RT05 project
   (created with no `desired_instance_size`, then resized to Small) reading 2
   fits the same rule (creation size not read back).
+- **Filtered vs unfiltered Postgres Changes at 5000 joins, and per-user
+  private Broadcast** (RT06, 2026-10-28, `out/2026-10-28/`; S1 and S2 created
+  Small, L created Large, pool as created, `connection_pool` 5; 5000 users
+  inserted into `auth.users` by SQL, tokens minted under the legacy JWT secret
+  and checked against a session token): shape A (one shared public topic,
+  unfiltered INSERT binding, RLS `user_id = auth.uid()`) and shape B (a topic
+  per user, `user_id=eq.<uid>` filter) both got `Too many database timeouts`
+  on Small and neither on Large; it followed the project more than the shape
+  (S1: A 0 and 0, B 84 and 218 of 5000; S2: A 1620, B 1721). The subscription
+  statement ran once per ready channel, shape B 13 to 26 per cent more DB time
+  per channel. 20 rows inserted across users reached their owners only (20 of
+  20, 0 misdelivered) in both shapes; the 20 arrived together after 7256 to
+  9851 ms (Small A), 6666 to 7966 (Small B), 5380 and 5841 (Large A), 4583 and
+  4796 (Large B), and the Postgres Changes poll statement's DB time over the
+  window was 0.80 to 0.88 of shape A's under shape B (inferred: per-row cost
+  scales with all 5000 subscriptions either way). Private Broadcast on
+  `user:<uid>` topics: the `realtime.messages` policy ran 5000 times for 5000
+  joins and 0 times across 2997 to 11999 sends per phase; every message
+  delivered to its user only, p50 12 to 17 ms; send statement 0.134 to 0.24
+  ms per message on Small and 0.09 to 0.148 on Large (batched per 50 ms tick;
+  a statement per message not run); `realtime.messages` one row per message,
+  about 400 bytes each.
 
 ## experiments/auth-providers - key facts (AU01-AU04 2026-10-10, self-provisioned throwaway projects)
 

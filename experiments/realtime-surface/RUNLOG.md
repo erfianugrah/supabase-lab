@@ -1,15 +1,17 @@
 # realtime-surface RUNLOG
 
 Chronological record of what was run. Projects were created on a Pro-plan
-organisation, region ap-southeast-1, default compute (RT05: resized to Small),
+organisation, region ap-southeast-1, default compute (RT05: resized to Small;
+RT06: created at Small or Large),
 no add-ons, and deleted by the module that created them. Org slugs and project refs are not recorded.
 Vantage: a local macOS machine (not in the project's region); the current
 `@supabase/supabase-js` is whatever the installed package.json said at run time
 (RT01a records it), and the old client is the one pinned in this directory's
 `package.json`. Every count is n=1 per row on one project unless a row says
 otherwise (RT05: two reps per burst row, one for its two over-range pool
-probes). Published artifacts: `out/2026-10-10/` and
-`out/2026-10-22/` (redacted, with `.facts.md` beside each).
+probes; RT06: two reps per row on two of its three projects). Published
+artifacts: `out/2026-10-10/`, `out/2026-10-22/`, `out/2026-10-26/` and
+`out/2026-10-28/` (redacted, with `.facts.md` beside each).
 
 Sources for the claims each module is measured against:
 
@@ -450,6 +452,205 @@ join to ready 6208 ms, canary wait 1595 ms, fan-out 1771 ms and teardown
 between bursts. One teardown (pool 20, 500 joins, r1) read -1, no zero
 `realtime.subscription` count within its 90 s wall-clock wait, which a
 sleep in teardown would also give; teardown is not quoted above.
+
+## 2026-10-28 - RT06 (filtered vs unfiltered Postgres Changes at 5000 joins, per-user private Broadcast)
+
+Question: an app gives each user a notification feed. A load test put 5000
+clients on one shared public topic, each with an unfiltered INSERT binding
+on an RLS-protected notifications table (shape A); the app gives each user
+its own channel with one INSERT binding filtered by `user_id=eq.<uid>`
+(shape B). Does shape A measure the app's join cost, what does each shape
+cost per inserted row, and what does private per-user Broadcast cost the
+database per message?
+
+Claims measured against: the Postgres Changes page
+(https://supabase.com/docs/guides/realtime/postgres-changes, "Postgres
+Changes authorizes every event against each subscriber. When you make a
+single change to a table with 100 subscribed users, Realtime performs 100
+authorization checks"), and the authorization page
+(https://supabase.com/docs/guides/realtime/authorization, "Client access
+policies are cached for the duration of the connection. Your database is
+not queried for every Channel message.").
+
+Artifacts, three projects, each created and deleted by RT06 (lab commit
+c2de0d9 plus the uncommitted RT06 module):
+
+| run | artifact | compute at creation | shape reps | Broadcast send reps |
+| --- | --- | --- | --- | --- |
+| S1 | `out/2026-10-28/run-2026-10-28T08-30-00-876Z.json` | Small | 2 per shape | 2 per rate |
+| L | `out/2026-10-28/run-2026-10-28T08-45-04-130Z.json` | Large | 2 per shape | 2 per rate |
+| S2 | `out/2026-10-28/run-2026-10-28T09-01-27-519Z.json` | Small | 1 per shape | 1 per rate |
+
+S1 ran 08:30:00 to 08:44:08 UTC, L 08:45:04 to 09:01:15, S2 09:01:27 to
+09:10:38. Each project was created with `desired_instance_size` (S1 and S2
+`small`, L `large`; `max_connections` read 90 and 160), not resized. Two
+unpublished dev runs at 200 and 300 clients came first (projects deleted,
+HTTP 200 in the local log). A `GET /v1/projects` at 09:10 UTC listed no `rt-*`
+project. S2 exists because S1's node CPU read -1 on every row (the module
+computed each window before the metrics endpoint's cached snapshot had moved
+past it; fixed before L and S2 by an `RT06-cpu` row written at the end).
+
+Setup, the same on all three (RT06-setup): Realtime config as created,
+`postgres_changes_pool` null, `connection_pool` 5, `max_concurrent_users`
+10000, `max_joins_per_second` 2500. 5000 users inserted into `auth.users`
+with one SQL statement (544, 383 and 548 ms). Access tokens minted on the
+orchestrator as HS256 under the legacy JWT secret from `GET
+/v1/projects/{ref}/postgrest`, `sub` = the user id, `role` and `aud`
+`authenticated`. RT06-tokens passed on all three: a minted token and a
+password-grant session token each joined a filtered binding and received
+their own row and not the other's. Table `rt06_notifications` with RLS
+`using (user_id = (select auth.uid()))` for `authenticated`, an index on
+`user_id`. Raw protocol frames (`lib/peruser.ts`): one WebSocket per user,
+one channel per socket, sockets opened at 100 per second, then all 5000
+joins sent at once. Shape A topic `rt06-shared` for every client; shape B
+topic `rt06-n:<uid>` with `filter` `user_id=eq.<uid>`. Both shapes: one
+`INSERT` binding on `public.rt06_notifications`, `private: false`.
+
+Database cost is pg_stat_statements' `total_exec_time` delta over the phase
+for statements not run by the module's own `postgres` sessions; every such
+statement quoted below ran as `supabase_admin`. Node CPU is the metrics
+endpoint's `node_cpu_seconds_total` (2 CPUs reported on Small and on Large),
+whose snapshot moved about once a minute, so a phase's figure is the busy
+share across one or two whole snapshot intervals: coarse, and it includes
+socket opening, delivery and teardown.
+
+### Joins (RT06b)
+
+| run, row | ready of 5000 | `Too many database timeouts` | join to ready p50 / p95 ms | first join to last settled ms | subscription statement calls / ms |
+| --- | --- | --- | --- | --- | --- |
+| S1 A r1 | 5000 | 0 | 2939 / 5591 | 5944 | 5000 / 5180 |
+| S1 B r1 | 4916 | 84 | 3028 / 5706 | 6063 | 4916 / 5750 |
+| S1 A r2 | 5000 | 0 | 2877 / 5391 | 5707 | 5000 / 4841 |
+| S1 B r2 | 4782 | 218 | 3027 / 5690 | 6033 | 4782 / 5828 |
+| S2 A r1 | 3380 | 1620 | 2964 / 5716 | 6269 | 3380 / 3856 |
+| S2 B r1 | 3279 | 1721 | 3085 / 5703 | 6480 | 3279 / 4345 |
+| L A r1 | 5000 | 0 | 2802 / 5285 | 5597 | 2471 + 2529 / 1537 + 1526 |
+| L B r1 | 5000 | 0 | 2955 / 5550 | 5909 | 5000 / 3764 |
+| L A r2 | 5000 | 0 | 2685 / 5227 | 5548 | 5000 / 3131 |
+| L B r2 | 5000 | 0 | 2931 / 5496 | 5837 | 5000 / 3572 |
+
+- The only failure class was `pc_error` `{:error, "Too many database
+  timeouts"}`, and only on Small. It hit both shapes and followed the
+  project more than the shape: on S1 shape A had 0 and 0 and shape B 84
+  and 218; on S2 shape A had 1620 and shape B 1721. Large had none in four
+  bursts. No join error, socket failure or rate-limit reply on any row;
+  5000 of 5000 sockets opened every time.
+- "Subscription statement" is the one `supabase_admin` statement that
+  starts `with candidates as ( select pub.schemaname, pub.tablename from
+  pg_publication_tables pub ...`, run once per ready channel (plus `BEGIN`
+  and `COMMIT`). Its call count equalled the ready count on every row, so
+  a channel that got the timeout left no subscription statement in
+  pg_stat_statements (L A r1 split it over two query ids). Per ready
+  channel (derived, ms over calls): shape A 0.97 and 1.04 ms against shape
+  B 1.17 and 1.22 ms on S1, 1.14 against 1.33 ms on S2, 0.61 and 0.63
+  against 0.71 and 0.75 ms on L. The filtered binding's join took 13 to 26
+  per cent more database time per channel than the unfiltered one on each
+  project and rep pair; join to ready p50 was 89 to 246 ms higher for shape
+  B in each pair.
+- `realtime.subscription` held one row per ready channel in both shapes:
+  shape A 1 distinct `filters` value, shape B one per channel.
+  `realtime_subscription_manager_pub` peaked at 4 connections on every row,
+  Small and Large.
+- Teardown (every socket closed until `realtime.subscription` read 0):
+  14197 to 18442 ms on S1, 16257 and 16364 ms on S2, 4214 to 6177 ms on L.
+
+### Delivery of 20 rows (RT06b)
+
+After a canary row had reached its owner (1 canary on every row), 20 rows
+were inserted in one statement, one each for 20 ready clients spread over
+the fleet. "WAL statement" is the `supabase_admin` statement starting
+`SELECT wal->>$5 as type, wal->>$6 as schema, ...` (the Postgres Changes
+poll), its pg_stat_statements delta over the delivery window.
+
+| run, row | delivered to owner | misdelivered | latency p50 / p95 ms | WAL statement calls / ms |
+| --- | --- | --- | --- | --- |
+| S1 A r1 | 20 of 20 | 0 | 9486 / 9490 | 7 / 9332 |
+| S1 B r1 | 20 of 20 | 0 | 7966 / 7967 | 8 / 7862 |
+| S1 A r2 | 20 of 20 | 0 | 9851 / 9853 | 8 / 9482 |
+| S1 B r2 | 20 of 20 | 0 | 7839 / 7843 | 8 / 7599 |
+| S2 A r1 | 20 of 20 | 0 | 7256 / 7259 | 7 / 7273 |
+| S2 B r1 | 20 of 20 | 0 | 6666 / 6667 | 7 / 6418 |
+| L A r1 | 20 of 20 | 0 | 5841 / 5843 | 8 / 5514 |
+| L B r1 | 20 of 20 | 0 | 4796 / 4797 | 9 / 4409 |
+| L A r2 | 20 of 20 | 0 | 5380 / 5383 | 8 / 5414 |
+| L B r2 | 20 of 20 | 0 | 4583 / 4592 | 8 / 4380 |
+
+- Both shapes delivered each row to its owner and to no one else: 20
+  clients received a row, 0 duplicates, 0 channel errors after ready. Under
+  shape A that is the RLS policy at work, since every client held an
+  unfiltered binding on the same table.
+- Latency is from the INSERT's return on the orchestrator to arrival. The
+  20 rows arrived together (p50 and p95 within 9 ms of each other).
+- The WAL statement's time over the window covers 20 rows plus that
+  window's empty polls. Shape B's was 0.80 to 0.88 of shape A's in each
+  project and rep pair (derived). Inference, not separated by this run: the
+  per-row cost scales with the 5000 subscriptions in both shapes, and the
+  `user_id=eq` filter trims it by 12 to 20 per cent instead of reducing it to
+  the one matching subscriber. The run does not show where inside the
+  statement the filter is applied.
+- Node CPU (RT06-cpu, coarse, whole burst): L shape A 12.6 and 12.4 per
+  cent, shape B 6.8 and 8.6; S2 shape A 14.8, shape B 12.7. S1 not read.
+
+### Private per-user Broadcast (RT06c)
+
+5000 private channels, topic `user:<uid>`, one per user. The
+`realtime.messages` select policy for `authenticated`:
+`extension = 'broadcast' and (select realtime.topic()) = 'user:' || (select
+auth.uid())::text and public.rt06_policy_hit()`, the last a volatile
+function that calls `nextval` on a sequence (not rolled back with the
+authorisation transaction), so the sequence counts policy evaluations.
+Sends: `public.rt06_send_batch(jsonb)`, a plpgsql loop calling
+`realtime.send(payload, 'note', 'user:<uid>', true)` per message, issued
+every 50 ms with that tick's messages on up to 4 pooler sessions, each
+message to the next ready user in turn, for 60 s.
+
+| run | ready of 5000 | join to ready p50 / p95 ms | policy evaluations during joins | `realtime.authorize` statement calls / ms |
+| --- | --- | --- | --- | --- |
+| S1 | 5000 | 905 / 1683 | 5000 | 5000 / 2363 |
+| L | 5000 | 648 / 1220 | 5000 | 5000 / 1612 |
+| S2 | 5000 | 981 / 1825 | 5000 | 5000 / 2395 |
+
+| run, rate, rep | sent | delivered to the intended client | latency p50 / p95 / max ms | send statement ms per message | policy evaluations during sends |
+| --- | --- | --- | --- | --- | --- |
+| S1 50/s r1 | 2998 | 2998 | 14 / 20 / 357 | 0.193 | 0 |
+| S1 200/s r1 | 11990 | 11990 | 16 / 23 / 306 | 0.134 | 0 |
+| S1 50/s r2 | 2999 | 2999 | 14 / 20 / 229 | 0.2 | 0 |
+| S1 200/s r2 | 11999 | 11999 | 16 / 21 / 515 | 0.142 | 0 |
+| S2 50/s r1 | 2997 | 2997 | 14 / 19 / 337 | 0.24 | 0 |
+| S2 200/s r1 | 11995 | 11995 | 17 / 22 / 242 | 0.161 | 0 |
+| L 50/s r1 | 2999 | 2999 | 13 / 18 / 374 | 0.148 | 0 |
+| L 200/s r1 | 11998 | 11998 | 14 / 19 / 481 | 0.09 | 0 |
+| L 50/s r2 | 2999 | 2999 | 12 / 17 / 91 | 0.147 | 0 |
+| L 200/s r2 | 11994 | 11994 | 14 / 20 / 349 | 0.091 | 0 |
+
+- Authorisation ran once per join and not per message: 5000 policy
+  evaluations for 5000 joins on every project, one `realtime.authorize` call
+  per join (0.32 to 0.48 ms each, derived), and 0 evaluations during each
+  of the ten send phases. This agrees with the authorization page.
+- Every message reached its user's channel, none another channel; no send
+  error, no channel error or close. Latency is from the batch being issued
+  on the orchestrator to arrival there, so it includes the pooler round trip.
+- Database cost per message is the send statement's pg_stat_statements time
+  divided by messages. It fell at 200 per second, where each statement
+  carried about four times as many messages; a statement per message (or a
+  trigger per row) was not run. The `supabase_admin` statement time in the
+  same windows was the Postgres Changes poll (127 to 130 calls per phase),
+  not per message.
+- `realtime.messages` grew by one row per message (S1 1146880 to 13246464
+  bytes over 5 partitions across its four phases; L 1155072 to 13205504),
+  about 404 and 402 bytes per row for a payload of a key and a timestamp
+  (derived).
+- Node CPU (coarse): L 2.7, 3.7, 3.3 and 2.4 per cent; S2 4.6 and 2.6 per
+  cent. They do not rise with the send rate: at this resolution the sends
+  are not separable from the idle baseline.
+
+### Not run
+
+A permissive policy under shape A (every client receiving every row); a
+`postgres_changes_pool` other than as created; what a timed-out client does
+next (the raw client never retries); more than one client address; Realtime's
+own CPU; a statement or trigger per message; payloads above a few dozen
+bytes; sizes other than Small and Large.
 
 ## Harness lessons (2026-10-10, unpublished iterations)
 
