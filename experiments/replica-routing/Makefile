@@ -12,7 +12,7 @@
 ROOT := $(abspath ../..)
 TS := $(shell date +%Y%m%d-%H%M%S)
 
-.PHONY: run run-rr02 run-rr03 run-rr04 facts publish list
+.PHONY: run run-rr02 run-rr03 run-rr04 run-rr06 facts publish list
 
 # RR02: re-routing on a lagging or unhealthy replica, non-REST traffic through
 # the load balancer. Same billing shape as RR01; 24 and 33 minutes in the
@@ -51,6 +51,25 @@ run-rr04:
 	@test -n "$(PVLAB_ORG_PRO)" || (echo "PVLAB_ORG_PRO not set" && exit 1)
 	cd $(ROOT) && bun harness/src/run.ts --where local --tests experiments/replica-routing/tests \
 	  --experiment replica-routing --only RR04 --destructive \
+	  --out experiments/replica-routing/evidence/$(TS)
+
+# RR06: same-region pair plus a custom domain: which node serves reads through
+# the custom host, a custom-host token on the load balancer and replica hosts,
+# two clients (Auth on the custom host, data on the load balancer), and a Worker
+# on its own hostname splitting GET/HEAD /rest/v1 to the load balancer. Needs,
+# injected per command:
+#   sx SUPABASE_ACCESS_TOKEN CLOUDFLARE_API_KEY CLOUDFLARE_EMAIL CLOUDFLARE_ACCOUNT_ID -- \
+#     env PVLAB_ORG_PRO=<pro-org-slug> make run-rr06 DOMAIN=<host> WORKER_DOMAIN=<host>
+# DOMAIN in a Cloudflare zone the key pair can edit; WORKER_DOMAIN optional, either
+# a host in such a zone or pvlab-rr06-split.<subdomain>.workers.dev (no DNS wait)
+# (RR06g skips without it). Billable: Small primary, Small replica, pitr_7,
+# custom_domain. RR06p removes the Worker, hostname, DNS records and project.
+run-rr06:
+	@test -n "$(PVLAB_ORG_PRO)" || (echo "PVLAB_ORG_PRO not set" && exit 1)
+	@test -n "$(DOMAIN)" || (echo "DOMAIN=<host in a Cloudflare zone> required" && exit 1)
+	cd $(ROOT) && PVLAB_ENDPOINT_CUSTOM_DOMAIN="$(DOMAIN)" PVLAB_ENDPOINT_WORKER_DOMAIN="$(WORKER_DOMAIN)" \
+	  bun harness/src/run.ts --where local --tests experiments/replica-routing/tests \
+	  --experiment replica-routing --only RR06 --destructive \
 	  --out experiments/replica-routing/evidence/$(TS)
 
 run:

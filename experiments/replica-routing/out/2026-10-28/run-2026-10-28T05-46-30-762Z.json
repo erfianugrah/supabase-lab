@@ -1,0 +1,129 @@
+{
+  "startedAt": "2026-10-28T05:46:30.762Z",
+  "finishedAt": "2026-10-28T06:02:00.707Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "replica-routing",
+  "labCommit": "1fdc95d",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "RR06a",
+      "title": "primary (Small, ap-southeast-1), pitr_7, schema (RLS table rr6_docs, view, rr6_touch), users A and B, seed 3/5/2 rows",
+      "status": "pass",
+      "detail": "healthy after 10s; pitr_7 200; schema HTTP 201; seed HTTP 201; users 2/2",
+      "measurements": {
+        "healthy_after_s": 10,
+        "region": "ap-southeast-1"
+      },
+      "durationMs": 929941
+    },
+    {
+      "id": "RR06b",
+      "title": "read replica in ap-southeast-1; replica host; load balancer host",
+      "status": "pass",
+      "detail": "setup HTTP 204; first session connection after 197s; replica host answers replica; load balancer <ref>-all.supabase.co",
+      "measurements": {
+        "replica_served_after_s": 197
+      },
+      "durationMs": 929941
+    },
+    {
+      "id": "RR06c",
+      "title": "custom domain up: add-on, initialize, DNS, verify, activate; host serves rr_whoami",
+      "status": "pass",
+      "detail": "add-on HTTP 200; CNAME 200, TXT _cf-custom-hostname 200 at 1s, TXT _acme-challenge 200 at 3s; verified 87s; activate first HTTP 201, 1 attempt(s); reconfigured 0s; custom host answered primary after 51s",
+      "measurements": {
+        "verified_s": 87,
+        "active_s": 0,
+        "serving_s": 51,
+        "activate_attempts": 1
+      },
+      "durationMs": 929941
+    },
+    {
+      "id": "RR06d",
+      "title": "sign in through the custom domain; that user token on the custom, load balancer, replica and primary hosts (accessToken client, 10 reads each)",
+      "status": "pass",
+      "detail": "sign-in ok, jwt ES256+kid role=authenticated, iss https://<ref>.supabase.co/auth/v1; custom: primary rows=3 uid=A foreign=0: 10 | lb: replica rows=3 uid=A foreign=0: 6; primary rows=3 uid=A foreign=0: 4 | replica: replica rows=3 uid=A foreign=0: 10 | primary: primary rows=3 uid=A foreign=0: 10",
+      "measurements": {
+        "signin_custom": "ok",
+        "token": "jwt ES256+kid role=authenticated",
+        "token_iss": "https://<ref>.supabase.co/auth/v1",
+        "custom_accessToken_x10": "primary rows=3 uid=A foreign=0: 10",
+        "custom_raw_http": 200,
+        "custom_auth_user_http": 200,
+        "lb_accessToken_x10": "replica rows=3 uid=A foreign=0: 6; primary rows=3 uid=A foreign=0: 4",
+        "lb_raw_http": 200,
+        "lb_auth_user_http": 200,
+        "replica_accessToken_x10": "replica rows=3 uid=A foreign=0: 10",
+        "replica_raw_http": 200,
+        "primary_accessToken_x10": "primary rows=3 uid=A foreign=0: 10",
+        "primary_raw_http": 200,
+        "primary_auth_user_http": 200
+      },
+      "durationMs": 929941
+    },
+    {
+      "id": "RR06e",
+      "title": "split: 200 anon GETs (rpc rr_whoami) through the custom host and the load balancer, interleaved; 50 user-token reads through the custom host",
+      "status": "info",
+      "detail": "custom host {\"primary\":200}; load balancer {\"replica\":105,\"primary\":95}; user reads via custom host primary rows=3 uid=A foreign=0: 50",
+      "measurements": {
+        "custom_replica": 0,
+        "custom_primary": 200,
+        "lb_replica": 105,
+        "lb_primary": 95,
+        "custom_user_reads": "primary rows=3 uid=A foreign=0: 50"
+      },
+      "durationMs": 929941
+    },
+    {
+      "id": "RR06f",
+      "title": "two clients: Auth on the custom host, data on the load balancer with accessToken from the Auth client's session; 50 reads, 5 POST rpc writes, 1 insert, refresh, 20 reads",
+      "status": "pass",
+      "detail": "signin ok; reads_before_refresh primary rows=3 uid=A foreign=0: 32; replica rows=3 uid=A foreign=0: 18; rpc_post_writes {\"primary\":5}; insert HTTP 201; rows_written 6; refresh ok; token_changed yes; reads_after_refresh primary rows=3 uid=A foreign=0: 12; replica rows=3 uid=A foreign=0: 8; data_client_auth_call @supabase/supabase-js: Supabase Client is configured with the accessToken option, accessing supabase; data_client_hosts {\"GET <ref>-all.supabase.co\":70,\"POST <ref>-all.supabase.co\":6}",
+      "measurements": {
+        "signin": "ok",
+        "reads_before_refresh": "primary rows=3 uid=A foreign=0: 32; replica rows=3 uid=A foreign=0: 18",
+        "rpc_post_writes": "{\"primary\":5}",
+        "insert": "HTTP 201",
+        "rows_written": 6,
+        "refresh": "ok",
+        "token_changed": "yes",
+        "reads_after_refresh": "primary rows=3 uid=A foreign=0: 12; replica rows=3 uid=A foreign=0: 8",
+        "data_client_auth_call": "@supabase/supabase-js: Supabase Client is configured with the accessToken option, accessing supabase",
+        "data_client_hosts": "{\"GET <ref>-all.supabase.co\":70,\"POST <ref>-all.supabase.co\":6}"
+      },
+      "durationMs": 929941
+    },
+    {
+      "id": "RR06g",
+      "title": "splitting Worker",
+      "status": "fail",
+      "detail": "deploy exit 0 Deployed pvlab-rr06-split triggers (3.90 sec) |   <worker-host> (custom domain) | Current Version ID: af4232fb-38b7-43cf-8814-beee644edd90; serving no A record on the system resolver",
+      "measurements": {
+        "deploy_exit": 0,
+        "serving_s": "never"
+      },
+      "durationMs": 929941
+    },
+    {
+      "id": "RR06p",
+      "title": "teardown: Worker, custom hostname, DNS records, replica, project",
+      "status": "pass",
+      "detail": "wrangler delete exit 0; custom-hostname DELETE HTTP 200; DNS records removed 3; replica remove HTTP 204; project DELETE HTTP 200; run took 15 min",
+      "measurements": {
+        "project_delete_http": 200,
+        "run_min": 15
+      },
+      "durationMs": 929941
+    }
+  ]
+}
