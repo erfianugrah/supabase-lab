@@ -1,0 +1,70 @@
+{
+  "startedAt": "2026-10-28T08:45:41.492Z",
+  "finishedAt": "2026-10-28T08:47:48.240Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "cron-behaviour",
+  "labCommit": "c2de0d9",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "CB02a",
+      "title": "direct delete from cron.job_run_details as postgres (Management API)",
+      "status": "info",
+      "detail": "owner supabase_admin; postgres DELETE privilege true; rows before 7; delete older than 20 s -> 3 removed; rows after 5",
+      "measurements": {
+        "owner": "supabase_admin",
+        "postgres_can_delete": "true",
+        "rows_before": 7,
+        "removed": 3,
+        "rows_after": 5
+      },
+      "durationMs": 125569
+    },
+    {
+      "id": "CB02b",
+      "title": "the same delete as a pg_cron job",
+      "status": "info",
+      "detail": "purge schedule '15 seconds', 4 runs recorded: succeeded \"DELETE 6\": 1; succeeded \"DELETE 3\": 3; filler '5 seconds' rows left 3",
+      "measurements": {
+        "purge_schedule": "15 seconds",
+        "purge_runs": 4,
+        "purge_status": "succeeded: 4",
+        "purge_messages": "DELETE 6: 1; DELETE 3: 3",
+        "filler_rows_left": 3
+      },
+      "durationMs": 125569
+    },
+    {
+      "id": "CB02c",
+      "title": "cron.log_run: value, context, settable by postgres?",
+      "status": "info",
+      "detail": "show {\"cron.log_run\":\"on\"}; context postmaster; SET in session: ERROR ERROR: 55P02: parameter \"cron.log_run\" cannot be changed without restarting the server; ALTER ROLE postgres SET: ERROR ERROR: 55P02: parameter \"cron.log_run\" cannot be changed without restarting the server; ALTER SYSTEM: ERROR ERROR: 42501: permission denied to set parameter \"cron.log_run\"",
+      "measurements": {
+        "log_run": "on",
+        "context": "postmaster",
+        "set_session": "ERROR ERROR: 55P02: parameter \"cron.log_run\" cannot be changed without restarting the server",
+        "alter_role": "ERROR ERROR: 55P02: parameter \"cron.log_run\" cannot be changed without restarting the server",
+        "alter_system": "ERROR ERROR: 42501: permission denied to set parameter \"cron.log_run\""
+      },
+      "durationMs": 125569
+    },
+    {
+      "id": "CB99",
+      "title": "teardown: project deleted and gone from the listing",
+      "status": "pass",
+      "detail": "DELETE 200; absent from GET /projects after 0 s",
+      "measurements": {
+        "delete_status": 200,
+        "gone_from_listing_s": 0
+      },
+      "durationMs": 1178
+    }
+  ]
+}
