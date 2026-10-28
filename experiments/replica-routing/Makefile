@@ -12,7 +12,7 @@
 ROOT := $(abspath ../..)
 TS := $(shell date +%Y%m%d-%H%M%S)
 
-.PHONY: run run-rr02 run-rr03 run-rr04 run-rr06 facts publish list
+.PHONY: run run-rr02 run-rr03 run-rr04 run-rr06 run-rr07 facts publish list
 
 # RR02: re-routing on a lagging or unhealthy replica, non-REST traffic through
 # the load balancer. Same billing shape as RR01; 24 and 33 minutes in the
@@ -70,6 +70,24 @@ run-rr06:
 	cd $(ROOT) && PVLAB_ENDPOINT_CUSTOM_DOMAIN="$(DOMAIN)" PVLAB_ENDPOINT_WORKER_DOMAIN="$(WORKER_DOMAIN)" \
 	  bun harness/src/run.ts --where local --tests experiments/replica-routing/tests \
 	  --experiment replica-routing --only RR06 --destructive \
+	  --out experiments/replica-routing/evidence/$(TS)
+
+# RR07: the RR06 shape plus the splitting Worker on a Workers Custom Domain:
+# time to serving, Worker hop latency, CORS (headers and headless Chromium),
+# OAuth PKCE round trips through the Worker (mock issuer in the Keycloak slot),
+# SAML through the Worker (lab-signed Response; needs docker + oven/bun:1).
+# The module names its hosts rr07-<epoch> and rr07w-<epoch> in ZONE:
+#   (cd browser && bun install)
+#   sx SUPABASE_ACCESS_TOKEN CLOUDFLARE_API_KEY CLOUDFLARE_EMAIL CLOUDFLARE_ACCOUNT_ID -- \
+#     env PVLAB_ORG_PRO=<pro-org-slug> make run-rr07 ZONE=<cloudflare zone>
+# Billable: Small primary, Small replica, pitr_7, custom_domain. RR07p removes the
+# Worker, its custom domain and certificate, the hostname, DNS records and project.
+run-rr07:
+	@test -n "$(PVLAB_ORG_PRO)" || (echo "PVLAB_ORG_PRO not set" && exit 1)
+	@test -n "$(ZONE)" || (echo "ZONE=<Cloudflare zone the key pair can edit> required" && exit 1)
+	cd $(ROOT) && PVLAB_ENDPOINT_ZONE="$(ZONE)" \
+	  bun harness/src/run.ts --where local --tests experiments/replica-routing/tests \
+	  --experiment replica-routing --only RR07 --destructive \
 	  --out experiments/replica-routing/evidence/$(TS)
 
 run:

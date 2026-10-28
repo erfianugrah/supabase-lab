@@ -47,7 +47,7 @@ const REGION = process.env.PVLAB_RR6_REGION ?? "ap-southeast-1";
 const SPLIT_N = 200;
 const WORKER_NAME = "pvlab-rr06-split";
 
-const SCHEMA = `
+export const SCHEMA = `
 create table if not exists public.rr_marker (id bigserial primary key, tag text not null, written_at timestamptz not null default clock_timestamp());
 insert into public.rr_marker(tag) values ('seed');
 grant select on public.rr_marker to anon, authenticated;
@@ -76,14 +76,14 @@ notify pgrst, 'reload schema';
 
 /* ---------- helpers ---------- */
 
-const b64json = (s: string) => JSON.parse(Buffer.from(s, "base64url").toString()) as Record<string, unknown>;
-const noPersist = { auth: { persistSession: false, autoRefreshToken: false } } as const;
+export const b64json = (s: string) => JSON.parse(Buffer.from(s, "base64url").toString()) as Record<string, unknown>;
+export const noPersist = { auth: { persistSession: false, autoRefreshToken: false } } as const;
 
-interface HostnameCfg {
+export interface HostnameCfg {
   status?: string;
   data?: { result?: { ssl?: { validation_records?: { txt_name?: string; txt_value?: string }[] }; ownership_verification?: { type?: string; name?: string; value?: string } } };
 }
-function wantedTxt(cfg: HostnameCfg): { name: string; value: string }[] {
+export function wantedTxt(cfg: HostnameCfg): { name: string; value: string }[] {
   const out: { name: string; value: string }[] = [];
   for (const r of cfg.data?.result?.ssl?.validation_records ?? []) if (r.txt_name && r.txt_value) out.push({ name: r.txt_name, value: r.txt_value });
   const ov = cfg.data?.result?.ownership_verification;
@@ -92,7 +92,7 @@ function wantedTxt(cfg: HostnameCfg): { name: string; value: string }[] {
 }
 
 /** Row-level summary of a read of rr6_docs_v: count, which node(s), whose uid, rows of another tenant. */
-interface ViewRead {
+export interface ViewRead {
   ok: boolean;
   rows: number;
   node: string;
@@ -100,7 +100,7 @@ interface ViewRead {
   foreign: number;
   err?: string;
 }
-async function viewRead(c: SupabaseClient, label: (u?: string | null) => string): Promise<ViewRead> {
+export async function viewRead(c: SupabaseClient, label: (u?: string | null) => string): Promise<ViewRead> {
   try {
     const r = await c.from("rr6_docs_v").select("*");
     if (r.error) return { ok: false, rows: 0, node: "none", uid: "-", foreign: 0, err: `${r.status} ${r.error.code ?? ""} ${(r.error.message ?? "").slice(0, 60)}` };
@@ -116,7 +116,7 @@ async function viewRead(c: SupabaseClient, label: (u?: string | null) => string)
     return { ok: false, rows: 0, node: "none", uid: "-", foreign: 0, err: errText(e).slice(0, 80) };
   }
 }
-function tallyViews(vs: ViewRead[]): Record<string, number> {
+export function tallyViews(vs: ViewRead[]): Record<string, number> {
   const t: Record<string, number> = {};
   for (const v of vs) {
     const k = v.ok ? `${v.node} rows=${v.rows} uid=${v.uid} foreign=${v.foreign}` : `ERR ${v.err}`;
@@ -124,9 +124,9 @@ function tallyViews(vs: ViewRead[]): Record<string, number> {
   }
   return t;
 }
-const tallyStr = (t: Record<string, number>) => Object.entries(t).map(([k, v]) => `${k}: ${v}`).join("; ");
+export const tallyStr = (t: Record<string, number>) => Object.entries(t).map(([k, v]) => `${k}: ${v}`).join("; ");
 
-async function anonNode(base: string, anon: string): Promise<string> {
+export async function anonNode(base: string, anon: string): Promise<string> {
   try {
     const r = await fetch(`${base}/rest/v1/rpc/rr_whoami`, { headers: { apikey: anon, Authorization: `Bearer ${anon}` }, signal: AbortSignal.timeout(15_000) });
     const p = parseNode(r.status, await r.text());
@@ -135,7 +135,7 @@ async function anonNode(base: string, anon: string): Promise<string> {
     return `ERR ${errText(e).slice(0, 60)}`;
   }
 }
-function count(xs: string[]): Record<string, number> {
+export function count(xs: string[]): Record<string, number> {
   const t: Record<string, number> = {};
   for (const x of xs) t[x] = (t[x] ?? 0) + 1;
   return t;
@@ -165,7 +165,7 @@ async function waitServing(host: string, anon: string, budgetMs: number): Promis
   return { s: "never", last };
 }
 
-async function wrangler(args: string[]): Promise<{ code: number; tail: string }> {
+export async function wrangler(args: string[]): Promise<{ code: number; tail: string }> {
   const proc = Bun.spawn(["bunx", "wrangler", ...args], { cwd: `${import.meta.dir}/../worker`, stdout: "pipe", stderr: "pipe" });
   const [o, e] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text()]);
   return { code: await proc.exited, tail: (o + e).trim().split("\n").slice(-3).join(" | ").slice(0, 300) };

@@ -52,6 +52,15 @@ setup gate hunt) and `medium-serverless` (MS06: same-region replica).
 | RR06f | two clients: Auth on the custom host, data on the load balancer with `accessToken` from the Auth client's session; writes; a refresh |
 | RR06g | a Cloudflare Worker splitting GET/HEAD `/rest/v1/*` to the load balancer and the rest to the custom host; one supabase-js client through it |
 | RR06p | teardown: Worker, custom hostname, DNS records, replica, project |
+| RR07a-c | RR06's shape (Small pair in ap-southeast-1, `pitr_7`, custom domain) plus a mock OIDC issuer (Edge Function) in the Keycloak slot |
+| RR07d | the RR06 Worker on a Workers Custom Domain in the same zone: seconds from the deploy to an answer on the zone's nameservers, on 1.1.1.1, and through the Worker |
+| RR07e | Worker hop latency: 50 anon GETs through the Worker and 50 to the load balancer, interleaved, p50/p90 |
+| RR07f | CORS: preflight and actual requests with an `Origin` for GET `/rest/v1`, POST `rpc`, POST `/auth/v1/token`, through the Worker, the custom host and the load balancer |
+| RR07g | real cross-origin fetches in headless Chromium (`browser/cors-check.ts`): password sign-in, RLS read, POST `rpc`, through the Worker and the custom host |
+| RR07h-k | OAuth PKCE round trip entered at the Worker, the custom host, the project host, and at the Worker with the callback hop through the Worker: `redirect_uri`, code exchange |
+| RR07l | the OAuth session through the Worker: rows under RLS, `auth.uid()`, node, POST `rpc`, refresh |
+| RR07m | SAML SSO (lab-signed Response) started through the Worker: SP metadata per host, ACS POST through the Worker and to the metadata ACS, code exchange, reads |
+| RR07p | teardown: Worker, Workers Custom Domain, certificate, auth providers, custom hostname, DNS records, replica, project |
 
 The node that served a request is read from `public.rr_whoami()`
 (`pg_is_in_recovery()`, postmaster start time) called as a GET, not inferred
@@ -66,6 +75,7 @@ PVLAB_ORG_PRO=<pro-org-slug> make run-rr02   # RR02, about 25 to 35 minutes
 PVLAB_ORG_PRO=<pro-org-slug> make run-rr03   # RR03, about 10 to 12 minutes
 PVLAB_ORG_PRO=<pro-org-slug> make run-rr04   # RR04, about 14 to 16 minutes
 PVLAB_ORG_PRO=<pro-org-slug> make run-rr06 DOMAIN=<host> [WORKER_DOMAIN=<host>]   # RR06, about 9 to 15 minutes; Makefile header lists the credentials
+PVLAB_ORG_PRO=<pro-org-slug> make run-rr07 ZONE=<zone>   # RR07; run `bun install` in browser/ first; Makefile header lists the credentials
 make leftovers        # nothing named rr-* should print
 make facts RUN=evidence/<ts>/run-<stamp>.json        # ONLY=RR02 for an RR02 run (RR03, RR04 likewise)
 make publish RUN=evidence/<ts>/run-<stamp>.json
@@ -147,9 +157,25 @@ Full record: `RUNLOG.md`; artifacts `out/2026-10-28/`. supabase-js 2.118.0.
 | Auth client on the custom host, data client on `<ref>-all` with `accessToken` reading the Auth client's session | 70 of 70 reads correct in each run (140 of 140 over two runs) across a `refreshSession` (replica 26 and 37 of 70); in each run 5 POST `rpc` writes on the primary, an insert 201, 6 rows written; `dataClient.auth.getSession()` throws | RR06f |
 | Worker splitting GET/HEAD `/rest/v1/*` to `<ref>-all`, the rest to the custom host, on `*.workers.dev` (run 2 only) | sign-in and refresh through it ok; 120 of 120 table reads correct, replica 53 of 120; `get: true` rpc replica 10 of 20; POST rpc primary 5 of 5. Run 1 on a Workers Custom Domain in the lab zone never resolved on the workstation (DNS, no request reached it) | RR06g |
 
-Not measured: an OAuth or SAML round trip through the Worker (an `authorize`
-probe answered 400, no provider configured), browser CORS through it; other
-regions; load beyond one request at a time.
+Not measured in RR06: an OAuth or SAML round trip through the Worker, browser
+CORS through it (all measured in RR07, below); other regions; load beyond one
+request at a time.
+
+## Measured (2026-10-28, RR07, three projects, runs 0 to 2, Singapore workstation, RR06's shape, Worker on a Workers Custom Domain in the same zone)
+
+Full record: `RUNLOG.md`; artifacts `out/2026-10-28/`. supabase-js 2.118.0,
+wrangler 4.147.0, Playwright 1.63.0. Run 0 stopped at RR07d (the module's own
+DNS wait, see RUNLOG); runs 1 and 2 passed 12 of 12.
+
+| finding | value | module |
+|---|---|---|
+| Worker on a Workers Custom Domain, seconds after `wrangler deploy` exited | A record on the zone's nameservers and on 1.1.1.1 at 3 s (run 1) and 5 s (run 2); `rr_whoami` answered through it at 3 s and 6 s | RR07d |
+| Worker hop latency, 50 anon GETs each way, interleaved | p50 34.9 ms through the Worker against 33.3 ms to `-all` (run 1), 55.8 against 35.5 ms (run 2): the hop added 1.6 and 20.3 ms at p50 | RR07e |
+| CORS through the Worker, `Origin: https://app.example.test`, GET `/rest/v1`, POST `rpc`, POST `/auth/v1/token` | preflight 200 `Allow-Origin: *`, actual 200 with the origin reflected (`Allow-Credentials: true` on `/auth/v1/token` only); 9 of 9 header comparisons per run identical to the custom host and `-all`, both runs | RR07f |
+| Cross-origin fetch in headless Chromium through the Worker and the custom host | sign-in, RLS read (5 rows), POST `rpc` all 200, 0 console errors, both runs | RR07g |
+| OAuth PKCE entered at the Worker, custom and project hosts | `redirect_uri` `<custom-host>/auth/v1/callback` from every entry; code exchange ok at each entry host, through the Worker included, both runs | RR07h-k |
+| OAuth session through the Worker | 30 of 30 reads correct per run (replica 15 and 12 of 30), POST `rpc` primary 3 of 3, refresh ok | RR07l |
+| SAML through the Worker | available on the Pro org (enable 200, provider 201); SP entity ID and ACS on the custom host whichever host served the metadata; ACS POST through the Worker and to the custom host both gave a code, exchange through the Worker ok, 10 of 10 reads correct, both runs | RR07m |
 
 Not measured (RR01 to RR04): other region pairs, write rates above 50 inserts/s,
 behaviour with `hot_standby_feedback` on, the load balancer's rule, a
