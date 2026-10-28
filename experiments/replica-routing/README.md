@@ -45,6 +45,13 @@ setup gate hunt) and `medium-serverless` (MS06: same-region replica).
 | RR04j | the split while the replica's replay is stopped (RR02h's conflict method, three cycles) |
 | RR04k | `POST /restart` while reading: what `-all` serves while each node is down |
 | RR04l | `edge_logs` on the three hosts: method, status, redirect identifier |
+| RR06a-b | same-region shape (Small primary and Small replica in ap-southeast-1, `pitr_7`); RLS table `rr6_docs`, `rr6_touch()`; users A and B |
+| RR06c | `custom_domain` add-on, hostname, DNS through Cloudflare, verify, activate, the custom host serves |
+| RR06d | sign in through the custom host; that token on the custom, load balancer, replica and primary hosts: rows, `auth.uid()`, node |
+| RR06e | 200 anon GETs through the custom host and 200 through the load balancer, interleaved; 50 user reads through the custom host |
+| RR06f | two clients: Auth on the custom host, data on the load balancer with `accessToken` from the Auth client's session; writes; a refresh |
+| RR06g | a Cloudflare Worker splitting GET/HEAD `/rest/v1/*` to the load balancer and the rest to the custom host; one supabase-js client through it |
+| RR06p | teardown: Worker, custom hostname, DNS records, replica, project |
 
 The node that served a request is read from `public.rr_whoami()`
 (`pg_is_in_recovery()`, postmaster start time) called as a GET, not inferred
@@ -58,6 +65,7 @@ SUPABASE_ACCESS_TOKEN=... PVLAB_ORG_PRO=<pro-org-slug> make run
 PVLAB_ORG_PRO=<pro-org-slug> make run-rr02   # RR02, about 25 to 35 minutes
 PVLAB_ORG_PRO=<pro-org-slug> make run-rr03   # RR03, about 10 to 12 minutes
 PVLAB_ORG_PRO=<pro-org-slug> make run-rr04   # RR04, about 14 to 16 minutes
+PVLAB_ORG_PRO=<pro-org-slug> make run-rr06 DOMAIN=<host> [WORKER_DOMAIN=<host>]   # RR06, about 9 to 15 minutes; Makefile header lists the credentials
 make leftovers        # nothing named rr-* should print
 make facts RUN=evidence/<ts>/run-<stamp>.json        # ONLY=RR02 for an RR02 run (RR03, RR04 likewise)
 make publish RUN=evidence/<ts>/run-<stamp>.json
@@ -128,7 +136,22 @@ Full record: `RUNLOG.md`; artifacts `out/2026-10-26/run-2026-10-26T06-19-17-837Z
 | Split while the replica's replay is stopped | `-all` sent 46 of 102 (run 1, one stop; 46 stale) and 180 of 343 (run 2, three stops; 160 stale) reads in the stale window to the replica; largest heartbeat age (`stale_ms`) served 29,613 and 30,669 ms | RR04j |
 | Project restart | while only the primary was failing, `-all` served 14 and 13 reads from the replica and failed 12 and 9 (none moved wholesale); edge_logs show 521/522 to both nodes | RR04k |
 
-Not measured: other region pairs, write rates above 50 inserts/s,
+## Measured (2026-10-28, RR06, two projects, two runs, Singapore workstation, primary and replica both in ap-southeast-1, custom domain active)
+
+Full record: `RUNLOG.md`; artifacts `out/2026-10-28/`. supabase-js 2.118.0.
+
+| finding | value | module |
+|---|---|---|
+| Reads through the custom host | 200 of 200 anon GETs served by the primary in each run, while the interleaved load balancer GETs split 105/95 (run 1) and 102/98 (run 2) replica/primary; 50 of 50 user-token reads by the primary in each run | RR06e |
+| Token from `signInWithPassword` on the custom host | ES256, `iss` the project host; with an `accessToken` client 10 of 10 reads correct on each of the custom, load balancer, replica and primary hosts (user's 3 rows, `auth.uid()` the user's, 0 foreign), both runs; load balancer replica 6 (run 1) and 2 (run 2) of 10 | RR06d |
+| Auth client on the custom host, data client on `<ref>-all` with `accessToken` reading the Auth client's session | 70 of 70 reads correct in each run (140 of 140 over two runs) across a `refreshSession` (replica 26 and 37 of 70); in each run 5 POST `rpc` writes on the primary, an insert 201, 6 rows written; `dataClient.auth.getSession()` throws | RR06f |
+| Worker splitting GET/HEAD `/rest/v1/*` to `<ref>-all`, the rest to the custom host, on `*.workers.dev` (run 2 only) | sign-in and refresh through it ok; 120 of 120 table reads correct, replica 53 of 120; `get: true` rpc replica 10 of 20; POST rpc primary 5 of 5. Run 1 on a Workers Custom Domain in the lab zone never resolved on the workstation (DNS, no request reached it) | RR06g |
+
+Not measured: an OAuth or SAML round trip through the Worker (an `authorize`
+probe answered 400, no provider configured), browser CORS through it; other
+regions; load beyond one request at a time.
+
+Not measured (RR01 to RR04): other region pairs, write rates above 50 inserts/s,
 behaviour with `hot_standby_feedback` on, the load balancer's rule, a
 replica that is down while the primary is untouched (the Management API has
 no per-replica restart as of 2026-10-23), recovery of the load balancer

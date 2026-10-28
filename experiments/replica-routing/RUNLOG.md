@@ -1008,6 +1008,151 @@ the request side carries client details.
 - Cost: not metered. Each run kept a Small primary, a Small replica and
   `pitr_7` for about 14 and 16 minutes; the aborted attempt about 4 minutes.
 
+## 2026-10-28 - RR06, a read replica on a project with a custom domain
+
+Question: the read replicas guide says requests through a custom domain are
+not routed through the load balancer and points at the dedicated endpoints
+([read-replicas](https://supabase.com/docs/guides/platform/read-replicas)).
+What does an app that keeps its custom domain for Auth (OAuth callbacks, SAML)
+do to get reads onto the replica, and does a token issued through the custom
+domain work on the load balancer and replica hosts?
+
+Shape: two throwaway Pro-org projects, one per run, the same day. Each: primary
+in ap-southeast-1 on Small compute, `pitr_7`, one Small read replica in the
+same region (the RR03/RR04 shape), the `custom_domain` add-on with a hostname
+in a Cloudflare-hosted zone, DNS written through the Cloudflare v4 API.
+Vantage: the Singapore workstation. supabase-js 2.118.0. Artifacts:
+
+- run 1: `out/2026-10-28/run-2026-10-28T05-46-30-762Z.json`, 05:46:30 to
+  06:02:00 UTC, 6 pass, 1 info (RR06e), 1 fail (RR06g), 0 skip
+- run 2: `out/2026-10-28/run-2026-10-28T06-03-01-848Z.json`, 06:03:01 to
+  06:11:35 UTC, 7 pass, 1 info (RR06e), 0 fail
+
+Both artifacts record lab commit 1fdc95d; the module was uncommitted. Between
+the runs the module changed in two places: a `*.workers.dev` Worker host
+deploys without `--domain` (RR06g), and the serving wait, shared by RR06c's
+custom-host wait and RR06g's Worker wait, asks 1.1.1.1 before the system
+resolver. Nothing else changed.
+
+Setup: replica setup answered 204; first session-pooler connection to the
+replica 197 s (run 1) and 183 s (run 2) after the call. Custom hostname
+verified 87 s and 151 s after the CNAME write (TXT records 1 to 3 s later), `activate` 201 on the first
+call both runs, and the custom host answered `rpc/rr_whoami` 51 s after
+`5_services_reconfigured` both runs (run 1 polled the system resolver only;
+run 2 asked 1.1.1.1 first, then the system resolver). The module then
+waited 30 s before RR06d (HP03d saw the Auth redirect move to the custom
+host about 6 s after `5_services_reconfigured`).
+
+### RR06e: which node serves a read through the custom host
+
+200 anonymous GETs of `rpc/rr_whoami` through the custom host, interleaved
+with 200 through `<ref>-all.supabase.co`, one at a time:
+
+| | run 1 | run 2 |
+|---|---|---|
+| custom host | primary 200, replica 0 | primary 200, replica 0 |
+| load balancer, same period | replica 105, primary 95 | replica 102, primary 98 |
+| 50 reads of `rr6_docs_v` through the custom host with user A's token | primary 50 | primary 50 |
+
+The guide's statement held: no read through the custom host reached the
+replica in 500 tries over two runs, while the load balancer spread the
+interleaved reads over both nodes as RR03h did.
+
+### RR06d: a token issued through the custom domain, on every host
+
+User A signed in with `signInWithPassword` on a supabase-js client whose base
+URL was the custom host. The access token was `jwt ES256+kid
+role=authenticated` with `iss` `https://<ref>.supabase.co/auth/v1` (the
+project host, as HP04 found). That token, through an `accessToken` client on
+each host, 10 reads of `rr6_docs_v` each:
+
+| host | run 1 | run 2 |
+|---|---|---|
+| custom host | primary 10 | primary 10 |
+| load balancer (`-all`) | replica 6, primary 4 | primary 8, replica 2 |
+| replica host | replica 10 | replica 10 |
+| primary host | primary 10 | primary 10 |
+
+Every read returned user A's 3 rows, `auth.uid()` user A and 0 rows of
+another tenant. A raw `GET /rest/v1/rr6_docs_v` with the token answered 200
+on all four hosts, and `GET /auth/v1/user` answered 200 on the custom, load
+balancer and primary hosts (not sent to the replica host, which serves REST
+GETs only, RR02f).
+
+### RR06f: two clients
+
+An Auth client on the custom host (`signInWithPassword`, then
+`refreshSession`), and a data client on `<ref>-all.supabase.co` created with
+`accessToken: async () => (await authClient.auth.getSession()).data.session?.access_token ?? null`:
+
+| | run 1 | run 2 |
+|---|---|---|
+| 50 reads before the refresh | primary 32, replica 18 | replica 26, primary 24 |
+| 5 `rpc('rr6_touch')` (POST, writes a row) | primary 5 | primary 5 |
+| 1 `.insert()` | HTTP 201 | HTTP 201 |
+| rows written (count on the primary) | 6 | 6 |
+| `refreshSession` | ok, token changed | ok, token changed |
+| 20 reads after the refresh | primary 12, replica 8 | replica 11, primary 9 |
+| requests the data client sent | GET 70, POST 6, all to `<ref>-all` | the same |
+
+All 140 reads (70 per run) returned user A's 3 rows with `auth.uid()` user A
+and 0 foreign rows. The refresh changed the Auth client's access token
+(`token_changed` yes) and the data client needed no reconfiguration; the
+module did not log which token the data client sent, and the old token was
+still valid. `dataClient.auth.getSession()` threw `Supabase Client is
+configured with the accessToken option, accessing supabase...` both runs; by
+inference (sign-in and refresh on the data client were not called) the data
+client cannot sign in or refresh on its own, and the session lives in the
+Auth client.
+
+### RR06g: a Worker that splits by method
+
+A Cloudflare Worker (`worker/rr06-split.js`) sends GET and HEAD on
+`/rest/v1/*` to `<ref>-all.supabase.co` and everything else to the custom
+host, and tags each response `x-rr06-route`. One supabase-js client on the
+Worker's host, user B (5 rows).
+
+Run 1 put the Worker on a Workers Custom Domain in the same zone as the
+custom hostname. `wrangler deploy` exited 0 and named the custom domain, but
+the module's wait saw no A record on the system resolver for 8 minutes and
+RR06g failed before any request. Likely cause (inferred, not separated): the
+wait's first lookup ran before the record existed and the resolver cached the
+miss for the zone's SOA minimum, 1800 s. Run 2 used the account's
+`*.workers.dev` host instead and the patched wait (1.1.1.1 first); the host
+answered 10 s after the deploy.
+
+Run 2 only (run 1 failed before any request):
+
+| | result |
+|---|---|
+| `signInWithPassword` through the Worker | ok |
+| 100 reads of `rr6_docs_v` | primary 60, replica 40 |
+| 20 `rpc('rr_whoami', {}, { get: true })` | primary 10, replica 10 |
+| 5 `rpc('rr6_touch')` (POST) | primary 5 |
+| `refreshSession` through the Worker | ok |
+| 20 reads after the refresh | replica 13, primary 7 |
+| routes taken (`x-rr06-route`) | GET read 140, POST write 7 |
+
+All 120 table reads returned user B's 5 rows, `auth.uid()` user B and 0
+foreign rows. A `GET /auth/v1/authorize?provider=github` through the Worker
+answered 400 with no `Location` (no OAuth provider was configured on the
+project), so where an OAuth redirect points behind the Worker was not
+measured.
+
+### Not settled by RR06
+
+- An OAuth or SAML round trip through the Worker (one `authorize` probe
+  answered 400, no provider configured), and browser CORS through it (the run is a
+  script; the Worker passes the origin's CORS headers unchanged).
+- The Worker on a Workers Custom Domain in the lab zone (run 1 failed on DNS
+  before any request) rather than `*.workers.dev`.
+- Latency added by the Worker hop, and the data client's behaviour across an
+  expiry without a refresh call (the run refreshed explicitly).
+- Other regions, a second replica, larger compute; load beyond one request at
+  a time.
+- Cost: not metered. Each run kept a Small primary, a Small replica, `pitr_7`
+  and the `custom_domain` add-on for about 15 and 9 minutes.
+
 ## Not measured
 
 - Any primary region other than ap-northeast-1 (RR01, RR02) and
@@ -1019,7 +1164,7 @@ the request side carries client details.
 - Replication delay for a large write (the largest transaction here is a
   50,000-row update; the RR02g bulk insert filled the disk before it
   committed).
-- Custom domains. Auth, Storage, Realtime, GraphQL and Edge Function traffic
+- Custom domains beyond RR06 (one shape, two runs, 2026-10-28). Auth, Storage, Realtime, GraphQL and Edge Function traffic
   through the load balancer is RR02f/RR02k; the replica's behaviour on a
   project restart is RR02i (cross-region) and RR04k (same region).
 - The load balancer's rule. Whether it re-routes off a lagging or unhealthy

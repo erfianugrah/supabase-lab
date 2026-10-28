@@ -4412,7 +4412,7 @@ projects (feature battery, two conversion probes), all `small`,
   cannot call them), so the blog's "tracked" is untested for the dashboard;
   `migration_version`; the dashboard merge-request screen.
 
-## experiments/replica-routing - key facts (validated 2026-10-10, Pro org; RR02 2026-10-23, two runs; RR03 and RR04 2026-10-26, two runs each)
+## experiments/replica-routing - key facts (validated 2026-10-10, Pro org; RR02 2026-10-23, two runs; RR03 and RR04 2026-10-26, two runs each; RR06 2026-10-28, two runs)
 
 - **The API load balancer's host is `<ref>-all.supabase.co` and the Management
   API does not return it** (RR01e, 2026-10-10): the Dashboard route
@@ -4568,6 +4568,26 @@ projects (feature battery, two conversion probes), all `small`,
   (RR02d): HTTP 200 and config `600s` both runs, but the replica's
   `pg_settings` read `600000ms` in run 1 and `30000ms (default)` in run 2 at
   the same point; read it back on the replica before relying on it.
+- **Reads through a custom domain all reached the primary; a second client
+  on `-all` gets reads to the replica** (RR06, 2026-10-28, two runs, same-region Small
+  pair): 200 of 200 anon GETs and 50 of 50 user reads through the custom host
+  were served by the primary in each run, while the interleaved `-all` GETs
+  split 105/95 (run 1) and 102/98 (run 2) replica/primary. A token from `signInWithPassword` on the custom
+  host carries `iss` = the project host and read correctly (user's rows,
+  `auth.uid()`, 0 foreign) on the custom, `-all`, replica and primary hosts.
+  An Auth client on the custom host plus a data client on `-all` with
+  `accessToken` reading the Auth client's session: 140 of 140 reads correct
+  over two runs (70 per run) across a `refreshSession`, POST writes on the
+  primary, `dataClient.auth.getSession()` throws. A Cloudflare Worker sending GET/HEAD `/rest/v1/*` to `-all` and the
+  rest to the custom host also worked with one client (run 2, `*.workers.dev`
+  host); run 1's Worker on a hostname in the lab zone never resolved on the
+  workstation within 8 min (inferred, not separated: a cached miss from a
+  lookup before the record existed; SOA minimum 1800 s per the module's
+  comment, not in the artifact). The module now asks 1.1.1.1 before the
+  system resolver; run 2 used `*.workers.dev`, so that wait was not tried on
+  a lab-zone hostname. An OAuth or SAML round trip through the Worker was not
+  run (one `GET /auth/v1/authorize?provider=github` answered 400 with no
+  provider configured); nor was browser CORS through it.
 
 ## experiments/scoped-pats - key facts (SP01-SP10, validated 2026-10-10)
 
