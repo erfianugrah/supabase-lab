@@ -1,6 +1,6 @@
 # RUNLOG - observability-surface
 
-All runs 2026-10-10 except OB03d (2026-10-23, its own section). Vantage: one macOS machine in Singapore (Bun 1.3.14; Node v26.11.1
+All runs 2026-10-10 except OB03d (2026-10-23) and OB06 (2026-10-28), each in its own section. Vantage: one macOS machine in Singapore (Bun 1.3.14; Node v26.11.1
 for the esbuild bundles; `supabase` CLI 2.120.0), projects in
 ap-southeast-1 on a Pro-plan organization, Management API from the same
 machine. Raw run artifacts are `evidence/run1/` to `evidence/run3/`
@@ -12,7 +12,7 @@ Every project this experiment created was deleted by the module that made it
 (checked with `GET /v1/projects` after the last run: none named `ob-surface-`
 remained).
 
-Published artifacts (redacted, a `.facts.md` beside each, `out/2026-10-10/`; OB03d in `out/2026-10-23/`):
+Published artifacts (redacted, a `.facts.md` beside each, `out/2026-10-10/`; OB03d in `out/2026-10-23/`; OB06 in `out/2026-10-28/`):
 
 | run | module | artifact |
 |---|---|---|
@@ -28,6 +28,8 @@ Published artifacts (redacted, a `.facts.md` beside each, `out/2026-10-10/`; OB0
 | run3 | OB02 | `run-2026-10-10T01-23-47-158Z.json` |
 | ob03d-run1 | OB03d | `run-2026-10-23T10-34-27-519Z.json` |
 | ob03d-run2 | OB03d | `run-2026-10-23T10-45-54-614Z.json` |
+| ob06-run2 | OB06 | `run-2026-10-28T08-30-38-352Z.json` |
+| ob06-run3 | OB06 | `run-2026-10-28T08-38-28-289Z.json` |
 
 Reading guide. "Docs say" lines come from public pages read on 2026-10-10 and
 are not measurements. "Measured" lines name the module row, `n`, and the run.
@@ -437,6 +439,152 @@ one-bound window lengths, other regions and plans, the Explorer UI, the MCP
 server's stateless protocol shape (2026-07-28), `query_logs` with only one
 bound, and whether the 1000-row cap is per query or per response size (the
 rows were small: two columns).
+
+## OB06 - track_planning for Data API traffic, lock waits on the metrics endpoint, restore to a new project (2026-10-28)
+
+Question: an app reads its database through the Data API and wants planning
+time in `pg_stat_statements`; its operators scrape the metrics endpoint and
+want to see sessions stuck behind locks; and they want to know whether a
+restore to a new project can be scripted.
+
+Docs say (read 2026-10-28):
+
+- https://www.postgresql.org/docs/17/sql-alterrole.html : a role setting
+  becomes the session default "Whenever the role subsequently starts a new
+  session ... This only happens at login time; executing `SET ROLE` or `SET
+  SESSION AUTHORIZATION` does not cause new configuration values to be set."
+- https://docs.postgrest.org/en/stable/references/transactions.html ,
+  "Impersonated Role Settings": PostgREST applies the impersonated role's
+  settings as transaction-scoped settings, but "Settings that have a context
+  which requires privileges won't be applied by default", unless `GRANT SET ON
+  PARAMETER <setting> TO <authenticator>` (Postgres 15 and later).
+- v1 OpenAPI document (https://api.supabase.com/api/v1-json),
+  `UpdatePostgresConfigBody`: `additionalProperties: false`, and
+  `pg_stat_statements.track_planning` is not among its properties
+  (`pg_stat_statements.max` is).
+- https://supabase.com/docs/guides/observability/metrics and its self-hosted
+  Prometheus page: Basic auth `service_role` plus a secret API key; "Keep the
+  scrape interval at 60 seconds to match Supabase's refresh cadence."
+
+Design: one Micro project per run, Pro-plan org, ap-southeast-1, Postgres
+17.11. SQL as `postgres` over a session-mode pooler connection (the Management
+API SQL endpoint also ran as `postgres`). OB06a tries each `ALTER` and resets
+it. OB06c runs one arm per setting, alone: apply it, `NOTIFY pgrst, 'reload
+config'`, terminate the `authenticator` backends, wait for the Data API to
+answer, then as `anon`, `authenticated` (a password-grant user token) and
+`service_role` call an RPC that returns `current_setting(...)` inside the
+request and send 3 GETs to a table unique to that arm and role, then read that
+table's statements from `pg_stat_statements`. OB06f holds a row lock (`select
+... for update`, a second session's `update` waits) and then an `ACCESS
+EXCLUSIVE` table lock (a second session's `select` waits), 130 s each, with a
+30 s baseline, gap and tail, and scrapes the metrics endpoint and reads the
+waiter's `pg_stat_activity` row every 10 s. Vantage: one macOS machine in
+Singapore, Bun 1.3.14, `supabase` CLI 2.122.0.
+
+Runs: ob06-run2 08:30-08:38 UTC, ob06-run3 08:38-08:45 UTC. Run2 ran an
+earlier revision: no `GRANT SET ON PARAMETER` probe, and its snapshot count
+fingerprinted `pg_` and `node_` series together. A run before them (not
+published) used a postgres session through the pooler as the positive control
+without first dropping the pooler's other backends, read `off`, and was
+replaced by the control below. Each run's project was deleted by the module
+(OB06z, HTTP 200) and `GET /v1/projects` listed no `ob-surface-` project at
+08:45 UTC.
+
+Measured, `pg_stat_statements.track_planning` (both runs agree on every
+row):
+
+- OB06a: as `postgres`, `alter role ... set pg_stat_statements.track_planning
+  = on` was accepted for `authenticator`, `authenticated`, `anon`, `postgres`
+  and `service_role`; `alter database postgres set ...` was refused with
+  `permission denied to set parameter "pg_stat_statements.track_planning"`.
+  The parameter's context is `superuser`, default `off`, no
+  `pg_parameter_acl` entry. ob06-run3: `grant set on parameter
+  pg_stat_statements.track_planning to authenticator` was refused with
+  `permission denied for parameter pg_stat_statements.track_planning`.
+- OB06b: with the role setting in place, a postgres session that ran `set
+  role` to `authenticator`, `authenticated`, `anon` or `service_role` still
+  showed `off`. Positive control: after `alter role postgres set ...`, the
+  other postgres backends terminated (1) and a new login (backend 0.01 s
+  old) showed `on`, source `user`.
+- OB06c: only the `authenticator` arm put planning into the statistics. With
+  it, the value inside the request was `on` for all three roles, and each
+  PostgREST statement (`WITH pgrst_source AS ( SELECT ... )`) showed
+  `calls=3 plans=3`; `total_plan_time` per 3 calls was 0.43, 0.32 and 0.31 ms
+  (anon, authenticated, service_role) in ob06-run2, 0.49, 0.33 and 0.36 ms in
+  ob06-run3. The baseline and the `authenticated`, `anon`, `service_role` and
+  `postgres` arms read `off` inside every request and `plans` 0. Every RPC and
+  GET answered 200 in every arm, so a role setting PostgREST skips does not
+  break requests. The database arm did not run (its `ALTER` was refused).
+  Two `authenticator` backends were terminated per arm. The per-table `calls`
+  column (5) also counts the module's own `create table` and `insert`.
+- OB06d: `PUT /v1/projects/{ref}/config/database/postgres` with the key
+  answered HTTP 400 `Unrecognized key: "pg_stat_statements.track_planning"`;
+  `supabase postgres-config update --config
+  pg_stat_statements.track_planning=on --no-restart --experimental` exited 1,
+  `unknown Postgres config parameter: pg_stat_statements.track_planning`. The
+  config read back without the key both times, and `show` stayed `off`.
+
+Inference: a Data API request runs on an `authenticator` login, so the
+login-time setting on `authenticator` is the one that reaches it; the
+per-role settings are skipped by PostgREST because the parameter needs
+superuser and `authenticator` cannot be granted it. Setting it on
+`authenticator` turns planning statistics on for every Data API role at once.
+
+Measured, metrics endpoint:
+
+- OB06e: Basic auth with the secret key and with the legacy `service_role`
+  JWT both answered 200. One scrape held 307 families and 766 series, 49
+  families named `pg_*`. 22 families match lock|wait|activity|conflict|
+  blocked|deadlock: `pg_stat_activity_xact_runtime`,
+  `pg_stat_database_conflicts_confl_{bufferpin,deadlock,lock,snapshot,tablespace}_total`,
+  `pg_stat_database_conflicts_total`, `pg_stat_database_deadlocks_total` (each
+  one series, labels `supabase_identifier`, `service_type=postgresql`,
+  `server`), `pgbouncer_pools_client_{maxwait_seconds,waiting_cancel_connections,waiting_connections}`
+  and `pgbouncer_stats_client_wait_seconds_total` (labels `database`, `user`),
+  `pgrst_db_pool_waiting`, `db_sql_connection_wait_total` and
+  `db_sql_connection_wait_duration_milliseconds_total` (Auth, `otelsql`),
+  `node_procs_blocked`, `node_pressure_{cpu,io,memory}_waiting_seconds_total`,
+  `node_memory_Mlocked_bytes` and two `node_time_clocksource_*_info` families.
+  No series carries a `state` or wait-event label (0 and 0); 20 carry a `mode`
+  label. There is no `pg_locks` family and no per-state
+  `pg_stat_activity` count.
+- OB06f: the waiter showed `Lock:transactionid:active` (row) and
+  `Lock:relation:active` (table) in 24 of 36 scrapes. The only matching
+  `pg_` series that moved with the waits was `pg_stat_activity_xact_runtime`,
+  the age of the oldest open transaction: in ob06-run3 it read 30.083627 at
+  60 s and 100.132932 at 130 s during the row wait, and 80.0403 at 270 s
+  during the table wait, then 0 once both had ended. The pgbouncer, PostgREST
+  pool and Auth wait gauges stayed 0 throughout; the conflict and deadlock
+  counters did not change. The `node_pressure_*` counters rose at every
+  snapshot, waits or not. ob06-run3: `pg_` values changed 5 times, 60 to 70 s
+  apart (`node_` values the same); ob06-run2, with one fingerprint for both,
+  saw 8 changes 10 to 70 s apart.
+
+Answer: no. The endpoint exposes neither wait events nor lock waits; a
+blocked session shows up only as an old transaction in
+`pg_stat_activity_xact_runtime` (the holder's age; inference: a long
+idle-in-transaction session would give the same reading), refreshed about
+once a minute.
+
+Measured, restore to a new project (OB06g, both runs): the v1 document has
+115 paths and the v2 document 36; none mentions clone, and the create-project
+body has no source, backup or restore field (`db_pass`, `name`,
+`organization_id`, `organization_slug`, `plan`, `region`,
+`region_selection`, `kps_enabled`, `desired_instance_size`, `template_url`,
+`release_channel`, `postgres_engine`, `high_availability`). The restore paths
+are in-place (`/v1/projects/{ref}/restore`, `database/backups/restore`,
+`restore-pitr`, `restore-point`, `undo`) plus `POST
+/v2/projects/{ref}/backups/download` (its body takes a backup id and the type
+`project_backup_file_url`). Branch creation takes `with_data`. `GET
+/v1/projects/{ref}/clone` answered 404 and the Dashboard's clone route
+answered a PAT with 401 `Unsupported access token`, as RP01d found on
+2026-10-10. No clone was created.
+
+Not measured: the database-level arm (refused); a pooled (Supavisor) or
+custom-schema Data API path; PostgREST's version (not recorded); whether
+`branches` `with_data` or the backup-download route give a usable copy; the
+metrics endpoint on other compute sizes or with many waiters; Realtime or
+Storage connections waiting on locks.
 
 ## OB05 - notebooks pull/push
 

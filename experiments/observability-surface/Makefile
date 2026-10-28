@@ -15,7 +15,7 @@ OUT := $(CURDIR)/evidence/$(STAMP)
 #   sx SUPABASE_ACCESS_TOKEN CLOUDFLARE_EMAIL CLOUDFLARE_API_KEY CLOUDFLARE_ACCOUNT_ID -- \
 #     env PVLAB_ORG_PRO=<slug> make probe IDS=OB04
 
-.PHONY: install gen probe probe-ob02 probe-ob03 list cleanup
+.PHONY: install gen probe probe-ob02 probe-ob03 probe-ob06 list cleanup
 
 install:
 	cd apps && bun install
@@ -30,6 +30,12 @@ probe: gen
 	cd $(ROOT) && OB_STAMP=$(STAMP) bun harness/src/run.ts \
 	  --tests experiments/observability-surface/tests --where local \
 	  --experiment observability-surface --only $(IDS) --destructive --out $(OUT)/$(IDS)
+
+# OB06: track_planning for Data API traffic, metrics endpoint during lock
+# waits (OB06_HOLD_S per wait, default 130), restore-to-new-project API surface.
+# One micro project, ~12 min.
+probe-ob06:
+	$(MAKE) probe IDS=OB06
 
 list: gen
 	cd $(ROOT) && bun harness/src/run.ts --tests experiments/observability-surface/tests --where local --list | grep OB
