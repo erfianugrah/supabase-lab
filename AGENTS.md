@@ -5717,3 +5717,27 @@ runs 3-4. Numbers and per-write evidence: RUNLOG.md, artifacts
   direct-connection write path, n > 4, why the original
   cluster was restarted, client-server clock skew (needed to confirm the
   apparent ~10 s overlap of 15.19 and 17.11 accepting writes in run 3).
+
+## experiments/cron-behaviour - key facts (validated 2026-10-28, two runs, Pro org, Micro, ap-southeast-1; Postgres 17.11, pg_cron 1.6.4, pgmq 1.5.1)
+
+- **Hosted pg_cron skips runs whose time falls in a restart or resize; it
+  does not catch up, and a run in flight fails without a re-run** (CB04
+  restart, CB05 resize Micro -> Small, n=2 each): 1 every-minute instant
+  missed per event (new postmaster 49.5 s / 67.7 s after the restart
+  request, 67.7 s / 49.7 s after the resize), as many runs after recovery
+  as minute boundaries, 0 late, 0 duplicates; the `'10 seconds'` job
+  resumed 10.2-10.3 s after the new postmaster with 10 s spacing. The
+  `pg_sleep(120)` run in flight was `failed` in 4 of 4 with either `SSL
+  connection has been closed unexpectedly` (end_time set) or `server
+  restarted` (no end_time), never re-run. Jobs run over libpq to localhost
+  (`cron.use_background_workers=off`, postmaster context): `CALL proc()`
+  whose procedure COMMITs works only as the whole command (CB01: 5 rows in
+  5 transactions; an error at iteration 3 keeps the 2 earlier commits);
+  any other statement in the same command string fails it with `invalid
+  transaction termination` and 0 rows. `postgres` can delete from
+  `cron.job_run_details` (owner `supabase_admin`), directly and as a cron
+  job (CB02); `cron.log_run` is `postmaster` context and not changeable as
+  `postgres`. pgmq (CB03): archiving 10k 145 B messages grew the archive
+  table 2555904 B; read + archive of 1,000 took 25 ms p50 per cron run,
+  read + delete 19 ms. Figures from `out/2026-10-28/`; details and limits in
+  its RUNLOG.
