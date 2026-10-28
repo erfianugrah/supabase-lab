@@ -3329,10 +3329,10 @@ Numbers: `RUNLOG.md`, artifacts `out/2026-10-08/`.
   workers.dev hostname was once refused on the first provider create (cause
   not captured); `createProviderWhenResolvable` waits.
 
-## experiments/observability-surface - key facts (2026-10-10, OB03d 2026-10-23, Pro-plan org)
+## experiments/observability-surface - key facts (2026-10-10, OB03d 2026-10-23, OB06 2026-10-28, Pro-plan org)
 
 Self-provisioning (`ob-surface-` projects, ap-southeast-1), no OpenTofu state.
-Modules OB01-OB05 and OB03d; docs claims and measurements are kept apart in RUNLOG.md.
+Modules OB01-OB06 and OB03d; docs claims and measurements are kept apart in RUNLOG.md.
 
 - **supabase-js trace propagation (OB01)**: with the OTel API resolvable at run
   time, 2.111.0, 2.112.0 and 2.117.3 all attach `traceparent` (never `tracestate`
@@ -3409,6 +3409,22 @@ Modules OB01-OB05 and OB03d; docs claims and measurements are kept apart in RUNL
   refuses these orgs regardless of the entitlement; what grants access was not
   determined. Missing prerequisite: an org the v2 route accepts, or a drain
   created in the Dashboard pointed at the sink.
+- **track_planning, metrics waits, clone API (OB06, 2 runs, Micro, PG 17.11)**:
+  as `postgres`, `alter role <r> set pg_stat_statements.track_planning = on`
+  is accepted for authenticator, authenticated, anon, postgres and
+  service_role; `alter database postgres set` and `grant set on parameter ...
+  to authenticator` are refused (context `superuser`). Only the setting on
+  `authenticator` reaches Data API queries (in-request `on`, `calls=3
+  plans=3` for anon, authenticated and service_role after reload config plus
+  terminating the authenticator backends); PostgREST skips the per-role ones
+  (`off` in the request, `plans` 0, requests still 200), and `SET ROLE` does
+  not apply them either. postgres-config refuses the key (`PUT` 400
+  `Unrecognized key`, CLI exit 1). The metrics endpoint has no wait-event,
+  `state` or `pg_locks` series (22 of 307 families match lock/wait/activity);
+  a lock wait shows only as `pg_stat_activity_xact_runtime`, the oldest open
+  transaction's age, refreshed every 60 to 70 s. The OpenAPI documents still
+  have no clone or restore-to-new-project path (v1 115, v2 36 paths) and the
+  Dashboard clone route refuses a PAT (401).
 
 ## experiments/logs-volume - key facts (validated 2026-10-15, Pro org, ap-southeast-1, one self-provisioned project per module run)
 

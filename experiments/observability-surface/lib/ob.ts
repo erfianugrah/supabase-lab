@@ -50,7 +50,7 @@ async function devProject(ctx: Ctx): Promise<ObProject | null> {
   return { ctx: child, ref: st.ref, name: st.name, createdAt: Date.now(), healthyMs: 0, dbPass: st.dbPass };
 }
 
-export async function makeProject(ctx: Ctx, tag: string, prefix = NAME_PREFIX): Promise<ObProject> {
+export async function makeProject(ctx: Ctx, tag: string, prefix = NAME_PREFIX, size?: string): Promise<ObProject> {
   const dev = await devProject(ctx);
   if (dev) return dev;
   const org = ctx.orgs.pro;
@@ -63,6 +63,7 @@ export async function makeProject(ctx: Ctx, tag: string, prefix = NAME_PREFIX): 
     name,
     db_pass: dbPass,
     region: "ap-southeast-1",
+    ...(size ? { desired_instance_size: size } : {}),
   });
   const ref = (create.json as { ref?: string; id?: string } | undefined)?.ref ?? (create.json as { id?: string } | undefined)?.id ?? "";
   if (create.status !== 201 || !ref) throw new Error(`create HTTP ${create.status}: ${create.text.slice(0, 300)}`);
