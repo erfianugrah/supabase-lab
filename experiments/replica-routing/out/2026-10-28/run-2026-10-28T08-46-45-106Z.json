@@ -1,0 +1,273 @@
+{
+  "startedAt": "2026-10-28T08:46:45.106Z",
+  "finishedAt": "2026-10-28T08:54:46.085Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "replica-routing",
+  "labCommit": "c2de0d9",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "RR07a",
+      "title": "primary (Small, ap-southeast-1), pitr_7, RR06 schema, users A and B, mock OIDC issuer in the Keycloak slot",
+      "status": "pass",
+      "detail": "healthy after 10s; pitr_7 200; schema HTTP 201; seed HTTP 201; users 2/2; issuer deploy HTTP 201; keycloak PATCH 200, in settings after 3s",
+      "measurements": {
+        "healthy_after_s": 10,
+        "region": "ap-southeast-1",
+        "idp_deploy_http": 201,
+        "keycloak_patch_http": 200,
+        "keycloak_settled_s": 3
+      },
+      "durationMs": 480977
+    },
+    {
+      "id": "RR07b",
+      "title": "read replica in ap-southeast-1; load balancer host",
+      "status": "pass",
+      "detail": "setup HTTP 204; first session connection after 182s; replica host answers replica; load balancer <ref>-all.supabase.co",
+      "measurements": {
+        "replica_served_after_s": 182
+      },
+      "durationMs": 480977
+    },
+    {
+      "id": "RR07c",
+      "title": "custom domain up: add-on, initialize, DNS, verify, activate; host serves rr_whoami",
+      "status": "pass",
+      "detail": "add-on HTTP 200; CNAME 200, TXT _cf-custom-hostname 200 at 1s, TXT _acme-challenge 200 at 3s; verified 150s; activate first HTTP 400 {\"message\":\"Verification has not been completed.\"}, 2 attempt(s); reconfigured 61s; custom host answered primary 0s after that",
+      "measurements": {
+        "verified_s": 150,
+        "active_s": 61,
+        "serving_s": 0,
+        "activate_attempts": 2
+      },
+      "durationMs": 480977
+    },
+    {
+      "id": "RR07d",
+      "title": "the Worker on a Workers Custom Domain in the same zone: deploy, zone nameservers, 1.1.1.1, serving (seconds after the deploy exited)",
+      "status": "pass",
+      "detail": "wrangler deploy exit 0 in 9s; A record on the zone's nameservers 3s, on 1.1.1.1 3s; rr_whoami through the Worker answered replica 3s after the deploy",
+      "measurements": {
+        "deploy_exit": 0,
+        "deploy_s": 9,
+        "zone_nameservers": 2,
+        "deploy_output_names_custom_domain": "yes",
+        "workers_domain_listed": "yes",
+        "zone_ns_answer_s": 3,
+        "public_resolver_answer_s": 3,
+        "serving_s": 3,
+        "last": "replica"
+      },
+      "durationMs": 480977
+    },
+    {
+      "id": "RR07e",
+      "title": "Worker hop latency: 50 anon GET rpc/rr_whoami through the Worker and 50 straight to the load balancer, interleaved, order alternated, after 5 warm-ups each",
+      "status": "info",
+      "detail": "Worker p50 34.9 ms p90 60 ms; load balancer p50 33.3 ms p90 63.9 ms; p50 delta 1.6 ms; nodes via Worker {\"primary\":30,\"replica\":20}, via load balancer {\"replica\":26,\"primary\":24}",
+      "measurements": {
+        "n_each": 50,
+        "worker_ok": 50,
+        "lb_ok": 50,
+        "worker_p50_ms": 34.9,
+        "worker_p90_ms": 60,
+        "lb_p50_ms": 33.3,
+        "lb_p90_ms": 63.9,
+        "p50_delta_ms": 1.6,
+        "worker_nodes": "{\"primary\":30,\"replica\":20}",
+        "lb_nodes": "{\"replica\":26,\"primary\":24}"
+      },
+      "durationMs": 480977
+    },
+    {
+      "id": "RR07f",
+      "title": "CORS: preflight and actual requests with Origin https://app.example.test for GET /rest/v1, POST /rest/v1/rpc, POST /auth/v1/token, through the Worker, the custom host and the load balancer",
+      "status": "info",
+      "detail": "Access-Control-Allow-Origin values seen [\"*\",\"https://app.example.test\"]; header sets that differ: none; rest_get preflight via Worker 200 {\"access-control-allow-origin\":\"*\",\"access-control-allow-methods\":\"GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS,TRACE,CONNECT\",\"access-control-allow-headers\":\"apikey,authorization,content-type,x-client-info\",\"access-control-allow-credentials\":\"-\",\"access-control-max-age\":\"3600\",\"access-control-expose-headers\":\"-\",\"vary\":\"-\"} route=write; rest_get actual via Worker 200 {\"access-control-allow-origin\":\"https://app.example.test\",\"access-control-allow-methods\":\"-\",\"access-control-allow-headers\":\"-\",\"access-control-allow-credentials\":\"-\",\"access-control-max-age\":\"-\",\"access-control-expose-headers\":\"Content-Encoding, Content-Location, Content-Range, Content-Type, Date, Location, Server, Transfer-Encoding, Range-Unit\",\"vary\":\"Accept-Encoding\"} route=read",
+      "measurements": {
+        "rest_get_worker_pre": "200 {\"access-control-allow-origin\":\"*\",\"access-control-allow-methods\":\"GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS,TRACE,CONNECT\",\"access-control-allow-headers\":\"apikey,authorization,content-type,x-client-info\",\"access-control-allow-credentials\":\"-\",\"access-control-max-age\":\"3600\",\"access-control-expose-headers\":\"-\",\"vary\":\"-\"} route=write",
+        "rest_get_worker_act": "200 {\"access-control-allow-origin\":\"https://app.example.test\",\"access-control-allow-methods\":\"-\",\"access-control-allow-headers\":\"-\",\"access-control-allow-credentials\":\"-\",\"access-control-max-age\":\"-\",\"access-control-expose-headers\":\"Content-Encoding, Content-Location, Content-Range, Content-Type, Date, Location, Server, Transfer-Encoding, Range-Unit\",\"vary\":\"Accept-Encoding\"} route=read",
+        "rest_get_custom_pre": "200 {\"access-control-allow-origin\":\"*\",\"access-control-allow-methods\":\"GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS,TRACE,CONNECT\",\"access-control-allow-headers\":\"apikey,authorization,content-type,x-client-info\",\"access-control-allow-credentials\":\"-\",\"access-control-max-age\":\"3600\",\"access-control-expose-headers\":\"-\",\"vary\":\"-\"}",
+        "rest_get_custom_act": "200 {\"access-control-allow-origin\":\"https://app.example.test\",\"access-control-allow-methods\":\"-\",\"access-control-allow-headers\":\"-\",\"access-control-allow-credentials\":\"-\",\"access-control-max-age\":\"-\",\"access-control-expose-headers\":\"Content-Encoding, Content-Location, Content-Range, Content-Type, Date, Location, Server, Transfer-Encoding, Range-Unit\",\"vary\":\"Accept-Encoding\"}",
+        "rest_get_lb_pre": "200 {\"access-control-allow-origin\":\"*\",\"access-control-allow-methods\":\"GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS,TRACE,CONNECT\",\"access-control-allow-headers\":\"apikey,authorization,content-type,x-client-info\",\"access-control-allow-credentials\":\"-\",\"access-control-max-age\":\"3600\",\"access-control-expose-headers\":\"-\",\"vary\":\"-\"}",
+        "rest_get_lb_act": "200 {\"access-control-allow-origin\":\"https://app.example.test\",\"access-control-allow-methods\":\"-\",\"access-control-allow-headers\":\"-\",\"access-control-allow-credentials\":\"-\",\"access-control-max-age\":\"-\",\"access-control-expose-headers\":\"Content-Encoding, Content-Location, Content-Range, Content-Type, Date, Location, Server, Transfer-Encoding, Range-Unit\",\"vary\":\"Accept-Encoding\"}",
+        "rest_get_pre_worker_eq_custom": "yes",
+        "rest_get_act_worker_eq_custom": "yes",
+        "rest_get_act_worker_eq_lb": "yes",
+        "rpc_post_worker_pre": "200 {\"access-control-allow-origin\":\"*\",\"access-control-allow-methods\":\"GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS,TRACE,CONNECT\",\"access-control-allow-headers\":\"apikey,authorization,content-type,x-client-info\",\"access-control-allow-credentials\":\"-\",\"access-control-max-age\":\"3600\",\"access-control-expose-headers\":\"-\",\"vary\":\"-\"} route=write",
+        "rpc_post_worker_act": "200 {\"access-control-allow-origin\":\"https://app.example.test\",\"access-control-allow-methods\":\"-\",\"access-control-allow-headers\":\"-\",\"access-control-allow-credentials\":\"-\",\"access-control-max-age\":\"-\",\"access-control-expose-headers\":\"Content-Encoding, Content-Location, Content-Range, Content-Type, Date, Location, Server, Transfer-Encoding, Range-Unit\",\"vary\":\"-\"} route=write",
+        "rpc_post_custom_pre": "200 {\"access-control-allow-origin\":\"*\",\"access-control-allow-methods\":\"GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS,TRACE,CONNECT\",\"access-control-allow-headers\":\"apikey,authorization,content-type,x-client-info\",\"access-control-allow-credentials\":\"-\",\"access-control-max-age\":\"3600\",\"access-control-expose-headers\":\"-\",\"vary\":\"-\"}",
+        "rpc_post_custom_act": "200 {\"access-control-allow-origin\":\"https://app.example.test\",\"access-control-allow-methods\":\"-\",\"access-control-allow-headers\":\"-\",\"access-control-allow-credentials\":\"-\",\"access-control-max-age\":\"-\",\"access-control-expose-headers\":\"Content-Encoding, Content-Location, Content-Range, Content-Type, Date, Location, Server, Transfer-Encoding, Range-Unit\",\"vary\":\"-\"}",
+        "rpc_post_lb_pre": "200 {\"access-control-allow-origin\":\"*\",\"access-control-allow-methods\":\"GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS,TRACE,CONNECT\",\"access-control-allow-headers\":\"apikey,authorization,content-type,x-client-info\",\"access-control-allow-credentials\":\"-\",\"access-control-max-age\":\"3600\",\"access-control-expose-headers\":\"-\",\"vary\":\"-\"}",
+        "rpc_post_lb_act": "200 {\"access-control-allow-origin\":\"https://app.example.test\",\"access-control-allow-methods\":\"-\",\"access-control-allow-headers\":\"-\",\"access-control-allow-credentials\":\"-\",\"access-control-max-age\":\"-\",\"access-control-expose-headers\":\"Content-Encoding, Content-Location, Content-Range, Content-Type, Date, Location, Server, Transfer-Encoding, Range-Unit\",\"vary\":\"-\"}",
+        "rpc_post_pre_worker_eq_custom": "yes",
+        "rpc_post_act_worker_eq_custom": "yes",
+        "rpc_post_act_worker_eq_lb": "yes",
+        "auth_token_worker_pre": "200 {\"access-control-allow-origin\":\"*\",\"access-control-allow-methods\":\"GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS,TRACE,CONNECT\",\"access-control-allow-headers\":\"apikey,authorization,content-type,x-client-info\",\"access-control-allow-credentials\":\"-\",\"access-control-max-age\":\"3600\",\"access-control-expose-headers\":\"-\",\"vary\":\"-\"} route=write",
+        "auth_token_worker_act": "200 {\"access-control-allow-origin\":\"https://app.example.test\",\"access-control-allow-methods\":\"-\",\"access-control-allow-headers\":\"-\",\"access-control-allow-credentials\":\"true\",\"access-control-max-age\":\"-\",\"access-control-expose-headers\":\"X-Total-Count, Link, X-Supabase-Api-Version\",\"vary\":\"Origin, Accept-Encoding\"} route=write",
+        "auth_token_custom_pre": "200 {\"access-control-allow-origin\":\"*\",\"access-control-allow-methods\":\"GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS,TRACE,CONNECT\",\"access-control-allow-headers\":\"apikey,authorization,content-type,x-client-info\",\"access-control-allow-credentials\":\"-\",\"access-control-max-age\":\"3600\",\"access-control-expose-headers\":\"-\",\"vary\":\"-\"}",
+        "auth_token_custom_act": "200 {\"access-control-allow-origin\":\"https://app.example.test\",\"access-control-allow-methods\":\"-\",\"access-control-allow-headers\":\"-\",\"access-control-allow-credentials\":\"true\",\"access-control-max-age\":\"-\",\"access-control-expose-headers\":\"X-Total-Count, Link, X-Supabase-Api-Version\",\"vary\":\"Origin, Accept-Encoding\"}",
+        "auth_token_lb_pre": "200 {\"access-control-allow-origin\":\"*\",\"access-control-allow-methods\":\"GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS,TRACE,CONNECT\",\"access-control-allow-headers\":\"apikey,authorization,content-type,x-client-info\",\"access-control-allow-credentials\":\"-\",\"access-control-max-age\":\"3600\",\"access-control-expose-headers\":\"-\",\"vary\":\"-\"}",
+        "auth_token_lb_act": "200 {\"access-control-allow-origin\":\"https://app.example.test\",\"access-control-allow-methods\":\"-\",\"access-control-allow-headers\":\"-\",\"access-control-allow-credentials\":\"true\",\"access-control-max-age\":\"-\",\"access-control-expose-headers\":\"X-Total-Count, Link, X-Supabase-Api-Version\",\"vary\":\"Origin, Accept-Encoding\"}",
+        "auth_token_pre_worker_eq_custom": "yes",
+        "auth_token_act_worker_eq_custom": "yes",
+        "auth_token_act_worker_eq_lb": "yes"
+      },
+      "durationMs": 480977
+    },
+    {
+      "id": "RR07g",
+      "title": "real cross-origin fetches from a page at https://app.example.test in headless Chromium: password sign-in, RLS read, POST rpc, through the Worker and the custom host",
+      "status": "pass",
+      "detail": "console_errors 0; worker_signin 200 token; worker_read 200 rows=5 primary; worker_rpc_post 200 primary; custom_signin 200 token; custom_read 200 rows=5 primary; custom_rpc_post 200 primary",
+      "measurements": {
+        "console_errors": 0,
+        "worker_signin": "200 token",
+        "worker_read": "200 rows=5 primary",
+        "worker_rpc_post": "200 primary",
+        "custom_signin": "200 token",
+        "custom_read": "200 rows=5 primary",
+        "custom_rpc_post": "200 primary"
+      },
+      "evidence": "",
+      "durationMs": 480977
+    },
+    {
+      "id": "RR07h",
+      "title": "OAuth (Keycloak slot, mock issuer) PKCE round trip entered at the worker host; code exchanged at the entry host",
+      "status": "pass",
+      "detail": "entry worker; authorize_url worker/auth/v1/authorize; code_challenge_sent yes; redirect_uri custom/auth/v1/callback; issuer_sent_browser_to custom/auth/v1/callback; landed site-url/hp-callback; exchange ok; token_iss project/auth/v1; provider keycloak; token_request_redirect_uri custom/auth/v1/callback; get_user_via_entry ok; hops authorize worker/auth/v1/authorize 302 route=write > issuer project/functions/v1/hp-mock-idp/protocol/openid-connect/auth 302 > callback custom/auth/v1/callback 302",
+      "measurements": {
+        "entry": "worker",
+        "authorize_url": "worker/auth/v1/authorize",
+        "code_challenge_sent": "yes",
+        "redirect_uri": "custom/auth/v1/callback",
+        "issuer_sent_browser_to": "custom/auth/v1/callback",
+        "landed": "site-url/hp-callback",
+        "exchange": "ok",
+        "token_iss": "project/auth/v1",
+        "provider": "keycloak",
+        "token_request_redirect_uri": "custom/auth/v1/callback",
+        "get_user_via_entry": "ok",
+        "hops": "authorize worker/auth/v1/authorize 302 route=write > issuer project/functions/v1/hp-mock-idp/protocol/openid-connect/auth 302 > callback custom/auth/v1/callback 302"
+      },
+      "durationMs": 480977
+    },
+    {
+      "id": "RR07i",
+      "title": "OAuth (Keycloak slot, mock issuer) PKCE round trip entered at the custom host; code exchanged at the entry host",
+      "status": "pass",
+      "detail": "entry custom; authorize_url custom/auth/v1/authorize; code_challenge_sent yes; redirect_uri custom/auth/v1/callback; issuer_sent_browser_to custom/auth/v1/callback; landed site-url/hp-callback; exchange ok; token_iss project/auth/v1; provider keycloak; token_request_redirect_uri custom/auth/v1/callback; get_user_via_entry ok; hops authorize custom/auth/v1/authorize 302 > issuer project/functions/v1/hp-mock-idp/protocol/openid-connect/auth 302 > callback custom/auth/v1/callback 302",
+      "measurements": {
+        "entry": "custom",
+        "authorize_url": "custom/auth/v1/authorize",
+        "code_challenge_sent": "yes",
+        "redirect_uri": "custom/auth/v1/callback",
+        "issuer_sent_browser_to": "custom/auth/v1/callback",
+        "landed": "site-url/hp-callback",
+        "exchange": "ok",
+        "token_iss": "project/auth/v1",
+        "provider": "keycloak",
+        "token_request_redirect_uri": "custom/auth/v1/callback",
+        "get_user_via_entry": "ok",
+        "hops": "authorize custom/auth/v1/authorize 302 > issuer project/functions/v1/hp-mock-idp/protocol/openid-connect/auth 302 > callback custom/auth/v1/callback 302"
+      },
+      "durationMs": 480977
+    },
+    {
+      "id": "RR07j",
+      "title": "OAuth (Keycloak slot, mock issuer) PKCE round trip entered at the project host; code exchanged at the entry host",
+      "status": "pass",
+      "detail": "entry project; authorize_url project/auth/v1/authorize; code_challenge_sent yes; redirect_uri custom/auth/v1/callback; issuer_sent_browser_to custom/auth/v1/callback; landed site-url/hp-callback; exchange ok; token_iss project/auth/v1; provider keycloak; token_request_redirect_uri custom/auth/v1/callback; get_user_via_entry ok; hops authorize project/auth/v1/authorize 302 > issuer project/functions/v1/hp-mock-idp/protocol/openid-connect/auth 302 > callback custom/auth/v1/callback 302",
+      "measurements": {
+        "entry": "project",
+        "authorize_url": "project/auth/v1/authorize",
+        "code_challenge_sent": "yes",
+        "redirect_uri": "custom/auth/v1/callback",
+        "issuer_sent_browser_to": "custom/auth/v1/callback",
+        "landed": "site-url/hp-callback",
+        "exchange": "ok",
+        "token_iss": "project/auth/v1",
+        "provider": "keycloak",
+        "token_request_redirect_uri": "custom/auth/v1/callback",
+        "get_user_via_entry": "ok",
+        "hops": "authorize project/auth/v1/authorize 302 > issuer project/functions/v1/hp-mock-idp/protocol/openid-connect/auth 302 > callback custom/auth/v1/callback 302"
+      },
+      "durationMs": 480977
+    },
+    {
+      "id": "RR07k",
+      "title": "OAuth (Keycloak slot, mock issuer) PKCE round trip entered at the worker, callback hop through the Worker host; code exchanged at the entry host",
+      "status": "pass",
+      "detail": "entry worker, callback hop through the Worker; authorize_url worker/auth/v1/authorize; code_challenge_sent yes; redirect_uri custom/auth/v1/callback; issuer_sent_browser_to custom/auth/v1/callback; landed site-url/hp-callback; exchange ok; token_iss project/auth/v1; provider keycloak; token_request_redirect_uri custom/auth/v1/callback; get_user_via_entry ok; hops authorize worker/auth/v1/authorize 302 route=write > issuer project/functions/v1/hp-mock-idp/protocol/openid-connect/auth 302 > callback worker/auth/v1/callback 302 route=write",
+      "measurements": {
+        "entry": "worker, callback hop through the Worker",
+        "authorize_url": "worker/auth/v1/authorize",
+        "code_challenge_sent": "yes",
+        "redirect_uri": "custom/auth/v1/callback",
+        "issuer_sent_browser_to": "custom/auth/v1/callback",
+        "landed": "site-url/hp-callback",
+        "exchange": "ok",
+        "token_iss": "project/auth/v1",
+        "provider": "keycloak",
+        "token_request_redirect_uri": "custom/auth/v1/callback",
+        "get_user_via_entry": "ok",
+        "hops": "authorize worker/auth/v1/authorize 302 route=write > issuer project/functions/v1/hp-mock-idp/protocol/openid-connect/auth 302 > callback worker/auth/v1/callback 302 route=write"
+      },
+      "durationMs": 480977
+    },
+    {
+      "id": "RR07l",
+      "title": "the OAuth (PKCE) session on the Worker-host client: 20 reads of rr6_docs_v, 3 POST rpc, refresh, 10 reads",
+      "status": "pass",
+      "detail": "reads replica rows=4 uid=O foreign=0: 13; primary rows=4 uid=O foreign=0: 7; POST rpc {\"primary\":3}; refresh ok; reads after primary rows=4 uid=O foreign=0: 8; replica rows=4 uid=O foreign=0: 2",
+      "measurements": {
+        "reads": "replica rows=4 uid=O foreign=0: 13; primary rows=4 uid=O foreign=0: 7",
+        "reads_replica": 15,
+        "reads_primary": 15,
+        "rpc_post": "{\"primary\":3}",
+        "refresh": "ok",
+        "reads_after_refresh": "primary rows=4 uid=O foreign=0: 8; replica rows=4 uid=O foreign=0: 2"
+      },
+      "durationMs": 480977
+    },
+    {
+      "id": "RR07m",
+      "title": "SAML SSO (lab-signed Response) started on the Worker-host client (PKCE): SP metadata per host, ACS POST through the Worker and to the metadata ACS, code exchange and 10 reads through the Worker",
+      "status": "pass",
+      "detail": "saml_enable_patch 200; saml_enabled_in_settings_s 3; provider_create 201; sp_metadata_via_worker 200 entity custom/auth/v1/sso/saml/metadata acs custom/auth/v1/sso/saml/acs; sp_metadata_via_custom 200 entity custom/auth/v1/sso/saml/metadata acs custom/auth/v1/sso/saml/acs; sp_metadata_via_project 200 entity custom/auth/v1/sso/saml/metadata acs custom/auth/v1/sso/saml/acs; acs_post_via_worker sso url host <id>.example.com; AuthnRequest ACS custom/auth/v1/sso/saml/acs; ACS POST to worker/auth/v1/sso/saml/acs 302 route=write -> site-url/hp-callback code yes; exchange via Worker ok; acs_post_to_metadata_acs sso url host <id>.example.com; AuthnRequest ACS custom/auth/v1/sso/saml/acs; ACS POST to custom/auth/v1/sso/saml/acs 302 -> site-url/hp-callback code yes; exchange via Worker ok; reads_via_worker primary rows=2 uid=S foreign=0: 5; replica rows=2 uid=S foreign=0: 5; provider sso:<uuid>",
+      "measurements": {
+        "saml_enable_patch": 200,
+        "saml_enabled_in_settings_s": 3,
+        "provider_create": 201,
+        "sp_metadata_via_worker": "200 entity custom/auth/v1/sso/saml/metadata acs custom/auth/v1/sso/saml/acs",
+        "sp_metadata_via_custom": "200 entity custom/auth/v1/sso/saml/metadata acs custom/auth/v1/sso/saml/acs",
+        "sp_metadata_via_project": "200 entity custom/auth/v1/sso/saml/metadata acs custom/auth/v1/sso/saml/acs",
+        "acs_post_via_worker": "sso url host <id>.example.com; AuthnRequest ACS custom/auth/v1/sso/saml/acs; ACS POST to worker/auth/v1/sso/saml/acs 302 route=write -> site-url/hp-callback code yes; exchange via Worker ok",
+        "acs_post_to_metadata_acs": "sso url host <id>.example.com; AuthnRequest ACS custom/auth/v1/sso/saml/acs; ACS POST to custom/auth/v1/sso/saml/acs 302 -> site-url/hp-callback code yes; exchange via Worker ok",
+        "reads_via_worker": "primary rows=2 uid=S foreign=0: 5; replica rows=2 uid=S foreign=0: 5",
+        "provider": "sso:<uuid>"
+      },
+      "durationMs": 480977
+    },
+    {
+      "id": "RR07p",
+      "title": "teardown: Worker, Workers Custom Domain, certificate, auth providers, custom hostname, DNS records, replica, project",
+      "status": "pass",
+      "detail": "wrangler delete exit 0; Workers Custom Domains left after delete 0; certificate packs for the Worker host 0, deleted 0; auth providers off HTTP 200; custom-hostname DELETE HTTP 200; DNS records removed 3; replica remove HTTP 204; project DELETE HTTP 200; run took 8 min",
+      "measurements": {
+        "project_delete_http": 200,
+        "run_min": 8
+      },
+      "durationMs": 480977
+    }
+  ]
+}
