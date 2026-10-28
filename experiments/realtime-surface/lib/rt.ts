@@ -61,7 +61,8 @@ export function skipWithoutOrg(ctx: Ctx, id: string, title: string): TestResult[
   return [{ id, title, status: "skip", detail: "PVLAB_ORG_PRO not set (and no PVLAB_PEER_RT project to reuse)" }];
 }
 
-export async function withProject<T>(ctx: Ctx, label: string, fn: (p: Proj) => Promise<T>): Promise<T> {
+/** `size` is passed as `desired_instance_size` at creation (RT06): settings that Realtime derives from the size are fixed at creation (data-api-capacity DC16), so a resize afterwards is not the same project. */
+export async function withProject<T>(ctx: Ctx, label: string, fn: (p: Proj) => Promise<T>, opts: { size?: string } = {}): Promise<T> {
   const org = ctx.orgs.pro ?? "";
   if (!org) throw new Error("PVLAB_ORG_PRO not set");
   let ref = ctx.peers.rt ?? "";
@@ -74,6 +75,7 @@ export async function withProject<T>(ctx: Ctx, label: string, fn: (p: Proj) => P
         name: `rt-${label}-${Date.now()}`,
         db_pass: dbPass,
         region: "ap-southeast-1",
+        ...(opts.size ? { desired_instance_size: opts.size } : {}),
       });
       ref = String((create.json as { ref?: string } | undefined)?.ref ?? "");
       if (create.status !== 201 || !ref) throw new Error(`create HTTP ${create.status}: ${create.text.slice(0, 200)}`);

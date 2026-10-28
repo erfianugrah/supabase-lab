@@ -1,4 +1,4 @@
-# realtime-surface: self-provisioning modules (RT01-RT05). Each module creates a
+# realtime-surface: self-provisioning modules (RT01-RT06). Each module creates a
 # throwaway project on the Pro org, runs, and deletes it. No OpenTofu state.
 #
 #   make install                      # supabase-js at the old version RT04 receives on
@@ -6,6 +6,7 @@
 #   SUPABASE_ACCESS_TOKEN=... PVLAB_ORG_PRO=<slug> make run            # RT01-RT04 (RT05 is the long burst battery, about 70 min)
 #   SUPABASE_ACCESS_TOKEN=... PVLAB_ORG_PRO=<slug> make run ONLY=RT03  # one module
 #   ... make run ONLY=RT05 RT05_LEVELS=100,500 RT05_REPS=1             # a shorter burst battery
+#   ... make run ONLY=RT06                                           # filter vs shared-topic joins, per-user Broadcast (about 45 min)
 #
 # Reuse a project while iterating (never deleted): PVLAB_PEER_RT=<ref>, with
 # PVLAB_RT_DBPASS=<its db password> for the modules that open a pooler session.
@@ -15,6 +16,7 @@
 ROOT := $(abspath ../..)
 ONLY ?= RT01,RT02,RT03,RT04
 export RT05_LEVELS RT05_REPS RT05_POOLS RT05_KINDS RT05_CONNECT_RATE RT05_SETTLE_MS RT05_COMPUTE RT05_BOUNDS RT05_BC_LEVELS
+export RT06_COMPUTE RT06_N RT06_REPS RT06_SHAPES RT06_ROWS RT06_CONNECT_RATE RT06_SETTLE_MS RT06_BC_N RT06_BC_RATES RT06_BC_SECS
 TS := $(shell date +%Y%m%d-%H%M%S)
 
 .PHONY: install list run facts
