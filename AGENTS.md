@@ -4450,7 +4450,7 @@ projects (feature battery, two conversion probes), all `small`,
   cannot call them), so the blog's "tracked" is untested for the dashboard;
   `migration_version`; the dashboard merge-request screen.
 
-## experiments/replica-routing - key facts (validated 2026-10-10, Pro org; RR02 2026-10-23, two runs; RR03 and RR04 2026-10-26, two runs each; RR06 2026-10-28, two runs)
+## experiments/replica-routing - key facts (validated 2026-10-10, Pro org; RR02 2026-10-23, two runs; RR03 and RR04 2026-10-26, two runs each; RR06 2026-10-28, two runs; RR07 2026-10-28, three runs)
 
 - **The API load balancer's host is `<ref>-all.supabase.co` and the Management
   API does not return it** (RR01e, 2026-10-10): the Dashboard route
@@ -4626,6 +4626,23 @@ projects (feature battery, two conversion probes), all `small`,
   a lab-zone hostname. An OAuth or SAML round trip through the Worker was not
   run (one `GET /auth/v1/authorize?provider=github` answered 400 with no
   provider configured); nor was browser CORS through it.
+- **The splitting Worker on the app's own hostname carries OAuth, SAML and
+  CORS; the provider still registers the custom host** (RR07, 2026-10-28,
+  runs 1 and 2 of three, RR06's shape, Worker on a Workers Custom Domain in
+  the same zone): serving 3 s and 6 s after `wrangler deploy` exited. OAuth
+  (PKCE, mock issuer in the Keycloak slot) entered at the Worker, custom or
+  project host always got `redirect_uri` `<custom-host>/auth/v1/callback`, and
+  the code exchange through the Worker worked; the session's reads through
+  the Worker were correct (30 of 30 per run). SAML is available on the Pro
+  org; the SP entity ID and ACS are the custom host's whichever host serves
+  the metadata, and an ACS POST through the Worker signed in. CORS headers
+  through the Worker matched the custom host and `-all` in 9 of 9 comparisons
+  per run, and a headless Chromium page on another origin signed in, read and
+  wrote through it. The hop added 1.6 ms (run 1) and 20.3 ms (run 2) at p50
+  over 50 interleaved GETs, not separated from Cloudflare location effects.
+  Run 0 failed on the module's own DNS wait: a Bun `Resolver` instance that
+  asks before the record exists keeps the `ENOTFOUND` (ad-hoc probe, not in
+  an artifact), the likelier cause of RR06 run 1's miss too (inference).
 
 ## experiments/scoped-pats - key facts (SP01-SP10, validated 2026-10-10)
 

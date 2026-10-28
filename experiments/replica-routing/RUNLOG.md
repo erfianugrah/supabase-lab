@@ -1153,6 +1153,207 @@ measured.
 - Cost: not metered. Each run kept a Small primary, a Small replica, `pitr_7`
   and the `custom_domain` add-on for about 15 and 9 minutes.
 
+## 2026-10-28 - RR07, the splitting Worker on the app's own hostname: DNS, hop latency, CORS, OAuth, SAML
+
+Question: an app keeps one branded API hostname with a read replica behind
+it. A Cloudflare Worker on that hostname sends GET and HEAD on `/rest/v1/*`
+to the load balancer (`<ref>-all.supabase.co`) and everything else to the
+project's custom domain (RR06g's `worker/rr06-split.js`, unchanged). RR06g
+showed password sign-in, refresh, reads and writes through it on a
+`*.workers.dev` host. Does it serve on a hostname in the app's own zone, what
+does the Worker hop cost, do the CORS headers come through, and do an OAuth
+and a SAML sign-in complete through it?
+
+Shape: RR06's, one throwaway Pro-org project per run: primary in
+ap-southeast-1 on Small compute, `pitr_7`, one Small read replica in the same
+region, the `custom_domain` add-on with the hostname `rr07-<epoch>` in a
+Cloudflare-hosted zone. The Worker runs on a Workers Custom Domain
+`rr07w-<epoch>` in the same zone (`wrangler deploy --domain`). OAuth uses
+hostname-path's mock OIDC issuer (an Edge Function on the project) in the
+Keycloak provider slot; the module plays the browser and drives the PKCE flow
+with supabase-js (`flowType: "pkce"`, `signInWithOAuth` with
+`skipBrowserRedirect`, then `exchangeCodeForSession`). SAML uses
+auth-providers AU04's lab IdP (xml-crypto in an `oven/bun:1` container signs
+the Response). Vantage: the Singapore workstation. supabase-js 2.118.0,
+wrangler 4.147.0, Playwright 1.63.0, Bun 1.3.14. Artifacts:
+
+- run 0: `out/2026-10-28/run-2026-10-28T08-27-13-474Z.json`, 08:27:13 to
+  08:40:46 UTC, 4 pass, 1 fail (RR07d), 0 skip; the module stopped at RR07d
+- run 1: `out/2026-10-28/run-2026-10-28T08-46-45-106Z.json`, 08:46:45 to
+  08:54:46 UTC, 12 pass, 0 fail, 0 skip
+- run 2: `out/2026-10-28/run-2026-10-28T08-54-56-906Z.json`, 08:54:56 to
+  09:02:26 UTC, 12 pass, 0 fail, 0 skip
+
+All three record lab commit c2de0d9; the module was uncommitted. Between run 0
+and run 1 the module's DNS wait changed (RR07d below) and RR07d gained two
+fields (`deploy_output_names_custom_domain`, `workers_domain_listed`).
+Nothing else changed.
+
+Setup: replica first session-pooler connection 172 s (run 0), 182 s (run 1)
+and 197 s (run 2) after the setup call. Custom hostname verified 87 s, 150 s
+and 151 s after the CNAME write; `activate` answered 201 on the first call in
+runs 0 and 2, and in run 1 `400 "Verification has not been completed."` then
+succeeded on the second attempt. The custom host answered `rpc/rr_whoami`
+5 s, 0 s and 5 s after `5_services_reconfigured` was seen.
+
+### RR07d: time to serving on a Workers Custom Domain
+
+Seconds after `wrangler deploy` exited:
+
+| | run 0 | run 1 | run 2 |
+|---|---|---|---|
+| `wrangler deploy` exit, wall time | 0, 9 s | 0, 9 s | 0, 11 s |
+| deploy output names the custom domain; Workers domains API lists it | not recorded | yes; yes | yes; yes |
+| A record on the zone's own nameservers | never (8 min budget) | 3 s | 5 s |
+| A record on 1.1.1.1 | not asked | 3 s | 5 s |
+| `rpc/rr_whoami` answered through the Worker (system resolver) | not reached | 3 s, replica | 6 s, replica |
+
+Run 0 asked the zone's nameservers through one Bun `Resolver` instance,
+starting the moment the deploy exited. An ad-hoc probe after run 0 (not in an
+artifact): a Worker deployed the same way to a fresh name was on the zone's
+nameservers within seconds by `dig`; a Bun `Resolver` instance that had asked
+before the record existed kept returning `ENOTFOUND` for the rest of the
+probe while a new instance and `dig` returned the record, and the
+module-level `resolve4` and `lookup` did the same. Runs 1 and 2 create a new
+`Resolver` per query and ask the system resolver only after 1.1.1.1 answers.
+
+That probe also bears on RR06 run 1, whose Worker host never resolved: RR06's
+wait polled the module-level `resolve4` from before the record existed. By
+inference, Bun's in-process cache of the miss is the likelier cause than the
+macOS resolver holding it for the zone's SOA minimum; RR06's run did not
+separate the two.
+
+### RR07e: latency of the Worker hop
+
+50 anonymous GETs of `rpc/rr_whoami` through the Worker and 50 straight to
+`<ref>-all`, one at a time, interleaved with the order alternated, after 5
+warm-ups each that were discarded. All 200 requests per run answered.
+
+| | run 1 | run 2 |
+|---|---|---|
+| through the Worker, p50 / p90 | 34.9 / 60 ms | 55.8 / 88.9 ms |
+| straight to `-all`, p50 / p90 | 33.3 / 63.9 ms | 35.5 / 67.9 ms |
+| p50 through the Worker minus p50 direct | 1.6 ms | 20.3 ms |
+| nodes through the Worker | primary 30, replica 20 | replica 19, primary 31 |
+| nodes direct | replica 26, primary 24 | primary 20, replica 30 |
+
+The two runs disagree: the hop added 1.6 ms at p50 in one and 20.3 ms in the
+other. The figure includes whatever Cloudflare location and connection reuse
+each path got; the runs did not separate those from the Worker itself.
+
+### RR07f: CORS headers, Worker against the custom host and `-all`
+
+`Origin: https://app.example.test`; the preflight asked for the method and
+`apikey,authorization,content-type,x-client-info`; actual requests carried
+`apikey`, user B's token (REST and RPC) and `Content-Type`. The same values
+on every host, both runs:
+
+| request | preflight (`OPTIONS`) | actual request |
+|---|---|---|
+| GET `/rest/v1/rr6_docs_v` | 200; `Access-Control-Allow-Origin: *`; `-Methods: GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS,TRACE,CONNECT`; `-Headers` the requested list; `-Max-Age: 3600`; no `-Allow-Credentials` | 200; `-Allow-Origin` the request's origin; no `-Allow-Credentials`; `-Expose-Headers: Content-Encoding, Content-Location, Content-Range, Content-Type, Date, Location, Server, Transfer-Encoding, Range-Unit`; `Vary: Accept-Encoding` |
+| POST `/rest/v1/rpc/rr6_touch` | as for the GET | 200; `-Allow-Origin` the origin; no `-Allow-Credentials`; the same expose list; no `Vary` |
+| POST `/auth/v1/token?grant_type=password` | as for the GET | 200; `-Allow-Origin` the origin; `-Allow-Credentials: true`; `-Expose-Headers: X-Total-Count, Link, X-Supabase-Api-Version`; `Vary: Origin, Accept-Encoding` |
+
+For each of the three requests the module compared the Worker's headers with
+the custom host's (preflight and actual) and with `-all`'s (actual): 9
+comparisons per run, all identical, both runs. The Worker sent every
+`OPTIONS` to the custom host (`x-rr06-route: write`), including the preflight
+for the GET whose actual request went to `-all` (`read`).
+
+### RR07g: a cross-origin fetch in a browser
+
+Headless Chromium (Playwright 1.63.0) on a page at `https://app.example.test`
+(served by `page.route`), through the Worker host and through the custom
+host, one of each request per host: password sign-in 200 with a token, a read
+of `rr6_docs_v` 200 with user B's 5 rows (served by the primary each time),
+POST `rpc/rr6_touch` 200 on the primary, and 0 console errors. The same in
+both runs.
+
+### RR07h-k: OAuth (PKCE) entered at each host
+
+The code was exchanged at the host the flow was entered at. The same in both
+runs:
+
+| entered at | `redirect_uri` sent to the issuer | issuer sent the browser to | `redirect_uri` in the token request | landed | code exchange |
+|---|---|---|---|---|---|
+| Worker host (RR07h) | `<custom-host>/auth/v1/callback` | custom host | custom host | site URL with `?code` | ok, through the Worker |
+| custom host (RR07i) | `<custom-host>/auth/v1/callback` | custom host | custom host | site URL with `?code` | ok |
+| project host (RR07j) | `<custom-host>/auth/v1/callback` | custom host | custom host | site URL with `?code` | ok |
+| Worker host, callback request sent to the Worker host instead (RR07k) | `<custom-host>/auth/v1/callback` | custom host (module rewrote it) | custom host | site URL with `?code` | ok, through the Worker |
+
+In every case `code_challenge` was on the authorize URL, the token's `iss`
+was `<project-host>/auth/v1`, `app_metadata.provider` was `keycloak`, and
+`getUser()` through the entry host answered. The authorize request through
+the Worker went to the custom host (`write`). The callback the provider must
+have registered is `https://<custom-host>/auth/v1/callback`: the Auth server
+named it whatever host the flow entered at, the Worker host included. RR07k
+shows the callback endpoint also works when the request reaches it through
+the Worker; a real provider sends the browser to the `redirect_uri` it was
+given, so it would not go there unprompted. The mock issuer checks no
+`redirect_uri`, so a provider's own mismatch check was not exercised.
+
+### RR07l: the OAuth session through the Worker
+
+The Worker-host client holding RR07h's session (4 rows seeded for that user):
+
+| | run 1 | run 2 |
+|---|---|---|
+| 30 reads of `rr6_docs_v` (20, refresh, 10) | replica 15, primary 15 | replica 12, primary 18 |
+| 3 POST `rpc('rr6_touch')` | primary 3 | primary 3 |
+| `refreshSession` through the Worker | ok | ok |
+
+Every read returned the OAuth user's 4 rows, `auth.uid()` that user and 0
+rows of another tenant.
+
+### RR07m: SAML through the Worker
+
+Entitlement: `PATCH config/auth {saml_enabled: true}` 200, `saml_enabled`
+true in `/auth/v1/settings` 3 s later, SSO provider create 201, both runs; so
+SAML is available on this Pro org (AU04 found the same on 2026-10-10) and was
+run. The SP metadata fetched through the Worker, the custom host and the
+project host gave the same entity ID `<custom-host>/auth/v1/sso/saml/metadata`
+and ACS `<custom-host>/auth/v1/sso/saml/acs`, and the AuthnRequest named the
+same ACS, both runs.
+
+Two sign-ins per run, each started with `signInWithSSO` on a PKCE client on
+the Worker host, the lab IdP signing a Response for that AuthnRequest:
+
+| ACS POST sent to | run 1 | run 2 |
+|---|---|---|
+| the Worker host (`write`, to the custom host) | 302 to the site URL with `?code`; exchange through the Worker ok | the same |
+| the metadata ACS (custom host) | 302 to the site URL with `?code`; exchange through the Worker ok | the same |
+| then 10 reads of `rr6_docs_v` through the Worker | primary 5, replica 5 | primary 6, replica 4 |
+
+Every read returned the SAML user's 2 rows, `auth.uid()` that user and 0
+foreign rows; `app_metadata.provider` was `sso:<uuid>`. The IdP is the test
+itself (AU04's caveat): this says the Auth server accepted a well-formed
+Response through the Worker, not that a vendor IdP interoperates.
+
+### Teardown (RR07p)
+
+Each run: `wrangler delete` exit 0; 0 Workers Custom Domains left on the
+hostname; 0 certificate packs naming the Worker host found; auth providers off
+200; `DELETE custom-hostname` 200; 3 DNS records removed; replica remove 204;
+project `DELETE` 200. After run 2 the Cloudflare and Management APIs listed no
+`rr07` Worker, custom domain or DNS record and none of the three projects
+these runs created.
+
+### Not settled by RR07
+
+- A real OIDC provider's or vendor IdP's own checks (`redirect_uri`
+  registration, ACS/entity ID registration): the mock issuer and the lab IdP
+  accept anything.
+- The Worker hop's cost: two runs, one vantage, 1.6 and 20.3 ms at p50; not
+  separated from Cloudflare location and connection effects.
+- Browser fetches with `credentials: "include"`, Realtime, Storage and
+  Functions through the Worker.
+- A cache in front of REST GETs: the actual GET response reflected the origin
+  in `Access-Control-Allow-Origin` with `Vary: Accept-Encoding` only, so a
+  cache keyed without the origin could hand one origin's header to another
+  (inference; the Worker does not cache).
+- Cost: not metered. Each run kept a Small primary, a Small replica, `pitr_7`
+  and the `custom_domain` add-on for about 8 minutes (run 0 about 14).
+
 ## Not measured
 
 - Any primary region other than ap-northeast-1 (RR01, RR02) and
@@ -1164,7 +1365,7 @@ measured.
 - Replication delay for a large write (the largest transaction here is a
   50,000-row update; the RR02g bulk insert filled the disk before it
   committed).
-- Custom domains beyond RR06 (one shape, two runs, 2026-10-28). Auth, Storage, Realtime, GraphQL and Edge Function traffic
+- Custom domains beyond RR06 and RR07 (one shape, 2026-10-28). Auth, Storage, Realtime, GraphQL and Edge Function traffic
   through the load balancer is RR02f/RR02k; the replica's behaviour on a
   project restart is RR02i (cross-region) and RR04k (same region).
 - The load balancer's rule. Whether it re-routes off a lagging or unhealthy
