@@ -61,6 +61,13 @@ setup gate hunt) and `medium-serverless` (MS06: same-region replica).
 | RR07l | the OAuth session through the Worker: rows under RLS, `auth.uid()`, node, POST `rpc`, refresh |
 | RR07m | SAML SSO (lab-signed Response) started through the Worker: SP metadata per host, ACS POST through the Worker and to the metadata ACS, code exchange, reads |
 | RR07p | teardown: Worker, Workers Custom Domain, certificate, auth providers, custom hostname, DNS records, replica, project |
+| RR08a-c | same-region shape (Small primary and Small replica in ap-southeast-1, `pitr_7`); `rr8_items` 1,500,000 rows, `rr8_list(p_ms)` (a STABLE scan of 1 to 7 s); one user; replica and load balancer hosts |
+| RR08d | steady lag at 4 heartbeat inserts a second: heartbeat age on both hosts, `replay_lag` |
+| RR08e, RR08h, RR08j, RR08l | 4 + 4 readers (replica host, `-all`) of `rr8_list` as `authenticated` while the primary updates 500 rows every 250 ms and runs `VACUUM (VERBOSE)` every 30 s: defaults (e), `max_standby_streaming_delay` 5s (h), 120s (j), `hot_standby_feedback` on (l); failures by SQLSTATE, read time, heartbeat age, `replay_lag`, `pg_stat_database_conflicts`, dead tuples VACUUM could not remove |
+| RR08f, RR08n | the readers while the primary takes three brief ACCESS EXCLUSIVE locks, feedback off (f) and on (n) |
+| RR08g, RR08i, RR08k | `PUT config/database/postgres` (merged over current overrides, as the CLI does); `pg_settings` and postmaster start on both nodes |
+| RR08m | feedback on plus one 120 s repeatable-read transaction on the replica: VACUUM's not-removable count, `n_dead_tup`, heap growth |
+| RR08o-p | API role settings on the replica; teardown |
 
 The node that served a request is read from `public.rr_whoami()`
 (`pg_is_in_recovery()`, postmaster start time) called as a GET, not inferred
@@ -76,8 +83,9 @@ PVLAB_ORG_PRO=<pro-org-slug> make run-rr03   # RR03, about 10 to 12 minutes
 PVLAB_ORG_PRO=<pro-org-slug> make run-rr04   # RR04, about 14 to 16 minutes
 PVLAB_ORG_PRO=<pro-org-slug> make run-rr06 DOMAIN=<host> [WORKER_DOMAIN=<host>]   # RR06, about 9 to 15 minutes; Makefile header lists the credentials
 PVLAB_ORG_PRO=<pro-org-slug> make run-rr07 ZONE=<zone>   # RR07; run `bun install` in browser/ first; Makefile header lists the credentials
+PVLAB_ORG_PRO=<pro-org-slug> make run-rr08   # RR08, 48 and 49 minutes on 2026-10-28 (before a 5-minute wait per PUT was removed)
 make leftovers        # nothing named rr-* should print
-make facts RUN=evidence/<ts>/run-<stamp>.json        # ONLY=RR02 for an RR02 run (RR03, RR04 likewise)
+make facts RUN=evidence/<ts>/run-<stamp>.json        # ONLY=RR02 for an RR02 run (RR03, RR04, RR08 likewise)
 make publish RUN=evidence/<ts>/run-<stamp>.json
 ```
 
@@ -176,9 +184,26 @@ DNS wait, see RUNLOG); runs 1 and 2 passed 12 of 12.
 | OAuth PKCE entered at the Worker, custom and project hosts | `redirect_uri` `<custom-host>/auth/v1/callback` from every entry; code exchange ok at each entry host, through the Worker included, both runs | RR07h-k |
 | OAuth session through the Worker | 30 of 30 reads correct per run (replica 15 and 12 of 30), POST `rpc` primary 3 of 3, refresh ok | RR07l |
 | SAML through the Worker | available on the Pro org (enable 200, provider 201); SP entity ID and ACS on the custom host whichever host served the metadata; ACS POST through the Worker and to the custom host both gave a code, exchange through the Worker ok, 10 of 10 reads correct, both runs | RR07m |
+## Measured (2026-10-28, RR08, two projects, two runs, Singapore workstation, primary and replica both in ap-southeast-1)
+
+Full record: `RUNLOG.md`; artifacts `out/2026-10-28/run-2026-10-28T08-24-49-796Z.json` and `run-2026-10-28T08-26-05-821Z.json`. Readers: 4 on the replica host and 4 on `-all`, each read 1 to 7 s, role `authenticated` (8 s `statement_timeout`); the primary updated about 2,000 rows a second with `VACUUM` every 30 s. Cells read run 1; run 2.
+
+| finding | value | module |
+|---|---|---|
+| `PUT config/database/postgres` for `max_standby_streaming_delay` and `hot_standby_feedback` | HTTP 200 in 6 of 6 changes; `pg_settings` on both nodes showed the value at the first read, 10 s after; no restart of either node | RR08g, RR08i, RR08k |
+| Defaults (30 s, feedback off) | 0 reads failed at the client, but `confl_snapshot` 436; 288 on the replica; reads up to 11,547; 13,021 ms (planned at most 6,999); heartbeat age p95 25,557; 23,641 ms, max 29,025; 28,874 | RR08e |
+| `max_standby_streaming_delay` 5s | heartbeat age max 5,528; 5,259 ms; `confl_snapshot` 1,404; 863; reads up to 19,358; 18,899 ms on the replica host; 3 reads in two runs past the client's 30 s timeout | RR08h |
+| `max_standby_streaming_delay` 120s | `confl_snapshot` 316; 131, read overrun p95 113 to 186 ms; heartbeat age max 90,903; 63,246 ms, replay stops of up to 122.8; 120 s | RR08j |
+| `hot_standby_feedback` on | `confl_snapshot` 0; 0, reads up to 7,019; 7,044 ms, data at most 250; 236 ms old; cost on the primary: VACUUM could not remove up to 26,500; 26,000 dead tuples a pass (13,000; 13,000 at defaults), cutoff up to 106; 106 XIDs old (52; 52) | RR08l |
+| Feedback on plus one 120 s replica transaction | not removable 30,000, 90,000, 150,000, 210,000 over four passes, then 24,000; 30,000 after it committed; heap +10.6; +9.6 MB in 165 s | RR08m |
+| Brief ACCESS EXCLUSIVE lock, feedback off and on | replay stopped behind it in both settings (largest age 5,270; 10,567 ms off, 6,292; 6,736 ms on); `confl_lock` 0 and 0 reads failed in both, as every read ended inside the 30 s delay | RR08f, RR08n |
+| Steady lag at 4 inserts a second | `replay_lag` p95 3.7; 2.1 ms, max 4.7; 5.9 ms | RR08d |
+
+Inference, not measured: the conflicts in RR08e, RR08h and RR08j did not reach the client because PostgREST retried each cancelled transaction (documented for PostgREST before v16, https://github.com/PostgREST/postgrest/issues/3673); the version on these projects was not recorded. Not measured: a lock with a 5 s delay, autovacuum on its own schedule, other sizes or regions.
+
 
 Not measured (RR01 to RR04): other region pairs, write rates above 50 inserts/s,
-behaviour with `hot_standby_feedback` on, the load balancer's rule, a
+behaviour with `hot_standby_feedback` on (RR08 measured it on 2026-10-28), the load balancer's rule, a
 replica that is down while the primary is untouched (the Management API has
 no per-replica restart as of 2026-10-23), recovery of the load balancer
 endpoint after the last replica is removed beyond 1,200 s, read-your-writes
