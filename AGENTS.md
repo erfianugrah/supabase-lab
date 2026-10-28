@@ -4450,7 +4450,7 @@ projects (feature battery, two conversion probes), all `small`,
   cannot call them), so the blog's "tracked" is untested for the dashboard;
   `migration_version`; the dashboard merge-request screen.
 
-## experiments/replica-routing - key facts (validated 2026-10-10, Pro org; RR02 2026-10-23, two runs; RR03 and RR04 2026-10-26, two runs each; RR06 2026-10-28, two runs; RR07 2026-10-28, three runs)
+## experiments/replica-routing - key facts (validated 2026-10-10, Pro org; RR02 2026-10-23, two runs; RR03 and RR04 2026-10-26, two runs each; RR06 and RR08 2026-10-28, two runs each; RR07 2026-10-28, three runs)
 
 - **The API load balancer's host is `<ref>-all.supabase.co` and the Management
   API does not return it** (RR01e, 2026-10-10): the Dashboard route
@@ -4643,6 +4643,27 @@ projects (feature battery, two conversion probes), all `small`,
   Run 0 failed on the module's own DNS wait: a Bun `Resolver` instance that
   asks before the record exists keeps the `ENOTFOUND` (ad-hoc probe, not in
   an artifact), the likelier cause of RR06 run 1's miss too (inference).
+- **Hot-standby conflicts against 1 to 7 s Data API reads on a same-region
+  replica** (RR08, 2026-10-28, two runs, Small pair, ~2,000 updated rows a
+  second plus VACUUM every 30 s on the primary, 4 + 4 readers as
+  `authenticated`): `PUT config/database/postgres` set
+  `max_standby_streaming_delay` and `hot_standby_feedback` on both nodes by the
+  first read 10 s later, no restart, 6 of 6 changes. At the defaults no read
+  failed at the client, yet the replica counted 436 and 288 snapshot
+  conflicts, reads ran up to 11,547 and 13,021 ms and replay stopped for up to
+  about 30 s (heartbeat age max 29,025 and 28,874 ms). Inference, not
+  measured: PostgREST retried each cancelled transaction (PostgREST before v16
+  does, issue 3673); a PostgREST that does not retry would most likely surface
+  them as 40001. 5s capped the lag near 5 s (max 5,528 and 5,259 ms) for the
+  most conflicts (1,404 and 863) and the slowest reads (up to 19,358 and
+  18,899 ms; 3 past a 30 s client timeout); 120s cut conflicts (316 and 131)
+  but let replay stop for up to 122.8 and 120 s. Feedback on: 0 conflicts,
+  reads at most 250 and 236 ms stale, and VACUUM on the primary left up to
+  26,500 and 26,000 dead tuples a pass against 13,000 at the defaults; one
+  120 s replica transaction grew that to 210,000 in four passes. Feedback did
+  not stop replay waiting behind a brief ACCESS EXCLUSIVE lock (largest age
+  6,292 and 6,736 ms); no read was cancelled by it at the 30 s delay. Steady
+  lag at 4 inserts a second: `replay_lag` p95 3.7 and 2.1 ms (#276).
 
 ## experiments/scoped-pats - key facts (SP01-SP10, validated 2026-10-10)
 

@@ -1354,6 +1354,274 @@ these runs created.
 - Cost: not metered. Each run kept a Small primary, a Small replica, `pitr_7`
   and the `custom_domain` add-on for about 8 minutes (run 0 about 14).
 
+## 2026-10-28 - RR08, hot-standby conflicts against 1 to 8 s Data API reads on a same-region replica
+
+Question: an app reads lists that take 1 to 8 s through the Data API (role
+`authenticated`, 8 s `statement_timeout`) on a read replica in the same region
+as the primary, while the primary takes continuous updates and VACUUM. What can
+be tuned on hosted against recovery conflicts, and what does each setting cost?
+Also (#276): replication lag at a light write rate, and how long replay stops
+on a same-region replica.
+
+Shape: two throwaway Pro-org projects, one per run, run at the same time (run 2
+started 76 s after run 1). Each: primary in ap-southeast-1 on Small compute,
+`pitr_7`, one Small read replica in the same region (the RR03/RR04 shape).
+Vantage: the Singapore workstation. Artifacts (module rows quoted from the
+facts files beside them):
+
+- run 1: `out/2026-10-28/run-2026-10-28T08-24-49-796Z.json`, 08:24:49 to
+  09:13:30 UTC, 7 pass, 9 info, 0 fail
+- run 2: `out/2026-10-28/run-2026-10-28T08-26-05-821Z.json`, 08:26:05 to
+  09:13:57 UTC, 7 pass, 9 info, 0 fail
+
+Both artifacts record lab commit c2de0d9; the module was uncommitted. After
+run 2 two changes were made, neither to a measurement: the heartbeat pollers
+start 1.5 s after the heartbeat writer (see "First poll of an arm" below), and
+the wait after each PUT stops when the replica host serves `rr_node`, where
+before it also waited for a heartbeat age under 1,500 ms that no heartbeat
+was writing between arms, so it ran its full 5 minutes after every PUT. No
+other logic changed. Replica setup answered 204; first session-pooler
+connection to the replica 207 s (run 1) and 151 s (run 2) after the call.
+
+### Schema, readers and what is counted
+
+- `rr8_items`: 1,500,000 rows (`id`, `grp`, `v`, a 24-byte pad), 97.7 MB heap
+  after the seed in both runs. Select granted to `authenticated` only.
+- `rr8_list(p_ms)`: a STABLE plpgsql function that counts and sums a
+  100,000-row id range of `rr8_items`, sleeps 0.25 s, and repeats until `p_ms`
+  has passed; returns `pg_is_in_recovery()` and the age of the newest heartbeat
+  row at the call's start. As a STABLE function it runs under the calling
+  statement's snapshot for the whole call.
+- Readers: 4 loops on the replica's own host and 4 on `<ref>-all`, back to
+  back, `GET /rest/v1/rpc/rr8_list?p_ms=N` with N uniform in 1,000 to 6,999,
+  a user JWT (role `authenticated`), client timeout 30 s. RR08o read the role
+  settings on the replica: `anon` `statement_timeout=3s`, `authenticated`
+  `statement_timeout=8s`, `authenticator` `statement_timeout=8s,lock_timeout=8s`
+  (both runs).
+- Writer (arms with updates): `update rr8_items set v = v + 1` on 500
+  consecutive ids every 250 ms, walking the id range (2,042 to 2,225 rows a
+  second across the arms); `VACUUM (VERBOSE) rr8_items` every 30 s, its
+  `tuples: X removed, Y remain, Z are dead but not yet removable` and
+  `removable cutoff ... XIDs old` lines parsed. `autovacuum_count` rose by 0 in
+  every arm of both runs, so every vacuum figure is the explicit one.
+- Staleness: a heartbeat row inserted on the primary every 250 ms (4 inserts a
+  second, the only writes in RR08d); `rpc/rr_node` polled every 500 ms on the
+  replica host and the primary host returns the age of the newest heartbeat
+  row the node can see (`stale_ms`, clock skew and the 250 ms period
+  included). A stale episode is a run of consecutive replica-host polls over
+  2,000 ms (RR02's threshold, chosen, not measured). `replay_lag`, the
+  primary's WAL position minus the replica's replay position, and
+  `age(backend_xmin)` of the replica's walsender (the xmin that
+  `hot_standby_feedback` reports) were read from `pg_stat_replication` on the
+  primary every second.
+- Recovery conflicts: `pg_stat_database_conflicts` on the replica before and
+  after each arm (`confl_snapshot_delta`, `confl_lock_delta`).
+- Settings: `PUT /v1/projects/{ref}/config/database/postgres` with the body
+  merged over the current overrides, as `supabase postgres-config update`
+  does; then `pg_settings` on both nodes over session-pooler connections every
+  10 s until they show the requested value, and the postmaster start time on
+  both nodes before and after (a change means a restart).
+
+First poll of an arm: the pollers started with the heartbeat writer, so the
+first poll of an arm could read the previous arm's last heartbeat row. That
+shows as a 0.5 s first "episode" whose age is the gap since the previous arm:
+226,081 ms in RR08d run 1, 319,024 to 319,170 ms in RR08h (both runs), RR08j
+run 2 and RR08l (both runs), and 5,790 to 5,952 ms in the arms that followed another
+arm directly. Those single polls are the `hb_replica_stale_ms_max` of those
+rows and are not lag; the p50 and p95 move by at most one poll. The figures
+below leave them out and quote the largest age within a later episode
+instead. In RR08j run 1 the first poll falls inside the arm's first, 122.8 s
+episode.
+
+### Setting the knobs (RR08g, RR08i, RR08k)
+
+| PUT body | HTTP | config read back | `pg_settings` primary / replica | matched after | restart |
+|---|---|---|---|---|---|
+| `max_standby_streaming_delay: 5s` | 200 both runs | `5s` | `5000ms (configuration file)` on both | 10 s, both nodes, both runs (first poll) | no, either node |
+| `max_standby_streaming_delay: 120s` | 200 both runs | `120s` | `120000ms (configuration file)` on both | 10 s, both | no |
+| `max_standby_streaming_delay: 30s`, `hot_standby_feedback: true` | 200 both runs | `30s`, `true` | `30000ms`, `on`, both `(configuration file)` | 10 s, both | no |
+
+Before the first PUT both settings read `(unset)` in the config and `30000ms
+(default)` / `off (default)` in `pg_settings` on the replica. Each value was in
+force on the replica at the first read, 10 s after the call, in 6 of 6 changes
+over two runs, without a restart of either node. RR02d (2026-10-23) once
+read the default on the replica after a PUT of `600s`; that did not recur
+here.
+
+### RR08d: steady lag at a light write rate (#276)
+
+Heartbeat only, 4 inserts a second, no readers, 120 s.
+
+| | run 1 | run 2 |
+|---|---|---|
+| heartbeat age on the replica host, p50 / p95 | 34 / 71 ms | 12 / 48 ms |
+| largest age on the replica host | first poll only (see above); no later poll over 2,000 ms | 262 ms |
+| the same on the primary host, p50 | 23 ms | 23 ms |
+| `replay_lag` p50 / p95 / max | 2.6 / 3.7 / 4.7 ms | 1.5 / 2.1 / 5.9 ms |
+| replay position behind, max | 296 bytes | 296 bytes |
+
+At this rate the same-region replica replays within a few milliseconds; the
+heartbeat age read through the Data API is mostly the 250 ms period and the
+two hosts' clocks (the primary host's own p50 is 23 ms in both runs). RR03i
+measured the same shape at 50 inserts a second (2026-10-26).
+
+### Arms with updates and VACUUM
+
+Each arm: the readers, the writer and VACUUM every 30 s, 240 s (C 300 s).
+Order within a run: A, A-lock, D, C, B, B-long, B-lock, so the table had
+already grown in A, D and C before B ran. Cells read run 1; run 2.
+
+| | A defaults (RR08e) | D delay 5s (RR08h) | C delay 120s (RR08j) | B feedback on (RR08l) |
+|---|---|---|---|---|
+| reads, replica host / `-all` | 218 / 241; 211 / 221 | 168 / 192; 188 / 217 | 282 / 270; 277 / 296 | 245 / 243; 246 / 238 |
+| reads that failed at the client | 0; 0 | 2 (one per host); 1 (replica host): client timeout at 30 s | 0; 0 | 0; 0 |
+| 40001 or 57014 returned to the client | 0; 0 | 0; 0 | 0; 0 | 0; 0 |
+| `confl_snapshot` on the replica during the arm | 436; 288 | 1,404; 863 | 316; 131 | 0; 0 |
+| longest replica-served read, replica host (planned at most 6,999 ms) | 11,547; 13,021 ms | 19,358; 18,899 ms | 16,596; 13,166 ms | 7,019; 7,044 ms |
+| read time minus planned time, p95, replica host / `-all` replica-served | 3,407 / 1,460; 3,165 / 3,824 ms | 8,461 / 9,463; 5,418 / 6,264 ms | 157 / 186; 113 / 122 ms | 120 / 157; 91 / 102 ms |
+| heartbeat age on the replica host, p50 / p95 | 6,771 / 25,557; 7,258 / 23,641 ms | 1,273 / 4,589; 506 / 4,269 ms | 14,181 / 86,425; 13,245 / 49,248 ms | 35 / 153; 6 / 28 ms |
+| largest heartbeat age (within an episode) | 29,025; 28,874 ms | 5,528; 5,259 ms | 90,903; 63,246 ms | no poll over 2,000 ms after the first, both runs |
+| polls over 2,000 ms | 75; 84.4 % | 39.4; 29.8 % | 95.7; 96.7 % | 0.2; 0.2 % (the first poll) |
+| `replay_lag` p95 / max | 25,751.3 / 28,503.2; 23,421.1 / 28,557.6 ms | 4,632.5 / 5,010.1; 4,257.4 / 5,004.6 ms | 86,501.4 / 90,757.9; 48,753.9 / 63,006.1 ms | 8.5 / 182.5; 6.5 / 18.9 ms |
+| oldest data a replica-served read saw (heartbeat age at the call's start), replica host | 26,038; 25,975 ms | 4,475; 4,819 ms | 89,501; 59,587 ms | 250; 236 ms |
+| VACUUM: not yet removable per pass, max | 13,000; 13,000 | 9,500; 12,500 | 12,500; 11,500 | 26,500; 26,000 |
+| VACUUM: removable cutoff age, max | 52; 52 XIDs | 38; 52 XIDs | 50; 46 XIDs | 106; 106 XIDs |
+| replica xmin age on the primary, max | none reported (feedback off) | none | none | 130; 128 XIDs |
+| `n_dead_tup` at the end | 75,889; 77,240 | 112,471; 124,546 | 75,332; 74,315 | 94,173; 95,653 |
+| rows updated a second | 2,050; 2,052 | 2,215; 2,225 | 2,045; 2,042 | 2,046; 2,046 |
+
+Stale episodes (seconds over 2,000 ms on the replica host, after the first
+poll): A run 1 `29.5 3.5 2.5 5 30 14.5 3.5 1.5 29.5 0.5 29.5 30`, run 2
+`29 29.6 3 5 22 29.5 28.5 28.6 0.5 3.5 3 8.5 11.5`; C run 1 `122.8 44.5 2.5 68
+49.5`, run 2 `120 42.5 75.5 51.5`; D 31 and 29 episodes of 0.5 to 4.5 s.
+
+What this shows, per arm:
+
+- A, defaults (`max_standby_streaming_delay` 30 s, feedback off): no read
+  failed at the client in either run, but the replica recorded 436 and 288
+  snapshot conflicts, replay stopped for up to about 30 s at a time (the long
+  episodes ran 28.5 to 30 s, largest age 29,025 and 28,874 ms), the heartbeat
+  age was over 2,000 ms for 75 and 84.4 % of the arm, and replica-served reads
+  took up to 11,547 and 13,021 ms against a planned 6,999 ms at most and an
+  8 s `statement_timeout`.
+- D, 5 s: replay never fell more than about 5 s behind (largest age 5,528 and
+  5,259 ms, `replay_lag` max 5,010.1 and 5,004.6 ms), at the price of the most
+  conflicts (1,404 and 863) and the longest reads (up to 19,358 and 18,899 ms
+  on the replica host, 25,759 ms through `-all` in run 2; p95 overrun 5,418
+  to 9,463 ms). Three reads in two runs did not return within the client's
+  30 s timeout; all three started in the last 7 s of the arm (233.7, 235.6 and
+  236.9 s into a 240 s arm), while the writer was still running.
+- C, 120 s: fewer conflicts (316 and 131) and small overruns (p95 113 to
+  186 ms), but replay stopped for up to 122.8 and 120 s: the heartbeat age
+  reached 90,903 and 63,246 ms, a replica-served read saw data 89,501 and
+  59,587 ms old, and over 95 % of polls were over 2,000 ms.
+- B, `hot_standby_feedback` on (30 s): 0 snapshot conflicts in both runs, no
+  overrun beyond 157 ms at p95, the replica at most 250 and 236 ms behind as a
+  read saw it. The cost moved to the primary: VACUUM left 21,500 to 26,500
+  (run 1) and 23,270 to 26,000 (run 2) dead tuples per pass that it could not
+  remove, against 1,000 to 13,000 and 0 to 13,000 in A; the removable cutoff
+  was 86 to 106 (run 1) and 94 to 106 (run 2) XIDs old, against at most 52 in
+  A. In A the cutoff was held back only by the primary's own reads (`-all`
+  sends about half of them to the primary); in B the replica's xmin (at most
+  130 and 128 XIDs old) was the older one. Heap size did not grow in B (104.8
+  and 105.7 MB before and after) because A, D and C had already grown the
+  table and VACUUM had freed space in it; A grew it by 4.8 and 5 MB from the
+  fresh 97.7 MB. Heap growth is therefore not compared between the arms.
+
+Inference, not measured: the conflicts counted on the replica in A, D and C
+were absorbed by PostgREST, which retried the cancelled transaction. Three
+things in the artifacts point to it: `confl_snapshot` rose by 131 to 1,404 an
+arm while 0 of 2,781 reads in those arms returned 40001 to the client;
+replica-served reads took up to 25,759 ms, longer than one statement can run
+under the 8 s `statement_timeout`, so a read was more than one statement; and
+the overrun is largest where conflicts are most frequent (D) and absent where
+there are none (B). PostgREST documents this behaviour: before v16 it retried
+a transaction on SQLSTATE 40001, including recovery conflicts on a replica
+([PostgREST #3673](https://github.com/PostgREST/postgrest/issues/3673),
+"infinite retrying ... causes replication lag"), and v16.0 stopped
+([PR #4222](https://github.com/PostgREST/postgrest/pull/4222),
+[v16.0 release](https://github.com/PostgREST/postgrest/releases/tag/v16.0)).
+The PostgREST version these projects ran was not recorded, and the
+replica's Postgres log was not read, so the retry count per read is not
+known. If hosted moves to a PostgREST that does not retry, each of these
+conflicts would most likely reach the client as a 40001 error instead of a
+slower read; that was not tested.
+
+### RR08m: feedback on with one long replica transaction
+
+Arm B plus, from 15 s in, one repeatable-read transaction on the replica
+(session pooler) that counted `rr8_items` and then held its snapshot through
+`pg_sleep(120)`; 165 s in all.
+
+| | run 1 | run 2 |
+|---|---|---|
+| the long transaction | ran its 120 s, not cancelled | ran its 120 s, not cancelled |
+| VACUUM not yet removable, the five passes | 30,000, 90,000, 150,000, 210,000, 24,000 | 30,000, 90,000, 150,000, 210,000, 30,000 |
+| removable cutoff age, the five passes | 120, 360, 601, 843, 98 XIDs | 120, 361, 601, 842, 120 XIDs |
+| replica xmin age on the primary, max | 1,009 XIDs | 1,002 XIDs |
+| `n_dead_tup`, largest sampled | 269,500 | 268,844 |
+| heap growth over the arm | 10.6 MB | 9.6 MB |
+| Data API reads failed | 0 of 160 + 157 | 0 of 172 + 167 |
+
+With feedback on, a replica transaction holds back VACUUM on the primary for
+as long as it runs: the dead tuples it might still need grew by 60,000 per
+30 s pass (the writer's 2,000 rows a second) until it committed, and the next
+pass removed them (24,000 and 30,000 left). The table grew by about 10 MB in
+165 s at this update rate.
+
+### RR08f and RR08n: a brief ACCESS EXCLUSIVE lock, feedback off and on
+
+Readers and the heartbeat only, no writer; three times per arm (37.5 s apart
+in a 150 s arm), on the primary: `begin; lock table rr8_items in access
+exclusive mode; select pg_sleep(0.2); commit`.
+
+| | A, feedback off (RR08f) | B, feedback on (RR08n) |
+|---|---|---|
+| lock acquired on the primary after (run 1; run 2) | 5,573, 5,040, 5,169; 2,097, 12, 4,961 ms | 2,039, 750, 3,561; 1,784, 4,652, 1,367 ms |
+| stale episodes on the replica host after the first poll, s | 2, 3.5, 3.5; 5.5, 0.5, 4, 10.6 | 3, 3, 4.5; 5, 4.5, 4.5 |
+| largest heartbeat age in them | 5,270; 10,567 ms | 6,292; 6,736 ms |
+| `confl_lock` on the replica | 0; 0 | 0; 0 |
+| reads failed (40001, 57014 or other) | 0 of 142 + 151; 0 of 140 + 148 | 0 of 148 + 152; 0 of 137 + 146 |
+| read time minus planned, p95, replica host | 128; 702 ms | 140; 162 ms |
+
+Replay stopped behind the lock with feedback on as with it off (episodes of 3
+to 5 s with feedback on), so `hot_standby_feedback` did not remove the lock
+wait; Postgres documents feedback as reporting an xmin, which covers snapshot
+conflicts and not locks. No read was cancelled in either setting because each
+replica read ended within about 7 s, under the 30 s delay. Whether a lock
+cancels reads with `max_standby_streaming_delay` 5 s was not run. The lock
+itself waited up to 5,573 ms on the primary; inference, not measured: behind
+the primary-served half of the `-all` reads (AccessShare locks held for up to
+7 s).
+
+### #276: replay pause on a same-region replica
+
+The longest replay stops measured on the same-region replica were 28.5 to 30 s
+at the default delay (arm A, both runs) and 120 to 122.8 s at 120 s (arm C),
+with the replica's own host and `-all` serving that stale data with HTTP 200
+throughout (RR04j showed the load balancer keeps sending reads to such a
+replica). Steady lag at 4 inserts a second was `replay_lag` p95 3.7 and 2.1 ms
+(RR08d). Inference: the stops are set by `max_standby_streaming_delay` and the
+overlapping readers rather than by the region pair; RR01 (cross-region) saw
+30.2 to 31.6 s with one long query at the same default.
+
+### Not settled by RR08
+
+- The PostgREST version on these projects, and the replica's Postgres log
+  (`canceling statement due to conflict with recovery` per retry); so the
+  retry count per read, and whether a retry continued after the client gave
+  up at 30 s, are not known.
+- A lock under `max_standby_streaming_delay` 5 s; a lock held longer than
+  0.2 s on the primary; VACUUM truncation (no arm emptied trailing pages).
+- `hot_standby_feedback` with Data API reads longer than 7 s (only the 120 s
+  repeatable-read session in RR08m), and its cost at update rates above about
+  2,000 rows a second.
+- Autovacuum on its own schedule (it never started in any arm; the explicit
+  VACUUM every 30 s ran instead), more than 8 concurrent readers, other
+  compute sizes or regions, a cross-region replica.
+- Cost: not metered. Each run kept a Small primary, a Small replica and
+  `pitr_7` for about 49 and 48 minutes.
+
 ## Not measured
 
 - Any primary region other than ap-northeast-1 (RR01, RR02) and

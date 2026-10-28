@@ -12,7 +12,7 @@
 ROOT := $(abspath ../..)
 TS := $(shell date +%Y%m%d-%H%M%S)
 
-.PHONY: run run-rr02 run-rr03 run-rr04 run-rr06 run-rr07 facts publish list
+.PHONY: run run-rr02 run-rr03 run-rr04 run-rr06 run-rr07 run-rr08 facts publish list
 
 # RR02: re-routing on a lagging or unhealthy replica, non-REST traffic through
 # the load balancer. Same billing shape as RR01; 24 and 33 minutes in the
@@ -88,6 +88,20 @@ run-rr07:
 	cd $(ROOT) && PVLAB_ENDPOINT_ZONE="$(ZONE)" \
 	  bun harness/src/run.ts --where local --tests experiments/replica-routing/tests \
 	  --experiment replica-routing --only RR07 --destructive \
+	  --out experiments/replica-routing/evidence/$(TS)
+
+# RR08: hot-standby conflicts against 1 to 8 s Data API reads on a same-region
+# replica (Small primary + Small replica + pitr_7, ap-southeast-1): defaults,
+# max_standby_streaming_delay 5s and 120s, hot_standby_feedback on, and a brief
+# ACCESS EXCLUSIVE lock with feedback off and on. About 45 minutes. Knobs:
+#   PVLAB_RR8_ARMS=steady,A,Alock,D,C,B,Blong,Block
+#   PVLAB_RR8_ARM_S (240) / PVLAB_RR8_C_S (300) / PVLAB_RR8_LOCK_S (150)
+#   PVLAB_RR8_READERS (4 per host) / PVLAB_RR8_ROWS (1500000) / PVLAB_RR8_REGION
+#   PVLAB_RR_REFS_FILE=<path outside git>  appends the created ref
+run-rr08:
+	@test -n "$(PVLAB_ORG_PRO)" || (echo "PVLAB_ORG_PRO not set" && exit 1)
+	cd $(ROOT) && bun harness/src/run.ts --where local --tests experiments/replica-routing/tests \
+	  --experiment replica-routing --only RR08 --destructive \
 	  --out experiments/replica-routing/evidence/$(TS)
 
 run:
