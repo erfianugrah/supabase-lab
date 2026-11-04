@@ -372,7 +372,7 @@ client can poll. See RUNLOG.md; artifacts in `out/2026-09-24/` and
   extension. privatelink-aws T22 carries the same change, not run (needs the
   AWS PrivateLink rig).
 
-## experiments/data-api-capacity - key facts (validated 2026-10-22/23/26, Pro org; DC01-03 ap-southeast-1 Small then Large, DC04 ap-northeast-2 Small then 4XL, DC05-07 ap-northeast-2 Small, DC08 ap-northeast-2 Small then 4XL, in-region clients; DC09 and DC12 ap-southeast-1 Small; DC13 ap-southeast-1 Small to XL to 2XL, DC14 the same project at 2XL, DC15 ap-southeast-1 Small to Large to Small; DC16 ap-southeast-1 created 2XL and created Small; DC17 ap-southeast-1 Small; DC18-DC19 2026-10-27 ap-southeast-1 created Small and created 4XL)
+## experiments/data-api-capacity - key facts (validated 2026-10-22/23/26, Pro org; DC01-03 ap-southeast-1 Small then Large, DC04 ap-northeast-2 Small then 4XL, DC05-07 ap-northeast-2 Small, DC08 ap-northeast-2 Small then 4XL, in-region clients; DC09 and DC12 ap-southeast-1 Small; DC13 ap-southeast-1 Small to XL to 2XL, DC14 the same project at 2XL, DC15 ap-southeast-1 Small to Large to Small; DC16 ap-southeast-1 created 2XL and created Small; DC17 ap-southeast-1 Small; DC18-DC19 2026-10-27 ap-southeast-1 created Small and created 4XL; DC22 2026-11-03/04 ap-southeast-1 created Small (two runs) and created Large, Team org)
 
 The Data API's connection pool, what a full pool looks like to a client, the
 pool settings' PATCH, statement timeouts per role, throughput under request
@@ -712,6 +712,51 @@ from the next run on).
   (https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/cluster/v3/circuit_breaker.proto);
   where the unanswered requests waited is not visible, and a slow PostgREST
   with idle pool connections was not run.
+- **A missing-function 404 costs PostgREST CPU that grows with the
+  functions in the exposed schema, and at 505 functions 110 such requests
+  a second stalled every Data API request on Small and on Large** (DC22,
+  three runs 2026-11-03/04, `out/2026-11-03/run-2026-11-03T23-23-46-930Z.json`
+  Small, `out/2026-11-04/run-2026-11-04T00-21-42-484Z.json` Small,
+  `out/2026-11-04/run-2026-11-04T00-21-47-402Z.json` Large; legacy anon key,
+  probes at 2 req/s per key from this lab's Mac). One PGRST202 at rest took
+  0 / 2 / 6 / 21 / 61 / 206 ms upstream (`x-envoy-upstream-service-time`,
+  p50 of 20) with 5 / 105 / 255 / 505 / 1005 / 2005 functions in `public`
+  on Small, 19 and 184 ms at 505 and 2005 on Large; a PGRST205 (missing
+  table) 0 ms up to 1001 relations. PostgREST v14.18 builds a fuzzy set of
+  every function in the schema for the hint on each PGRST202 and keeps a
+  memoised index for tables (PR #4472), and plans before `usePool`, so
+  neither 404 takes a pool connection (source-read,
+  https://github.com/PostgREST/postgrest/blob/v14.18/src/PostgREST/Error.hs).
+  A random name gets `hint: null`: the cost is paid with nothing returned.
+  With 505 functions, a 110 req/s missing-function flood saturated both
+  sizes within its first 15 s and held probe p50 at 14.3 to 22.9 s over
+  the next 120 s for the legacy anon, `sb_secret_` and `sb_publishable_`
+  keys alike, node CPU 70.6 to 81.4 % (Small), pool waiting 0
+  (Small) and 503s from about 90 s in (one body: `upstream connect error
+  ... delayed connect error: 111`). With 5 functions, 440 req/s of missing
+  tables, missing functions or valid reads left the anon probe at p50 26
+  to 30 ms (27 ms with no flood): request rate alone did not do it at
+  these rates. Function names here were synthetic (`dc22_f_NNNNN`); varied
+  names not measured.
+- **A no-change PATCH restart did not clear that stall; disabling legacy
+  API keys did** (DC22 S, same runs, 110 req/s with 505 functions). After
+  the restart the probes came back for one 15 s bucket on Small (p50 39 to
+  43 ms, between Cloudflare 520/521/522/525 answers and three "Starting
+  PostgREST" lines) and were at 18.8 to 20.4 s in the next; on Large they
+  stayed at about 26 s. `PUT /v1/projects/{ref}/api-keys/legacy?enabled=false`
+  moved the refusal to the gateway (401 `{"message":"Legacy API keys are
+  disabled",...}`, `sb-error-code: UNAUTHORIZED_DISABLED_LEGACY_KEY`, no
+  `proxy-status: PostgREST`), and secret/publishable probes recovered 30 s
+  (Small) and 75 s (Large) after the PUT while the flood went on; the
+  gateway's switch took 7 s to the first anon 401 (run 1) and about 60 s
+  to every request (Large). 110 req/s of gateway 401s left probes at p50
+  32 to 39 ms with node CPU 1.3 to 1.4 %. After a heavier flood (2005
+  functions, 440 req/s, run 1) secret/publishable probes stayed at p50
+  1114 / 466 ms for the whole 4-minute arm after the switch, node CPU 85.1
+  %: fits PostgREST working through accepted requests (440 req/s of 401s
+  without a backlog not run). After legacy keys are off the metrics
+  endpoint takes `sb_secret_` as the Basic password, not the legacy
+  service_role key (401).
 - Harness: `lib/tier.ts` `readPool` reads the pool four ways at the current
   size; DC13 and DC16 read Realtime through `lib/rt-read.ts`, which imports
   realtime-surface `lib/burst.ts` for its 100-join burst

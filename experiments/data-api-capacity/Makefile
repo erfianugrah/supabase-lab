@@ -19,7 +19,9 @@ TS := $(shell date +%Y%m%d-%H%M%S)
 # the gateway's long-request timeout, with DC99. DC18 (Small, about 20
 # minutes) times recovery after a write stall under a fixed rate; DC19 (about
 # 10 minutes) bursts requests at each step, stopping early once the gateway
-# answers 503 overflow. Both need oha; DC18 also sqlite3.
+# answers 503 overflow. Both need oha; DC18 also sqlite3. DC22 (Small,
+# about 60 minutes) floods missing tables/functions against probes, adds
+# objects to public, then disables legacy API keys; needs oha and sqlite3.
 ONLY ?= DC01,DC02,DC03,DC99
 
 .PHONY: run clean publish-evidence
