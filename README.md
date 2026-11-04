@@ -158,6 +158,15 @@ facts):
   default, so the flag does not fail closed; under 5 MB that fallback exits
   0 and lands. Write-up:
   https://erfi.dev/reference/supabase-edge-function-limits/
+- `edge-burst` - whether a non-recursive burst against one Edge Function
+  draws 429 `RATE_LIMIT_EXCEEDED` (the error-codes page, read 2026-11-04,
+  attributes that code to recursive or nested calls). 2026-11-04, ap-northeast-1, Team org, one
+  self-provisioned Micro per run: open-loop steps from 25 to 2,400 req/s
+  against a no-op function and from 25 to 800 req/s against a function
+  making one supabase-js `rpc()`, plus 1,000-request bursts through 450 and
+  150 lanes, from one client. No 429 of any kind; the highest step without a
+  client flag was 1,200 req/s (no-op). Open-loop generator with an
+  in-flight cap under `lib/load.ts`, unit tested.
 - `self-hosted-auth` - a GoTrue you run yourself against a managed project's
   Postgres (session pooler, `postgres` role, `search_path=auth`): it shares
   the auth schema, its HS256 tokens (legacy `jwt_secret`) are accepted by
