@@ -58,6 +58,11 @@ Test matrix evidence (runner /home/ssm-user/evidence-20260731-071032.log):
 - T11 FINDING: PREPARE/EXECUTE succeeded on 6543 transaction mode -
   Supavisor supports prepared statements now; the old
   "transaction mode breaks prepared statements" assumption is stale.
+  (2026-11-04: this probe went to port 6543 on the endpoint, which is the
+  dedicated PgBouncer, so "Supavisor" above is wrong; one client only. On
+  Supavisor transaction mode with concurrent clients, Prisma 6.19 failed in
+  medium-serverless MS10 and pgjdbc's default prepare in pooler-checkout
+  PC08; see the privatelink key facts in AGENTS.md.)
 - T12 PASS endpoint survives public-access closure to a single /32;
   T12b confirms public Supavisor path blocked by the same restrictions
   -> restrictions + PrivateLink = full public DB lockout story works.

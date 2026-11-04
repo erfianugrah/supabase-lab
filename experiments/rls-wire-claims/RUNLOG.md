@@ -52,7 +52,10 @@ env (wrangler auth; self-skips without them).
   the 5432 behavior and of the doc-derived expectation; transaction mode
   does not reset session GUCs on return. Reinforces the rule: claims go in a
   transaction (`set_config(..., true)` or `SET LOCAL`), never a bare `SET`.
-- **Prepared statements work over 6543** (parity with T11).
+- **Prepared statements work over 6543** (parity with T11). (2026-11-04:
+  with concurrent clients, Supavisor transaction mode failed Prisma in
+  medium-serverless MS10 and pgjdbc's default prepare in pooler-checkout
+  PC08.)
 - **Hyperdrive did NOT replay across claims** (C03, against expectation):
   identical SQL text + parameter under claims A warmed the cache (n=1); the
   same query under claims B returned 0, not A's row. Either Hyperdrive's

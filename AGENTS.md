@@ -284,8 +284,16 @@ Measured (micro, ap-southeast-1; evidence/20260731-175026/REPORT.md):
   db.<ref>.supabase.co); against the raw endpoint IP it fails by design.
 - `link --skip-pooler` is the load-bearing CLI fact (T09): default link
   targets the public shared pooler.
-- Supavisor transaction mode supports prepared statements now (T11) -
-  the old assumption is stale.
+- SQL `PREPARE`/`EXECUTE` from a single client succeeded on 6543 through
+  the endpoint, which is the dedicated PgBouncer, not Supavisor (T11; the
+  probe hit `PHZ_HOST` port 6543, see `tests/t02-connectivity.ts`; the
+  RUNLOG's "Supavisor" wording is wrong). It says nothing about Supavisor or
+  about concurrent clients: on Supavisor transaction mode Prisma 6.19 at 20
+  clients (medium-serverless MS10) and pgjdbc's default server-side prepare
+  at 12 and 40 connections (pooler-checkout PC08) failed, while the
+  dedicated PgBouncer carried both. The docs say the shared pooler does not
+  support prepared statements in transaction mode (connecting-to-postgres,
+  "Transaction mode limitations", read 2026-11-04).
 - PostgREST root `/rest/v1/` answers 200 to the legacy service_role key and
   `sb_secret_` keys only; anon and the publishable key get 401 (DD04,
   2026-10-10). Anon probes need a real table. SQL-created tables get anon
