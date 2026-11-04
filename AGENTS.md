@@ -1545,9 +1545,9 @@ its experiment dir and planRun honours `--experiment` as a REAL filter -
 before 2026-08-18 it was a label only, and `--only I04` ran both twins.
 Always pass `--experiment <dir>` in probes.
 
-## experiments/compute-disk - key facts (validated 2026-08-19; autoscale write surface re-probed 2026-09-23; paid-plan fill D10/D11 2026-10-01; D09 rewritten and re-run 2026-10-23)
+## experiments/compute-disk - key facts (validated 2026-08-19; autoscale write surface re-probed 2026-09-23; paid-plan fill D10/D11 2026-10-01; D09 rewritten and re-run 2026-10-23; D13 live IOPS change 2026-11-04)
 
-Self-provisioning (no tofu), Pro/Team/Free orgs, modules D01-D11 (D11 is a
+Self-provisioning (no tofu), Pro/Team/Free orgs, modules D01-D13 (D11 is a
 curl replay recorded in the RUNLOG, no test file). D10 is not mapped in
 `.pi/probe-compute-disk.sh`; run it directly with `PVLAB_ORG_PRO` set.
 Reference: COMPUTE-DISK.md at the repo root; see the experiment's
@@ -1620,6 +1620,36 @@ result-id -> module-id mapping.
   settle. A caller gets a success code and no effect. Re-probed 2026-09-23 on a
   platform-plan org and a second control plane, replicating D04/D07 on Pro and
   Team.
+- **A live gp3 IOPS and throughput raise interrupted no Postgres connection
+  (direct 5432, session and transaction pooler) and did not restart
+  Postgres** (D13, 2026-11-04, Pro org, ap-northeast-1, created Large, IPv4
+  add-on; runs 3 and 4, n = 2, `out/2026-11-04/`). One `POST /config/disk`
+  (201, empty body) took a running volume from 3000 to 4000 IOPS and 125 to
+  250 MiB/s. Held and fresh connections through direct 5432, Supavisor
+  session and Supavisor transaction had no failure in the 3 min after the
+  POST, and `pg_postmaster_start_time` did not change. `GET /config/disk`
+  read the new values 2.3 s after the POST, and the project read
+  `ACTIVE_HEALTHY` at every poll to +25 min. A write load of 2049 MB heap
+  plus 1974 MB WAL took 42224-43985 ms before the change and 12672-14919 ms
+  in the loads from +180 s (unlogged control 2379-2480 ms); the 0 to 180 s
+  window was not probed.
+- **A second disk change 1501 s after the first was refused with a 429
+  naming four hours, and a size change starts the same refusal** (D13; D03
+  above recorded enforcement as nondeterministic). The second change,
+  1501.2 s (run 3) and 1501 s (run 4) after the first, answered `429
+  Database disk can only be modified once per four hours. Last modified at
+  04-11-2026 10:11:05 UTC` (run 3; day-month-year, the accepted POST's time;
+  no `Retry-After` among the headers recorded). The three projects created
+  Large in ap-northeast-1 on 2026-11-04 started on gp3 8 GB, which allows at
+  most 4,000 IOPS; 6,000 needs 12 GB, and in run 2 the size-only grow set
+  the `Last modified at` time, so the IOPS POST 949.5 s later was refused.
+  Not tested: the Data API path (each D13 project in the Pro org answered
+  402 that day, runs 2 to 4 naming `exceed_realtime_connection_count_quota`,
+  #275), an IOPS or throughput decrease, io2, other sizes and regions,
+  whether the refusal ends at exactly 4 h. `CHECKPOINT` is refused to
+  `postgres` (42501). Fresh direct connections over the add-on failed singly,
+  three times before any disk change and twice about 20 min after an
+  accepted one (#295).
 
 ## experiments/rls-policy-cost - key facts (validated 2026-08-19)
 

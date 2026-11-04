@@ -3,6 +3,8 @@
 One project per module, self-provisioning (no tofu), Pro/Team/Free orgs.
 Reference: COMPUTE-DISK.md at repo root. Probes: `.pi/probe-compute-disk.sh D01[,...]`. D10 runs directly:
 `PVLAB_ORG_PRO=<slug> pvlab --where local --experiment compute-disk --only D10 --destructive`.
+D13 (2026-11-04) runs through this experiment's Makefile: `make probe-bg ONLY=D13`
+(`make sweep PREFIX=...` deletes what a dead run left).
 
 ## Findings, by module
 
@@ -46,6 +48,15 @@ Reference: COMPUTE-DISK.md at repo root. Probes: `.pi/probe-compute-disk.sh D01[
   Pro project's single manual `POST /config/disk` 2 -> 12 GB answered 201
   and was applied. The cap is a billing control and did not act at resize
   time.
+- D13 (live IOPS/throughput raise, 2026-11-04, runs 3 and 4 of four on Large
+  projects in `ap-northeast-1`): raising 3000 -> 4000 IOPS and 125 -> 250 MiB/s
+  on a running gp3 volume restarted nothing and cost no held connection on
+  direct 5432, the session pooler or the transaction pooler; the config read
+  the new values 2.3 s after the POST and the same write load took 12672 to
+  14919 ms from +180 s, against 42224 to 43985 ms before. A second change
+  1501 s later answered
+  `429 Database disk can only be modified once per four hours`. The Data API
+  was not tested (org-level 402). See the 2026-11-04 entry.
 
 ## Operational notes
 
@@ -56,6 +67,183 @@ Reference: COMPUTE-DISK.md at repo root. Probes: `.pi/probe-compute-disk.sh D01[
 - The first fill round ran a 5-mod disk increase burst without triggering
   the quota; the second round caught the cooldown on the second attempt.
   Recorded as nondeterministic, not a clean pass/fail.
+
+## 2026-11-04 - raising disk IOPS and throughput on a running gp3 project (D13, #291)
+
+Question: when provisioned disk IOPS and throughput are raised on a running
+gp3 project, do connections through direct 5432, the Supavisor session pooler
+(5432), the Supavisor transaction pooler (6543) and the Data API see an
+interruption; does Postgres restart; how long until the new values are
+reported and until they take effect; is a second change shortly after
+refused, and how?
+
+Claims under test (checked 2026-11-04 against the 2026-11-03 crawl of
+supabase.com `guides/platform/compute-and-disk`): provisioning IOPS and
+throughput "requires Large compute size or above"; "After any disk attribute
+change, there is a cooldown period of approximately four hours"; downtime is
+stated for compute changes and not for a disk performance change; Large's
+compute disk limits are 79 MB/s and 3,600 IOPS baseline, 594 MB/s and 20,000
+IOPS burst (docs figures, not found in the crawl; unverified), and sizes up to
+2XL burst "for short periods of time, drawing on a disk IO budget". AWS (EBS user guide and the 2026-01-15 announcement, read
+2026-11-04): up to four Elastic Volumes modifications per volume in a rolling
+24 hours, each once the previous one is `completed`; the docs mirror's
+ModifyVolume API page still says "wait at least six hours", an older text.
+
+Module `tests/d13-live-iops-change.ts` (libs `lib/disk-change.ts`,
+`lib/live-paths.ts`, unit tests in `lib/disk-change.test.ts`). One throwaway
+project per run, Pro org, `ap-northeast-1`, created Large, IPv4 add-on on so
+direct 5432 is reachable from this IPv4-only vantage (Singapore); deleted at
+the end of the run. Paths, every sample kept with its phase: direct, session
+pooler and transaction pooler, each as a held connection (`select
+pg_postmaster_start_time()` every 1 s, reconnect on any error) and as a fresh
+connection (connect, `select 1`, disconnect, every 2 s); 5 s connect and
+query timeouts. Write load: two sessions each insert 500,000 rows of
+`repeat('x', 1900)` into their own table (2049 MB heap, 1974 MB WAL per
+load), timed as the longer of the two sessions' INSERT statements; an
+`unlogged` variant (no WAL) is the control for how much of that time is WAL
+I/O. All four artifacts read lab commit 1360735; the module was uncommitted
+and changed between runs (run 1 required the Data API; runs 1 and 2 targeted
+6,000 IOPS; run 3 has the `accepted_after_grow_post_s` bug; D13b lists every
+attempt only since after run 4, so no artifact here has that list).
+
+| Run | Artifact (`out/2026-11-04/`) | What it did |
+|---|---|---|
+| 1 | `run-2026-11-04T09-13-48-724Z.json` | Stopped at probe-table seeding: the Data API answered 402 (below). Project deleted. |
+| 2 | `run-2026-11-04T09-23-59-871Z.json` | Data API dropped. Size-only grow 8 -> 24 GB, then the IOPS change attempted 949.5 s later and refused. Ended by deleting its project (below). |
+| 3 | `run-2026-11-04T09-53-29-290Z.json` | The change: 3000 -> 4000 IOPS and 125 -> 250 MiB/s in one POST, no size change, then a second change. |
+| 4 | `run-2026-11-04T10-21-54-142Z.json` | Replicate of run 3. |
+
+Results (runs 3 and 4 unless stated; n = 2 for the change):
+
+- **The volume was big enough without a grow.** `GET /config/disk` read
+  `gp3 8 GB 3000 IOPS 125 MiB/s` at the start of runs 3 and 4 (and
+  `size_gb` 8 in run 2) on projects created Large; D10 and D12 read 2 GB on
+  Micro projects in October. At 500 IOPS per GB (D11) 8 GB allows 4,000, so
+  the target was 4,000 rather than the 6,000 first planned: 6,000 needs 12 GB,
+  and a size change first starts the cooldown (run 2).
+- **No interruption on any Postgres path.** From the accepted POST to +25 min,
+  quiet windows only (`D13c`): run 3 `direct_held` 0/1434, `direct_fresh`
+  0/717, `session_held` 0/1434, `session_fresh` 0/717, `txn_held` 0/1434,
+  `txn_fresh` 0/717; run 4 the same six paths 0/1437, 1/717, 0/1437, 0/720,
+  0/1437, 0/720. First 3 min after the POST (`D13c-change3min`): 0 failures on
+  every path in both runs (held 0/180, fresh 0/89 in run 3; held 0/180,
+  fresh 0/90 in run 4). Longest gap between successful held samples in the
+  `D13c` windows 1.007 s (run 3) and 1.006 s (run 4) against a 1 s cadence
+  (`D13c-change3min`: 1.005 s and 1.006 s). The one
+  post-change failure (run 4, `direct_fresh`, `2026-11-04T11:00:20.972Z`,
+  `5003ms timeout expired`, recovered on the next sample; max outage 5.003 s)
+  came about 21 min after the POST, whose `last_modified_at` reads
+  `2026-11-04T10:39:40.483Z`; see the next point: it is not attributed to
+  the change, and run 2's timing does not exclude the change as its cause.
+- **`direct_fresh` failed now and then, three times with no disk change
+  made.** Run 4 had three `Connection terminated unexpectedly` (101 to
+  105 ms) at `2026-11-04T10:36:28.223Z`, `10:36:42.228Z` and
+  `10:38:50.270Z` in `quiet_pre_attempt1`, before the change POST; run 2 had
+  one (106 ms) at `2026-11-04T09:55:39.049Z` in `baseline_main`, after its
+  IOPS POST was refused but 1229.2 s after its accepted size-only grow
+  (`last_modified_at` `2026-11-04T09:35:09.801Z`), about as long after a disk
+  change as run 4's post-change failure. All are on the fresh direct
+  connection over the IPv4 add-on; the held direct connection and all four
+  pooler probes had no failure in those windows. Two causes fit all five
+  (these four and run 4's post-change failure) and were not separated: something on the add-on path, and server-side work
+  after the write loads (each pair of logged loads writes 2 x 1974 MB of WAL,
+  close to `max_wal_size` 4GB; checkpoint timing was not read); for the two
+  about 20 min after an accepted disk change, that change fits as well. Run 3
+  had none at all.
+- **No restart.** `pg_postmaster_start_time()` read
+  `2026-11-04 09:54:57.206501+00` (run 3) and `2026-11-04 10:23:36.094154+00`
+  (run 4) at setup, 25 min after the change and at the end
+  (`postmaster_start_mgmt_before_main` repeats the setup read when no grow
+  ran); the held connections saw one distinct start time per run and logged
+  no connection error event.
+- **Reported at once.** The config read the new values on the first poll,
+  2.3 s after the POST (both runs), with `last_modified_at` set to the POST
+  time. The project status read `ACTIVE_HEALTHY` on the first poll (+2.5 s,
+  +2.4 s) and read nothing else at 10 s polls for 5 min, then 60 s polls to
+  +25 min. The POST answered `201` with an empty body.
+- **Effective by the first probe at +180 s.** The logged load took 43538 and
+  42278 ms before the change in run 3 (42224 and 43985 ms in run 4), and
+  12890, 14919, 12824, 12771 ms at +180, +420, +660, +900 s after it (run 4:
+  12791, 12938, 12693, 12672 ms). WAL per second of insert: 45.3 and
+  46.7 MB/s before, 132.3 to 154.6 MB/s after (run 4: 46.7 and 44.9, then
+  152.6 to 155.8). The unlogged control took 2379 ms (run 3) and 2480 ms
+  (run 4), so most of the logged time is WAL work, and the drop after a
+  disk-only change puts that work on the disk. Nothing was measured
+  between the POST and +180 s.
+- **A second change 1501.2 s (run 3) and 1501 s (run 4) after the first was
+  refused by a message naming four hours from the first.** Throughput
+  250 -> 300 MiB/s: `429 {"message":"Database disk can only be modified once
+  per four hours. Last modified at 04-11-2026 10:11:05 UTC"}` (run 4:
+  `... 10:39:40 UTC`). The time is day-month-year and is the accepted
+  change's own POST time. Of the four headers the module records, the
+  response carried
+  `x-ratelimit-limit=120; x-ratelimit-remaining=119; x-ratelimit-reset=60`
+  (the request-rate limit) and no `Retry-After`.
+- **A size change starts the same cooldown (run 2).** Size-only grow 8 ->
+  24 GB: `201`, read back in 2.3 s, 0 failures on all six paths for the 10 min
+  after it (held 0/603, fresh 0/302 each), postmaster start unchanged
+  (`2026-11-04 09:25:42.512096+00`). The IOPS change 949.5 s later answered
+  `429 ... Last modified at 04-11-2026 09:35:09 UTC`. In the run's
+  `evidence/<ts>/run.log` (gitignored, local only), not the artifact,
+  attempts 2 to 11 every 5 min (09:56 to 10:41 UTC) all answered 429 naming
+  the same 09:35:09: the refusals did not move the stated last modification.
+  The artifact keeps attempt 1 only (D13c, which lists later attempts, is
+  built only after an accepted change).
+- **The Data API, Realtime and the metrics endpoint were not testable.**
+  Each of the four D13 projects answered HTTP 402 with the anon key. Runs 2,
+  3 and 4 (`data_api_tested`) recorded `HTTP 402 {"message":"Service for this
+  project is restricted due to the following violations:
+  exceed_realtime_connection_count_quota. The project owner must upgrade
+  their plan or remove spend caps to restore service."}`; run 1's summary
+  `detail` keeps `rest_read=HTTP 402 Service for this project is restricted
+  due to the following`, cut there. `/customer/v1/privileged/metrics` with
+  the service_role key answered 402 with the same body (hand check on run 2's
+  project, 10:41 UTC, not in an artifact). That is an org-level restriction:
+  run 1 met it with no disk change made, and it was in place before run 1
+  (hand check, 2026-11-04, not in an artifact). It is why no `rest_read` path
+  and no node disk counters are in the artifacts. An unauthenticated request
+  was answered 401 by the gateway before this check (hand check, 2026-11-04,
+  not in an artifact), so a 401 does not show the Data API working.
+- `CHECKPOINT` is refused to `postgres`: `42501 permission denied to execute
+  CHECKPOINT command` (every load).
+- IPv4 add-on: `PATCH 200`, A record first seen at the 80.3 s poll (10 s
+  polling) and direct 5432 answering 81.1 s (run 3) and 81 s (run 4) after
+  the PATCH, the same order pooler-checkout PC02d saw.
+
+How runs 1 and 2 ended. Run 1's module required the Data API probe table and
+stopped when it never served; the module now drops `rest_read` and records
+why. Run 2 grew the disk first (the module still does when the volume is too
+small for the target) and met the cooldown as designed, but parsed `04-11-2026`
+as 11 April, so instead of waiting to 13:35 UTC it retried every 5 min and
+would have given up at about 11:27 UTC. The run's process was not stopped,
+so its project was deleted with `make sweep PREFIX=d13-iops-` at 10:41:37
+UTC; every `baseline_main` failure from 10:41:42.979Z on in run 2's artifact
+(`XX000 (ENOTFOUND) tenant/user ... not found`, `getaddrinfo ENOTFOUND`,
+timeouts, `57P01` on the held pooler connections, the 404 `Resource has
+been removed` on attempt 12) comes from that deletion. `parseCooldown` now
+reads day-month-year (test with the observed string). Run 2's two loads at
+3000 IOPS / 125 MiB/s on the grown volume took 43230 and 28945 ms; the
+spread was not explained. In run 3's artifact `accepted_after_grow_post_s`
+and the summary `detail` read 396.5 although no grow ran (it counted from
+the point the grow was skipped); fixed before run 4, which reads `n/a (no
+grow)`.
+
+Not settled:
+
+- The Data API path (and Realtime): org restriction, not run.
+- Which of the two limits bound the load: both changed in one POST, and with
+  no disk counters (402) the WAL rate cannot be split between IOPS and
+  throughput. The post-change WAL rate (up to 155.8 MB/s) is above Large's
+  79 MB/s baseline (the unverified docs figure above), which the docs put in
+  burst; how long a project keeps the higher rate under sustained load was
+  not measured.
+- When between the POST and +180 s the change took effect.
+- Whether a change of IOPS alone, an IOPS or throughput decrease, a change to 6,000 IOPS after a
+  size change, io2, another region or another compute size behaves the same;
+  whether the four hours end at exactly four hours (no run lasted that long);
+  a change under an application's own write load.
+- The cause of the isolated `direct_fresh` failures.
+- n = 2 for the change, n = 1 for the size-only grow.
 
 ## 2026-10-23 - D09 outage accounting fixed; a resize is minutes down, not seconds (#175)
 
