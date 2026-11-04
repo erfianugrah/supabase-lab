@@ -4037,11 +4037,14 @@ because `harness/dist/pvlab` is a linux-x64 build.
   closed unexpectedly`) killed R16, R17 and R14's RP06d; module reads go
   through `again()`.
 
-## experiments/pooler-checkout - key facts (validated 2026-10-10 and 2026-10-23, Micro and Small, ap-southeast-1 and us-east-1, Pro org, Supavisor aws-0 hosts)
+## experiments/pooler-checkout - key facts (validated 2026-10-10 and 2026-10-23, Micro and Small, ap-southeast-1 and us-east-1, Pro org, Supavisor aws-0 hosts (PC01 to PC07); PC08 2026-11-04, Small, ap-northeast-1, pooler host prefix not recorded)
 
-Self-provisioning (Management API create and delete, no OpenTofu state), one
-Micro project per run. IPv4-only vantage in Singapore. Raw artifacts are in the
-ignored `evidence/`; redacted copies in `out/2026-10-10/`. Details: RUNLOG.md.
+Projects come from the Management API (no OpenTofu state): on 2026-10-10 each
+run created and deleted its own Micro project; the 2026-10-23 runs (one Micro,
+one Small) and PC08 (one Small) adopted projects created outside the harness
+(`PVLAB_PC_ADOPT`). IPv4-only vantage in Singapore. Raw artifacts are in the
+ignored `evidence/`; redacted copies in `out/2026-10-10/`, `out/2026-10-23/`
+and `out/2026-11-04/`. Details: RUNLOG.md.
 
 - **Transaction-pool exhaustion is a statement-time error, after 60 s.** With the
   effective pool (16 active backends on Micro, PC01b; the API reports
@@ -4097,6 +4100,56 @@ ignored `evidence/`; redacted copies in `out/2026-10-10/`. Details: RUNLOG.md.
 - **Host sleep voids timings.** Run 1 lost PC02 to a laptop idle sleep (a 100 s
   deadline fired at 241 s of wall time); later runs use `caffeinate` and a
   `-clock` row (wall minus monotonic clock).
+- **pgjdbc's default server-side prepare fails through Supavisor
+  transaction mode at 12 and 40 connections (fewer not tested);
+  `prepareThreshold=0` fixes it** (PC08, 2026-11-04, Small,
+  ap-northeast-1, Pro org; runs 11 and 12, pgjdbc 42.7.14, HikariCP 7.1.0,
+  Java in Docker, `out/2026-11-04/`). With the default threshold (5), shape
+  M (4 instances x `maximumPoolSize` 3) ran 603 of 4522 finished iterations
+  (run 11) and 276 of 2253 (run 12) without an error, shape H (4 x 10) 516
+  of 11572 and 283 of 4356; `extendedCacheEverything` on shape M 570 of 4830
+  (run 11 only). Errors: `26000 ... does not exist`, `42P05 ... already
+  exists`, `25P02` on autocommit reads, `08P01 bind message supplies N
+  parameters, but prepared statement "S_n" requires M`. Six results in run
+  12's PC08h-txn-default failed their check with no error (run 11: 1, 14
+  and 1 in PC08m-txn-default-reuse, PC08h-txn-default and
+  PC08q-txn-cacheall, text not recorded): a SELECT for id 8774 got row 6202,
+  an UPDATE RETURNING for 4673 got 367, and batch INSERTs reported
+  `[0, 0, 0, 0, 0]`. `prepareThreshold=0` ran 6000 of 6000 (shape M) and
+  20000 of 20000 (shape H) iterations clean on the same pooler in runs 11
+  and 12; `preferQueryMode=simple` ran 6000 of 6000 (shape M, run 11 only).
+  Direct 5432 (default and pt0, shapes M and H), Supavisor session (default
+  and pt0, shape M only) and the dedicated PgBouncer (all four arms on M,
+  default and pt0 on H) ran clean; PgBouncer did so with pgjdbc's default
+  prepare while switching backends on 5262 of 6000 SELECTs.
+- **Set a pgjdbc `socketTimeout` on Supavisor transaction mode** (PC08).
+  In PC08m-txn-default-nosocktimeout (run 11, default prepare, socketTimeout
+  left at the driver default 0), 11 of 12 workers had been inside an
+  explicit-transaction UPDATE for 180584 to 243074 ms when the 240 s cap
+  stopped the cell (summary at 245006 ms); no `prepareThreshold=0` row hit
+  the 30 s socketTimeout.
+- **A Hikari pool bigger than the session pool (15) is refused at fill;
+  workers see the refusal only after waiting `connectionTimeout`** (PC08,
+  n = 1). Excess connects get `XX000 FATAL: (EMAXCONNSESSION)` and Hikari
+  keeps retrying them in the background; workers queue for the connections
+  that exist, and a worker that waits 30 s gets
+  `SQLTransientConnectionException ... request timed out after 30001ms`
+  with SQLSTATE XX000 and the refusal as cause: 33 borrows in PC08s-4x10
+  (24 of 4000 iterations failed) and 5 of 20 in PC08s-hold. Four pools of
+  10 split the 15 as 6/4/3/2.
+- **40 connections on a transaction pool queue; a transaction still queued
+  after 60 s (Supavisor) or 80 s (dedicated) ends FATAL** (PC08, n = 1).
+  Active `pg_sleep` backends: 16 on Supavisor in both PC08t cells; on the
+  dedicated pooler 15 (queue cell, +5 s) and 16 (wait cell, +10 s), which
+  fits `reserve_pool_size` 1 (inference). With 10 rounds of `pg_sleep(1)`
+  per connection both poolers served 400 of 400 with no error. Holding
+  `pg_sleep(45)`, Supavisor failed 8 of 40 with `XX000 (ECHECKOUTTIMEOUT)
+  ... after 60000ms` 60075.2 to 60085.68 ms after the statement was sent,
+  and the dedicated pooler 8 of 40 with `08P01 FATAL: query_wait_timeout`
+  after 80337.73 to 80344.87 ms (its config reads back `query_wait_timeout`
+  80, in seconds). Hikari's `connectionTimeout` plays no part in the queued
+  statements: the connection is already open (it did fail 2 of 40 follow-up
+  borrows in PC08t-txn-wait, on replacement connects).
 
 ## experiments/jit-db-access - key facts (2026-10-10, Pro org, Postgres 17)
 

@@ -17,6 +17,7 @@ Measured results and their limits: `RUNLOG.md`.
 | PC05 | Does the pool-slot wait (60 s on PC01) move with session mode or a client setting (`statement_timeout`, `options`, connect timeout)? |
 | PC06 | A `login` event trigger delays the pooler's backend logins by 0, 8 or 20 s: does `ECHECKOUTTIMEOUT ... after 15000ms` appear while the pool has free slots? |
 | PC07 | Set `default_pool_size` 5 through the Management API: effective pool and the checkout timeout |
+| PC08 | pgjdbc + HikariCP on direct, Supavisor session, Supavisor transaction and the dedicated pooler, with pgjdbc's default server-side prepare and with `prepareThreshold=0` (plus `simple` and `extendedCacheEverything` on the transaction poolers); a Hikari pool bigger than the session pool; 40 connections against the transaction pools |
 | PC09 | Teardown and confirm the project left `GET /projects` |
 
 `lib/lint-pooler-hosts.ts` is the lint as a CLI:
@@ -25,7 +26,21 @@ flags something. `make lint` runs it over the repo.
 
 ## Run
 
-Needs bun, node, docker (toxiproxy for PC03) and a Pro org.
+Needs bun, node, docker (toxiproxy for PC03, the pinned Temurin JDK image for
+PC08) and a Pro org. PC08 runs `drivers/java/Probe.java` in that image with
+the JDK source launcher; `lib/java.ts` downloads the four pinned jars from
+Maven Central into the ignored `drivers/java/lib/` and checks each sha256.
+PC08 needs the IPv4 add-on for the direct and dedicated rows from an IPv4-only
+vantage: it switches the add-on on if it is off and removes it at the end
+(`PVLAB_PC08_KEEP_IPV4=1` leaves it on); an add-on already on at start is
+left as found. `PVLAB_PC08_ITER`, `PVLAB_PC08_PHASES`, `PVLAB_PC08_CELLS` (a
+regex on cell ids) and `PVLAB_PC08_MAX_WALL_S` shrink a run;
+`PVLAB_PC08_SOCKET_TIMEOUT_S` (default 30) is pgjdbc's socketTimeout for the
+workload cells except PC08m-txn-default-nosocktimeout, which keeps the driver
+default 0, as do the hold cells (PC08s-hold, PC08t-*). The full PC08 took
+1 h 52 min on 2026-11-04 (run 11), 2185 s of it in the five cells that ran to
+their wall cap, so it is not in the default `ONLY`: run it with
+`make probe ONLY=PC08,PC09`.
 
 ```sh
 SUPABASE_ACCESS_TOKEN=... PVLAB_ORG_PRO=<org slug> make probe
