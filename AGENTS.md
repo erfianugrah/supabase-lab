@@ -5846,3 +5846,51 @@ runs 3-4. Numbers and per-write evidence: RUNLOG.md, artifacts
   table 2555904 B; read + archive of 1,000 took 25 ms p50 per cron run,
   read + delete 19 ms. Figures from `out/2026-10-28/`; details and limits in
   its RUNLOG.
+
+## experiments/edge-burst - key facts (validated 2026-11-04, two runs, Team org, one self-provisioned Micro per run, ap-northeast-1)
+
+- **A non-recursive burst against one function drew no 429
+  `RATE_LIMIT_EXCEEDED`** (EB02/EB03, `out/2026-11-04/`; the error-codes
+  page, read 2026-11-04, attributes the code to recursive or nested calls).
+  From this lab's Mac (Singapore, IPv4, Bun fetch, keep-alive; HTTP/1.1 as
+  seen from `https://www.cloudflare.com/cdn-cgi/trace`, the project host not
+  checked) with `x-region: ap-northeast-1`, a no-op function took 25 to 800
+  req/s for 120 s per step and 1,200 req/s for 60 s (71,982 of 72,000 HTTP
+  200) with no client flag. At 1,600 and 2,400 req/s the client called
+  fetch() at 1599.9 and 2394.4 req/s; of 96,000 and 143,672 sent, 95,976 and
+  143,484 got HTTP 200 and the other 24 and 188 got no HTTP answer, so none
+  was a 429. Both steps are flagged `client_limited`. A function making one
+  supabase-js `rpc()` per request drew no 429 up to 800 req/s either, but ran
+  without a client flag only from 25 to 200 req/s: at 400 and 800 req/s 28
+  and 718 requests were skipped at the 450 in-flight cap (rpc 200:95258 of
+  95282 sent at 800). No 429 of any kind in either run.
+- **Bursts**: run 2, `eb-noop`, 1,000 requests through 150 lanes: 1,000 of
+  1,000 HTTP 200, sent at 1237.6 req/s, p99 220 ms. Run 1, 450 lanes opened
+  at once: 483 (`eb-noop`) and 514 (`eb-rpc`) of 1,000 got no HTTP answer,
+  456 and 514 of them `client_other` (first error text `Unable to connect`),
+  plus 22 socket closes and 5 30 s timeouts in the `eb-noop` burst (this Mac
+  or the far end not separated); every answer was 200.
+- **Other classes**: 503 with an empty body and no `x-sb-edge-region`, 4 / 1
+  / 18 in EB03-r200 / EB03-r400 / EB02-r1200, each in one 10 s bucket;
+  source not determined. No `BOOT_ERROR`, `WORKER_RESOURCE_LIMIT` or
+  Cloudflare HTML. Every 200 carried `x-sb-edge-region: ap-northeast-1`
+  and a SIN cf-ray.
+- **Not settled**: rates from about 1,600 req/s up (1,600 and 2,400 were
+  flagged; the highest unflagged step was 1,200) or denser bursts, where
+  requests went without an HTTP answer and this Mac or the far end was not
+  separated; other client IPs and colos (#292, a second vantage through a
+  Cloudflare Worker); other regions, unpinned requests, `verify_jwt` true
+  and other dates; the Pro plan (#293, a re-run on a Pro-plan org once the
+  org restriction lifts). On 2026-11-04 every function invocation on a
+  project created in the Pro org got HTTP 402, with a body naming a
+  usage-quota restriction (read as org-wide, since the project was new), so
+  the runs used the Team org through `PVLAB_ORG_PRO`; EB01a records
+  `org_plan`.
+- Harness: `lib/load.ts` is open loop with an in-flight cap (450) that
+  skips rather than queues. `client_limited` marks a step as not a clean
+  platform measurement without saying which side caused it; it is set by
+  skips, a send rate under 95 % of plan, p99 send lag over 250 ms, a host
+  pause and (since run 2, 09:44 UTC) any request without an HTTP answer.
+  Bun's fetch queues above 256 in flight by default (bun docs), so the
+  Makefile sets `BUN_CONFIG_MAX_HTTP_REQUESTS=512`; `PVLAB_EB_BURST_LANES`
+  sets the burst's lanes apart from the step cap.
