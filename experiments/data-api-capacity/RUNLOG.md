@@ -12,6 +12,277 @@ means the source named in the module header; "measured" means the artifact.
 DC08 is the exception to that vantage: its clients run in the project's
 region (section below).
 
+## 2026-11-03/04 - DC22, requests for missing tables and functions against other Data API requests (three runs)
+
+Harness: lab commit 5102785 plus the uncommitted DC22 module (runs 2 and
+3 also have its `curve` and `S` phases, added after run 1). Org: the lab's
+Team-plan org, passed through `PVLAB_ORG_PRO` (the module reads
+`ctx.orgs.pro` like every DC module; the Pro org was not used).
+ap-southeast-1, one project per run, each deleted by its own DC99 (DELETE
+200), and the Team org listed no projects after the last run. Clients:
+this lab's Mac in Singapore (10 cores) under `caffeinate -is`; oha 1.16.0
+(read locally, not in the artifact). Postgres 17.11 and PostgREST 14.18
+(`application_name` of `authenticator`) in all three artifacts (DC22a).
+A smoke run at 20 req/s on a fourth project the same day (not published,
+deleted) checked the harness.
+
+- Run 1: created `small` (pool 30),
+  `out/2026-11-03/run-2026-11-03T23-23-46-930Z.json` (19 results),
+  23:23:46 to 00:18:02 UTC; phases base, D, E.
+- Run 2: created `small`, `out/2026-11-04/run-2026-11-04T00-21-42-484Z.json`
+  (10 results), 00:21:42 to 00:35:36 UTC; phases curve, S.
+- Run 3: created `large` (`PVLAB_DC_SIZE=large`, pool 50),
+  `out/2026-11-04/run-2026-11-04T00-21-47-402Z.json` (7 results), 00:21:47
+  to 00:36:49 UTC; curve steps 0, 500, 2000, then S. Runs 2 and 3 ran at
+  the same time from the same Mac (each flood 110 req/s).
+
+### DC22 - does a stream of 404s for missing tables and functions slow other requests?
+
+Question: a client sends a steady stream of Data API requests for tables
+and functions that do not exist, with the legacy anon key; every answer is
+a 404. Can that stream slow the project's other Data API requests while
+Postgres is idle and the connection pool mostly free? Readings: H1, the
+404 path itself is expensive inside PostgREST (the "Perhaps you meant"
+hint is a fuzzy search over the schema cache); H2, it is request rate
+(gateway, JWT checks), not the 404 path; H3, with legacy API keys disabled
+the same stream is refused before PostgREST and the other requests
+recover.
+
+Source (PostgREST v14.18, source-read; Supabase's build assumed to match
+the tag): `App.hs` plans a request from the schema cache before
+`usePool`, so a 404 for a missing table or function never asks the pool
+(https://github.com/PostgREST/postgrest/blob/v14.18/src/PostgREST/App.hs).
+`Error.hs` computes the hint for PGRST205 (table) from an index memoised
+in the schema cache (`dbTablesFuzzyIndex`, PR #4472,
+https://github.com/PostgREST/postgrest/pull/4472, merged 2026-01-02),
+and for PGRST202 (function) builds `Fuzzy.fromList` over every function
+in the schema on each request (`noRpcHint`,
+https://github.com/PostgREST/postgrest/blob/v14.18/src/PostgREST/Error.hs).
+An open upstream issue asks for a setting to turn this spell checking off
+(https://github.com/PostgREST/postgrest/issues/4499).
+
+Method: three probes at 2 req/s each (`oha -q 2`, keep-alive, GET
+`dc_items?id=eq.4242`, an indexed point read), one per key: legacy anon
+(apikey and Bearer), `sb_secret_` (apikey), `sb_publishable_` (apikey).
+The flood: `oha -q RATE -c 2048 --rand-regex-url`, legacy anon key, one
+of: GET `/rest/v1/zz_<6>_<8>?select=id` (missing table, PGRST205), POST
+`/rest/v1/rpc/zz_<6>_<8>` with `{}` (missing function, PGRST202), GET
+`dc_items?id=eq.<4 digits>` (200). Run 1 arms: 30 s probes only, 150 s
+flood, 20 s after; probe figures below are requests sent during the 150
+s. Every 3 s during a flood one probe and one flood-shaped request kept
+`x-envoy-upstream-service-time` (the gateway's time to the upstream's
+headers; "upstream" below). Node CPU is the busy share between the first
+and last metrics refresh in the arm (4 refreshes over 142 to 188 s; DC05
+on the staleness). `public` held 1 table and 5 functions unless stated;
+D added 1000 tables (`dc22_t_NNNNN`, one int key) and 2000 functions
+(`dc22_f_NNNNN(a int) returns int language sql`), so 1001 relations and
+2005 functions, all served after a schema reload within 2 s.
+
+| run 1 arm | anon probe p50 / p95 / max ms | secret probe | publishable probe | flood statuses | flood p50 / p95 ms | upstream of a flood-shaped request, p50 ms | node CPU % |
+|---|---|---|---|---|---|---|---|
+| control | 27 / 40 / 53 | 60 / 71 / 132 | 32 / 42 / 96 | - | - | - | 6.8 |
+| table 110 | 28 / 42 / 74 | 62 / 85 / 111 | 31 / 47 / 73 | 404:16501 | 25 / 63 | 0 | 10.4 |
+| rpc 110 | 26 / 42 / 131 | 63 / 95 / 211 | 32 / 53 / 208 | 404:16501 | 26 / 69 | 0 | 15.5 |
+| valid 110 | 28 / 42 / 63 | 64 / 79 / 271 | 32 / 50 / 85 | 200:16501 | 27 / 67 | 1 | 13.2 |
+| table 220 | 28 / 47 / 243 | 66 / 97 / 270 | 33 / 55 / 343 | 404:33001 | 27 / 69 | 0 | 17.7 |
+| rpc 220 | 28 / 49 / 305 | 67 / 105 / 218 | 34 / 56 / 199 | 404:33001 | 27 / 70 | 0 | 17.8 |
+| valid 220 | 28 / 47 / 219 | 69 / 87 / 172 | 34 / 61 / 169 | 200:33001 | 28 / 75 | 2 | 25.1 |
+| table 440 | 30 / 49 / 180 | 73 / 104 / 180 | 35 / 57 / 223 | 404:65680 | 28 / 48 | 0 | 25.5 |
+| rpc 440 | 30 / 42 / 64 | 71 / 95 / 135 | 34 / 56 / 87 | 404:65670 | 28 / 47 | 0 | 30.9 |
+| valid 440 | 30 / 57 / 162 | 83 / 107 / 132 | 35 / 82 / 169 | 200:65675 | 29 / 64 | 2 | 33.4 |
+| D control (2005 functions) | 30 / 42 / 61 | 65 / 86 / 186 | 34 / 48 / 84 | - | - | - | 6.3 |
+| D table 440 | 30 / 49 / 139 | 74 / 98 / 169 | 36 / 54 / 93 | 404:65679 | 29 / 46 | 0 | 23.3 |
+| D rpc 440 | 3162 / 7785 / 20726 (200:49 503:231) | 3228 / 7204 / 35828 (200:19 503:262) | 3311 / 7880 / 12539 (200:45 503:235) | 404:355 503:45534 | 2750 / 6864 | 1616 (one sample) | 78.4 |
+| E rpc 440, legacy keys off | 17 / 24 / 148 (401:300) | 1114 / 1695 / 2005 | 466 / 904 / 1265 | 401:65671 | 18 / 30 | - (401) | 85.1 |
+
+Every probe answer not noted in its cell was a 200 (300 per probe per
+arm, 301 secret in rpc 440, 299 publishable in table 110, 298 secret and
+297 publishable in E). Client-side `Network is unreachable (os error 51)`
+hit 321 to 559 flood requests in each 440 arm; D rpc 440 also had 3025
+client timeouts (60 s), and the flood fell to 236 req/s achieved because
+the client's 2048 in-flight cap filled.
+
+- With 5 functions in `public`, no flood moved the probes: up to 440 req/s
+  of missing tables, missing functions or valid reads, every anon probe
+  p50 stayed within 26 to 30 ms against 27 ms with no flood, and every
+  answer was a 200. A flood-shaped 404 took 0 ms upstream (p50) and a
+  valid read 1 to 2 ms. Node CPU rose with rate about equally for the
+  three kinds (25.5, 30.9 and 33.4 % at 440 against 6.8 % with no flood).
+  `pgrst_db_pool_waiting` read 0 in every flood-window snapshot except
+  valid 440 (4).
+- With 2005 functions, a missing-function flood at 440 req/s slowed every
+  key: probe p50 3.2 to 3.3 s, maxima 12.5 to 35.8 s, 231 to 262 of each
+  probe's requests answered 503 (body not recorded in run 1), node CPU
+  78.4 %, `pgrst_db_pool_waiting` 0 and available 0 of 30 in the
+  snapshots, every `authenticator` sample idle (3 to 5) or idle in
+  transaction (1). A missing-table flood at the same rate and schema size
+  did nothing (probe p50 30 ms). One missing-function request at rest took
+  235 ms upstream (p50 of 20 sequential, DC22d) against 0 ms with 5
+  functions; a missing table 0 ms.
+- E (legacy keys off by `PUT /v1/projects/{ref}/api-keys/legacy?enabled=false`,
+  200): the first 401 for the anon key came 7 s after the PUT (5 s polls).
+  The 401 came from the gateway: body `{"message":"Legacy API keys are
+  disabled","hint":"Your legacy API keys (anon, service_role) were disabled
+  on <timestamp>. Re-enable them in the Supabase dashboard, or use the new
+  publishable and secret API keys."}`, header `sb-error-code:
+  UNAUTHORIZED_DISABLED_LEGACY_KEY`, no `proxy-status: PostgREST`, no
+  `x-envoy-upstream-service-time`; it answered missing tables and missing
+  functions the same way. The E arm's probes started less than a minute
+  after D rpc 440's flood ended, and its flood (rpc 440) got 401:65671.
+  The secret and publishable probes still ran at p50 1114 and 466 ms while
+  it ran (1049 / 435 ms in the 30 s before it, 971 / 403 ms in the 20 s
+  after), with node CPU 85.1 %. Two readings: PostgREST still working
+  through the missing-function requests it accepted during D rpc 440
+  (each 235 ms at rest), or the gateway's 401s at 440 req/s costing the
+  node CPU. Run 2 at 110 req/s of 401s read node CPU 1.4 % (below), which
+  favours the first; 440 req/s of 401s on a project with no backlog was
+  not run. When the slowdown ended was not measured (the project was
+  deleted after the arm).
+- After legacy keys were off, the metrics endpoint answered 401 to the
+  legacy service_role key and 200 to `sb_secret_` as the Basic password.
+- 404 bodies: `{"code":"PGRST205","details":null,"hint":null,"message":"Could
+  not find the table 'public.zz_nothere_table' in the schema cache"}` and
+  `{"code":"PGRST202","details":"Searched for the function public.zz_nothere_fn
+  without parameters or with a single unnamed json/jsonb parameter, but no
+  matches were found in the schema cache.","hint":null,"message":"Could not
+  find the function public.zz_nothere_fn without parameters in the schema
+  cache"}`, headers `proxy-status: PostgREST; error=PGRST20x`. A near
+  miss gets a hint (`dc_item`: `"Perhaps you meant the table
+  'public.dc_items'"`, `dc_slep`: `"Perhaps you meant to call the
+  function public.dc_sleep"`); random names get `hint: null`, so the cost
+  is paid with nothing returned. With 2005 functions, `dc22_t_0001x` got
+  `hint: null` and `dc22_f_0001x` got `public.dc22_f_00019`.
+- PostgREST logged none of the 404s: 0 `postgrest_logs` lines containing
+  `zz_` after the base arms (DC22b; DC12 found the same for 200s).
+- The secret-key probe ran about 35 ms slower than the anon probe in run 1
+  (control p50 60 against 27 ms; its upstream time 31 to 66 ms in the
+  samples against 1 to 2 ms for anon). Runs 2 and 3 did not show it (pre
+  p50 37 and 36 ms, upstream 3 to 6 ms). Not investigated.
+
+Runs 2 and 3, `curve`: functions added to `public` in steps, a schema
+reload, then 20 sequential requests per shape at rest (anon key), upstream
+p50 / max in ms:
+
+| functions in `public` | missing function, Small (run 2) | missing function, Large (run 3) | missing table, Small | valid read, Small |
+|---|---|---|---|---|
+| 5 | 0 / 7 | 0 / 0 | 0 / 6 | 1 / 18 |
+| 105 | 2 / 5 | - | 0 / 0 | 1 / 3 |
+| 255 | 6 / 10 | - | 0 / 0 | 1 / 3 |
+| 505 | 21 / 27 | 19 / 21 | 0 / 0 | 1 / 5 |
+| 1005 | 61 / 74 | - | 0 / 0 | 1 / 4 |
+| 2005 | 206 / 232 | 184 / 252 | 0 / 0 | 1 / 5 |
+
+- The cost of one missing-function 404 grew faster than the function
+  count: each doubling from 255 multiplied it by 2.9 to 3.5 (6, 21, 61,
+  206 ms), and Large paid about what Small paid (19 and 184 ms against 21
+  and 206). Missing tables stayed at 0 ms. The functions here share a
+  prefix (`dc22_f_`) and differ in five digits; a schema of varied names
+  was not measured, and why the cost grows faster than linearly was not
+  traced in the source.
+
+Runs 2 and 3, `S`: with 505 functions in `public` (missing function at
+rest: 23 ms Small, 18 ms Large), one missing-function flood at 110 req/s
+(legacy anon key) for 420 s with events at fixed offsets from its start:
+a no-change `db_pool` PATCH (the pool as found: 30 and 50; DC02e: every
+PATCH restarts PostgREST) at +120 s, legacy keys off at +240 s, flood end
+at +420 s (421 on Small), then 300 s of probes only. Probe p50 per 15 s
+bucket by send time, anon / secret / publishable, ms ("401": every anon
+answer in the bucket was a 401; the Large anon cells at +255 and +270
+mix 200s and 401s):
+
+| +s from flood start | Small (run 2) | Large (run 3) |
+|---|---|---|
+| -15 (no flood) | 29 / 34 / 31 | 29 / 33 / 29 |
+| 0 | 8873 / 8973 / 8882 | 1153 / 6213 / 8561 |
+| 30 | 32823 / 32887 / 32791 | 22237 / 21564 / 18503 |
+| 75 | 33945 / 33851 / 33914 | 26485 / 26461 / 26482 |
+| 135 (PATCH at 120) | 59867 (one 522) / none / none | 27873 / 27922 / 28046 |
+| 180 | 22454 / 6440 / 22304 (mostly 520 and 521) | 26542 / 26495 / 26545 |
+| 210 | 39 / 43 / 43 (anon 200:22 521:271 525:14) | 25972 / 25940 / 25958 |
+| 225 | 18806 / 20411 / 19326 | 25608 / 25729 / 25787 |
+| 255 (keys off at 240) | 401 / 15300 / 19453 | 26 / 25704 / 25695 |
+| 270 | 401 / 57 / 53 | 22 / 25647 / 25569 |
+| 300 | 401 / 36 / 34 | 18 / 18177 / 17425 |
+| 315 | 401 / 37 / 34 | 18 / 45 / 41 |
+| 435 (flood ended) | 401 / 37 / 36 | 17 / 36 / 31 |
+
+- 110 req/s of missing-function requests with 505 functions in `public`
+  saturated both sizes within the first 15 s bucket (probe p50 1.2 to 9.0
+  s in it) and held the probes at period p50 14.3 to 22.9 s over the 120
+  s before the PATCH (Small anon 22230, secret 19920, publishable 22856
+  ms; Large 16360, 16200, 14319 ms). Node CPU per refresh: Small 41.6 %
+  (the refresh straddling the flood start), then 70.6 to 81.4 % while the
+  flood reached PostgREST, 1.3 to 7.3 % after; Large 41.4 %, then 56 to
+  76.8 %, 1.0 to 1.5 % after. Pool snapshots: waiting 0 on Small
+  throughout; 11 to 17 on Large in the first three refreshes, with
+  available 4 of 50. The flood sent 1650 a bucket and was answered 910 to
+  964 (Small) and 1130 to 1243 (Large) 404s a bucket once it saturated.
+- 503s began about 90 s into the flood on both sizes, before the PATCH
+  (Small 1172 in the flood, Large 1573). One body, Large: `upstream
+  connect error or disconnect/reset before headers. retried and the latest
+  reset reason: remote connection failure, transport failure reason:
+  delayed connect error: 111`, `text/plain`, `x-envoy-attempt-count: 2`:
+  the gateway could not connect to its upstream (111 is connection
+  refused). What refused was not identified.
+- The restart did not help. On Small the PATCH (200) was followed by
+  three "Starting PostgREST" lines, about 6, 72 and 92 s after it (times
+  derived from the module's end, a few seconds of error), and Cloudflare
+  answered 520, 521, 522 and 525 for most requests from about 15 to 105 s
+  after it; the 15 s bucket at +210 s had probes at p50 39 to 43 ms, and
+  the next was back at 18.8 to 20.4 s. On Large: one start line, within a
+  few seconds of the PATCH, no 52x, and the probes stayed at about 26 s.
+- Legacy keys off recovered both sizes while the flood kept coming. Small:
+  the flood was 401:1645 404:5 in the bucket after the PUT's, and the
+  secret and publishable probes were at p50 57 / 53 ms 30 s after the
+  PUT. Large: the gateway's switch took longer, 401:615 404:1254 in the
+  PUT's bucket, 401:3360 404:1071 45 s later, 401:1643 404:7 60 s later,
+  and the probes came back 75 s after the PUT (p50 45 / 41 ms). L05
+  (iap-lockdown) measured about 45 s to the first anon 401; here 7 s
+  (run 1, first 401) to about 60 s (run 3, every request).
+- 110 req/s of gateway 401s cost nothing visible: from +285 s (Small) and
+  +330 s (Large) to the flood's end, the secret and publishable probes ran
+  at p50 32 to 39 ms per bucket, against period p50 36 / 34 (Small) and
+  34 / 32 ms (Large) after the flood stopped, with node CPU 1.4 % (Small)
+  and 1.3 % (Large) in the refreshes after the backlog cleared.
+
+Reading: H1 holds for missing functions and not for missing tables. A
+PGRST202 404 costs PostgREST CPU that grows with the number of functions
+in the exposed schema (0 ms at 5, 21 ms at 505, 206 ms at 2005 on Small),
+and at 505 functions 110 such requests a second saturated Small and
+Large: every Data API request, any key, waited 14 to 23 s (period p50)
+while Postgres sat idle and the pool snapshots showed free connections.
+A PGRST205 404 cost 0 ms up to 1001 relations (the memoised table index),
+and 440 req/s of them did nothing. H2 is falsified at these rates and
+sizes: 440 req/s of valid reads, of missing tables, or of missing
+functions with 5 functions, left the anon probe at p50 26 to 30 ms. H3
+holds: disabling legacy API keys moved the refusal to the gateway (401
+before PostgREST), and the probes came back within 30 s (Small) and 75 s
+(Large) of the PUT. A restart did not clear it (the flood refilled the
+queue within seconds). Derived, not measured: with C ms of CPU per
+request and P cores for PostgREST, the rate that saturates is about 1000
+x P / C a second (2 cores and 21 ms: about 95 req/s); it assumes the hint
+is CPU-bound and PostgREST uses every core, and PostgREST's core count was
+not read. After a flood that queued long hints (run 1, 2005 functions,
+440 req/s), the slowdown outlasted the flood by at least the 4-minute E
+arm; at 505 functions and 110 req/s it cleared within 30 to 75 s of the
+gateway refusing the flood.
+
+### Not run
+
+- Function names unlike the synthetic `dc22_f_NNNNN`; functions in a
+  schema other than `public`; GET /rpc; arguments on the missing call
+  (overloaded-name hints take another branch of `noRpcHint`).
+- XL and above (only Small and Large ran); a second vantage; HTTP/2 floods.
+- How long a backlog at 2005 functions takes to drain; 440 req/s of
+  gateway 401s on a project without a backlog.
+- The 503s' cause (one body kept, run 3); PostgREST's own CPU (the metrics
+  endpoint has node CPU only).
+
+### Cost
+
+Four Team-org projects (Small for about 55, 14 and 6 minutes, Large for
+about 15 minutes).
+
 ## 2026-10-27 - DC18 recovery after a write stall under a fixed rate, DC19 bursts against the gateway's 503 overflow (two runs)
 
 Harness: lab commit af374bd plus the uncommitted DC18 and DC19 modules and
