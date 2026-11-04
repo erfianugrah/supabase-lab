@@ -116,9 +116,11 @@ facts):
   the autoscale config surface (D04/D07), the free-org autoscale/read-only
   lifecycle (D05/D06/D06b), the dashboard-only IOPS gate (D08),
   upgrade/downgrade timing + sampled downtime (D09), the paid-plan fill -
-  autoscale, read-only, disk-full and recovery on Pro (D10) - and the grow
-  steps from a 2 GB volume (D11). Root reference:
-  COMPUTE-DISK.md.
+  autoscale, read-only, disk-full and recovery on Pro (D10), the grow
+  steps from a 2 GB volume (D11), the spend cap against a manual disk grow
+  past the 8 GB baseline (D12), and a live IOPS and throughput raise under
+  sampled connections, where a size change also starts the D03 four-hour
+  quota (D13). Root reference: COMPUTE-DISK.md.
 - `rls-policy-cost` - the cost of an RLS policy: whether `(select auth.uid())`
   hoists (InitPlan, access-control-neutral), what an index does to that win,
   and how a joined table inside an EXISTS policy behaves. Synthetic fixtures
