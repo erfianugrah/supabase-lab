@@ -381,6 +381,336 @@ public issue's case), compute sizes above Small, regions other than
 `ap-southeast-1`, the dedicated pooler (PgBouncer), and whether any tenant
 runs with a `pool_checkout_timeout` other than 60,000.
 
+## PC08 - pgjdbc + HikariCP on each path, server-side prepare on and off (runs 10 to 12, 2026-11-04)
+
+Question: what does a JDBC application with pgjdbc and HikariCP see on each
+Supabase connection path under concurrent pooled load, with pgjdbc's default
+server-side prepare and with `prepareThreshold=0`; and what does Hikari do
+when its pool is bigger than the session pool, or when 40 connections share
+the transaction pool?
+
+Client. `drivers/java/Probe.java` under the JDK single-file source launcher in
+`eclipse-temurin:21.0.13_9-jdk-noble` pinned by index digest (`JDK_IMAGE` in
+`lib/java.ts`), with `org.postgresql:postgresql` 42.7.14, `com.zaxxer:HikariCP`
+7.1.0 and slf4j 2.0.17 (api and simple). The versions were the `<release>` in
+each artifact's Maven Central `maven-metadata.xml` on 2026-11-04; each jar's
+sha1 matched the `.sha1` Maven Central publishes, and `lib/java.ts` checks the
+sha256 pinned beside it before every run. pgjdbc's documented default for
+`prepareThreshold` is 5 (https://jdbc.postgresql.org/documentation/use/,
+fetched 2026-11-04) and the loaded driver reported 5 at run time
+(`pgjdbc_default_prepareThreshold`, PC08-env). The password reaches the JVM as
+`-e PGPASSWORD`. One container per cell; an "app instance" is one
+`HikariDataSource` in that JVM, so 4 instances are four pools in one process,
+not four hosts.
+
+Workload per worker thread and iteration, one Hikari borrow per operation: a
+parameterised point `SELECT` on the 10,000-row `pc08_items` primary key that
+also returns `pg_backend_pid()`; an `UPDATE ... RETURNING` in an explicit
+transaction (`setAutoCommit(false)`, `commit()`); a 5-row batch `INSERT` into
+`pc08_events` in an explicit transaction. Every result is checked against the
+row id and a per-statement tag (`wrong_results`). A local Postgres 17 check
+before the runs logged 164 `execute S_n` lines for 20 iterations (1 instance
+x `maximumPoolSize` 2, 2 workers x 10 iterations each) with the default
+threshold and none with `prepareThreshold=0` or `simple` (scratch
+check, not an artifact): the default arm does switch to named server-side
+statements within a short cell.
+
+Project: one Small (`ci_small`) project in `ap-northeast-1`, Pro org, created
+with `POST /v1/projects` outside the harness and handed to runs 10, 11 and 12
+with `PVLAB_PC_ADOPT`, then deleted with `DELETE /v1/projects/{ref}` (HTTP 200;
+at 11:37 UTC `GET /v1/projects` listed no project with the run prefix and
+`GET /v1/projects/{ref}` answered 404). Same
+IPv4-only Singapore vantage as above, so every latency includes the
+Singapore-Tokyo round trip; the iteration is about five round trips.
+
+| Run | Evidence dir | What | Published artifact |
+|---|---|---|---|
+| 10 | `20261104-171121` | smoke: PC08 matrix phase only, 20 iterations per worker, IPv4 add-on switched on and left on | `out/2026-11-04/run-2026-11-04T09-11-22-458Z.json` |
+| 11 | `20261104-172408` | PC08, all phases, 500 iterations per worker (100 for the session-oversize rows) | `out/2026-11-04/run-2026-11-04T09-24-08-535Z.json` |
+| 12 | `20261104-191836` | PC08, the four Supavisor transaction-mode cells of shapes M and H only (`PVLAB_PC08_CELLS`), wall cap 240 s, which the two default cells reached; adds the text of each result that failed its check | `out/2026-11-04/run-2026-11-04T11-18-37-198Z.json` |
+
+All three runs: 2026-11-04 UTC, under `caffeinate`; the `PC08-clock` row
+passed in each (8 ms drift in run 11). Project read back (PC08-env, runs 10 and
+11): `ci_small`, `max_connections` 90, Postgres 17.11; Supavisor
+`default_pool_size null`, `max_client_conn null`, `pool_mode transaction`;
+`GET .../config/database/pgbouncer` answered 200 with no `default_pool_size`
+or `max_client_conn` field, `query_wait_timeout` 80 (seconds), `reserve_pool_size` 1,
+`ignore_startup_parameters` `options,extra_float_digits` (pgjdbc sends
+`extra_float_digits` at startup; the dedicated pooler ignores it rather than
+refusing the client). Effective pools, counted as active `pg_sleep` backends
+through the Management API (PC08t rows, run 11): Supavisor transaction 16
+(PC08t-txn-queue at +5 s, PC08t-txn-wait at +10 s); dedicated PgBouncer 15
+(PC08t-dedicated-queue, +5 s) and 16 (PC08t-dedicated-wait, +10 s); Supavisor
+session 15 (PC08s-hold, and the `EMAXCONNSESSION` text names
+`pool_size: 15`). IPv4 add-on (run 10, PC08-ipv4): `PATCH billing/addons`
+HTTP 200, an A record for `db.<ref>` from `dig` after 10 s, the first direct
+connect from the container after 12 s (10 s poll step). Runs 11 and 12 found
+it already on.
+
+No probe saw HTTP 402 or a "restricted" message. On 2026-11-04 Edge Function
+invocations (edge-burst RUNLOG) and Data API requests (compute-disk D13
+RUNLOG, naming `exceed_realtime_connection_count_quota`) on Pro-org projects
+answered HTTP 402; the Postgres paths PC08 uses were unaffected: a search of
+every raw output and log of runs 10 to 12 for 402 and "restricted" found
+none, and these rows use only Postgres paths and the Management API.
+
+### Design choices made during the runs, and why
+
+- socketTimeout 30 s on every workload cell except one. In smoke run 10,
+  PC08m-txn-default stalled: a thread dump showed five workers inside
+  `QueryExecutorImpl.processResults` (four on the `UPDATE`, one on the batch
+  `INSERT`), still waiting for a reply more than 4 minutes into the cell and
+  long after its last progress, while Postgres listed two probe backends, both
+  `idle`. The container was stopped by hand, so the run
+  10 row has no summary (`fail`, exit 137); the thread dump is not in an
+  artifact. pgjdbc's default `socketTimeout` is 0 (wait for ever), so a stalled
+  read parks a worker until the cell's cap. From run 11 on, workload cells set
+  30 s, turning a stall into a counted `08006` error;
+  PC08m-txn-default-nosocktimeout keeps the default to record the stall in an
+  artifact.
+- Backend reset before each cell. The module terminates, through the
+  Management API, the backends whose `application_name` is `Supavisor` or
+  `pc08-probe` (direct and PgBouncer backends carry the probe's name, and so
+  did the Supavisor transaction-mode backends in a `pg_stat_activity` read
+  during run 10), then waits 3 s.
+  That keeps one cell's named statements away from the next. To check that the
+  reset itself does not cause the transaction-mode errors: a scratch cell with
+  no reset at all (20 iterations, 12 workers, not an artifact) failed 201 of
+  240 iterations with the same SQLSTATEs, and PC08m-txn-default-reuse is the
+  artifact row without a reset.
+- Postgres's own log per cell. After the last cell the module counts
+  `postgres_logs` lines in each cell's window through the logs endpoint
+  (the 8 most frequent messages), digits folded, connection, disconnection and checkpoint lines left out
+  (`pg_log_*` columns). This is what the server refused, separate from what
+  the client saw.
+
+### Workload rows (run 11): every path, both arms
+
+Shape M is 4 instances x `maximumPoolSize` 3 with 3 workers each (12
+connections, under the session pool of 15); shape H is 4 x 10 with 10 workers
+each (40 connections, Hikari's default pool size per instance). 500 iterations
+per worker: 6000 per M cell and 20000 per H cell when nothing stops it.
+"Ok" means no operation in the iteration threw; an iteration whose result
+failed its check still counts as ok (Wrong results column), so up to 14 of
+PC08h-txn-default's 516 ok iterations may hold one. "Attempted" counts
+iterations that finished, ok or failed; workers still inside an operation at
+the cap are not in it. Latency percentiles are over ok iterations only.
+"Backend switches" counts how often a pooled connection's `SELECT` came back
+from a different `pg_backend_pid()` than that connection's previous one, over
+the `SELECT`s that returned the requested row (failed and wrong `SELECT`s are
+not in the denominator). Cells with iteration errors ran into the 480 s wall
+cap (240 s for the no-timeout row), so their attempted count is smaller.
+
+| Row | Path | Arm | Iterations ok / attempted | Wrong results | Iteration p50 / p95 / p99 ms | Backend switches / `SELECT`s with the requested row | Postgres lines about prepared statements or bind |
+|---|---|---|---|---|---|---|---|
+| PC08m-direct-default | direct 5432 | default (5) | 6000 / 6000 | 0 | 436.43 / 459.5 / 473.69 | 0 / 6000 | 0 |
+| PC08m-direct-pt0 | direct 5432 | `prepareThreshold=0` | 6000 / 6000 | 0 | 437.25 / 459.39 / 478.98 | 0 / 6000 | 0 |
+| PC08m-session-default | Supavisor session 5432 | default | 6000 / 6000 | 0 | 389.53 / 404.8 / 685.23 | 0 / 6000 | 0 |
+| PC08m-session-pt0 | Supavisor session 5432 | pt0 | 6000 / 6000 | 0 | 385.06 / 392.93 / 397 | 0 / 6000 | 0 |
+| PC08m-txn-default | Supavisor transaction 6543 | default | 603 / 4522 | 0 | 395.96 / 498.98 / 938.24 | 2914 / 4234 | 5331 |
+| PC08m-txn-default-reuse | Supavisor transaction 6543, no reset | default | 566 / 4562 | 1 | 393.59 / 487.03 / 925.28 | 2864 / 4243 | 5596 |
+| PC08m-txn-default-nosocktimeout | Supavisor transaction 6543, socketTimeout 0 | default | 509 / 754 | 0 | 393.41 / 427.89 / 488.6 | 183 / 740 | 409 |
+| PC08m-txn-pt0 | Supavisor transaction 6543 | pt0 | 6000 / 6000 | 0 | 383.79 / 394.51 / 398.11 | 5228 / 6000 | 0 |
+| PC08m-dedicated-default | PgBouncer 6543 | default | 6000 / 6000 | 0 | 421.89 / 444.64 / 457.43 | 5262 / 6000 | 0 |
+| PC08m-dedicated-pt0 | PgBouncer 6543 | pt0 | 6000 / 6000 | 0 | 435.89 / 458.67 / 475.36 | 5298 / 6000 | 0 |
+| PC08q-txn-simple | Supavisor transaction 6543 | `preferQueryMode=simple` | 6000 / 6000 | 0 | 391.96 / 399.47 / 404 | 5261 / 6000 | 0 |
+| PC08q-txn-cacheall | Supavisor transaction 6543 | `extendedCacheEverything` | 570 / 4830 | 1 | 391.26 / 526.73 / 839.99 | 3150 / 4548 | 5629 |
+| PC08q-dedicated-simple | PgBouncer 6543 | simple | 6000 / 6000 | 0 | 440.64 / 463.53 / 487.79 | 5238 / 6000 | 0 |
+| PC08q-dedicated-cacheall | PgBouncer 6543 | `extendedCacheEverything` | 6000 / 6000 | 0 | 438.96 / 459.87 / 489.69 | 5213 / 6000 | 0 |
+| PC08h-direct-default | direct 5432 | default | 20000 / 20000 | 0 | 435.06 / 456.93 / 478.9 | 0 / 20000 | 0 |
+| PC08h-direct-pt0 | direct 5432 | pt0 | 20000 / 20000 | 0 | 436.95 / 459.47 / 482.83 | 0 / 20000 | 0 |
+| PC08h-txn-default | Supavisor transaction 6543 | default | 516 / 11572 | 14 | 391.45 / 608.4 / 869.44 | 8795 / 10664 | 14984 |
+| PC08h-txn-pt0 | Supavisor transaction 6543 | pt0 | 20000 / 20000 | 0 | 411.52 / 434.48 / 455 | 16601 / 20000 | 0 |
+| PC08h-dedicated-default | PgBouncer 6543 | default | 20000 / 20000 | 0 | 477.09 / 527.48 / 612.87 | 18601 / 20000 | 0 |
+| PC08h-dedicated-pt0 | PgBouncer 6543 | pt0 | 20000 / 20000 | 0 | 483.81 / 524.06 / 545.19 | 18861 / 20000 | 0 |
+
+The only error in a clean row: PC08h-direct-default had one background
+Hikari connect fail with `08001 The connection attempt failed` (cause
+`EOFException`); no iteration failed.
+
+What the failing transaction-mode cells saw, PC08m-txn-default (run 11), the
+15 most frequent of its 17 error kinds (every listed kind but the `08006`
+timeouts failed 74.56 to 848.77 ms after the operation started):
+
+- `26000 prepared statement "S_n" does not exist`: 2027 on the batch
+  `INSERT` as `PSQLException`, 938 on the `UPDATE`, plus 219 on the batch
+  `INSERT` as `BatchUpdateException [26000]` (one per failed batch).
+- `42P05 prepared statement "S_n" already exists`: 320 batch `INSERT`s as
+  `BatchUpdateException`, 243 `UPDATE`, 134 `SELECT`, 90 batch `INSERT`s as
+  `PSQLException`.
+- `25P02 current transaction is aborted, commands ignored until end of
+  transaction block`: 143 `SELECT` (autocommit statements), 143 `UPDATE`, 125
+  batch `INSERT`s as `BatchUpdateException`; pgjdbc attached the earlier
+  `26000` or `42P05` as the cause.
+- `08006 An I/O error occurred while sending to the backend` caused by
+  `SocketTimeoutException: Read timed out`: 102 `UPDATE`s, after 30150.16 to
+  30209.44 ms (the 30 s socketTimeout).
+- `08P01 bind message supplies 0 parameters, but prepared statement "S_9"
+  requires 1` and the same shape with other counts: 38 `UPDATE`, 27
+  (`BatchUpdateException`) + 21 (`PSQLException`) batch `INSERT`s, 13
+  `SELECT`. Hikari logged 264 WARN or ERROR lines, the most frequent ones
+  "marked as broken" (SQLSTATE folded to `NPN` and `N` in the artifact, which
+  fits `08P01` and the `08006` timeouts), and replaced the broken
+  connections: 276 physical connects in the cell against
+  12 in the clean M rows (887 in PC08h-txn-default against 40 in the clean H
+  rows).
+- PC08m-txn-default-nosocktimeout also recorded 2 `22P02 invalid input
+  syntax for type bigint: "i3w0n73"` on the `UPDATE`: the `UPDATE`'s text
+  parameter was bound to a statement whose first parameter is a bigint, which
+  is the batch `INSERT`'s shape.
+
+Postgres's log for the same window: 3835 `prepared statement "S_N" does not
+exist`, 1333 `already exists`, 423 `current transaction is aborted`, 163
+`bind message supplies N parameters, but prepared statement "S_N" requires
+N`, 52 `there is already a transaction in progress` (a `BEGIN` that reached a
+backend already inside a transaction). PC08h-txn-default: 10197, 4224, 1374,
+563 and 145 of the same. The clean rows logged 2 to 4 lines each, none about
+prepared statements.
+
+The stall, PC08m-txn-default-nosocktimeout: at the 240 s cap 11 of 12 workers
+were still inside the `UPDATE` of an explicit transaction, the longest for
+243074 ms and the shortest for 180584 ms (summary at 245006 ms, the cap plus
+a 5 s join grace); with the 30 s socketTimeout the other capped cells ended
+with 4 (PC08m-txn-default), 5 (-reuse), 8 (PC08h-txn-default) and 2
+(PC08q-txn-cacheall) workers inside an `UPDATE` in run 11, and 5 and 11 in
+run 12's two default cells (cut by the cap, each under 30 s in). In every capped row of runs 11 and 12, each worker
+still inside an operation at the cap was in the `UPDATE` of an explicit
+transaction.
+
+Wrong results: 1, 14 and 1 results failed their check (row id, statement
+tag, or batch count of 5) without an error in PC08m-txn-default-reuse,
+PC08h-txn-default and PC08q-txn-cacheall. Run 11's probe counted them without
+the text (5 of the 14 in PC08h-txn-default were `SELECT`s: select_ok 10669
+against 10664 PID samples); run 12's probe adds `wrong_examples` (below).
+
+Reading. Measured: with pgjdbc's default `prepareThreshold` (5) and with
+`extendedCacheEverything`, Supavisor in transaction mode on this project
+failed most iterations at both 12 and 40 connections, with errors that say a
+named statement was missing, already present, or held different parameters
+on the backend the statement reached, and 102 `UPDATE`s in an explicit
+transaction waited without a reply until the client's 30 s socket timeout
+(PC08m-txn-default, run 11). With `prepareThreshold=0` the same pooler,
+project and load ran clean (6000 of 6000 and 20000 of 20000, shapes M and H)
+while moving between backends on 5228 of 6000 and 16601 of 20000 `SELECT`s;
+`preferQueryMode=simple` ran shape M only, 6000 of 6000, with 5261 of 6000
+switches. The dedicated PgBouncer (all four arms on M, default and pt0 on H)
+and Supavisor session mode (default and pt0, shape M only) ran clean: the
+session pooler because each client keeps its backend (0 switches); the
+dedicated pooler while switching backends (5262 of 6000 `SELECT`s in the M
+default row) with no error, which fits it keeping pgjdbc's named statements
+consistent across backends (inference: what PgBouncer forwarded was not
+logged), as medium-serverless MS10d found for Prisma's. How Supavisor forwards a named `Parse` and `Bind` is not observable
+from the client; the five Postgres messages above are what the server
+reported.
+
+### Run 12: the transaction-mode cells again, and what the wrong results were
+
+Same project, same module, cells filtered to the four below, wall cap 240 s
+instead of 480 s for all four cells (the two `prepareThreshold=0` cells
+finished inside it), so the default-arm attempted counts are smaller by design.
+
+| Row | Run 11 ok / attempted | Run 12 ok / attempted | Run 12 wrong results | Run 12 iteration p50 / p95 / p99 ms | Run 12 Postgres lines about prepared statements or bind |
+|---|---|---|---|---|---|
+| PC08m-txn-default | 603 / 4522 | 276 / 2253 | 0 | 391.36 / 543.84 / 927.91 | 2791 |
+| PC08m-txn-pt0 | 6000 / 6000 | 6000 / 6000 | 0 | 390.25 / 398.22 / 410.13 | 0 |
+| PC08h-txn-default | 516 / 11572 | 283 / 4356 | 6 | 388.84 / 470.77 / 675.16 | 5555 |
+| PC08h-txn-pt0 | 20000 / 20000 | 20000 / 20000 | 0 | 412.24 / 432.9 / 450.22 | 0 |
+
+The six wrong results in run 12's PC08h-txn-default, verbatim from the
+artifact (time since the workers started, after the pools filled, what was
+sent, what came back):
+
+- `2565ms update id 4673: got (id=367, tag=upd)`
+- `3072ms update id 2707: got (id=5130, tag=upd)`
+- `3895ms select id 8774: got (id=6202, k=1, v=i2w2n393, tag=sel, pid=17829)`
+- `2767ms`, `3562ms` and `3971ms insert batch: counts [0, 0, 0, 0, 0]`
+
+Reading. An `UPDATE ... RETURNING` sent for id 4673 answered with row 367, a
+point `SELECT` for id 8774 answered with row 6202, and three five-row batch
+`INSERT`s reported 0 rows per entry, each without an error. Two readings fit
+and this run cannot separate them: the statement ran with another statement's
+or another client's parameters (for the `UPDATE`, that would mean row 367 was
+changed instead of 4673), or the client received a reply that belonged to
+another statement. What reached the database per statement was not logged.
+6 wrong results across the 4356 attempted iterations (the probe does not
+record which iteration each came from, and any of them can sit inside the 283
+ok); none in the 6000 and 20000 iterations of the two `prepareThreshold=0`
+rows.
+
+### Hikari pool bigger than the session pool (run 11, PC08s)
+
+Hikari defaults as the loaded jar reported them (PC08-env): `maximumPoolSize`
+10, `connectionTimeout` 30000 ms, `validationTimeout` 5000 ms,
+`initializationFailTimeout` 1 ms; `minimumIdle` unset, so each pool tries to
+fill to `maximumPoolSize`. The session pool on this project is 15.
+
+| Row | Shape | What happened |
+|---|---|---|
+| PC08s-1x20 | 1 pool of 20, 20 workers, 100 iterations each | the pool held 15 connections; 22 of 37 physical connects failed in 297.46 to 471.93 ms with `XX000 FATAL: (EMAXCONNSESSION) max clients reached in session mode - max clients are limited to pool_size: 15`; 2000 of 2000 iterations ok, p50 383.64 ms, p99 4157.83 ms, max 10056.18 ms (workers queued inside Hikari for the 15 connections) |
+| PC08s-4x10 | 4 pools of 10, 10 workers each, 100 iterations each | the pools started with 6, 4, 3 and 2 connections (15 in all); 192 of 207 physical connects failed with the same `EMAXCONNSESSION`; 3976 of 4000 iterations ok; 33 borrows timed out in Hikari after 30000.38 to 30010.18 ms, for example `SQLTransientConnectionException [XX000]: app3 - Connection is not available, request timed out after 30001ms (total=2, active=2, idle=0, waiting=4)`, cause the `EMAXCONNSESSION` error; iteration p99 9061.58 ms, max 27116.3 ms. No pool failed to start: each got its first connection |
+| PC08s-hold | 1 pool of 20, each of 20 workers borrows once and runs `pg_sleep(40)` | 15 active sleepers at +10 s; 15 holds ok (40109.27 ms p50); 5 borrows failed after 30021.7 to 30021.99 ms with `Connection is not available, request timed out after 30005ms (total=15, active=15, idle=0, waiting=0)`, SQLSTATE `XX000` taken from the last `EMAXCONNSESSION`; all 20 follow-up `select 1` ok |
+
+Reading. Supavisor session mode refuses the 16th client at connect, as PC05a
+measured with node-postgres; Hikari treats that as a failed pool fill, keeps
+retrying in the background (37 and 207 attempts above), and serves its
+workers from the connections it has. Nothing errors while every worker gets
+a connection within `connectionTimeout`; once a worker waits 30 s it gets
+`SQLTransientConnectionException` whose SQLSTATE (`XX000`) and cause are the
+session pooler's refusal. Several pools sharing one session pool split it
+unevenly (6/4/3/2 here), and the smaller the pool the more of its borrows
+timed out (0, 4, 11 and 18 of the 33).
+
+### 40 connections against the transaction pools (run 11, PC08t)
+
+4 pools x 10, 10 workers each, no Hikari waiting (each worker has its own
+connection); the wait is inside the pooler.
+
+| Row | Path | Hold | Outcome |
+|---|---|---|---|
+| PC08t-txn-queue | Supavisor transaction 6543 | 10 x `pg_sleep(1)` per worker | 400 of 400 served, p50 2057.94 ms, max 3045.7 ms; 16 active sleepers at +5 s; no error |
+| PC08t-dedicated-queue | PgBouncer 6543 | same | 400 of 400 served, p50 2944.92 ms, max 3141.39 ms; 15 active sleepers at +5 s; no error |
+| PC08t-txn-wait | Supavisor transaction 6543 | one `pg_sleep(45)` per worker | 32 of 40 served (p50 45132.84 ms, max 90145.61 ms); 8 failed after 60075.2 to 60085.68 ms with `XX000 FATAL: (ECHECKOUTTIMEOUT) unable to check out connection from the pool after 60000ms in Transaction mode`; Hikari logged connections "marked as broken"; 2 of 40 follow-up `select 1` failed after 30006.9 to 30007.63 ms (`08001`, Hikari timeout, cause `Connection attempt timed out.` on 2 replacement connects that took 30001.53 to 30001.6 ms) |
+| PC08t-dedicated-wait | PgBouncer 6543 | same | 32 of 40 served (max 95426.1 ms); 8 failed after 80337.73 to 80344.87 ms with `08P01 FATAL: query_wait_timeout` (the `query_wait_timeout` 80 read back, in seconds); all 40 follow-ups ok |
+
+Reading. Both transaction poolers queue a client whose transaction finds no
+free backend; Hikari's `connectionTimeout` plays no part in the queued
+statements, because the Hikari connection is already open. The queue ends with an error after 60 s on
+Supavisor and 80 s on the dedicated pooler, both FATAL, so the server closes
+pgjdbc's connection and Hikari replaces it. With pgjdbc the Supavisor error
+arrives as `PSQLException` SQLSTATE `XX000` with severity FATAL; PC01
+recorded the same text with node-postgres, which did not show severity there.
+The two follow-up failures after the Supavisor wait were replacement connects
+that did not complete in 30 s; one run, n = 2, cause not separated.
+
+### Practical reading for a JDBC app (hedged where n is small)
+
+| Path | What to configure | Rests on |
+|---|---|---|
+| Supavisor transaction 6543 | Turn off named server-side statements: `prepareThreshold=0` in the JDBC URL or DataSource (or `preferQueryMode=simple`). pgjdbc's default (5) and `extendedCacheEverything` failed most iterations here and left autocommit reads failing with `25P02` | PC08m-txn-*, PC08h-txn-*, PC08q-txn-*, runs 11 and 12 |
+| Supavisor transaction 6543 | Set `socketTimeout` (seconds) above the longest legitimate statement plus the 60 s checkout wait, so a statement whose reply never comes fails instead of hanging; with the driver default 0 and pgjdbc's default prepare, 11 of 12 workers were still waiting at a 240 s cap | PC08m-txn-default-nosocktimeout; the threshold is a design choice, not measured |
+| Supavisor transaction 6543 | Size total app connections (sum of `maximumPoolSize` over instances) against the pool of 16 by transaction time: 40 connections with short transactions queued without error; a transaction that cannot start within 60 s fails with FATAL `ECHECKOUTTIMEOUT` (`XX000`), which a retry policy can treat as retryable | PC08t-txn-queue, PC08t-txn-wait, PC01 |
+| Supavisor session 5432 | Keep the sum of `maximumPoolSize` across every instance at or below the session pool (15 here); excess connects fail with `EMAXCONNSESSION` and Hikari hands its workers 30 s timeouts carrying that error. pgjdbc's default prepare works | PC08s-*, PC08m-session-* |
+| Dedicated PgBouncer `db.<ref>:6543` | pgjdbc defaults worked at 12 and 40 connections; queued transactions fail after `query_wait_timeout` (80 s here) with `08P01 FATAL: query_wait_timeout`. From an IPv4-only network it needs the IPv4 add-on | PC08m/h/q-dedicated-*, PC08t-dedicated-*, PC08-ipv4 |
+| Direct 5432 | pgjdbc and Hikari defaults ran clean at 40 connections on Small (`max_connections` 90); IPv4 add-on needed from IPv4-only networks | PC08m/h-direct-* |
+
+### Not settled by PC08
+
+- Why named statements fail through Supavisor transaction mode (statement and bind mismatches were observed; the mechanism was not traced) and why some
+  replies never come: only client errors and Postgres's log are observed.
+  Whether a Supavisor setting or release changes it was not tested.
+- Other pgjdbc and HikariCP versions, fewer than 12 concurrent connections on
+  the transaction poolers, `autosave`, `reWriteBatchedInserts`,
+  `prepareThreshold` values other than 0 and 5, Hikari's validation of idle
+  connections while a transaction pool is saturated (workers reused
+  connections within Hikari's 500 ms bypass window), connection churn from
+  `maxLifetime`.
+- Compute sizes other than Small, regions other than `ap-northeast-1`, an
+  in-region client (every latency includes the Singapore-Tokyo round trip),
+  separate hosts per app instance.
+- n: one run per row in run 11; the four transaction-mode cells of shapes M
+  and H twice (runs 11 and 12). The PC08m-session-*, PC08s-* and PC08t-*
+  rows ran once (run 11).
+
 ## What was not run
 
 - Compute sizes other than Micro and Small (Small since 2026-10-23), other
