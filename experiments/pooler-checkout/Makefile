@@ -8,6 +8,7 @@
 ROOT := $(abspath ../..)
 TS := $(shell date +%Y%m%d-%H%M%S)
 # MANDATORY: one registry carries every experiment's tests.
+# PC08 (pgjdbc + HikariCP, about 2 h) is left out of the default: make probe ONLY=PC08,PC09
 ONLY ?= PC01,PC02,PC03,PC04,PC05,PC06,PC07,PC09
 # Prefix of the project names this experiment creates; `sweep` deletes by it.
 PREFIX ?= pc-checkout-
@@ -24,7 +25,7 @@ probe:
 	@test -n "$(PVLAB_ORG_PRO)" || (echo "export PVLAB_ORG_PRO (a Pro org slug)"; exit 1)
 	@cd $(ROOT) && bun harness/scripts/gen-registry.ts >/dev/null
 	@mkdir -p evidence/$(TS)
-	@PVLAB_PC_PREFIX="$(PREFIX)" bun $(ROOT)/harness/src/run.ts --where local --experiment pooler-checkout \
+	@PVLAB_PC_PREFIX="$(PREFIX)" PVLAB_PC_RAW_DIR="evidence/$(TS)" bun $(ROOT)/harness/src/run.ts --where local --experiment pooler-checkout \
 		--only $(ONLY) --destructive --out evidence/$(TS)
 	@echo "== evidence/$(TS)/ =="
 

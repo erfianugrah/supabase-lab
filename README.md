@@ -364,7 +364,15 @@ facts):
   (`ECHECKOUTTIMEOUT`), fallback to session, direct and dedicated poolers,
   node-postgres, postgres.js and Prisma behaviour under a TCP reset, and an
   `aws-0` host lint. Self-provisioning, Micro. Measured 2026-10-10; see its
-  RUNLOG.
+  RUNLOG. PC08 (2026-11-04, one adopted Small project, ap-northeast-1)
+  runs pgjdbc with HikariCP in Docker through direct, Supavisor session,
+  Supavisor transaction and the dedicated PgBouncer: default server-side
+  prepare fails on Supavisor transaction mode at 12 and 40 connections
+  (fewer not tested), including rows returned for the wrong id with no
+  error, and `prepareThreshold=0` runs clean; it also covers Hikari pools
+  larger than the session pool (refused at fill; workers time out after
+  30 s) and 40 connections on a transaction pool (queued; FATAL after 60 s
+  on Supavisor, 80 s on the dedicated pooler).
 - `jit-db-access` - temporary token-based database access: grant a role with
   an expiry through the Management API, log in with the PAT as the Postgres
   password through the shared pooler and the direct path, and measure expiry
