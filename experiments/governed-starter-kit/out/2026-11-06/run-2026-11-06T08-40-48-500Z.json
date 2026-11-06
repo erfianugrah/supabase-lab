@@ -1,0 +1,130 @@
+{
+  "startedAt": "2026-11-06T08:40:48.500Z",
+  "finishedAt": "2026-11-06T08:41:04.103Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "governed-starter-kit",
+  "labCommit": "b8a3afd",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "K09-control",
+      "title": "member token, org role, declared project-scoped role",
+      "status": "info",
+      "detail": "projects 200; profile 403 {\"message\":\"This endpoint requires a user-scoped access token\"}; org role (unread); declared Owner",
+      "measurements": {
+        "org_role": "(unread)",
+        "declared_role": "Owner"
+      },
+      "durationMs": 15604
+    },
+    {
+      "id": "K09a",
+      "title": "member GET /projects",
+      "status": "info",
+      "detail": "200; 5 project(s); production listed; persistent branch not listed; preview branch not listed",
+      "measurements": {
+        "org_role": "(unread)",
+        "declared_role": "Owner",
+        "http": 200,
+        "count": 5
+      },
+      "durationMs": 15604
+    },
+    {
+      "id": "K09b",
+      "title": "member GET /projects/{prod}/branches",
+      "status": "info",
+      "detail": "200; 3 entr(ies)",
+      "measurements": {
+        "org_role": "(unread)",
+        "declared_role": "Owner",
+        "http": 200
+      },
+      "durationMs": 15604
+    },
+    {
+      "id": "K09c",
+      "title": "member SQL on the production",
+      "status": "info",
+      "detail": "owner rows 1; read-only SELECT 201; query SELECT 201; query DDL 201",
+      "measurements": {
+        "org_role": "(unread)",
+        "declared_role": "Owner",
+        "owner_rows": "1",
+        "readonly_select": "201",
+        "query_select": "201",
+        "query_ddl": "201"
+      },
+      "durationMs": 15604
+    },
+    {
+      "id": "K09d",
+      "title": "member SQL on the persistent branch",
+      "status": "info",
+      "detail": "owner rows 0; read-only SELECT 201; query SELECT 201; query DDL 201",
+      "measurements": {
+        "org_role": "(unread)",
+        "declared_role": "Owner",
+        "owner_rows": "0",
+        "readonly_select": "201",
+        "query_select": "201",
+        "query_ddl": "201"
+      },
+      "durationMs": 15604
+    },
+    {
+      "id": "K09e",
+      "title": "member SQL on the preview branch",
+      "status": "info",
+      "detail": "owner rows 0; read-only SELECT 201; query SELECT 201; query DDL 201",
+      "measurements": {
+        "org_role": "(unread)",
+        "declared_role": "Owner",
+        "owner_rows": "0",
+        "readonly_select": "201",
+        "query_select": "201",
+        "query_ddl": "201"
+      },
+      "durationMs": 15604
+    },
+    {
+      "id": "K09f",
+      "title": "member POST /projects/{prod}/branches",
+      "status": "info",
+      "detail": "201",
+      "measurements": {
+        "org_role": "(unread)",
+        "declared_role": "Owner",
+        "http": 201
+      },
+      "durationMs": 15604
+    },
+    {
+      "id": "K09g",
+      "title": "member GET api-keys (no reveal): production vs the preview branch",
+      "status": "info",
+      "detail": "production 200; preview branch 200",
+      "measurements": {
+        "org_role": "(unread)",
+        "declared_role": "Owner",
+        "prod": 200,
+        "branch": 200
+      },
+      "durationMs": 15604
+    },
+    {
+      "id": "K09.cleanup",
+      "title": "run's branches removed (project and persistent branch kept for the next role)",
+      "status": "info",
+      "detail": "deletes: 200, 200",
+      "durationMs": 15604
+    }
+  ]
+}

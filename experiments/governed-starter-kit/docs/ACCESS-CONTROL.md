@@ -61,7 +61,10 @@ Step timings are targets, not rehearsed numbers.
    a default role (the docs recommend Developer). Mention the safety rule -
    at least one non-SSO owner must exist - and that SSO and password
    accounts with the same email are separate accounts. Leave it unconfigured
-   unless a test IdP is ready.
+   unless a test IdP is ready. The dashboard's auto-join role picker offers
+   Owner, Administrator, Developer and Read-only, defaulting to Developer,
+   and no No-access option (dashboard source; backend not checked; see "SSO
+   auto-join roles" below).
 5. **Audit logs** (Organization > Audit logs, 30 s). Find the entries for
    the member invites from step 1 and for the `webhook-sink` deploy and
    secret update that `make integrations` made through the Management API.
@@ -100,6 +103,91 @@ Consequences worth saying out loud:
 - Audit logs cover the platform plane only. App-level actions are recorded
   by the kit itself: `agent_audit` for the in-app agent, and the
   `webhook-sink` receipts for decisions.
+
+## SSO auto-join roles
+
+Read from the dashboard source, not run against an org with SSO configured
+(the lab has no test IdP). In supabase/supabase, the auto-join form's "Default
+role on join" select lists four values: Owner, Administrator, Developer,
+Read-only
+(https://github.com/supabase/supabase/blob/fcfb0f022282a7967ab1b129ea365b4ae0438978/apps/studio/components/interfaces/Organization/SSO/JoinOrganizationOnSignup.tsx#L59-L62).
+The form starts with auto-join off and the role at Developer
+(https://github.com/supabase/supabase/blob/6d08d66b7d784220ec149fd77e0ba940c6067464/apps/studio/components/interfaces/Organization/SSO/SSOConfig.tsx#L94-L95)
+and falls back to Developer on submit, casting the role to one of those four
+(same file, L156-L161). The form schema itself takes any string (L47), and
+the saved role is read back from the backend, so these are the dashboard's
+choices; whether the backend accepts No access through another path was not
+checked. Both files read 2026-11-06.
+
+What it means for a rollout: through the dashboard, a member who joins by
+SSO auto-join gets one of those org-wide roles, and the lowest, Read-only,
+reads every project's data through `supabase_read_only_user` (BYPASSRLS,
+`pg_read_all_data`; "How the two planes combine" above). Invited members are
+not affected. An org that wants members to start with access to nothing
+keeps auto-join off and invites each member with the No-access org role plus
+a project-scoped grant.
+
+## Roles on branches (K09)
+
+Not yet measured: K09 needs a second account, and the lab org's member
+listing showed only the Owner when read by hand on 2026-11-06. The question
+is whether a project-scoped role on a production project carries to that
+project's branches, and whether a branch can hold a role of its own. It
+decides whether "builders get Developer on branches and Read-only on
+production" is possible.
+
+What is known:
+- A branch has its own project ref, absent from the org's project listing
+  (bu-attribution BA03), and a project-scoped invite names one project.
+- The access-control permission table (read 2026-11-06,
+  https://supabase.com/docs/guides/platform/access-control) gives Owner,
+  Administrator and Developer Read and Write on the production branch and
+  List, Create, Update and Delete on development branches; Read-only gets
+  Read on the production branch and List on development branches only. Its
+  footnote 8: with dashboard branching and no GitHub integration, the first
+  branch creation registers the production branch and needs Owner or
+  Administrator; Developers create branches normally after that. The table
+  says what a role may do, not whether a grant on the production project
+  reaches its branches. In K09 the owner registers the production branch
+  (setup), so K09f measures the case after registration.
+
+1. `sx SUPABASE_ACCESS_TOKEN -- make roles-setup` creates and keeps a
+   `kit-cm-roles-*` project with one table and a persistent branch
+   (`k09-staging`); the run log prints the project ref.
+2. In the dashboard, invite the second account with org role No access and a
+   project-scoped Read-only on that project only. Note whether the project
+   picker lists `k09-staging` as a separate entry.
+3. From the second account, create a classic (user-level) personal access
+   token, not a scoped one: a scoped token adds its own permission set, so a
+   refusal could come from the token rather than the role (scoped-pats SP06).
+   Store it in the vault; then
+   `sx SUPABASE_ACCESS_TOKEN PVLAB_PAT2=<vault item> -- make roles-probe PEER_ROLES=<ref> K09_ROLE=Read-only`.
+   The owner deletes leftover run branches, re-applies the table on
+   production and adds a preview branch. The member's token lists projects
+   and branches, runs SELECT (read-only and query endpoints) and DDL on
+   production and both branches (after an owner control read and an owner
+   drop of any leftover probe table on each), tries to create a branch and
+   reads key metadata. The owner deletes the preview branch and any branch
+   the member created. Recorded: status codes, and for a refusal the SQLSTATE
+   and a short reason with refs removed.
+4. Change the grant to project-scoped Developer and run step 3 with
+   `K09_ROLE=Developer`.
+5. `sx SUPABASE_ACCESS_TOKEN -- make roles-teardown PEER_ROLES=<ref>`, and
+   remove the member from the org in the dashboard.
+
+Done so far (2026-11-06): step 1, and step 3 with the lab's own owner token
+standing in for the member, as a baseline and a check of the module
+(`out/2026-11-06/run-2026-11-06T08-40-48-500Z.json`, `K09_ROLE=Owner`). That
+token got 201 on all three SQL probes on production, the persistent branch
+and the preview branch; 201 creating a branch; 200 on key metadata for
+production and the preview branch; and 200 listing `/projects`, where
+neither branch ref appeared. The owner control read found the table's one
+row on production and 0 rows on each branch: the branches had the table but
+no data. The token is a scoped one: `GET /v1/profile` answered 403 "This
+endpoint requires a user-scoped access token" (as in scoped-pats SP06), so
+the org role read as "(unread)" and the run is labelled by `K09_ROLE`. An
+earlier attempt that day stopped at that 403; the module no longer does. The
+project and `k09-staging` are still up for steps 2 to 5.
 
 ## One-time setup for the lab org (manual)
 

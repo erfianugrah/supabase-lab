@@ -81,7 +81,8 @@ seed-ready: guard-tok
 # (on). The LLM step needs ANTHROPIC_API_KEY as a function secret, set
 # separately: everything else (tool layer, embeddings) works without it.
 fn-deploy: guard-tok
-	supabase functions deploy agent --project-ref $(READY) --workdir . --use-api
+	@test -n "$(READY)" || (echo "no ready_ref - run 'make apply' first"; exit 1)
+	supabase functions deploy agent --remote=$(READY) --yes --workdir . --use-api
 
 # Real gte-small embeddings for kb_chunks, via the function's embed mode.
 kb-embed: guard-tok
@@ -126,6 +127,45 @@ mcp-probe: guard-tok
 	@PVLAB_REF=none PVLAB_ORG_TEAM="$(ORG_TEAM)" PVLAB_PROJECT_PREFIX="$(PROJECT_PREFIX)" \
 	 $(if $(PEER_MCP),PVLAB_PEER_MCP="$(PEER_MCP)",) $(if $(MCP_CLAUDE),PVLAB_K_CLAUDE=1,) \
 		$(RUNNER) --where local --only $(if $(ONLY),$(ONLY),K06$(COMMA)K07) --destructive \
+		--experiment governed-starter-kit --out evidence/$(TS)
+	@echo "== evidence/$(TS)/ =="
+
+# K08: change management (a direct production change, the drift check, db pull,
+# the next deploy, git-less branches) on its own throwaway project, removed at
+# the end with its branches. Needs the supabase CLI 3.x and Docker.
+#   sx SUPABASE_ACCESS_TOKEN -- make cm-probe
+CM_PREFIX ?= kit-cm-
+.PHONY: cm-probe
+cm-probe: guard-tok
+	@test -n "$(ORG_TEAM)" || (echo "no Team org slug - set ORG_TEAM=<slug> or fill supabase_org_id in secrets.tfvars"; exit 1)
+	@$(BUILD)
+	@mkdir -p evidence/$(TS)
+	@PVLAB_REF=none PVLAB_ORG_TEAM="$(ORG_TEAM)" PVLAB_PROJECT_PREFIX="$(CM_PREFIX)" \
+		$(RUNNER) --where local --only K08 --destructive \
+		--experiment governed-starter-kit --out evidence/$(TS)
+	@echo "== evidence/$(TS)/ =="
+
+# K09: does a project-scoped role on production carry to its branches? Needs a
+# second Supabase account. roles-setup creates and keeps a kit-cm-roles-*
+# project; grant the second account a project-scoped role on it in the
+# dashboard (docs/ACCESS-CONTROL.md, "Roles on branches"); roles-probe measures
+# with that account's PAT in PVLAB_PAT2; roles-teardown deletes the project.
+# Re-run roles-probe after each role change.
+#   sx SUPABASE_ACCESS_TOKEN -- make roles-setup
+#   sx SUPABASE_ACCESS_TOKEN PVLAB_PAT2=<vault item> -- make roles-probe PEER_ROLES=<ref> K09_ROLE=Read-only
+# K09_ROLE names the project-scoped grant under test; the org member listing
+# shows only the org role.
+#   sx SUPABASE_ACCESS_TOKEN -- make roles-teardown PEER_ROLES=<ref>
+.PHONY: roles-setup roles-probe roles-teardown
+roles-setup roles-probe roles-teardown: guard-tok
+	@test -n "$(ORG_TEAM)" || (echo "no Team org slug - set ORG_TEAM=<slug> or fill supabase_org_id in secrets.tfvars"; exit 1)
+	@test "$@" = roles-setup || test -n "$(PEER_ROLES)" || (echo "set PEER_ROLES=<ref> (printed by make roles-setup)"; exit 1)
+	@test "$@" != roles-probe || test -n "$$PVLAB_PAT2" || (echo "no PVLAB_PAT2 in the environment - the second account's PAT, e.g. sx PVLAB_PAT2=<vault item>"; exit 1)
+	@$(BUILD)
+	@mkdir -p evidence/$(TS)
+	@PVLAB_REF=none PVLAB_ORG_TEAM="$(ORG_TEAM)" PVLAB_PROJECT_PREFIX="$(CM_PREFIX)" \
+	 PVLAB_K09_MODE=$(patsubst roles-%,%,$@) $(if $(PEER_ROLES),PVLAB_PEER_ROLES="$(PEER_ROLES)",) $(if $(K09_ROLE),PVLAB_K09_ROLE="$(K09_ROLE)",) \
+		$(RUNNER) --where local --only K09 --destructive \
 		--experiment governed-starter-kit --out evidence/$(TS)
 	@echo "== evidence/$(TS)/ =="
 
@@ -224,7 +264,7 @@ fn-secret: guard-tok
 	@sx ANTHROPIC_API_KEY=$(ANTHROPIC_ITEM) -- sh -c \
 		'test -n "$$ANTHROPIC_API_KEY" || { echo "vault item is empty"; exit 1; }; \
 		 printf "ANTHROPIC_API_KEY=%s\n" "$$ANTHROPIC_API_KEY" \
-		   | supabase secrets set --env-file /dev/stdin --project-ref "$$0" >/dev/null' $(READY)
+		   | supabase secrets set --env-file /dev/stdin --remote="$$0" --yes >/dev/null' $(READY)
 	@printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -s -H @- \
 		"https://api.supabase.com/v1/projects/$(READY)/secrets" \
 		| jq -e 'any(.[]; .name == "ANTHROPIC_API_KEY")' >/dev/null \
@@ -246,10 +286,10 @@ fn-secret: guard-tok
 integrations: guard-tok
 	@test -n "$(READY)" || (echo "no ready_ref - run 'make apply' first"; exit 1)
 	bun scripts/kit.ts schema $(READY) sql/30-integrations.sql
-	supabase functions deploy webhook-sink --project-ref $(READY) --workdir . --use-api --no-verify-jwt
+	supabase functions deploy webhook-sink --remote=$(READY) --yes --workdir . --use-api --no-verify-jwt
 	@sh -c 'set -e; s=$$(openssl rand -hex 32); \
 		printf "WEBHOOK_SINK_SECRET=%s\n" "$$s" \
-		  | supabase secrets set --env-file /dev/stdin --project-ref "$$0" >/dev/null; \
+		  | supabase secrets set --env-file /dev/stdin --remote="$$0" --yes >/dev/null; \
 		printf "Authorization: Bearer %s\n" "$$SUPABASE_ACCESS_TOKEN" | { \
 		printf "https://%s.supabase.co/functions/v1/webhook-sink\n%s\n" "$$0" "$$s" \
 		  | jq -Rn "([39]|implode) as \$$q | [inputs] | {query: (\"select private.put_integration_secret(\" + \$$q + \"webhook_sink_url\" + \$$q + \", \" + \$$q + .[0] + \$$q + \"), private.put_integration_secret(\" + \$$q + \"webhook_sink_secret\" + \$$q + \", \" + \$$q + .[1] + \$$q + \")\")}" \
@@ -519,11 +559,11 @@ agent-local:
 bff-deploy: guard-tok
 	@test -n "$(READY)" || (echo "no ready_ref - run 'make apply' first"; exit 1)
 	bun scripts/kit.ts schema $(READY) sql/50-fanout.sql
-	supabase functions deploy upstream-mock --project-ref $(READY) --workdir . --use-api --no-verify-jwt
-	supabase functions deploy fanout-api --project-ref $(READY) --workdir . --use-api
+	supabase functions deploy upstream-mock --remote=$(READY) --yes --workdir . --use-api --no-verify-jwt
+	supabase functions deploy fanout-api --remote=$(READY) --yes --workdir . --use-api
 	@sh -c 'set -e; k=$$(openssl rand -hex 32); \
 		printf "UPSTREAM_API_KEY=%s\nUPSTREAM_BASE_URL=https://%s.supabase.co/functions/v1/upstream-mock\n" "$$k" "$$0" \
-		  | supabase secrets set --env-file /dev/stdin --project-ref "$$0" >/dev/null' $(READY)
+		  | supabase secrets set --env-file /dev/stdin --remote="$$0" --yes >/dev/null' $(READY)
 	@printf 'Authorization: Bearer %s\n' "$$SUPABASE_ACCESS_TOKEN" | curl -s -H @- \
 		"https://api.supabase.com/v1/projects/$(READY)/secrets" \
 		| jq -e '[.[].name] | contains(["UPSTREAM_API_KEY", "UPSTREAM_BASE_URL"])' >/dev/null \
