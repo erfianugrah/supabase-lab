@@ -71,7 +71,7 @@ const mod: TestModule = {
 
       // Deploy the block (gateway JWT check off, as the block's own docs require).
       const td = Date.now();
-      const dep = await $`supabase functions deploy mcp --project-ref ${s.ref} --workdir ${ROOT} --use-api --no-verify-jwt`
+      const dep = await $`supabase functions deploy mcp --remote=${s.ref} --yes --workdir ${ROOT} --use-api --no-verify-jwt`
         .env({ ...process.env, SUPABASE_ACCESS_TOKEN: ctx.pat ?? "" })
         .quiet()
         .nothrow();

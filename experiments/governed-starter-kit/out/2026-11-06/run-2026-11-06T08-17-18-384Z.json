@@ -1,0 +1,120 @@
+{
+  "startedAt": "2026-11-06T08:17:18.384Z",
+  "finishedAt": "2026-11-06T08:18:43.579Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "governed-starter-kit",
+  "labCommit": "b8a3afd",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "K08.00",
+      "title": "first migration deployed with db push --remote (PAT, no DB password)",
+      "status": "pass",
+      "detail": "exit 0; remote history 20261106081743",
+      "measurements": {
+        "cli_version": "3.0.0",
+        "push_ms": 690
+      },
+      "evidence": "Finished supabase db push.\n\nTarget: project <ref>\nInitialising login role...\nConfirmed by --yes: Apply 1 migration on project <ref>\nApplying migration 20261106081743_create_items.sql...",
+      "durationMs": 85195
+    },
+    {
+      "id": "K08.01",
+      "title": "hotfix applied directly on production (Management API SQL, owner)",
+      "status": "pass",
+      "detail": "http 201; columns id,name,hotfix_note",
+      "durationMs": 85195
+    },
+    {
+      "id": "K08.02",
+      "title": "migration history after the hotfix",
+      "status": "info",
+      "detail": "unchanged (20261106081743): local and remote agree, the hotfix is invisible to migration list",
+      "measurements": {
+        "history_rows": 1
+      },
+      "evidence": "Local            | Remote           | Time (UTC)            \n  ------------------|------------------|-----------------------\n   `20261106081743` | `20261106081743` | `2026-11-06 08:17:43` \n\n\nTarget: project kit-cm-hotfix-mw4pbkjz (<ref>) · production\nInitialising login role...",
+      "durationMs": 85195
+    },
+    {
+      "id": "K08.03",
+      "title": "db diff --remote shows the hotfix",
+      "status": "pass",
+      "detail": "column shown, index shown; exit 0",
+      "measurements": {
+        "exit_code": 0,
+        "diff_ms": 8012
+      },
+      "evidence": "ALTER TABLE \"public\".\"items\"\n  ADD COLUMN \"hotfix_note\" text;\n\nCREATE INDEX items_name_idx ON public.items USING btree (name);\n\n\nTarget: project kit-cm-hotfix-mw4pbkjz (<ref>) · production\nInitialising login role...\nCreating shadow database...\nApplying migration 20261106081743_create_items.sql...\nDiffing schemas...\nFinished supabase db diff.",
+      "durationMs": 85195
+    },
+    {
+      "id": "K08.04",
+      "title": "git-less preview branch created before the pull: has the unpulled hotfix?",
+      "status": "info",
+      "detail": "LACKS hotfix_note; columns id,name; history 20261106081743; branch FUNCTIONS_DEPLOYED/ACTIVE_HEALTHY",
+      "measurements": {
+        "branch_ready_ms": 10367
+      },
+      "durationMs": 85195
+    },
+    {
+      "id": "K08.05",
+      "title": "db pull --remote writes the hotfix as a migration and records it applied",
+      "status": "pass",
+      "detail": "exit 0; 1 new file(s); remote history 20261106081743,20261106081814",
+      "measurements": {
+        "pull_ms": 2781,
+        "new_files": 1
+      },
+      "evidence": "Finished supabase db pull.\n\nTarget: project kit-cm-hotfix-mw4pbkjz (<ref>) · production\nInitialising login role...\nCreating shadow database...\nApplying migration 20261106081743_create_items.sql...\nDiffing schemas...\nConfirmed by --yes: Update the remote migration history table on project kit-cm-hotfix-mw4pbkjz (<ref>) · production\nSchema written to supabase/migrations/20261106081814_hotfix_items.sql\nRepaired migration history: [20261106081814] => applied\n--- 20261106081814_hotfix_items.sql ---\nALTER TABLE \"public\".\"items\"\n  ADD COLUMN \"hotfix_note\" text;\n\nCREATE INDEX items_name_idx ON public.items USING btree (name);\n\n",
+      "durationMs": 85195
+    },
+    {
+      "id": "K08.06",
+      "title": "db diff --remote after the pull reports no changes",
+      "status": "pass",
+      "detail": "exit 0",
+      "measurements": {
+        "exit_code": 0
+      },
+      "evidence": "Target: project kit-cm-hotfix-mw4pbkjz (<ref>) · production\nInitialising login role...\nCreating shadow database...\nApplying migration 20261106081743_create_items.sql...\nApplying migration 20261106081814_hotfix_items.sql...\nDiffing schemas...\nFinished supabase db diff.\n\nNo schema changes found",
+      "durationMs": 85195
+    },
+    {
+      "id": "K08.07",
+      "title": "next migration: dry run lists only it, push applies it",
+      "status": "pass",
+      "detail": "dry run listed 20261106081820_add_owner_dept.sql; push exit 0",
+      "measurements": {
+        "dry_run_listed": 1
+      },
+      "evidence": "Finished supabase db push.\n\nTarget: project kit-cm-hotfix-mw4pbkjz (<ref>) · production\nInitialising login role...\nDRY RUN: migrations will *not* be pushed to the database.\nWould push these migrations:\n • 20261106081820_add_owner_dept.sql\n---\nFinished supabase db push.\n\nTarget: project kit-cm-hotfix-mw4pbkjz (<ref>) · production\nInitialising login role...\nConfirmed by --yes: Apply 1 migration on project kit-cm-hotfix-mw4pbkjz (<ref>) · production\nApplying migration 20261106081820_add_owner_dept.sql...",
+      "durationMs": 85195
+    },
+    {
+      "id": "K08.08",
+      "title": "preview branch created after the pull: hotfix and next migration present, same history",
+      "status": "pass",
+      "detail": "columns id,name,hotfix_note,owner_dept; branch history 20261106081743,20261106081814,20261106081820; production history 20261106081743,20261106081814,20261106081820",
+      "measurements": {
+        "branch_ready_ms": 10335
+      },
+      "durationMs": 85195
+    },
+    {
+      "id": "K08.teardown",
+      "title": "project and branches removed",
+      "status": "info",
+      "detail": "2 branch(es); deleted kit-cm-hotfix-mw4pbkjz: http 200",
+      "durationMs": 85195
+    }
+  ]
+}

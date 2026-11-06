@@ -1,5 +1,83 @@
 # governed-starter-kit - RUNLOG
 
+## 2026-11-06 - change management: K08 hotfix loop, K09 set up, SSO auto-join roles, CLI 3
+
+Why: two questions the kit's control model leaves open: whether anyone can
+change production directly, and how a direct fix gets back into the
+repository. New page: `docs/CHANGE-MANAGEMENT.md`. The code of record for
+the K08 and K09 runs below is the commit that adds this entry; both
+artifacts carry `labCommit b8a3afd`, which predates the two modules (they
+were untracked files when they ran).
+
+- **K08 (new, `make cm-probe`)**: two module runs, each on its own
+  `kit-cm-hotfix-*` project (Team org, ap-southeast-1, API default size),
+  each 7 pass checks of 7 plus 3 info rows (K08.02, K08.04, teardown), 0
+  fail. Run A `out/2026-11-06/run-2026-11-06T08-17-18-384Z.json`, 85 s; run
+  B `out/2026-11-06/run-2026-11-06T08-40-45-318Z.json`, 183 s, with two
+  added reads of the K08.04 branch. An earlier attempt failed in the module
+  (it listed `supabase/migrations`, which `supabase init` does not create;
+  the first `migration new` does) and deleted its project; its artifact is
+  in `evidence/20261106-161559/`, unpublished.
+  - `db push --remote=<ref> --yes`, no `--password`: exit 0 (690 ms, 765 ms).
+  - Direct change through the Management API SQL route (201): migration
+    history unchanged (1 row); `db diff --remote` printed both statements,
+    exit 0 (8012 ms, 6397 ms); `db pull --remote --yes` exit 0 (2781 ms,
+    3752 ms), one new file with exactly the two statements, its version
+    recorded on the remote; then `db diff --remote` "No schema changes
+    found", exit 0; next migration: dry run listed only it, push applied it.
+  - K08.04, branch made before the pull: lacks the hotfix in both runs. Run
+    A read it once, at the first ready status poll (10 s). Run B at the first
+    ready status (11 s): no `items` table, empty history; at 60 s and 120 s:
+    `id,name`, the one migration. K08.08, branch made after the pull and
+    K08.07's push: has both columns and production's three versions, read
+    once at the first ready status. The status polls are 10 s apart, so the
+    ready times (10367 ms, 10335 ms in run A; 10650 ms, 10506 ms in run B)
+    mean "ready by the second poll".
+  - Not the dashboard SQL Editor route (a PAT cannot call it, BA06); the
+    git-less branching blog says SQL Editor changes are tracked, so K08.02
+    is for the API route only.
+  - Before the module, by hand on `kit-cm-dev-*` (deleted, no artifact):
+    push, direct change, `migration list`, `db diff`, `db pull`, diff, next
+    push, a branch after the pull, and a branch made after a second,
+    unpulled change, read once soon after its status read ready (time not
+    recorded); it lacked that column. Same outcomes.
+- **K09 (new)**: needs a second account; the org member listing showed only
+  the Owner (read by hand). `make roles-setup` created and kept
+  `kit-cm-roles-*` with a persistent branch `k09-staging`. Owner-token
+  baseline, `K09_ROLE=Owner`
+  (`out/2026-11-06/run-2026-11-06T08-40-48-500Z.json`): 201 on read-only
+  SELECT, query SELECT and query DDL on production and both branches; 201
+  creating a branch; 200 on key metadata for production and the preview
+  branch; 200 on `/projects` with neither branch ref listed; owner control
+  read 1 row on production, 0 on each branch. `GET /v1/profile` answered 403
+  "This endpoint requires a user-scoped access token" (the lab PAT is
+  scoped, SP06). Two earlier baseline runs that day (one stopped at that
+  403, one before the review changes) are not published. After an
+  independent review the module records org and declared role separately,
+  keeps probing when `/projects` is refused, records SQLSTATE and a short
+  scrubbed reason for refusals, adds the owner control read, names run
+  branches per run, clears leftovers and records branch delete statuses.
+  The restricted-role runs (Read-only, then Developer) are steps 2 to 5 in
+  ACCESS-CONTROL.md.
+- **SSO auto-join roles**: from the dashboard source at pinned commits, not
+  run against an org with SSO: the "Default role on join" select offers
+  Owner, Administrator, Developer, Read-only; the form starts at Developer.
+  Backend not checked. Written up in ACCESS-CONTROL.md.
+- **CLI 3.0.0**: by hand with a dummy token, no artifact: `--project-ref`
+  parses with "--project-ref is deprecated and will be removed in v4";
+  `secrets set` (stdout to `/dev/null`) and `functions deploy` (stdout piped)
+  stopped at "Confirmation required: ... This run can't ask because stdout is
+  not a terminal. Nothing was changed.", exit 1 for `secrets set` (the deploy's
+  exit code was not recorded); with `--yes` both went on to the API (401).
+  On CLI 3 the kit's `secrets set` lines would have failed `make up`. The
+  seven hosted calls in the Makefile and K06's deploy now pass `--remote=<ref>
+  --yes`, and `fn-deploy` refuses an empty `READY`. K06 re-ran with the new
+  deploy line: 10 pass, deploy 4 s
+  (`out/2026-11-06/run-2026-11-06T08-24-17-224Z.json`). `fn-deploy`,
+  `fn-secret`, `integrations` and `bff-deploy` were not run after the
+  change: the kit is down. `db push/pull/diff` default to the local database
+  in 3.0.0 (`--help`).
+
 ## 2026-10-23 - next 16.4.2 for the Next.js RCE advisories; not deployed
 
 Why: `bun audit` on the app listed next 16.3.8 under GHSA-2464-fhr4-w9xw and

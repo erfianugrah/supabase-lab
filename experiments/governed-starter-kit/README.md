@@ -74,7 +74,11 @@ ask for confirmation).
   2026-10-07). The kit does not call them, so invite members and set roles in
   the dashboard. They are not removed by `make destroy`. Walkthrough and plan
   tiers: `docs/ACCESS-CONTROL.md`.
-- Dashboard SSO needs a SAML identity provider configured on the org.
+- Dashboard SSO needs a SAML identity provider configured on the org. The
+  dashboard gives a member who joins through SSO auto-join an org-wide role
+  (Owner, Administrator, Developer or Read-only; no No-access option in the
+  dashboard source, backend not checked), so an org that grants per project
+  keeps auto-join off and invites members (`docs/ACCESS-CONTROL.md`).
 
 ## In-app agent
 
@@ -162,6 +166,28 @@ for the example app, and for a `create-next-app -e with-supabase` app
 cacheComponents - both broke on Workers) then `npm run deploy`;
 `make live-app-delete` / `make app-delete` remove them.
 
+## Change management (K08, K09)
+
+`docs/CHANGE-MANAGEMENT.md` covers sandbox, staging and production, who can
+change production, and the hotfix loop: a direct change on production,
+`supabase db diff --remote` to catch it, `supabase db pull --remote` to turn
+it into a migration, the next deploy, and what a new branch is built from.
+K08 measures that loop on its own throwaway project. K09 is built to measure
+whether a project-scoped role on production carries to its branches; it has
+not yet run with a second account (procedure in `docs/ACCESS-CONTROL.md`,
+"Roles on branches").
+
+```bash
+sx SUPABASE_ACCESS_TOKEN -- make cm-probe                    # K08, kit-cm-hotfix-*, needs Docker
+sx SUPABASE_ACCESS_TOKEN -- make roles-setup                 # K09 step 1: project + persistent branch, kept
+sx SUPABASE_ACCESS_TOKEN PVLAB_PAT2=<vault item> -- make roles-probe PEER_ROLES=<ref> K09_ROLE=Read-only
+sx SUPABASE_ACCESS_TOKEN -- make roles-teardown PEER_ROLES=<ref>
+```
+
+The kit targets the supabase CLI 3.x: hosted projects are selected with
+`--remote=<ref>` (`--project-ref` is deprecated there), and `db push`,
+`db pull` and `db diff` go to the local database unless `--remote` is given.
+
 ## Integration: decision webhook
 
 `make integrations` (part of `make up`, after `fn-deploy`) wires purchase
@@ -237,8 +263,8 @@ user. The kit adds three tools to the block's `whoami`:
 policies and the same `decide_purchase_request` function as the web app) and
 `list_client_notes` (rows scoped by the token's `client_id`,
 `sql/60-mcp.sql`). The block needs asymmetric signing keys and the project's
-OAuth server; deploy with `supabase functions deploy mcp --use-api
---no-verify-jwt`. Two changes to the block's own files: `tools/result.ts`
+OAuth server; deploy with `supabase functions deploy mcp --remote=<ref> --yes
+--use-api --no-verify-jwt`. Two changes to the block's own files: `tools/result.ts`
 reads `error.message` from a PostgREST error object (the original printed
 `[object Object]`, RUNLOG 2026-10-10), and the MCP SDK import goes through the
 `mcp-sdk` entry in `deno.json` instead of an inline `npm:` specifier.

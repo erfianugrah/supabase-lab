@@ -2906,7 +2906,7 @@ Redacted artifacts: `out/2026-09-30/`. Details: RUNLOG.md.
   (Postgres names the client in hba refusals) and any addresses named in
   `PVLAB_REDACT_ADDRS`; documentation-range addresses stay.
 
-## experiments/governed-starter-kit - key facts (validated 2026-10-07; K06 and K07 2026-10-10, micro, ap-southeast-1, Team org)
+## experiments/governed-starter-kit - key facts (validated 2026-10-07; K06 and K07 2026-10-10; K08 2026-11-06; micro, ap-southeast-1, Team org)
 
 Two projects (`kit-live` baseline only, `kit-ready` baseline + example app +
 agent + webhook) plus any `make new-app` backends. Details: the experiment's
@@ -2914,6 +2914,48 @@ README.md, RUNLOG.md and docs/.
 
 - **PAT**: the `~/.supabase/access-token` keyfile returns 401 since
   2026-10-07; run every target under `sx SUPABASE_ACCESS_TOKEN --`.
+- **Supabase CLI 3.0.0** (2026-11-06): hosted targets are `--remote=<ref>`
+  (`--project-ref` still parses with the warning "--project-ref is deprecated
+  and will be removed in v4"); `db push/pull/diff` default to the LOCAL
+  database; with no `--password` the PAT is enough ("Initialising login
+  role..."). A hosted change with stdout not a terminal stops at
+  "Confirmation required ... Nothing was changed" (exit 1 on `secrets set`,
+  dummy token, by hand) unless `--yes`: every hosted call in the Makefile and
+  K06 passes it, and `fn-deploy` now refuses an empty `READY` (an empty
+  `--remote=` with `--yes` could reach the linked project). K06 re-ran with
+  it 10/10 (`out/2026-11-06/run-2026-11-06T08-24-17-224Z.json`). A git
+  worktree has no `secrets.tfvars` (gitignored); pass `ORG_TEAM=` (e.g. via
+  `secretctl exec 'dotenv:<main checkout>/secrets.tfvars#supabase_org_id'`).
+- **K08 change management (`make cm-probe`, 2026-11-06, two module runs,
+  each 7 of 7 pass checks plus 3 info, and a hand run with no artifact)**: a
+  direct change through the Management API SQL route (owner PAT) leaves the
+  migration history unchanged; the dashboard SQL Editor route was not
+  tested (PAT cannot call it, BA06; the branching blog says it is tracked).
+  `db diff --remote` shows the change but exits 0 with or without drift
+  (fail CI on output, not exit code); `db pull --remote --yes` writes it as
+  one migration and marks it applied, then the diff is clean and the next
+  `db push` runs only the new file. Once production has a migration
+  history, a git-less preview branch lacks an unpulled hotfix (still at
+  120 s after create in run B), as the dashboard branching docs' replay
+  mechanism predicts; with no history the branch gets a schema dump. A
+  branch's ready status can come before its schema (run B: no table at
+  11 s); read the schema, not the status. docs/CHANGE-MANAGEMENT.md.
+- **K09 roles on branches: NOT MEASURED** - needs a second account (the
+  lab Team org's member listing showed only the Owner, read by hand
+  2026-11-06). `make roles-setup` left `kit-cm-roles-*` + persistent branch
+  `k09-staging` UP (billing) on 2026-11-06 for the dashboard grant (card
+  #298). Owner-token baseline ran (`out/2026-11-06/run-2026-11-06T08-40-48-500Z.json`:
+  all 201/200, branch refs absent from `/projects`, the table on both
+  branches with 0 rows). The lab PAT is scoped: `GET /v1/profile` 403 "This
+  endpoint requires a user-scoped access token" (SP06), so the org role
+  reads "(unread)" and runs are labelled by `K09_ROLE=`; use a classic PAT
+  for the member. Steps: docs/ACCESS-CONTROL.md "Roles on branches";
+  `make roles-teardown PEER_ROLES=<ref>` when done.
+- **SSO auto-join** (dashboard source, pinned commits, not run): the
+  dashboard form offers Owner, Administrator, Developer, Read-only (default
+  Developer), no No-access; backend not checked. Through the dashboard, a
+  member joining by auto-join gets an org-wide role; invited members are not
+  affected.
 - **`make probe` on macOS** runs `bun harness/src/run.ts` (the compiled
   `pvlab` is linux-x64 only). K01-K04 share the seeded users and rows: do not
   run two probes at once (a concurrent K02 row made K01.01 count 4 instead
