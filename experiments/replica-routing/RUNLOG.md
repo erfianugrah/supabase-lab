@@ -1622,6 +1622,168 @@ overlapping readers rather than by the region pair; RR01 (cross-region) saw
 - Cost: not metered. Each run kept a Small primary, a Small replica and
   `pitr_7` for about 49 and 48 minutes.
 
+## 2026-11-09 - RR09, cold reads per node, a primary with a busy disk and edge_logs per hostname, on a Team org
+
+Question: RR01 to RR08 ran on a Pro org with tables that fit in memory. Four
+things stayed open: which node takes the buffer misses when reads miss the
+cache, through a custom host and through `-all`; whether `-all` keeps sending
+reads to a primary whose disk is busy (RR04i loaded CPU, which barely slowed
+REST reads); whether a project's own `edge_logs` record which hostname a request
+came through, which is the check an operator would run to learn whether an app
+calls `-all`, a replica host, the project host or a custom domain; and how long
+`-all` fails after its only replica is removed, past RR02j's 1,200 s watch. RR09
+asks the first three on a Team org. The fourth (RR09g) was not run, see below.
+
+Shape: three throwaway projects on the Team org (`org_plan` `team` in RR09a of
+every run), one per run, the same day. Each: a Small primary in ap-southeast-1,
+`pitr_7`, the disk grown to 24 GB before any data (303 s, 302 s and 302 s after
+the call in runs 1, 2 and 3), a Small read replica in the same region, and
+`rr9_cold`, 4,000,000 rows of about 1 KB (`repeat(md5(id), 30)`, inline, under
+the TOAST threshold): heap 3.81 GB, total relation size 3.9 GB, against the 2 GB
+of memory the compute docs give Small (shared_buffers 512MB). GB is 1024^3
+bytes and node_disk MB is 1024^2 bytes throughout. Run 3 adds the
+`custom_domain` add-on with a hostname in a Cloudflare-hosted zone. Vantage: the
+Singapore workstation. Artifacts:
+
+- run 1: `out/2026-11-09/run-2026-11-09T07-19-34-700Z.json`, 07:19:34 to
+  08:13:07 UTC, lab commit d039f7a, 2 pass, 1 fail
+- run 2: `out/2026-11-09/run-2026-11-09T08-26-18-905Z.json`, 08:26:18 to
+  08:38:27 UTC, lab commit e5fd176, 3 pass, 1 fail
+- run 3: `out/2026-11-09/run-2026-11-09T08-39-01-619Z.json`, 08:39:01 to
+  09:03:29 UTC, lab commit 49b0933, 5 pass, 3 info
+
+Run 1 loaded the table first (4,000,000 rows in 192 s), then called
+`read-replicas/setup`: HTTP 204, and the replica never accepted a session
+connection in the module's 45-minute wait (RR09b fail, "served never"). During
+that wait a hand read of `GET /config/disk` (not in the artifact) showed the
+primary's volume at 36 GB, `last_modified_at` 07:52:12 UTC, against the 24 GB
+the module set. Why the replica never served was not read; a base backup of a
+3.9 GB primary outlasting 45 minutes on Small and an interaction with the disk
+change are both open, and nothing separates them. Run 1 also ran an earlier
+version of the module (d039f7a).
+
+Run 2 added the replica to the empty primary (first session connection 181 s
+after the setup call) and loaded afterwards (205 s), so the load streamed to the
+replica. It then probed for the load balancer once and recorded "NOT found"
+without the candidates it tried. Run 3 retries the lookup and records the
+probes: `<ref>-all.supabase.co` answered at the first probe (`all:resolves`; the
+platform route that lists load balancers returned HTTP 401 to the PAT, as in
+RR01e). Run 3: replica first session connection 182 s after the setup call,
+load 183 s, custom hostname verified 149 s after the TXT writes, and the custom
+host answered `rr_whoami` 11 s after the activation wait ended (the artifact
+does not record whether that wait ended on `5_services_reconfigured` or on its
+15-minute cap).
+
+The RR09b title in runs 2 and 3 reads "(built after the load)", text left in the
+code from run 1 (d039f7a); in both runs the replica was added before the load
+(RR09a2 records the load, after RR09b's replica was serving). Run 3's order:
+replica, load, load balancer lookup, custom domain, RR09d's tagged GETs, RR09e,
+RR09f, then RR09d's log read. No step waited for the replica's replay to catch up
+after the load. Inference, not measured: the replica was still replaying during
+RR09d's GETs and the first RR09e arm (its node_disk read 3970.9 MB during the
+custom-host arm, which sends it no requests).
+
+### RR09d: what a project's edge_logs record per hostname
+
+Twenty GETs of `rr_marker` with a `tag=eq.rr9-<host>` filter were sent to each
+of the four hosts, then `edge_logs` was grouped by host, query string, method,
+status and redirect identifier, read 595 s after the first tagged GET (RR09e and
+RR09f ran in between):
+
+| sent to | status at the client | logged host | redirect identifier | rows |
+|---|---|---|---|---|
+| custom host | 200 x20 | the custom host | none | 20 |
+| project host | 200 x20 | the project host | none | 20 |
+| replica host | 503 x20 | the replica host | none | 20 |
+| `-all` | 200 x9, 503 x11 | `-all` | the primary (9, all 200); the replica (11, all 503) | 20 |
+
+80 rows for 80 requests. Each request was logged under the hostname the client
+addressed, the custom host under its own name, and each `-all` row named the
+node it was sent to. Every 503 was on a request routed to the replica: all 20
+GETs to the replica host and the 11 that `-all` sent to it. The response bodies
+were not recorded, so which layer answered 503 is not known. `-all` kept sending
+reads to the replica while requests routed to it got 503; RR02h and RR04j saw it
+keep sending reads to a replica whose replay was stopped, which answered 200
+with stale rows.
+
+### RR09e: cold reads with no extra load
+
+Each GET is `rpc/rr9_cold_read?n=50`, a plpgsql function doing 50 random
+primary-key lookups, called by GET. 90 s per arm, 8 concurrent clients,
+disjoint key ranges per arm. The node is `pg_is_in_recovery()` evaluated inside
+the function and returned in each 200 body. `blks_read` and `blks_hit` are the
+before and after values of `pg_stat_database` for the database on each node,
+read over a fresh session connection with a 12 s settle after the arm, so they
+count every backend's buffer misses in that database, OS page-cache hits
+included; miss % is read / (read + hit). node_disk is read bytes summed over
+devices from each host's metrics endpoint.
+
+| arm | requests | served primary / replica | ms p50 / p95, primary | ms p50 / p95, replica | blks_read primary (miss % of read + hit) | blks_read replica (miss % of read + hit) | node_disk read MB primary / replica |
+|---|---|---|---|---|---|---|---|
+| custom host, keys 1 to 1000000 | 9825 | 9825 / 0 | 66.2 / 120.4 | none | 274027 (13.9) | not read | 2301.5 / 3970.9 (replica served no request) |
+| `-all`, keys 1000001 to 2000000 | 3158 | 1529 / 1629 | 64.7 / 87.3 | 308.3 / 762.1 | 60294 (19.6) | 58754 (17.5) | 512.7 / 2492.8 |
+
+Cache-hot probe after the arms, 100 sequential `rpc/rr_whoami` through `-all`:
+replica 52, primary 48; p50 38 ms on the primary, 38.8 ms on the replica.
+
+Through the custom host the primary served all 9825 requests and the replica
+none, so every request's buffer misses were the primary's. Through `-all` the
+requests split 1529 / 1629 and the buffer misses 60294 / 58754, a replica share
+of 49.4 %. The replica cell in the custom arm is not clean: recorded as -1, which
+means the before or after read on the replica threw or a counter went backwards;
+the artifact does not say which. In the `-all` arm the replica's node_disk read
+2492.8 MB against the primary's 512.7 MB, far more than its 58754 `blks_read` of
+8 KiB account for (non-request reads as in the custom arm, inference); the
+replica's latency was 308.3 / 762.1 ms against the primary's 64.7 / 87.3 ms,
+while `-all` still sent it 1629 of 3158 requests. The `-all` arm completed 3158
+requests in the 90 s against the custom arm's 9825, which follows from half of
+them waiting on the slower replica (inference). At 3.81 GB of heap against 2 GB
+of memory most buffer misses reach the disk, not all (inference). In
+data-api-capacity the metrics endpoint's payload refreshed rarely (DC05, pool
+series, 1 s scrapes over 100 s); if node_disk shares that cadence, each before or
+after reading here can be stale by a large part of a 90 s arm, so the node_disk
+figures are approximate (not checked for node_disk).
+
+### RR09f: the same with four sequential scans keeping the primary's disk busy (103.5 MB/s; ceiling not measured)
+
+Four session-pooler connections to the primary looped `select count(*) from
+public.rr9_cold where length(pad) > 0` with `synchronize_seqscans` off, starting
+30 s before the arms. Over the 212 s between the hog's first and last readings,
+which span both RR09f arms and the hot probe, the primary's `blks_read` rose
+14208 a second and its node_disk read 103.5 MB/s, scans and point reads
+together. 8 full scans completed; at the end `pg_cancel_backend` was called on 6
+backends named `rr9_hog` (4 sessions; the other 2 probably parallel workers, not
+checked).
+
+| arm | requests | served primary / replica | ms p50 / p95, primary | ms p50 / p95, replica | blks_read primary (miss % of read + hit) | blks_read replica (miss % of read + hit) | node_disk read MB primary / replica |
+|---|---|---|---|---|---|---|---|
+| `-all`, keys 2000001 to 3000000 | 9950 | 4989 / 4961 | 76.8 / 102.2 | 62.7 / 89.1 | 2136299 (53.4) | 145633 (14.6) | 12101.8 / 1966 |
+| custom host, keys 3000001 to 4000000 | 8529 | 8529 / 0 | 81 / 115.4 | none | 869785 (32.1) | 12 (1.7) | 9804.5 / 118 |
+
+Cache-hot probe during the scans, 100 `rpc/rr_whoami` through `-all`: replica
+55, primary 45; p50 44.8 ms on the primary, 37.8 ms on the replica.
+
+With the scans running, `-all` split 4989 / 4961. The primary's `blks_read` and
+node_disk columns include the four scans, so the 6.4 % replica share of
+`blks_read` in that row is not a request split. Point reads on the primary ran
+at 76.8 / 102.2 ms through `-all` and 81 / 115.4 ms through the custom host,
+against 64.7 / 87.3 and 66.2 / 120.4 ms in RR09e: p50 rose on both paths, p95
+rose through `-all` and fell through the custom host. One run per arm, on
+different key ranges; that the scans are throughput-bound is inference. The disk
+was busy and no read timed out; a node slowed to the point of timeouts was not
+tested.
+
+Not measured in RR09: the removal watch RR09g (runs 1 and 2 stopped at RR09b;
+run 3 ran with `PVLAB_RR9_PHASES=logs,cold,hog`, which the artifact does not
+record), so RR02j's 1,200 s stays the longest watch; a wait for the replica's
+replay before the arms, or any reading of replica lag; more than one run of any
+arm; any size but Small, any region but ap-southeast-1; the 503 response bodies;
+why run 1's replica never served; the disk's throughput ceiling. Cost: not
+metered. Run 3's project lived 24 minutes with a Small replica, `pitr_7`, a 24
+GB volume and `custom_domain`; run 1's lived 54 minutes with `pitr_7`, the grown
+volume and a replica whose setup returned 204 but never served; run 2's lived 12
+minutes without the custom domain.
+
 ## Not measured
 
 - Any primary region other than ap-northeast-1 (RR01, RR02) and
@@ -1629,11 +1791,12 @@ overlapping readers rather than by the region pair; RR01 (cross-region) saw
 - Load beyond RR04h (32 concurrent readers for 20 s through `-all`, 1,125.1
   and 852.4 requests a second) and RR03i/RR04g (50 single-row inserts a
   second); a node slowed at the REST layer (RR04i's CPU loops did not slow
-  it).
+  it; RR09f's busy disk raised point-read p50 and left the split at 4989 /
+  4961; a node slowed to the point of timeouts was not tested).
 - Replication delay for a large write (the largest transaction here is a
   50,000-row update; the RR02g bulk insert filled the disk before it
   committed).
-- Custom domains beyond RR06 and RR07 (one shape, 2026-10-28). Auth, Storage, Realtime, GraphQL and Edge Function traffic
+- Custom domains beyond RR06, RR07 (one shape, 2026-10-28) and RR09 (cold reads through one, 2026-11-09). Auth, Storage, Realtime, GraphQL and Edge Function traffic
   through the load balancer is RR02f/RR02k; the replica's behaviour on a
   project restart is RR02i (cross-region) and RR04k (same region).
 - The load balancer's rule. Whether it re-routes off a lagging or unhealthy

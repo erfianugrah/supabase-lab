@@ -1,0 +1,50 @@
+{
+  "startedAt": "2026-11-09T07:19:34.700Z",
+  "finishedAt": "2026-11-09T08:13:07.181Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "replica-routing",
+  "labCommit": "d039f7a",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "RR09a",
+      "title": "primary (Small, ap-southeast-1) in the team org, pitr_7, disk 24 GB, rr9_cold 4000000 rows of ~1 KB",
+      "status": "pass",
+      "detail": "org plan team; healthy after 10s; pitr_7 200; disk grown after 303s; loaded 4000000 rows in 192s; heap 3.81 GB, total 3.9 GB; shared_buffers 512MB; PostgreSQL 17.11 on x86_64-pc-linux-gnu,",
+      "measurements": {
+        "org_plan": "team",
+        "healthy_after_s": 10,
+        "disk_grown_s": 303,
+        "load_s": 192,
+        "heap_gb": 3.81,
+        "region": "ap-southeast-1"
+      },
+      "durationMs": 3212467
+    },
+    {
+      "id": "RR09b",
+      "title": "read replica",
+      "status": "fail",
+      "detail": "setup HTTP 204 ; served never",
+      "durationMs": 3212467
+    },
+    {
+      "id": "RR09p",
+      "title": "teardown: custom hostname, DNS records, replica, project",
+      "status": "pass",
+      "detail": "custom-hostname DELETE HTTP n/a; DNS records removed n/a; replica remove HTTP n/a; project DELETE HTTP 200; run took 54 min",
+      "measurements": {
+        "project_delete_http": 200,
+        "run_min": 54
+      },
+      "durationMs": 3212467
+    }
+  ]
+}

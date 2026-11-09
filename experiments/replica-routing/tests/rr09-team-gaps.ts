@@ -359,7 +359,7 @@ const mod: TestModule = {
       const lbAfterS = Math.round((Date.now() - tLb) / 1000);
       push({
         id: "RR09b",
-        title: `read replica in ${REGION} (built after the load); replica host; load balancer host`,
+        title: `read replica in ${REGION} (added to the empty primary; RR09a2 loads after it); replica host; load balancer host`,
         status: lb.url && rn === "replica" ? "pass" : "fail",
         detail: `setup HTTP ${setup.status}; first session connection after ${servedS}s; replica host answers ${rn}; load balancer ${lb.url ? lb.url.replace(/^https:\/\//, "") : "NOT found"} after ${lbAfterS}s of retries (tried ${lb.tried.join(" ")}; platform route HTTP ${lb.platformStatus})`,
         measurements: { replica_served_after_s: servedS },

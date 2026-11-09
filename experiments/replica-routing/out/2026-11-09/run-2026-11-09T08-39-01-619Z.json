@@ -1,0 +1,182 @@
+{
+  "startedAt": "2026-11-09T08:39:01.619Z",
+  "finishedAt": "2026-11-09T09:03:29.206Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "replica-routing",
+  "labCommit": "49b0933",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "RR09a",
+      "title": "primary (Small, ap-southeast-1) in the team org, pitr_7, disk 24 GB, schema",
+      "status": "pass",
+      "detail": "org plan team; healthy after 10s; pitr_7 200; disk grown after 302s",
+      "measurements": {
+        "org_plan": "team",
+        "healthy_after_s": 10,
+        "disk_grown_s": 302,
+        "region": "ap-southeast-1"
+      },
+      "durationMs": 1467583
+    },
+    {
+      "id": "RR09a2",
+      "title": "rr9_cold 4000000 rows of ~1 KB loaded AFTER the replica serves (streams to it), then VACUUM ANALYZE",
+      "status": "pass",
+      "detail": "loaded 4000000 rows in 183s; heap 3.81 GB, total 3.9 GB; shared_buffers 512MB; PostgreSQL 17.11 on x86_64-pc-linux-gnu,",
+      "measurements": {
+        "load_s": 183,
+        "heap_gb": 3.81
+      },
+      "durationMs": 1467583
+    },
+    {
+      "id": "RR09b",
+      "title": "read replica in ap-southeast-1 (built after the load); replica host; load balancer host",
+      "status": "pass",
+      "detail": "setup HTTP 204; first session connection after 182s; replica host answers replica; load balancer <ref>-all.supabase.co after 0s of retries (tried all:resolves; platform route HTTP 401)",
+      "measurements": {
+        "replica_served_after_s": 182
+      },
+      "durationMs": 1467583
+    },
+    {
+      "id": "RR09c",
+      "title": "custom domain up: add-on, initialize, DNS, verify, activate; host serves rr_whoami",
+      "status": "pass",
+      "detail": "add-on HTTP 200, initialize HTTP 201, CNAME 200, TXT _acme-challenge 200, TXT _cf-custom-hostname 200, verified 149s, activate first HTTP 201, 1 attempt(s); custom host answered primary after 11s",
+      "measurements": {
+        "serving_s": 11
+      },
+      "durationMs": 1467583
+    },
+    {
+      "id": "RR09e",
+      "title": "cold reads, no load: 90 s per arm, 8 concurrent clients, 50 random point reads per GET, disjoint key ranges; per node served, latency, blks_read, node_disk reads",
+      "status": "info",
+      "detail": "e_custom: 9825 req (50 random rows each, keys 1-1000000), served primary 9825 / replica 0, errors 0; ms p50/p95 primary 66.2/120.4, replica none/none; blks_read primary 274027 (miss 13.9%), replica -1 (miss -1%), replica share -1%; node_disk read MB primary 2301.5 (metrics HTTP 200), replica 3970.9 (metrics HTTP 200) | e_lb: 3158 req (50 random rows each, keys 1000001-2000000), served primary 1529 / replica 1629, errors 0; ms p50/p95 primary 64.7/87.3, replica 308.3/762.1; blks_read primary 60294 (miss 19.6%), replica 58754 (miss 17.5%), replica share 49.4%; node_disk read MB primary 512.7 (metrics HTTP 200), replica 2492.8 (metrics HTTP 200) | hot probe (100 x rpc/rr_whoami via lb, sequential): replica x52, primary x48; ms p50 primary 38, replica 38.8",
+      "measurements": {
+        "e_custom_requests": 9825,
+        "e_custom_served_primary": 9825,
+        "e_custom_served_replica": 0,
+        "e_custom_errors": 0,
+        "e_custom_p50_primary_ms": 66.2,
+        "e_custom_p95_primary_ms": 120.4,
+        "e_custom_p50_replica_ms": "none",
+        "e_custom_p95_replica_ms": "none",
+        "e_custom_blks_read_primary": 274027,
+        "e_custom_blks_read_replica": -1,
+        "e_custom_miss_pct_primary": 13.9,
+        "e_custom_miss_pct_replica": -1,
+        "e_custom_replica_share_blks_pct": -1,
+        "e_custom_disk_read_mb_primary": 2301.5,
+        "e_custom_disk_read_mb_replica": 3970.9,
+        "e_lb_requests": 3158,
+        "e_lb_served_primary": 1529,
+        "e_lb_served_replica": 1629,
+        "e_lb_errors": 0,
+        "e_lb_p50_primary_ms": 64.7,
+        "e_lb_p95_primary_ms": 87.3,
+        "e_lb_p50_replica_ms": 308.3,
+        "e_lb_p95_replica_ms": 762.1,
+        "e_lb_blks_read_primary": 60294,
+        "e_lb_blks_read_replica": 58754,
+        "e_lb_miss_pct_primary": 19.6,
+        "e_lb_miss_pct_replica": 17.5,
+        "e_lb_replica_share_blks_pct": 49.4,
+        "e_lb_disk_read_mb_primary": 512.7,
+        "e_lb_disk_read_mb_replica": 2492.8,
+        "e_hot_lb": "replica x52, primary x48"
+      },
+      "evidence": "e_custom: 9825 req (50 random rows each, keys 1-1000000), served primary 9825 / replica 0, errors 0; ms p50/p95 primary 66.2/120.4, replica none/none; blks_read primary 274027 (miss 13.9%), replica -1 (miss -1%), replica share -1%; node_disk read MB primary 2301.5 (metrics HTTP 200), replica 3970.9 (metrics HTTP 200)\ne_lb: 3158 req (50 random rows each, keys 1000001-2000000), served primary 1529 / replica 1629, errors 0; ms p50/p95 primary 64.7/87.3, replica 308.3/762.1; blks_read primary 60294 (miss 19.6%), replica 58754 (miss 17.5%), replica share 49.4%; node_disk read MB primary 512.7 (metrics HTTP 200), replica 2492.8 (metrics HTTP 200)\nhot probe (100 x rpc/rr_whoami via lb, sequential): replica x52, primary x48; ms p50 primary 38, replica 38.8",
+      "durationMs": 1467583
+    },
+    {
+      "id": "RR09f",
+      "title": "cold reads with 4 sequential-scan sessions saturating the PRIMARY's disk: split, per-node latency, blks_read; a cache-hot probe",
+      "status": "info",
+      "detail": "f_lb: 9950 req (50 random rows each, keys 2000001-3000000), served primary 4989 / replica 4961, errors 0; ms p50/p95 primary 76.8/102.2, replica 62.7/89.1; blks_read primary 2136299 (miss 53.4%), replica 145633 (miss 14.6%), replica share 6.4%; node_disk read MB primary 12101.8 (metrics HTTP 200), replica 1966 (metrics HTTP 200) | f_custom: 8529 req (50 random rows each, keys 3000001-4000000), served primary 8529 / replica 0, errors 0; ms p50/p95 primary 81/115.4, replica none/none; blks_read primary 869785 (miss 32.1%), replica 12 (miss 1.7%), replica share 0%; node_disk read MB primary 9804.5 (metrics HTTP 200), replica 118 (metrics HTTP 200) | hot probe under the hog (100 x rpc/rr_whoami via lb): replica x55, primary x45; ms p50 primary 44.8, replica 37.8 | hog: 4/4 sessions, 8 full scans completed, primary blks_read 14208/s and node_disk 103.5 MB/s over 212 s; cancelled 6",
+      "measurements": {
+        "hog_sessions": 4,
+        "f_lb_requests": 9950,
+        "f_lb_served_primary": 4989,
+        "f_lb_served_replica": 4961,
+        "f_lb_errors": 0,
+        "f_lb_p50_primary_ms": 76.8,
+        "f_lb_p95_primary_ms": 102.2,
+        "f_lb_p50_replica_ms": 62.7,
+        "f_lb_p95_replica_ms": 89.1,
+        "f_lb_blks_read_primary": 2136299,
+        "f_lb_blks_read_replica": 145633,
+        "f_lb_miss_pct_primary": 53.4,
+        "f_lb_miss_pct_replica": 14.6,
+        "f_lb_replica_share_blks_pct": 6.4,
+        "f_lb_disk_read_mb_primary": 12101.8,
+        "f_lb_disk_read_mb_replica": 1966,
+        "f_custom_requests": 8529,
+        "f_custom_served_primary": 8529,
+        "f_custom_served_replica": 0,
+        "f_custom_errors": 0,
+        "f_custom_p50_primary_ms": 81,
+        "f_custom_p95_primary_ms": 115.4,
+        "f_custom_p50_replica_ms": "none",
+        "f_custom_p95_replica_ms": "none",
+        "f_custom_blks_read_primary": 869785,
+        "f_custom_blks_read_replica": 12,
+        "f_custom_miss_pct_primary": 32.1,
+        "f_custom_miss_pct_replica": 1.7,
+        "f_custom_replica_share_blks_pct": 0,
+        "f_custom_disk_read_mb_primary": 9804.5,
+        "f_custom_disk_read_mb_replica": 118,
+        "f_hot_lb": "replica x55, primary x45",
+        "f_hot_p50_primary_ms": 44.8,
+        "f_hot_p50_replica_ms": 37.8,
+        "hog_connected": 4,
+        "hog_scans_completed": 8,
+        "hog_primary_blks_read_per_s": 14208,
+        "hog_primary_disk_read_mbps": 103.5
+      },
+      "evidence": "f_lb: 9950 req (50 random rows each, keys 2000001-3000000), served primary 4989 / replica 4961, errors 0; ms p50/p95 primary 76.8/102.2, replica 62.7/89.1; blks_read primary 2136299 (miss 53.4%), replica 145633 (miss 14.6%), replica share 6.4%; node_disk read MB primary 12101.8 (metrics HTTP 200), replica 1966 (metrics HTTP 200)\nf_custom: 8529 req (50 random rows each, keys 3000001-4000000), served primary 8529 / replica 0, errors 0; ms p50/p95 primary 81/115.4, replica none/none; blks_read primary 869785 (miss 32.1%), replica 12 (miss 1.7%), replica share 0%; node_disk read MB primary 9804.5 (metrics HTTP 200), replica 118 (metrics HTTP 200)\nhot probe under the hog (100 x rpc/rr_whoami via lb): replica x55, primary x45; ms p50 primary 44.8, replica 37.8\nhog: 4/4 sessions, 8 full scans completed, primary blks_read 14208/s and node_disk 103.5 MB/s over 212 s; cancelled 6",
+      "durationMs": 1467583
+    },
+    {
+      "id": "RR09d",
+      "title": "edge_logs per hostname: 20 GETs of rr_marker tagged rr9-<host> to each host, then the rows the project's logs hold for them",
+      "status": "info",
+      "detail": "sent {\"custom\":{\"200\":20},\"lb\":{\"200\":9,\"503\":11},\"replica\":{\"503\":20},\"primary\":{\"200\":20}}; 80 rows in 5 groups after 595 s; sent custom -> logged host custom, redirect none, GET 200: 20; sent primary -> logged host primary, redirect none, GET 200: 20; sent replica -> logged host replica, redirect none, GET 503: 20; sent lb -> logged host lb, redirect replica, GET 503: 11; sent lb -> logged host lb, redirect primary, GET 200: 9",
+      "measurements": {
+        "log_rows": 80,
+        "log_groups": 5,
+        "sent_custom": "200x20",
+        "sent_lb": "200x9 503x11",
+        "sent_replica": "503x20",
+        "sent_primary": "200x20",
+        "sent_custom_logged_host_custom_redirect_none_GET_200": 20,
+        "sent_primary_logged_host_primary_redirect_none_GET_200": 20,
+        "sent_replica_logged_host_replica_redirect_none_GET_503": 20,
+        "sent_lb_logged_host_lb_redirect_replica_GET_503": 11,
+        "sent_lb_logged_host_lb_redirect_primary_GET_200": 9
+      },
+      "evidence": "sent custom -> logged host custom, redirect none, GET 200: 20\nsent primary -> logged host primary, redirect none, GET 200: 20\nsent replica -> logged host replica, redirect none, GET 503: 20\nsent lb -> logged host lb, redirect replica, GET 503: 11\nsent lb -> logged host lb, redirect primary, GET 200: 9\nattribute names (42): identifier,project,request.cf.asOrganization,request.cf.botManagement.ja4,request.cf.city,request.cf.clientTrustScore,request.cf.colo,request.cf.country,request.headers.accept,request.headers.cf_connecting_ip,request.headers.cf_ray,request.headers.user_agent,request.host,request.method,request.path,request.sb.jwt.apikey.payload.algorithm,request.sb.jwt.apikey.payload.expires_at,request.sb.jwt.apikey.payload.issued_at,request.sb.jwt.apikey.payload.issuer,request.sb.jwt.apikey.payload.role,request.sb.jwt.apikey.payload.signature_prefix,request.sb.jwt.authorization.payload.algorithm,request.sb.jwt.authorization.payload.expires_at,request.sb.jwt.authorization.payload.issued_at,request.sb.jwt.authorization.payload.issuer,request.sb.jwt.authorization.payload.role,request.sb.jwt.authorization.payload.signature_prefix,request.search,request.url,request_id,response.headers.cf_cache_status,response.headers.cf_ray,response.headers.content_length,response.headers.content_range,response.headers.content_type,response.headers.sb_gateway_version,response.headers.x_envoy_attempt_count,response.headers.x_envoy_upstream_service_time,response.origin_time,response.status_code,span_id,trace_id",
+      "durationMs": 1467584
+    },
+    {
+      "id": "RR09p",
+      "title": "teardown: custom hostname, DNS records, replica, project",
+      "status": "pass",
+      "detail": "custom-hostname DELETE HTTP 200; DNS records removed 3; replica remove HTTP 204; project DELETE HTTP 200; run took 24 min",
+      "measurements": {
+        "project_delete_http": 200,
+        "run_min": 24
+      },
+      "durationMs": 1467584
+    }
+  ]
+}
