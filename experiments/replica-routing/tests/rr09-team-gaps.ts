@@ -348,12 +348,20 @@ const mod: TestModule = {
         measurements: { load_s: loadS, heap_gb: heapGb },
       });
 
-      const lb = await findLoadBalancer(pctx, ref, anon);
+      // Retry: run 2 (2026-11-09) probed once, after the load, and missed; the
+      // candidates tried are kept so a miss says which host answered what.
+      let lb = await findLoadBalancer(pctx, ref, anon);
+      const tLb = Date.now();
+      while (!lb.url && Date.now() - tLb < 10 * 60_000) {
+        await sleep(20_000);
+        lb = await findLoadBalancer(pctx, ref, anon);
+      }
+      const lbAfterS = Math.round((Date.now() - tLb) / 1000);
       push({
         id: "RR09b",
         title: `read replica in ${REGION} (built after the load); replica host; load balancer host`,
         status: lb.url && rn === "replica" ? "pass" : "fail",
-        detail: `setup HTTP ${setup.status}; first session connection after ${servedS}s; replica host answers ${rn}; load balancer ${lb.url ? lb.url.replace(/^https:\/\//, "") : "NOT found"}`,
+        detail: `setup HTTP ${setup.status}; first session connection after ${servedS}s; replica host answers ${rn}; load balancer ${lb.url ? lb.url.replace(/^https:\/\//, "") : "NOT found"} after ${lbAfterS}s of retries (tried ${lb.tried.join(" ")}; platform route HTTP ${lb.platformStatus})`,
         measurements: { replica_served_after_s: servedS },
       });
       if (!lb.url) return out;
