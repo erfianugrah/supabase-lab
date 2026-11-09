@@ -12,8 +12,11 @@
  * 1,200 s).
  *
  *   RR09a  primary (Small) in the org of role PVLAB_RR9_ORG_ROLE (team), pitr_7,
- *          disk grown, a table several times the node's RAM, org plan recorded
- *   RR09b  same-region read replica; replica host; load balancer host
+ *          disk grown, schema, org plan recorded
+ *   RR09b  same-region read replica on the still-empty primary; replica host;
+ *          load balancer host. RR09a2 then loads a table several times the
+ *          node's RAM, which streams to the replica (run 1 on 2026-11-09 built
+ *          the replica after a 3.9 GB load: setup 204, never served in 45 min)
  *   RR09c  custom domain (optional): add-on, DNS, verify, activate, serving
  *   RR09d  edge_logs: tagged GETs sent to each hostname, then the rows the
  *          project's logs hold for them (host, query string, redirect identifier)
@@ -276,29 +279,12 @@ const mod: TestModule = {
       }
       const anon = keys.anon;
       const svc = keys.service;
-      const tl = Date.now();
-      const loader = await connectSession(primaryEntry, dbPass);
-      let loaded = 0;
-      try {
-        await loader.query("set statement_timeout = 0");
-        for (let lo = 1; lo <= ROWS; lo += LOAD_CHUNK) {
-          const hi = Math.min(ROWS, lo + LOAD_CHUNK - 1);
-          await loader.query(`insert into public.rr9_cold select g, repeat(md5(g::text), 30) from generate_series(${lo}, ${hi}) g`);
-          loaded = hi;
-        }
-        await loader.query("vacuum (analyze) public.rr9_cold");
-      } finally {
-        await loader.end().catch(() => {});
-      }
-      const loadS = Math.round((Date.now() - tl) / 1000);
-      const size = await sql(pctx, "select pg_relation_size('public.rr9_cold')::bigint as heap, pg_total_relation_size('public.rr9_cold')::bigint as total, current_setting('shared_buffers') as sb, version() as v");
-      const heapGb = round(Number(size.rows[0]?.heap ?? 0) / 1024 ** 3, 2);
       push({
         id: "RR09a",
-        title: `primary (Small, ${REGION}) in the ${ORG_ROLE} org, pitr_7, disk ${DISK_GB} GB, rr9_cold ${ROWS} rows of ~1 KB`,
-        status: loaded === ROWS ? "pass" : "fail",
-        detail: `org plan ${orgPlan}; healthy after ${h.waitedS}s; pitr_7 ${pitr.status || "already"}; disk grown after ${grownS}s; loaded ${loaded} rows in ${loadS}s; heap ${heapGb} GB, total ${round(Number(size.rows[0]?.total ?? 0) / 1024 ** 3, 2)} GB; shared_buffers ${size.rows[0]?.sb}; ${String(size.rows[0]?.v ?? "").slice(0, 40)}`,
-        measurements: { org_plan: orgPlan, healthy_after_s: h.waitedS, disk_grown_s: grownS, load_s: loadS, heap_gb: heapGb, region: REGION },
+        title: `primary (Small, ${REGION}) in the ${ORG_ROLE} org, pitr_7, disk ${DISK_GB} GB, schema`,
+        status: "pass",
+        detail: `org plan ${orgPlan}; healthy after ${h.waitedS}s; pitr_7 ${pitr.status || "already"}; disk grown after ${grownS}s`,
+        measurements: { org_plan: orgPlan, healthy_after_s: h.waitedS, disk_grown_s: grownS, region: REGION },
       });
 
       /* ---- RR09b: replica ---- */
@@ -337,6 +323,31 @@ const mod: TestModule = {
         await sleep(10_000);
         rn = await anonNode(replicaBase, anon);
       }
+      const tl = Date.now();
+      const loader = await connectSession(primaryEntry, dbPass);
+      let loaded = 0;
+      try {
+        await loader.query("set statement_timeout = 0");
+        for (let lo = 1; lo <= ROWS; lo += LOAD_CHUNK) {
+          const hi = Math.min(ROWS, lo + LOAD_CHUNK - 1);
+          await loader.query(`insert into public.rr9_cold select g, repeat(md5(g::text), 30) from generate_series(${lo}, ${hi}) g`);
+          loaded = hi;
+        }
+        await loader.query("vacuum (analyze) public.rr9_cold");
+      } finally {
+        await loader.end().catch(() => {});
+      }
+      const loadS = Math.round((Date.now() - tl) / 1000);
+      const size = await sql(pctx, "select pg_relation_size('public.rr9_cold')::bigint as heap, pg_total_relation_size('public.rr9_cold')::bigint as total, current_setting('shared_buffers') as sb, version() as v");
+      const heapGb = round(Number(size.rows[0]?.heap ?? 0) / 1024 ** 3, 2);
+      push({
+        id: "RR09a2",
+        title: `rr9_cold ${ROWS} rows of ~1 KB loaded AFTER the replica serves (streams to it), then VACUUM ANALYZE`,
+        status: loaded === ROWS ? "pass" : "fail",
+        detail: `loaded ${loaded} rows in ${loadS}s; heap ${heapGb} GB, total ${round(Number(size.rows[0]?.total ?? 0) / 1024 ** 3, 2)} GB; shared_buffers ${size.rows[0]?.sb}; ${String(size.rows[0]?.v ?? "").slice(0, 40)}`,
+        measurements: { load_s: loadS, heap_gb: heapGb },
+      });
+
       const lb = await findLoadBalancer(pctx, ref, anon);
       push({
         id: "RR09b",
