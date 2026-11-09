@@ -12,7 +12,7 @@
 ROOT := $(abspath ../..)
 TS := $(shell date +%Y%m%d-%H%M%S)
 
-.PHONY: run run-rr02 run-rr03 run-rr04 run-rr06 run-rr07 run-rr08 facts publish list
+.PHONY: run run-rr02 run-rr03 run-rr04 run-rr06 run-rr07 run-rr08 run-rr09 facts publish list
 
 # RR02: re-routing on a lagging or unhealthy replica, non-REST traffic through
 # the load balancer. Same billing shape as RR01; 24 and 33 minutes in the
@@ -102,6 +102,25 @@ run-rr08:
 	@test -n "$(PVLAB_ORG_PRO)" || (echo "PVLAB_ORG_PRO not set" && exit 1)
 	cd $(ROOT) && bun harness/src/run.ts --where local --tests experiments/replica-routing/tests \
 	  --experiment replica-routing --only RR08 --destructive \
+	  --out experiments/replica-routing/evidence/$(TS)
+
+# RR09: gaps RR01-RR08 left, on a Team org: cold reads per node (a ~4 GB table
+# on Small, about twice its RAM), the load balancer with a disk-saturated
+# primary, edge_logs per hostname, and the load balancer after its only replica
+# is removed. Small primary + Small replica + pitr_7 + 24 GB disk (+ custom_domain
+# with DOMAIN). About 70 to 100 minutes. Knobs:
+#   PVLAB_RR9_PHASES=logs,cold,hog,remove / PVLAB_RR9_ORG_ROLE (team)
+#   PVLAB_RR9_ROWS (4000000, ~1 KB each) / PVLAB_RR9_DISK_GB (24) / PVLAB_RR9_REGION
+#   PVLAB_RR9_ARM_S (90) / PVLAB_RR9_CONC (8) / PVLAB_RR9_BATCH (50) / PVLAB_RR9_HOG (4)
+#   PVLAB_RR9_REMOVE_WATCH_S (2400)
+#   PVLAB_RR_REFS_FILE=<path outside git>  appends the created ref
+#   sx SUPABASE_ACCESS_TOKEN CLOUDFLARE_API_KEY CLOUDFLARE_EMAIL -- \
+#     env PVLAB_ORG_TEAM=<team-org-slug> make run-rr09 [DOMAIN=<host in a Cloudflare zone>]
+run-rr09:
+	@test -n "$(PVLAB_ORG_TEAM)$(PVLAB_RR9_ORG_ROLE)" || (echo "PVLAB_ORG_TEAM not set" && exit 1)
+	cd $(ROOT) && PVLAB_ENDPOINT_CUSTOM_DOMAIN="$(DOMAIN)" \
+	  bun harness/src/run.ts --where local --tests experiments/replica-routing/tests \
+	  --experiment replica-routing --only RR09 --destructive \
 	  --out experiments/replica-routing/evidence/$(TS)
 
 run:
