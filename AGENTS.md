@@ -4605,7 +4605,7 @@ projects (feature battery, two conversion probes), all `small`,
   cannot call them), so the blog's "tracked" is untested for the dashboard;
   `migration_version`; the dashboard merge-request screen.
 
-## experiments/replica-routing - key facts (validated 2026-10-10, Pro org; RR02 2026-10-23, two runs; RR03 and RR04 2026-10-26, two runs each; RR06 and RR08 2026-10-28, two runs each; RR07 2026-10-28, three runs)
+## experiments/replica-routing - key facts (validated 2026-10-10, Pro org; RR02 2026-10-23, two runs; RR03 and RR04 2026-10-26, two runs each; RR06 and RR08 2026-10-28, two runs each; RR07 2026-10-28, three runs; RR09 2026-11-09, Team org, three runs, one complete)
 
 - **The API load balancer's host is `<ref>-all.supabase.co` and the Management
   API does not return it** (RR01e, 2026-10-10): the Dashboard route
@@ -4819,6 +4819,30 @@ projects (feature battery, two conversion probes), all `small`,
   not stop replay waiting behind a brief ACCESS EXCLUSIVE lock (largest age
   6,292 and 6,736 ms); no read was cancelled by it at the 30 s delay. Steady
   lag at 4 inserts a second: `replay_lag` p95 3.7 and 2.1 ms (#276).
+- **Cold reads, a primary with a busy disk and edge_logs per hostname, on a Team
+  org** (RR09, 2026-11-09, run 3 complete; Small pair in ap-southeast-1,
+  `rr9_cold` 3.81 GB of heap against the 2 GB of memory the compute docs give
+  Small, 50 random primary-key reads per GET, 8 clients, 90 s per arm): through
+  the custom host 9825 of 9825 requests were served by the primary, through
+  `-all` 1529 primary / 1629 replica with buffer misses 60294 / 58754 (49.4 % on
+  the replica). With four sequential scans running, the primary's node_disk read
+  103.5 MB/s over 212 s that also held the RR09f point reads, and `-all` split
+  4989 / 4961; primary point reads ran 76.8 / 102.2 ms p50 / p95 against 64.7 /
+  87.3 without the scans (one run per arm, different key ranges), so a busy disk
+  did not move the split. `edge_logs` held 80 rows for 80 tagged GETs, each under
+  the hostname the client addressed (the custom host under its own name) and each
+  `-all` row with the node it went to; after the load and RR09c, with no wait for
+  replay, requests routed to the replica answered 503 (20 of 20 on its own host)
+  and `-all` still sent it 11 of 20. RR02h and RR04j saw the same routing to a
+  replica whose replay was stopped, which answered 200 with stale rows. Run 1
+  added the replica after a 3.9 GB load (total relation size; heap 3.81 GB) and
+  setup 204 never served in 45 minutes; why was not read (a slow base backup and
+  the disk change are both open, RUNLOG). Runs 2 and 3 added it to the empty
+  primary (first session connection 181 s and 182 s after the setup call) and
+  loaded afterwards; both served. No arm waited for replay after the load; that
+  the replica was still replaying in RR09d and RR09e is inference (its node_disk
+  read 3970.9 MB during the custom-host arm, which sends it no requests). RR09g,
+  the removal watch, was not run.
 
 ## experiments/scoped-pats - key facts (SP01-SP10, validated 2026-10-10)
 
@@ -5932,6 +5956,16 @@ runs 3-4. Numbers and per-write evidence: RUNLOG.md, artifacts
   direct-connection write path, n > 4, why the original
   cluster was restarted, client-server clock skew (needed to confirm the
   apparent ~10 s overlap of 15.19 and 17.11 accepting writes in run 3).
+- **Outside this module, 2026-11-09: the same loss on a Team org, Small, at
+  3.65 GB** (pgmig repo, `test/inplace-upgrade.harness.ts` and
+  `docs/research/2026-11-09-pg15-to-17-live.md`; one run per size, 15.19 to
+  target image `supabase-postgres-17.11.0.018`, a 1 s probe writer and a 2 s
+  sampler through the session pooler): 53 of 458 acknowledged writes absent at
+  0.06 GB and 52 of 691 at 3.65 GB, all acknowledged by the last 15.19 restart
+  before 17.11 answered. POST to ACTIVE_HEALTHY 337.4 s and 633.1 s; data
+  upgrade stage 122.5 s and 142.8 s; first answer from 17.11 at +318.8 s and
+  +344.6 s. These are pgmig harness runs, not UI01-UI06 module runs, and their
+  logs are not archived in this repo.
 
 ## experiments/cron-behaviour - key facts (validated 2026-10-28, two runs, Pro org, Micro, ap-southeast-1; Postgres 17.11, pg_cron 1.6.4, pgmq 1.5.1)
 

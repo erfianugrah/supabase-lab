@@ -68,6 +68,14 @@ setup gate hunt) and `medium-serverless` (MS06: same-region replica).
 | RR08g, RR08i, RR08k | `PUT config/database/postgres` (merged over current overrides, as the CLI does); `pg_settings` and postmaster start on both nodes |
 | RR08m | feedback on plus one 120 s repeatable-read transaction on the replica: VACUUM's not-removable count, `n_dead_tup`, heap growth |
 | RR08o-p | API role settings on the replica; teardown |
+| RR09a, RR09a2 | Small primary on a Team org, `pitr_7`, 24 GB disk; after the replica serves, `rr9_cold` 4,000,000 rows of ~1 KB (3.81 GB heap) |
+| RR09b | same-region replica on the empty primary; replica host; load balancer host (retried) |
+| RR09c | `custom_domain` add-on, DNS through Cloudflare, verify, activate |
+| RR09d | 20 tagged GETs to each of the custom, `-all`, replica and project hosts; the `edge_logs` rows for them (host, query string, redirect identifier) |
+| RR09e | cold reads (50 random primary-key reads per GET, 8 clients, 90 s) through the custom host and `-all`: node served, latency, `blks_read` per node, node_disk reads |
+| RR09f | the same while four sequential scans read from the primary's disk; a cache-hot probe |
+| RR09g | removal watch on `-all` after `read-replicas/remove` (written, not run) |
+| RR09p | teardown: custom hostname, DNS records, replica, project |
 
 The node that served a request is read from `public.rr_whoami()`
 (`pg_is_in_recovery()`, postmaster start time) called as a GET, not inferred
@@ -84,6 +92,7 @@ PVLAB_ORG_PRO=<pro-org-slug> make run-rr04   # RR04, about 14 to 16 minutes
 PVLAB_ORG_PRO=<pro-org-slug> make run-rr06 DOMAIN=<host> [WORKER_DOMAIN=<host>]   # RR06, about 9 to 15 minutes; Makefile header lists the credentials
 PVLAB_ORG_PRO=<pro-org-slug> make run-rr07 ZONE=<zone>   # RR07; run `bun install` in browser/ first; Makefile header lists the credentials
 PVLAB_ORG_PRO=<pro-org-slug> make run-rr08   # RR08, 48 and 49 minutes on 2026-10-28 (before a 5-minute wait per PUT was removed)
+PVLAB_ORG_TEAM=<team-org-slug> make run-rr09 DOMAIN=<host>   # RR09, 24 minutes on 2026-11-09 (run 3, PVLAB_RR9_PHASES=logs,cold,hog, not recorded in the artifact); Makefile header lists the knobs
 make leftovers        # nothing named rr-* should print
 make facts RUN=evidence/<ts>/run-<stamp>.json        # ONLY=RR02 for an RR02 run (RR03, RR04, RR08 likewise)
 make publish RUN=evidence/<ts>/run-<stamp>.json
@@ -201,6 +210,26 @@ Full record: `RUNLOG.md`; artifacts `out/2026-10-28/run-2026-10-28T08-24-49-796Z
 
 Inference, not measured: the conflicts in RR08e, RR08h and RR08j did not reach the client because PostgREST retried each cancelled transaction (documented for PostgREST before v16, https://github.com/PostgREST/postgrest/issues/3673); the version on these projects was not recorded. Not measured: a lock with a 5 s delay, autovacuum on its own schedule, other sizes or regions.
 
+
+## Measured (2026-11-09, RR09, Team org, three runs, one complete)
+
+Full record: `RUNLOG.md`; artifacts `out/2026-11-09/`. Run 3
+(`run-2026-11-09T08-39-01-619Z`, lab commit 49b0933) holds every figure below
+except the last row, which quotes runs 1, 2 and 3. Small primary and Small replica in ap-southeast-1,
+`rr9_cold` 3.81 GB of heap, 8 clients, 90 s per arm, 50 random primary-key reads
+per GET.
+
+| finding | value | module |
+|---|---|---|
+| Cold reads through the custom host | 9825 of 9825 served by the primary; p50 / p95 66.2 / 120.4 ms | RR09e |
+| Cold reads through `-all` | 1529 primary / 1629 replica; buffer misses 60294 / 58754 (49.4 % on the replica); replica p50 / p95 308.3 / 762.1 ms against the primary's 64.7 / 87.3 ms; no step waited for the replica's replay after the load, and replay was not measured | RR09e |
+| `-all` with four sequential scans on the primary (its node_disk 103.5 MB/s over 212 s, point reads included) | 4989 primary / 4961 replica; primary p50 / p95 76.8 / 102.2 ms, replica 62.7 / 89.1 | RR09f |
+| `edge_logs` per hostname, 20 tagged GETs to each of four hosts | 80 rows for 80 requests, each under the hostname the client addressed; `-all` rows name the node: primary 9 (200), replica 11 (503) | RR09d |
+| Requests routed to the replica answered 503 after the load and RR09c (no wait for replay) | 20 of 20 on the replica host; `-all` still sent it 11 of 20; which layer answered 503 is not known | RR09d |
+| Replica added after a 3.9 GB load (run 1; total relation size, heap 3.81 GB) | setup HTTP 204, never served in 45 minutes, cause not read; added to the empty primary in runs 2 and 3: first session connection 181 s and 182 s after the setup call, both served | RR09b |
+
+Not measured in RR09: the removal watch (RR09g), a wait for replay before the
+arms, more than one run of an arm, other sizes or regions, the 503 bodies.
 
 Not measured (RR01 to RR04): other region pairs, write rates above 50 inserts/s,
 behaviour with `hot_standby_feedback` on (RR08 measured it on 2026-10-28), the load balancer's rule, a
