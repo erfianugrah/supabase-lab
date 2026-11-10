@@ -67,6 +67,24 @@ const CASES: { name: string; input: string; expected: string }[] = [
     input: "-- user: oauth:0a1b2c3d-4e5f-6a7b-8c9d-0e1f2a3b4c5d",
     expected: "-- user: oauth:<id>",
   },
+  // A scoped access token labels the statement with the owner's user uuid
+  // (logs-volume LV04i, 2026-11-10); `session:` and `pat:` uuid forms are
+  // covered defensively.
+  {
+    name: "scoped PAT owner uuid in a provenance comment",
+    input: "-- user: scoped_pat:0a1b2c3d-4e5f-6a7b-8c9d-0e1f2a3b4c5d",
+    expected: "-- user: scoped_pat:<id>",
+  },
+  {
+    name: "session-labelled uuid in a provenance comment",
+    input: "-- user: session:0a1b2c3d-4e5f-6a7b-8c9d-0e1f2a3b4c5d",
+    expected: "-- user: session:<id>",
+  },
+  {
+    name: "PAT id as a uuid in a provenance comment",
+    input: "-- user: pat:0a1b2c3d-4e5f-6a7b-8c9d-0e1f2a3b4c5d",
+    expected: "-- user: pat:<id>",
+  },
   // GoTrue error bodies carry a per-request error_id (cross-project-auth
   // X08g, 2026-10-23). In the raw artifact it usually sits inside a string
   // field, so its quotes are escaped.

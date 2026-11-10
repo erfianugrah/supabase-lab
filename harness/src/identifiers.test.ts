@@ -46,14 +46,17 @@ const REF = REF_SHAPE;
  * account's real PAT id on 2026-09-08. The ref scan passed on all four,
  * because a PAT id is not ref-shaped.
  */
-const CRED = /\bpat:\d+|\boauth:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g;
+const CRED =
+  /\b(?:scoped_pat|pat|session):[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}|\bpat:\d+|\boauth:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g;
 /**
  * Deliberately-synthetic credential fixtures, the same idea as the placeholder
  * refs in ALLOW: redact.test.ts has to contain the SHAPE to prove the redactor
- * removes it. Two entries, both counted-up digits. Add to this only for another
+ * removes it. Counted-up digits or one synthetic uuid. Add to this only for another
  * fixture, never to excuse a real value.
  */
 const CRED_ALLOW = new Set<string>(["pat:1234567", "oauth:0a1b2c3d-4e5f-6a7b-8c9d-0e1f2a3b4c5d"]);
+// uuid-labelled forms (logs-volume LV04i, 2026-11-10), same synthetic uuid as the oauth fixture.
+for (const label of ["scoped_pat", "session", "pat"]) CRED_ALLOW.add(`${label}:0a1b2c3d-4e5f-6a7b-8c9d-0e1f2a3b4c5d`);
 const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
 // Example addresses are fine: example.com, the reserved lab.test / lab.invalid
 // fixture domains, and the disposable-domain LIKE pattern S19 sends.
