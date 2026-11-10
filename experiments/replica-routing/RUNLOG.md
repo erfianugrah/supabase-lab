@@ -1784,6 +1784,132 @@ GB volume and `custom_domain`; run 1's lived 54 minutes with `pitr_7`, the grown
 volume and a replica whose setup returned 204 but never served; run 2's lived 12
 minutes without the custom domain.
 
+## 2026-11-10 - RR10, read replicas around a Postgres 15 to 17 move by logical replication
+
+Question: when a database with a read replica moves to Postgres 17 by logical
+replication into a new project, does the source's replica have to go, and on
+the new project is the replica added before the initial copy or after every
+table is synced? RR09 run 1 (2026-11-09) added a replica after a 3.9 GiB load
+and it never served in 45 minutes; runs 2 and 3 added it to an empty primary
+and loaded afterwards, and both served.
+
+Shape: one run, three throwaway projects on the Team org, Small,
+ap-southeast-1, `pitr_7`, each disk grown to 24 GB before any data: source S
+created with `postgres_engine: "15"` (15.19), targets A and B on the default
+(17.11). `rr10_t` is 4,000,000 rows of about 1 KB (`repeat(md5(g::text),
+30)`), 3.9 GiB total relation size. The subscriptions use S's direct
+connection on 5432 as `postgres`, `options=''-c statement_timeout=0''`.
+Artifact `out/2026-11-10/run-2026-11-10T09-17-41-956Z.json`, 09:17:41 to
+11:14:04 UTC, lab commit 6e78709 (the module was first committed with this
+write-up, after the run; its header comment has changed since), 3 pass, 3
+fail. While RR10e waited, A, B and S were read by hand through the
+Management API query and logs endpoints; the redacted output is
+`out/2026-11-10/rr10-manual-reads.md`, and those lines are marked "hand read"
+below.
+
+- RR10a (pass): S healthy after 132 s, A and B after 10 s; `pitr_7` 200 on
+  each; disks grown after 302, 302 and 303 s. `GET /database/backups` listed
+  0 completed physical backups on each; later reads of A (RR10c) and B (RR10e
+  before and after, and by hand at 10:48 UTC) also listed 0; S was not read
+  again.
+- RR10b (pass): S's replica, set up while S was empty, accepted a first
+  session 170 s after the setup call. The load then took 130 s; publication
+  201. `pg_stat_replication` through the query endpoint returned no standby
+  row on S right after the load, so the module's lag read is -1 there; during
+  RR10d at least one sample saw a standby row on S (`S replica lag max 0
+  bytes`). Hand read: S's replica logged `could not extend file
+  "base/5/17617.3": No space left on device` from its startup process at
+  09:29:54 UTC, and its postmaster logged `terminating any other active
+  server processes`.
+- RR10c (pass): A's replica, set up while A was empty and before any
+  subscription, accepted a first session after 182 s.
+- RR10d (fail): both `create subscription` calls answered 201 (S logged
+  decoding start for both slots at 09:33:03 UTC, hand read). B had every
+  table `r` by the 108 s sample (samples about every 15 s). A's table never
+  reached `r` in 156 samples up to the module's 40-minute bound (loop ended
+  10:13:15 UTC); the last sample read `f`, earlier states were not recorded.
+  Row counts: A 4,000,000, A's replica 4,000,000, B 4,000,000. A's replica
+  lag during the copy peaked at 81,396,272 bytes and, separately, 17,970 ms
+  (`pg_stat_replication` on A). Hand read: A's replica logged `could not
+  extend file "base/5/17643.3": No space left on device` (startup) and `could
+  not write to file "pg_wal/xlogtemp.5430"` (walreceiver) at 09:35:09 UTC,
+  and its postmaster logged `terminating any other active server processes`.
+  On S, at 09:33:03 a walsender logged `replication slot
+  "pg_17650_sync_17643_7703759698107299042" already exists`; at 09:34:44
+  logical decoding started for that slot; from 09:34:54 every attempt logged
+  `replication slot "pg_17650_sync_17643_7703759698107299042" does not
+  exist`, about every 5 s to the end of the read window (09:38:37 UTC). A's
+  tablesync worker was still starting and exiting with code 1 about every 5 s
+  at 10:18 UTC, while A's apply worker stayed up (`pg_stat_subscription` at
+  10:13:36 UTC: one worker, pid 7438, `received_lsn` and `latest_end_lsn`
+  1/1F000000, `last_msg_receipt_time` 10:13:36; `pg_subscription_rel` `f`
+  with no `srsublsn`). S's slots around 10:13 UTC: `rr10_sub_a` and
+  `rr10_sub_b` only. A and B both reported `system_identifier`
+  7703759698107299042, subscription OID 17650 and `rr10_t` OID 17643; S
+  reported 7703759990361338896 and 17617. A fourth project on the default
+  17.11, created about 10:15 UTC and deleted at once, reported the same
+  `system_identifier` 7703759698107299042 (largest `pg_class` OID 17634).
+- RR10e (fail): B's replica was set up at about 10:13 UTC, about 38 minutes
+  after B's copy finished; setup 204; no `READ_REPLICA` pooler entry appeared
+  in the 60-minute wait (checked about every 15 s; the 12 checks recorded
+  about every 300 s, 0 s to 3310 s, all show no entry). Hand read at 10:48
+  UTC: `pitr_enabled` true, `walg_enabled` true, an empty `backups` list, and
+  `physical_backup_data` `earliest_physical_backup_date_unix` 1794301788 /
+  `latest_physical_backup_date_unix` 1794305682 (09:09:48 and 10:14:42 UTC;
+  the first is before the run started; what the pair describes was not
+  read).
+- RR10f (fail): 1,000 rows inserted on S after B's sync and after A's
+  40-minute sync bound (201). 30 s later, the last read before teardown: A
+  4,000,000, A's replica 4,000,000, B 4,001,000.
+- RR10p: subscriptions dropped, S's and A's replicas removed (204, 204), all
+  three projects deleted (200 each).
+
+Reading RR10 (one run):
+
+- The source's replica did not have to go for the logical path: the
+  publication and both slots worked with S's replica attached, and both
+  copies delivered 4,000,000 rows; A's table never reached `r` (see the
+  `system_identifier` point below). The docs list deleting replicas as a
+  prerequisite of the in-place upgrade
+  (https://supabase.com/docs/guides/platform/upgrading, read 2026-11-10).
+- On the target, a replica added to the empty project before the
+  subscription served in 182 s, followed the 3.9 GiB copy (lag up to
+  81,396,272 bytes), and held the 4,000,000 rows A held after RR10d. A replica
+  added after the copy got no pooler entry in 60 minutes. With RR09 run 1
+  (replica added after a 3.9 GiB load, never served in 45 minutes, pooler
+  entry not recorded) that is two replicas added after about 4 GiB that never
+  served, and four added to an empty primary that did (RR09 runs 2 and 3,
+  RR10b, RR10c). Why the late ones stall was not read from outside.
+- Both replicas that followed a large write logged `No space left on device`
+  while the primaries had 24 GB disks, then `terminating any other active
+  server processes`. A's replica later held 4,000,000 rows (RR10d); S's
+  replica's rows were not counted. No Management API endpoint used here
+  returned a replica's disk size; that it does not follow a primary's manual
+  resize is inference.
+- New 17.11 projects share one `system_identifier` (3 of 3 read), and the same
+  setup steps give the same OIDs, so two targets syncing the same table from
+  one source at the same time compute the same tablesync slot name on the
+  source. B's sync finished (every table `r` by the 108 s sample) and the
+  slot was gone from 09:34:54; that B's cleanup dropped it is inference from
+  that timing. A's table never reached `r`; its apply worker ran and its row
+  count equalled the source's, and 30 s after 1,000 more rows were written
+  on S, A still held 4,000,000. No API call failed (both `create
+  subscription` calls answered 201); the signs were `pg_subscription_rel`
+  (`f`), the tablesync exits in A's log, and the walsender errors in S's
+  log.
+- Hand read, one line (probe 2 excerpt in the manual-reads file): A's
+  Postgres log held the `create subscription` statement with the connection
+  string's password in plain text; `log_statement` was not read.
+
+Not measured in RR10: subscriptions created one after another (whether waiting
+for every table `r` before the next avoids the collision is inference); any
+recovery of the stuck table (`refresh publication`, dropping and recreating the
+subscription); a replica added after a completed physical backup that includes
+the data (the `backups` list held no completed physical backup at any read);
+why B's replica never served; any size but 3.9 GiB; the replicas' disk sizes;
+what `pg_stat_replication` shows for Supabase standbys in general (no row on S
+right after the load, a row at some RR10d sample).
+
 ## Not measured
 
 - Any primary region other than ap-northeast-1 (RR01, RR02) and

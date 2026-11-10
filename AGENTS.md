@@ -4656,7 +4656,7 @@ projects (feature battery, two conversion probes), all `small`,
   cannot call them), so the blog's "tracked" is untested for the dashboard;
   `migration_version`; the dashboard merge-request screen.
 
-## experiments/replica-routing - key facts (validated 2026-10-10, Pro org; RR02 2026-10-23, two runs; RR03 and RR04 2026-10-26, two runs each; RR06 and RR08 2026-10-28, two runs each; RR07 2026-10-28, three runs; RR09 2026-11-09, Team org, three runs, one complete)
+## experiments/replica-routing - key facts (validated 2026-10-10, Pro org; RR02 2026-10-23, two runs; RR03 and RR04 2026-10-26, two runs each; RR06 and RR08 2026-10-28, two runs each; RR07 2026-10-28, three runs; RR09 2026-11-09, Team org, three runs, one complete; RR10 2026-11-10, Team org, one run)
 
 - **The API load balancer's host is `<ref>-all.supabase.co` and the Management
   API does not return it** (RR01e, 2026-10-10): the Dashboard route
@@ -4894,6 +4894,34 @@ projects (feature battery, two conversion probes), all `small`,
   the replica was still replaying in RR09d and RR09e is inference (its node_disk
   read 3970.9 MB during the custom-host arm, which sends it no requests). RR09g,
   the removal watch, was not run.
+
+- **Replicas around a 15 to 17 move by logical replication** (RR10,
+  2026-11-10, one run; Small, `pitr_7`, 24 GB disks; 3.9 GiB table). A source
+  with a read replica published and fed two subscriptions; its replica did not
+  have to go (the docs list deleting replicas as a prerequisite of the in-place
+  upgrade, https://supabase.com/docs/guides/platform/upgrading, read
+  2026-11-10). A target replica added to the empty project before the
+  subscription served in 182 s and followed the copy (lag up to 81,396,272
+  bytes and, separately, 17,970 ms); one added about 38 minutes after a
+  finished copy never got a pooler entry in 60 minutes. RR09 run 1's replica,
+  added after a 3.9 GiB load, never served in 45 minutes (pooler entry not
+  recorded). Both replicas that followed a large write logged `No space left
+  on device` on the replica, then `terminating any other active server
+  processes` (hand read, `out/2026-11-10/rr10-manual-reads.md`).
+- **New 17.11 projects share one `system_identifier`** (7703759698107299042 on
+  3 of 3 read, RR10 hand read), and identical setup steps give identical OIDs,
+  so two new targets syncing the same table from one source at once compute
+  the same tablesync slot name (`pg_<sub oid>_sync_<relid>_<sysid>`) on the
+  source. In RR10 the slot was gone from 09:34:54 UTC, after B's sync had
+  finished (by the 108 s sample; that B's cleanup dropped it is inference from
+  the timing). A's table never reached `r` (A's tablesync worker exited with
+  code 1 about every 5 s; S's walsender logged `replication slot ... does not
+  exist` on the same cadence), its apply worker stayed up, its count matched
+  (4,000,000), and 30 s after 1,000 more rows were written on S it still held
+  4,000,000 (RR10f, the last read before teardown). Check `pg_subscription_rel`
+  for all `r` and a marker row, never counts alone. In RR10, A's Postgres log
+  held the `create subscription` statement with the connection password in
+  plain text (one hand read; `log_statement` not read).
 
 ## experiments/scoped-pats - key facts (SP01-SP10, validated 2026-10-10)
 
@@ -6017,6 +6045,39 @@ runs 3-4. Numbers and per-write evidence: RUNLOG.md, artifacts
   upgrade stage 122.5 s and 142.8 s; first answer from 17.11 at +318.8 s and
   +344.6 s. These are pgmig harness runs, not UI01-UI06 module runs, and their
   logs are not archived in this repo.
+
+## experiments/pg17-extensions - key facts (validated 2026-11-10, PX01 one run, Team org, default compute size, ap-southeast-1; 15.19 and 17.11)
+
+- **timescaledb on Supabase 15 runs with `timescaledb.license` `apache`**
+  (PX01b/c): 2.16.1; compression, a continuous aggregate and
+  `add_retention_policy` were each refused with SQLSTATE 0A000. With the
+  setting at `apache` a project holds plain hypertables only; changing it was
+  not tested. 17.11 does not list the extension at all;
+  `pg_partman` 5.3.1 and `pg_cron` 1.6.4 are listed on both (PX01a).
+- **In-place eligibility names it** (PX01d/h): `eligible` false with
+  `validation_errors` `[{"type":"unsupported_extension","extension_name":"timescaledb"}]`,
+  true with `[]` once the extension is dropped.
+- **A hypertable does not replicate as-is** (PX01e): its publication lists the
+  chunks (32 tables, 31 of them chunks in `_timescaledb_internal`; the 32nd not
+  named in the artifact) and
+  `create subscription` on 17 fails with 3F000 `schema "_timescaledb_internal"
+  does not exist`.
+- **The pg_partman guide as written fails on both shapes** (PX01f): with a
+  primary key on the hypertable, `like ... including all` plus the guide's
+  `primary key (sent_at, id)` gives 42P16 multiple primary keys; without one,
+  the copy runs before `create_parent` and fails with 23514 `no partition ...
+  found for row`. Corrected order (PX01g): for a hypertable with a primary key,
+  `like ... including defaults including constraints including identity
+  including generated` in place of `including all`, keeping `primary key
+  (sent_at, id)`; `create_parent` before the copy; `insert ... overriding
+  system value` for a `GENERATED ALWAYS` identity (428C9 otherwise); then
+  `setval` to `max(id)`. Without the `setval` the next insert got id 1 next to
+  an existing id 1 and the `(sent_at, id)` key allowed it. Rows
+  past the premade window land in the default partition.
+- **After the conversion it replicates** (PX01i): `publish_via_partition_root =
+  true` into a plain table on 17 was synced by the first 10 s check with equal
+  counts (300,202),
+  and later rows into a premade and the default partition both arrived.
 
 ## experiments/cron-behaviour - key facts (validated 2026-10-28, two runs, Pro org, Micro, ap-southeast-1; Postgres 17.11, pg_cron 1.6.4, pgmq 1.5.1)
 
