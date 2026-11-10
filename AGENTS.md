@@ -3550,7 +3550,7 @@ Modules OB01-OB06 and OB03d; docs claims and measurements are kept apart in RUNL
   have no clone or restore-to-new-project path (v1 115, v2 36 paths) and the
   Dashboard clone route refuses a PAT (401).
 
-## experiments/logs-volume - key facts (validated 2026-10-15, Pro org, ap-southeast-1, one self-provisioned project per module run)
+## experiments/logs-volume - key facts (validated 2026-10-15 LV01-LV02 Pro org; 2026-11-09/10 LV03-LV05 Team org, one run each; ap-southeast-1, one self-provisioned project per module run)
 
 Size is a proxy: `event_message` plus `log_attributes` keys and values as the
 logs endpoint returns them (metered bytes are not readable by PAT, OB03c).
@@ -3585,6 +3585,49 @@ logs endpoint returns them (metered bytes are not readable by PAT, OB03c).
   not measured. `RAISE NOTICE` logs nothing at defaults, `RAISE LOG` one row
   per call. `alter role authenticator reset all` returned OK and left
   `log_statement=all` in place (three runs); `reset log_statement` removed it.
+- **PostgREST pool (LV04, LV05, PostgREST 14.18)**: idle pool connections
+  were not closed within 330 s (LV05b; docs default `db-pool-max-idletime`
+  30 s); connections were replaced at 1792-1797 s of age (LV04d). So
+  `alter role authenticator set log_min_duration_statement` first logged a
+  Data API call 1750 s later under steady traffic (LV04d).
+  `notify pgrst, 'reload schema'` replaced all 8 pool connections and the
+  setting applied within 90 s, 0 failed requests (LV05d);
+  `notify pgrst, 'reload config'` replaced none (LV05c). `postgres` can
+  `pg_terminate_backend` the `authenticator` connections (member of
+  `pg_signal_backend`; 2 of 2, 0 failed requests at ~2 req/s, LV04e). Open:
+  LV02's 45 s idle wait applied `authenticator` settings, which LV05b does
+  not explain.
+- **What the Postgres logs carry for Data API calls**: a statement cancelled
+  by `statement_timeout` logs `canceling statement due to statement timeout`
+  with the statement in `parsed.query` (placeholders, no values), user
+  `authenticator` (LV05a); a `log_min_duration_statement` row carries the
+  bind values in `parsed.detail` (`Parameters: $1 = '{"ms":300}', ...`,
+  LV05d).
+- **pg_cron snapshots of pg_stat_statements + pg_stat_activity (LV03,
+  LV04f)**: a job every 30 s and a difference between two snapshots named
+  the slow RPC first in its window (333978.6 ms over 485 calls) and absent
+  from the baseline top 5 (LV03b). Cost per run on the default size: 22.6 ms
+  average with ~706 statement rows, ~71.5 KB per snapshot (LV03d);
+  82.0 ms average, 103.5 ms max with ~4912 rows per snapshot (pg_stat_statements full),
+  453018 bytes per snapshot (LV04f). Data API traffic shows as
+  `authenticator` in `pg_stat_activity` (LV03c).
+- **Default-privileges revoke without service_role (LV04g)**: revoking
+  select/insert/update/delete on future tables from anon and authenticated
+  only gives anon 401 42501 and service_role 200 on a new table; a table
+  created before keeps its grants (DD01c revoked service_role too).
+- **Provenance comment (LV04i)**: SQL through the Management API query
+  endpoint logs `-- source: POST /v1/projects/:ref/database/query` and
+  `-- user: scoped_pat:<uuid>`, the owner's user uuid, equal to `user_id`
+  from the organisation members endpoint (compared, not archived). The
+  Dashboard's pg-meta route refuses a PAT (401), so its label was not
+  observed; publish-evidence redacts the `scoped_pat:`, `pat:` and
+  `session:` uuid forms (the last two defensively).
+- **edge_logs per host (LV04h)**: grouping `/rest/v1/` rows by
+  `log_attributes['request.host']` and
+  `log_attributes['load_balancer_redirect_identifier']` works through the
+  logs endpoint; the identifier is empty on a project with no replica.
+- **LV04b is invalid** (called before the schema cache had the function,
+  404 PGRST202); LV05a supersedes it.
 - **Harness notes**: Bun's `dns.lookup` returned ENOTFOUND for the AAAA-only
   `db.<ref>.supabase.co` on macOS while `dig` resolved it; `lib/lv.ts`
   `directSession` uses `dns.resolve6` plus TLS `servername`. The logs endpoint
