@@ -1,7 +1,7 @@
 # RUNLOG - logs-volume
 
 LV01 and LV02 ran 2026-10-15 on a Pro-plan organization; LV03 ran 2026-11-09
-and LV04 and LV05 2026-11-10 on a Team-plan organization, each project created
+and LV04 to LV06 2026-11-10 on a Team-plan organization, each project created
 with no `desired_instance_size` (compute size not read back). Vantage: one
 macOS machine in Singapore (Bun 1.3.14), projects in ap-southeast-1, created
 by each module and deleted in its `finally` (checked with `GET /v1/projects`
@@ -19,13 +19,14 @@ Published artifacts (redacted, a `.facts.md` beside each, `out/2026-10-15/`):
 | run2 | LV02 | `run-2026-10-15T01-03-02-840Z.json` | pooler session settings recorded; direct path failed (ENOTFOUND) |
 | run3 | LV02 | `run-2026-10-15T01-20-48-490Z.json` | pooler and direct paths both measured |
 
-LV03 to LV05, one run each:
+LV03 to LV06, one run each:
 
 | module | artifact | note |
 |---|---|---|
 | LV03 | `out/2026-11-09/run-2026-11-09T22-42-25-880Z.json` | snapshot job, slowdown named per window |
 | LV04 | `out/2026-11-10/run-2026-11-10T00-04-13-049Z.json` | pool lifetime, terminate, full pg_stat_statements, revoke, host query, provenance label; LV04b invalid (see LV04) |
 | LV05 | `out/2026-11-10/run-2026-11-10T00-53-56-452Z.json` | idle pool, `reload config` vs `reload schema`, timeout row |
+| LV06 | `out/2026-11-10/run-2026-11-10T03-58-44-175Z.json` | `templates/query_history.sql` installed, queried, removed through the CLI |
 
 Reading guide. "Docs say" lines come from public pages read on 2026-10-15 and
 are not measurements. "Measured" lines name the row, `n` and the run.
@@ -324,3 +325,46 @@ Reading LV04 and LV05 together (one run each):
 Not measured: pool behaviour at production concurrency, `reload schema` cost
 on a large schema, the transaction-mode pooler and direct connections for the
 `postgres`-role settings, the Dashboard's own provenance label.
+
+## LV06 - the query-history template through the Supabase CLI
+
+One run, 2026-11-10, same setup as LV04. `templates/query_history.sql` is
+LV03's snapshot job as one re-runnable file plus `rca.top(win, n)`, the
+difference between the last snapshot at or before `now() - win` and the
+latest; `templates/query_history_uninstall.sql` removes it. Both were applied
+with Supabase CLI 3.1.0 and a PAT only, no database password:
+`supabase projects list -o json | jq -r '.[] | select(.name == "<name>") | .ref' | while read ref; do supabase db query --remote="$ref" -f <file> --yes; done`
+(one project matched). Fixture: a 500,000-row table, `lv6_light(k)` (point
+read) and `lv6_heavy()` (`count(*)` with `like '%abc%'`), called over the Data
+API with the service_role key.
+
+- LV06a (pass): exit 0; `db query` in write mode ran as `postgres`;
+  afterwards schema `rca` with 3 tables, 2 functions and one job,
+  `30 seconds | select rca.take()`. stderr carried `Cannot find project ref.
+  Have you run supabase link?` from a CLI call outside a linked folder; the
+  project list still printed and the loop ran.
+- LV06b (pass): a second install exited 0 and left 3 tables, 2 functions and
+  1 job.
+- LV06c (pass): 65 s wait, then `lv6_light` about every 200 ms for 180 s and
+  two back-to-back `lv6_heavy` loops for the last 90 s, then 40 s idle.
+  `rca.top('130 seconds', 5)` through `db query --yes`: 1. `lv6_heavy`
+  162978.1 ms over 641 calls, 2. `select rca.take()` 150.8 ms over 4 calls,
+  3. `lv6_light` 118.6 ms over 479 of its 894 calls (the window starts at the
+  last snapshot at or before 130 s ago, so earlier light calls fall outside).
+  All 894 light and 641 heavy calls returned 200.
+- LV06d (pass): the same call through `supabase db query --read-only`
+  returned `lv6_heavy` first with the same figures; the role it ran as was
+  not recorded.
+- LV06e (pass): anon, authenticated and service_role have no schema usage, no
+  select on `rca.stmt_snap` and no execute on `rca.top`. An anon-key POST to
+  `/rest/v1/rpc/top` with `Accept-Profile: rca` got 406 PGRST106 (`rca` not
+  in the exposed schemas), so the revokes were not what stopped it.
+- LV06f (pass): the uninstall file through the same loop exited 0 and left
+  no `rca` schema and no `rca-snap` job; installing again gave 1 schema,
+  3 tables, 1 job.
+
+Not measured: more than one project in the loop, a filter on
+`organization_slug` (the field is in the CLI 3.1.0 JSON, checked 2026-11-10,
+not run in the loop), a project without `supabase_read_only_user`, an
+existing job named `rca-snap`, other CLI versions, and snapshot cost on a busy
+database (LV03d and LV04f are the cost figures).
