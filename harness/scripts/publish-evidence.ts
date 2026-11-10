@@ -87,6 +87,11 @@ export function redact(text: string, vantage: string[] = [], other: string[] = [
     // account's PAT id reached four published artifacts on 2026-09-08 before
     // this rule existed. It is an identifier for the token rather than the
     // token, and it still does not belong in a public repo.
+    // A scoped token names the owner's user uuid instead
+    // (`scoped_pat:<uuid>`, logs-volume LV04i, 2026-11-10); `session:` and
+    // `pat:` uuid forms are covered defensively. The uuid form runs first so
+    // `pat:\d+` cannot eat its leading digit.
+    .replace(/\b(scoped_pat|pat|session):[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/g, "$1:<id>")
     .replace(/\bpat:\d+/g, "pat:<id>")
     .replace(/\boauth:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g, "oauth:<id>")
     // GoTrue error bodies name the request with an `error_id` UUID
