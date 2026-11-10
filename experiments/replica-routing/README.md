@@ -76,6 +76,13 @@ setup gate hunt) and `medium-serverless` (MS06: same-region replica).
 | RR09f | the same while four sequential scans read from the primary's disk; a cache-hot probe |
 | RR09g | removal watch on `-all` after `read-replicas/remove` (written, not run) |
 | RR09p | teardown: custom hostname, DNS records, replica, project |
+| RR10a | three Small projects on a Team org: source S on `postgres_engine` 15, targets A and B on the default 17; `pitr_7` and a 24 GB disk each; completed physical backups listed |
+| RR10b | S: replica added while S is empty, then `rr10_t` 4,000,000 rows of ~1 KB, then a publication |
+| RR10c | A: replica added while A is empty, before any subscription |
+| RR10d | subscriptions on A and B at once (direct connection, `statement_timeout=0`), time to every table `r`, A's and S's replica lag during the copy, row counts on A, A's replica and B |
+| RR10e | B: replica added after the initial copy; first session within 60 minutes or never; backups before and after |
+| RR10f | 1,000 rows inserted on S after both syncs: counts on A, A's replica, B and B's replica |
+| RR10p | teardown: subscriptions, replicas, projects |
 
 The node that served a request is read from `public.rr_whoami()`
 (`pg_is_in_recovery()`, postmaster start time) called as a GET, not inferred
@@ -93,6 +100,7 @@ PVLAB_ORG_PRO=<pro-org-slug> make run-rr06 DOMAIN=<host> [WORKER_DOMAIN=<host>] 
 PVLAB_ORG_PRO=<pro-org-slug> make run-rr07 ZONE=<zone>   # RR07; run `bun install` in browser/ first; Makefile header lists the credentials
 PVLAB_ORG_PRO=<pro-org-slug> make run-rr08   # RR08, 48 and 49 minutes on 2026-10-28 (before a 5-minute wait per PUT was removed)
 PVLAB_ORG_TEAM=<team-org-slug> make run-rr09 DOMAIN=<host>   # RR09, 24 minutes on 2026-11-09 (run 3, PVLAB_RR9_PHASES=logs,cold,hog, not recorded in the artifact); Makefile header lists the knobs
+PVLAB_ORG_TEAM=<team-org-slug> make run-rr10   # RR10, 116 minutes on 2026-11-10 (A's sync ran to the 40-minute bound); Makefile header lists the knobs
 make leftovers        # nothing named rr-* should print
 make facts RUN=evidence/<ts>/run-<stamp>.json        # ONLY=RR02 for an RR02 run (RR03, RR04, RR08 likewise)
 make publish RUN=evidence/<ts>/run-<stamp>.json

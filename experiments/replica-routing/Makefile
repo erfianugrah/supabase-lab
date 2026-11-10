@@ -12,7 +12,7 @@
 ROOT := $(abspath ../..)
 TS := $(shell date +%Y%m%d-%H%M%S)
 
-.PHONY: run run-rr02 run-rr03 run-rr04 run-rr06 run-rr07 run-rr08 run-rr09 facts publish list
+.PHONY: run run-rr02 run-rr03 run-rr04 run-rr06 run-rr07 run-rr08 run-rr09 run-rr10 facts publish list
 
 # RR02: re-routing on a lagging or unhealthy replica, non-REST traffic through
 # the load balancer. Same billing shape as RR01; 24 and 33 minutes in the
@@ -121,6 +121,17 @@ run-rr09:
 	cd $(ROOT) && PVLAB_ENDPOINT_CUSTOM_DOMAIN="$(DOMAIN)" \
 	  bun harness/src/run.ts --where local --tests experiments/replica-routing/tests \
 	  --experiment replica-routing --only RR09 --destructive \
+	  --out experiments/replica-routing/evidence/$(TS)
+
+# RR10: replicas around a 15 -> 17 move by logical replication. Three Small
+# projects (S on postgres_engine 15, A and B on 17), pitr_7, 24 GB disks, up to
+# three Small replicas; 116 minutes on 2026-11-10. Knobs: PVLAB_RR10_ROWS (4000000),
+# PVLAB_RR10_DISK_GB (24), PVLAB_RR10_SERVE_MIN (60), PVLAB_RR10_SYNC_MIN (40),
+# PVLAB_RR10_SRC_REPLICA (1), PVLAB_RR10_ORG_ROLE (team), PVLAB_RR_KEEP=1.
+run-rr10:
+	@test -n "$(PVLAB_ORG_TEAM)$(PVLAB_RR10_ORG_ROLE)" || (echo "PVLAB_ORG_TEAM not set" && exit 1)
+	cd $(ROOT) && bun harness/src/run.ts --where local --tests experiments/replica-routing/tests \
+	  --experiment replica-routing --only RR10 --destructive \
 	  --out experiments/replica-routing/evidence/$(TS)
 
 run:
