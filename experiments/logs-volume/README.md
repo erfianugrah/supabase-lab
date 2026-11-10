@@ -6,8 +6,11 @@ dimension (https://supabase.com/docs/guides/platform/manage-your-usage/logs-inge
 The levers measured here are Postgres settings, Edge Function console output,
 the Auth call used (`getUser` vs `getClaims`) and request count.
 
-Self-provisioning: every module creates its own `lv-` project on a Pro
-organization (`PVLAB_ORG_PRO`) and deletes it in `finally`. No OpenTofu state.
+Self-provisioning: every module creates its own `lv-` project and deletes it
+in `finally`, LV01-LV02 on a Pro organization (`PVLAB_ORG_PRO`), LV03-LV05 on
+a Team organization by default (`PVLAB_ORG_TEAM`; `PVLAB_LV3_ORG_ROLE`,
+`PVLAB_LV4_ORG_ROLE`, `PVLAB_LV5_ORG_ROLE` = `team` or `pro`). No OpenTofu
+state.
 Measured values, their vantage and the size caveat are in `RUNLOG.md`.
 
 Size is a proxy. Metered ingest bytes are not readable with a PAT
@@ -21,13 +24,19 @@ the logs endpoint. Compare actions with it; do not read it as billed GB.
 |---|---|---|
 | LV01 | rows and size per action, per source: idle background, REST GET, single vs bulk insert, Edge Function with 0 / 1 / 10 console lines, `getUser` vs `getClaims`, repeated public Storage GET (cache hits), Realtime broadcast messages and an idle subscription | ~25-28 min, one project |
 | LV02 | `postgres_logs` added per REST request and per SQL statement (pooler and direct sessions) by `log_statement` (on `postgres`, `authenticator`, `anon`), `log_min_duration_statement` (on `postgres`, `authenticator`) and `pgaudit.log` (on `postgres`); `RAISE NOTICE` vs `RAISE LOG` in an RPC at defaults; whether `reset all` clears a role setting | ~14-17 min, one project |
+| LV03 | can a pg_cron job snapshotting `pg_stat_statements` and `pg_stat_activity` every 30 s name the query behind a slowdown for a chosen window, and what does a snapshot cost | ~12-15 min, one project |
+| LV04 | PostgREST pool connection lifetime and when an `authenticator` role setting reaches Data API calls; `pg_terminate_backend` to apply it; snapshot cost with `pg_stat_statements` full; default-privileges revoke from anon and authenticated only; `edge_logs` per host; the provenance comment on Management API SQL | ~45-55 min, one project |
+| LV05 | idle pool connections with no traffic; `notify pgrst, 'reload config'` vs `'reload schema'` for applying an `authenticator` setting; what `postgres_logs` keeps for a Data API statement timeout | ~15 min, one project |
 
 ## Run
 
 ```bash
-# secrets injected per command, never exported: SUPABASE_ACCESS_TOKEN, PVLAB_ORG_PRO
+# secrets injected per command, never exported: SUPABASE_ACCESS_TOKEN, PVLAB_ORG_PRO, PVLAB_ORG_TEAM
 make -C experiments/logs-volume probe IDS=LV01      # LV01_N, LV01_IDLE_S
 make -C experiments/logs-volume probe IDS=LV02      # LV02_WORK; the direct path needs IPv6
+make -C experiments/logs-volume probe IDS=LV03      # PVLAB_ORG_TEAM; PVLAB_LV3_* knobs
+make -C experiments/logs-volume probe IDS=LV04      # PVLAB_LV4_STEADY_MAX_S caps the pool wait
+make -C experiments/logs-volume probe IDS=LV05
 make -C experiments/logs-volume cleanup             # deletes any project named lv-*
 ```
 

@@ -1,0 +1,171 @@
+{
+  "startedAt": "2026-11-10T00:04:13.049Z",
+  "finishedAt": "2026-11-10T00:43:07.959Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "logs-volume",
+  "labCommit": "476d303",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "LV04a",
+      "title": "LV04a: setup",
+      "status": "info",
+      "measurements": {
+        "org_role": "team",
+        "healthy_ms": 11849,
+        "endpoint_role": "postgres",
+        "pg": "17.11",
+        "cron": "1.6.4",
+        "pss": "1.11",
+        "pss_track": "top",
+        "lmes": "error",
+        "authenticator_cfg": "session_preload_libraries=supautils, safeupdate, statement_timeout=8s, lock_timeout=8s",
+        "signal_backend": "true",
+        "postgrest_server_header": "cloudflare"
+      },
+      "durationMs": 2334908
+    },
+    {
+      "id": "LV04c",
+      "title": "LV04c: authenticator pool connections after a burst, idle",
+      "status": "info",
+      "measurements": {
+        "burst_status": "{\"200\":8}",
+        "pool_peak_after_burst": 8,
+        "pool_floor": 8,
+        "first_reached_floor_s": 0,
+        "listener_connections": 1,
+        "samples": "0s:8 5s:8 10s:8 15s:8 21s:8 26s:8 31s:8 36s:8 41s:8 46s:8 51s:8 56s:8 62s:8 67s:8 72s:8 77s:8 82s:8 87s:8 92s:8 97s:8 103s:8 108s:8 113s:8 118s:8 123s:8 128s:8 133s:8 139s:8 144s:8 149s:8"
+      },
+      "durationMs": 2334908
+    },
+    {
+      "id": "LV04g",
+      "title": "LV04g: default-privileges revoke from anon and authenticated only",
+      "status": "pass",
+      "measurements": {
+        "anon_new": "false",
+        "authenticated_new": "false",
+        "service_role_new": "true",
+        "anon_old": "true",
+        "owner": "postgres",
+        "anon_get_new_table": "401 {\"code\":\"42501\",\"details\":null,\"hint\":\"Grant the required privileges to the current role with: GRANT SELECT ON public.lv4_after TO anon;\",\"m",
+        "service_role_get_new_table": "200 [{\"id\":1}]",
+        "anon_get_table_created_before": "200 [{\"id\":1}]"
+      },
+      "durationMs": 2334908
+    },
+    {
+      "id": "LV04d",
+      "title": "LV04d: authenticator connection age under steady traffic, and delay until the new threshold logs",
+      "status": "info",
+      "measurements": {
+        "steady_seconds": 1812,
+        "samples": 117,
+        "first_logged_after_set_s": 1750,
+        "first_logged_row": "duration: 300.947 ms  execute 5: WITH pgrst_source AS (SELECT pgrst_call.pgrst_scalar FROM (SELECT $1 AS json_data) pgrst_payload, LATERAL (SELECT \"ms\" FROM jso || {'env':'prod','host':'db-<ref>','identifier':'<ref>','parsed.application_name':'PostgREST 14.18','parsed.backend_type':'client backend','parsed.command_tag':'SELECT','parsed.connection_from':'::1:50541','parsed",
+        "initial_pids": "6762,6760",
+        "pids_seen": 4,
+        "max_age_seen_s": 1797,
+        "max_age_of_replaced_s": 1797,
+        "pid_table": "6762:start=00:07:20,seen=0..1747s,age<=1797s,initial | 6760:start=00:07:10,seen=0..1732s,age<=1792s,initial | 9241:start=00:37:10,seen=1747..1810s,age<=70s | 9243:start=00:37:20,seen=1764..1810s,age<=59s",
+        "light_status": "{\"200\":3733}",
+        "slow_status": "{\"200\":188}"
+      },
+      "durationMs": 2334908
+    },
+    {
+      "id": "LV04e",
+      "title": "LV04e: reset by name, then pg_terminate_backend on the pool connections",
+      "status": "info",
+      "measurements": {
+        "terminate_status": 201,
+        "terminate_error": "-",
+        "targeted": 2,
+        "terminated": 2,
+        "slow_logged_after_reset_before_terminate": 6,
+        "slow_logged_after_terminate": 0,
+        "light_status_terminate_window": "{\"200\":299}",
+        "slow_status_terminate_window": "{\"200\":15}",
+        "pool_after": "9294:start=00:40:10,9287:start=00:39:24"
+      },
+      "durationMs": 2334908
+    },
+    {
+      "id": "LV04f",
+      "title": "LV04f: snapshot job with pg_stat_statements filled to pg_stat_statements.max",
+      "status": "info",
+      "measurements": {
+        "fill_statements": 6000,
+        "fill_batch_errors": 0,
+        "fill_first_error": "-",
+        "pss_max": "5000",
+        "pss_rows_after_fill": 4904,
+        "pss_wide_rows_after_fill": 4466,
+        "dealloc_after_fill": 7,
+        "jobid": "1",
+        "runs": 10,
+        "not_ok": 0,
+        "not_ok_msgs": "-",
+        "run_ms_avg": "82.0",
+        "run_ms_max": "103.5",
+        "snapshots": 10,
+        "stmt_rows_per_snapshot": "4911.8",
+        "stmt_text_rows": 4905,
+        "stmt_snap_bytes": 4530176,
+        "stmt_text_bytes": 729088,
+        "act_snap_bytes": 16384,
+        "pss_rows_at_end": 4913,
+        "dealloc_at_end": 7,
+        "stmt_snap_bytes_per_snapshot": 453018
+      },
+      "durationMs": 2334908
+    },
+    {
+      "id": "LV04b",
+      "title": "LV04b: Data API call cancelled by statement_timeout, statement text in postgres_logs",
+      "status": "fail",
+      "measurements": {
+        "http": "404 {\"code\":\"PGRST202\",\"details\":\"Searched for the function public.lv4_slow with parameter ms or with a single unnamed json/jsonb parameter, but no matches were found in the schema cache.\",\"hint\":null,\"me",
+        "client_ms": 74,
+        "log_rows": 0,
+        "logs_error": "-",
+        "event_message": "-",
+        "parsed_query": "-",
+        "severity": "-"
+      },
+      "durationMs": 2334908
+    },
+    {
+      "id": "LV04i",
+      "title": "LV04i: comment on a failing statement, v1 query endpoint and pg-meta route, PAT caller",
+      "status": "info",
+      "measurements": {
+        "v1_http": "400 Failed to run sql query: ERROR:  22012: division by zero\n",
+        "platform_http": "401 {\"message\":\"Unsupported access token\"}",
+        "log_rows": 1,
+        "logs_error": "-",
+        "rows": "select 1/0 as lv4_v1_probe\n\n-- source: POST /v1/projects/:ref/database/query\n-- user: scoped_pat:<id>\n-- date: 2026-11-10T00:04:26.064Z"
+      },
+      "durationMs": 2334908
+    },
+    {
+      "id": "LV04h",
+      "title": "LV04h: edge_logs REST requests by host and served_by",
+      "status": "pass",
+      "measurements": {
+        "http": 200,
+        "error": "-",
+        "rows": "<ref>.supabase.co |  | 4372"
+      },
+      "durationMs": 2334908
+    }
+  ]
+}
