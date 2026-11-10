@@ -1,0 +1,95 @@
+{
+  "startedAt": "2026-11-10T03:58:44.175Z",
+  "finishedAt": "2026-11-10T04:03:53.636Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "logs-volume",
+  "labCommit": "cb476ee",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "LV06a",
+      "title": "LV06a: install through the projects-list loop",
+      "status": "pass",
+      "measurements": {
+        "exit": 0,
+        "stderr": "Cannot find project ref. Have you run supabase link?\nTarget: project <ref>\nConfirmed by --yes: Run a SQL statement on project <ref>",
+        "write_mode_role": "postgres",
+        "schema": "1",
+        "tables": "3",
+        "functions": "2",
+        "jobs": "1",
+        "job": "30 seconds | select rca.take()"
+      },
+      "durationMs": 309460
+    },
+    {
+      "id": "LV06b",
+      "title": "LV06b: second install is a no-op apart from the job upsert",
+      "status": "pass",
+      "measurements": {
+        "exit": 0,
+        "stderr": "Cannot find project ref. Have you run supabase link?\nTarget: project <project> (<ref>) · production\nConfirmed by --yes: Run a SQL statement on project <project> (<ref>) · production",
+        "jobs": 1,
+        "tables": 3,
+        "functions": 2
+      },
+      "durationMs": 309460
+    },
+    {
+      "id": "LV06c",
+      "title": "LV06c: rca.top() over the incident window, via the CLI",
+      "status": "pass",
+      "measurements": {
+        "exit": 0,
+        "stderr": "Target: project <project> (<ref>) · production\nConfirmed by --yes: Run a SQL statement on project <project> (<ref>) · production",
+        "window": "130 seconds",
+        "top5": "1. 162978.1 ms / 641 calls: WITH pgrst_source AS (SELECT pgrst_call.pgrst_scalar FROM (SELECT \"public\".\"lv6_heavy\"() p | 2. 150.8 ms / 4 calls: select rca.take() | 3. 118.6 ms / 479 calls: WITH pgrst_source AS (SELECT pgrst_call.pgrst_scalar FROM (SELECT $1 AS json_data) pgrst_p | 4. 28.3 ms / 1120 calls: select set_config('search_path', $1, true), set_config('role', $2, true), set_config('requ | 5. 0.2 ms / 4 calls: update cron.job_run_details set job_pid = $1, status = $2 where runid = $3",
+        "heavy_rank": 1,
+        "light_status": "{\"200\":894}",
+        "heavy_status": "{\"200\":641}"
+      },
+      "durationMs": 309460
+    },
+    {
+      "id": "LV06d",
+      "title": "LV06d: rca.top() through supabase db query --read-only",
+      "status": "pass",
+      "measurements": {
+        "exit": 0,
+        "stderr": "Target: project <project> (<ref>) · production",
+        "top1": "1. 162978.1 ms / 641 calls: WITH pgrst_source AS (SELECT pgrst_call.pgrst_scalar FROM (SELECT \"public\".\"lv6_heavy\"() p"
+      },
+      "durationMs": 309460
+    },
+    {
+      "id": "LV06e",
+      "title": "LV06e: Data API roles on the rca schema",
+      "status": "pass",
+      "measurements": {
+        "privileges": "anon: usage=false select=false exec_top=false | authenticated: usage=false select=false exec_top=false | service_role: usage=false select=false exec_top=false",
+        "anon_rest_rpc_top": "406 {\"code\":\"PGRST106\",\"details\":null,\"hint\":\"Only the following schemas are exposed: public, graphql_public\",\"message\":\"Invalid schema: rca\"}"
+      },
+      "durationMs": 309460
+    },
+    {
+      "id": "LV06f",
+      "title": "LV06f: uninstall through the loop, then reinstall",
+      "status": "pass",
+      "measurements": {
+        "uninstall_exit": 0,
+        "uninstall_stderr": "Cannot find project ref. Have you run supabase link?\nTarget: project <project> (<ref>) · production\nConfirmed by --yes: Run a SQL statement on project <project> (<ref>",
+        "after_uninstall": "schema=0 jobs=0",
+        "reinstall_exit": 0,
+        "after_reinstall": "schema=1 tables=3 jobs=1"
+      },
+      "durationMs": 309460
+    }
+  ]
+}

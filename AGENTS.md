@@ -3550,7 +3550,7 @@ Modules OB01-OB06 and OB03d; docs claims and measurements are kept apart in RUNL
   have no clone or restore-to-new-project path (v1 115, v2 36 paths) and the
   Dashboard clone route refuses a PAT (401).
 
-## experiments/logs-volume - key facts (validated 2026-10-15 LV01-LV02 Pro org; 2026-11-09/10 LV03-LV05 Team org, one run each; ap-southeast-1, one self-provisioned project per module run)
+## experiments/logs-volume - key facts (validated 2026-10-15 LV01-LV02 Pro org; 2026-11-09/10 LV03-LV06 Team org, one run each; ap-southeast-1, one self-provisioned project per module run)
 
 Size is a proxy: `event_message` plus `log_attributes` keys and values as the
 logs endpoint returns them (metered bytes are not readable by PAT, OB03c).
@@ -3611,6 +3611,14 @@ logs endpoint returns them (metered bytes are not readable by PAT, OB03c).
   82.0 ms average, 103.5 ms max with ~4912 rows per snapshot (pg_stat_statements full),
   453018 bytes per snapshot (LV04f). Data API traffic shows as
   `authenticator` in `pg_stat_activity` (LV03c).
+- **Query-history template via the CLI (LV06)**: `templates/query_history.sql`
+  (LV03's job plus `rca.top(win, n)`) installs, re-installs (still one
+  `rca-snap` job, `cron.schedule` with the same name upserts), answers
+  `rca.top` in write and `--read-only` mode and uninstalls through
+  `supabase db query --remote=<ref> -f <file> --yes` with a PAT only (CLI
+  3.1.0; write mode runs as `postgres`). The slow RPC ranked first for its
+  window (162978.1 ms over 641 calls). `projects list` outside a linked
+  folder warns `Cannot find project ref` on stderr and still lists.
 - **Default-privileges revoke without service_role (LV04g)**: revoking
   select/insert/update/delete on future tables from anon and authenticated
   only gives anon 401 42501 and service_role 200 on a new table; a table
