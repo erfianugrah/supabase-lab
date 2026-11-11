@@ -1,0 +1,104 @@
+{
+  "startedAt": "2026-11-11T07:51:12.650Z",
+  "finishedAt": "2026-11-11T07:57:13.762Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "replica-routing",
+  "labCommit": "6b30084",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "RR13a",
+      "title": "S on postgres_engine 15 with the IPv4 add-on, T and T2 on the default; default size, ap-southeast-1, team org; db host records",
+      "status": "pass",
+      "detail": "versions S 15.19, T 17.11, T2 17.11; add-on PATCH HTTP 200 ; S A 1 AAAA 0 after 10 s; T A 0 AAAA 1; T2 A 0 AAAA 1",
+      "measurements": {
+        "s_dns_s": 10,
+        "s_a": 1,
+        "s_aaaa": 0
+      },
+      "durationMs": 361111
+    },
+    {
+      "id": "RR13b",
+      "title": "S: 1,000 rows and a publication; T and T2: the table",
+      "status": "pass",
+      "detail": "insert HTTP 201 ; publication HTTP 201 ",
+      "durationMs": 361111
+    },
+    {
+      "id": "RR13c",
+      "title": "S open: T subscribes, then T2 once T has every table r; the addresses S sees",
+      "status": "pass",
+      "detail": "T create HTTP 201  every table r 5s rows 1000; T2 create HTTP 201  every table r 5s rows 1000; S pg_stat_replication: rr13_sub_t <v4-a> streaming, rr13_sub_t2 <v4-b> streaming; T seen as v4-a (IPv4), T2 seen as v4-b; T and T2 do not share an address",
+      "measurements": {
+        "same_addr": 0,
+        "seen_t_v4": 1
+      },
+      "durationMs": 361111
+    },
+    {
+      "id": "RR13c2",
+      "title": "probe: S's walsenders and xid holders while each create ran; a logical slot created directly on S",
+      "status": "info",
+      "detail": "T: nothing on S; T2: nothing on S; direct pg_create_logical_replication_slot on S: HTTP 201 after 0 s ",
+      "measurements": {
+        "direct_slot_s": 0
+      },
+      "durationMs": 361111
+    },
+    {
+      "id": "RR13c3",
+      "title": "each target's own pg_net request to an IP echo service, against the address S saw",
+      "status": "info",
+      "detail": "T pg_net egress v4-a, S saw v4-a; T2 pg_net egress v4-b, S saw v4-b",
+      "measurements": {
+        "T_egress_equals_seen": 1,
+        "T2_egress_equals_seen": 1
+      },
+      "durationMs": 361111
+    },
+    {
+      "id": "RR13d",
+      "title": "S allows only the address S saw for T (/32) beside 2001:db8::/32; both targets reconnect",
+      "status": "pass",
+      "detail": "apply HTTP 201; after disable/enable and 100 rows: T 1100 (all after 0s), T2 1000 (not all in 120 s); S walsenders now: rr13_sub_t v4-a",
+      "measurements": {
+        "t_caught_up": 1,
+        "t2_caught_up": 0
+      },
+      "durationMs": 361111
+    },
+    {
+      "id": "RR13f",
+      "title": "T restarted under RR13d's restriction (only T's /32): does T reconnect, and from which address",
+      "status": "info",
+      "detail": "restart HTTP 200; healthy ACTIVE_HEALTHY after 66 s; 100 rows inserted on S: T 1200 (all after 0s); S then saw T as v4-a, before the restart v4-a; T's pg_net egress after the restart v4-a",
+      "measurements": {
+        "same_after_restart": 1,
+        "caught_up_under_old_rule": 1
+      },
+      "durationMs": 361111
+    },
+    {
+      "id": "RR13e",
+      "title": "S restricted to 192.0.2.0/24 and 2001:db8::/32; T reconnects (control)",
+      "status": "pass",
+      "detail": "apply HTTP 201; T 1200 after 60 s (the 100 rows did not arrive); S walsenders: none",
+      "durationMs": 361111
+    },
+    {
+      "id": "RR13p",
+      "title": "teardown",
+      "status": "info",
+      "detail": "S delete 200; T delete 200; T2 delete 200",
+      "durationMs": 361111
+    }
+  ]
+}

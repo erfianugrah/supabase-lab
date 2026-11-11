@@ -2128,9 +2128,12 @@ Reading RR12 (two runs):
   subscription it did not reconnect: 100 rows inserted on S had not arrived
   60 s later and S listed no walsender, while T's worker still had a pid. The
   orchestrator read no error source (RR12g returned no data).
-- A blocked `create subscription` hung instead of failing at
-  `connect_timeout`: in run 2 a statement timeout ended it at 120 s. Why
-  `connect_timeout` did not apply was not checked.
+- T2's `create subscription` hung instead of failing at `connect_timeout`:
+  in run 2 a statement timeout ended it at 120 s. Why `connect_timeout` did
+  not apply was not checked, and RR13 run 1 saw a second target's create
+  (no `connect_timeout` in its connection string) end in the same `57014`
+  statement timeout with the source open, so the hang alone does not show
+  that the restriction blocked it.
 
 Not measured in RR12: a source with the IPv4 add-on (the docs say only IPv4
 CIDRs are needed then); whether a target's address changes on restart,
@@ -2138,6 +2141,104 @@ resize, pause and restore or upgrade; a subscription through the session
 pooler; a walsender's survival under a restriction beyond 20 s; the
 subscriber's log lines for the blocked connection (RR12g); a target in
 another region.
+
+## 2026-11-11 - RR13, RR12 with the IPv4 add-on on the source
+
+Question: with the IPv4 add-on, a project's db host resolves to an A record
+only (MS02), so another project's subscription reaches it over IPv4, from an
+outbound address the docs say "is not static and cannot be guaranteed"
+(https://supabase.com/docs/guides/platform/ipv4-address, read 2026-11-11).
+Which IPv4 address does the source see for a target, do two targets in one
+region present the same address, does allowing that address let the
+subscription through, how can the target's address be found without opening
+the source, and does it hold across a reconnect and a restart?
+
+Shape: as RR12 (three throwaway projects on the Team org at the default
+compute size, ap-southeast-1; S on `postgres_engine: "15"` (15.19), T and T2
+on the default (17.11); `rr13_t` with 1,000 rows on S, published), plus the
+IPv4 add-on on S (`PATCH /v1/projects/{ref}/billing/addons`,
+`ipv4_default`), with S's records polled with `dig` against 1.1.1.1 until S
+had an A and no AAAA. T subscribes to S's direct host; T2 subscribes once T
+has every table `r` (one at a time). Addresses are recorded as roles
+(`<v4-a>`, `<v4-b>` in order of first sight, per run), not values. Three runs
+on 2026-11-11; all artifacts name lab commit 6b30084, which predates the
+module. The module changed between runs; the committed module is the run 3
+version.
+
+- run 1: `out/2026-11-11/run-2026-11-11T07-33-36-858Z.json`, 4 pass, 1 fail,
+  10 minutes; no source-side probe, no pg_net or restart step.
+- run 2: `out/2026-11-11/run-2026-11-11T07-45-00-115Z.json`, 5 pass, 5
+  minutes; adds RR13c2 (S's walsenders and xid holders sampled every 5 s
+  while each create ran, then a logical slot created directly on S).
+- run 3: `out/2026-11-11/run-2026-11-11T07-51-12-650Z.json`, 5 pass, 6
+  minutes; adds RR13c3 (each target's pg_net request to
+  https://api.ipify.org) and RR13f (a restart of T).
+
+- RR13a (all runs): add-on PATCH 200; S had an A record and no AAAA by the
+  poll 10 s after the PATCH (faster than MS02 and pooler-checkout saw; one
+  resolver, 1.1.1.1); T and T2 each had an AAAA record and no
+  A record.
+- RR13b (all runs): 1,000 rows and a publication on S, 201.
+- RR13c, run 1: T's `create subscription` returned 201 and T had every table
+  `r` after 6 s; T2's, started after that, returned HTTP 400 `57014:
+  canceling statement due to statement timeout` (57014 is a Postgres
+  statement timeout; which setting fired and after how long were not
+  recorded; the committed module's client budget is 150 s, and run 1's module
+  is not published), with no restriction on S and no `connect_timeout` in the
+  connection string, and T2 held 0 rows. S's `pg_stat_replication` listed
+  `rr13_sub_t` streaming from `<v4-a>`, an IPv4 address. Runs 2 and 3: both
+  creates returned 201, every table `r` after 5 s on each target, 1,000
+  rows each; S listed `rr13_sub_t` from `<v4-a>` and `rr13_sub_t2` from
+  `<v4-b>`, two different addresses (T's checked as dotted IPv4 in all runs;
+  T2's in run 3 by RR13c3, in run 2 implied by S having no AAAA).
+- RR13c2 (runs 2 and 3): both creates finished before the first 5 s sample,
+  so nothing was recorded on S; a logical slot created directly on S
+  returned 201 in 1 s (run 2) and 0 s (run 3).
+- RR13c3 (run 3): T's pg_net request came back from `<v4-a>` and T2's from
+  `<v4-b>`, the addresses S's `pg_stat_replication` showed for each.
+- RR13d (all runs): S allowed only `<v4-a>/32` beside 2001:db8::/32 (201);
+  20 s later both targets disabled and re-enabled their subscriptions and
+  100 rows were inserted on S. T held all 1,100 at the first check. Runs 2
+  and 3: T2 held 1,000 and had not got the 100 rows 120 s later (run 1's T2
+  had no subscription). S listed `rr13_sub_t` from `<v4-a>` only.
+- RR13f (run 3): `POST /v1/projects/{ref}/restart` on T answered 200; after
+  a fixed 30 s wait T read `ACTIVE_HEALTHY` (at 40 s at the earliest; the
+  module did not record when), and RR13f's last read ended 66 s after the
+  call (whether Postgres itself restarted was not read). 100 rows inserted on S under RR13d's restriction: T held
+  all 1,200 at the first check; S listed `rr13_sub_t` from `<v4-a>`, and T's
+  pg_net request came back from `<v4-a>`.
+- RR13e (all runs): S restricted to 192.0.2.0/24 and 2001:db8::/32 (201); T
+  disabled and re-enabled its subscription; 100 more rows on S had not
+  arrived 60 s later, and S listed no walsender.
+- RR13p (all runs): three projects deleted, 200 each.
+
+Reading RR13 (three runs):
+
+- With the IPv4 add-on on the source, a subscription from another project
+  arrived over IPv4 from an address that is not in the target's DNS (its db
+  host had only an AAAA record). The target's own pg_net request to an IP
+  echo service left from the same address (run 3, both targets), so that
+  is a way to read a target's address without opening the source.
+- The two targets presented different addresses (runs 2 and 3), and with
+  only T's /32 allowed T caught up while T2 got none of the 100 new rows in
+  120 s: each target needs its own entry, at least for these two projects in
+  one region (no step allowed T2's /32 to show it would then reconnect, and
+  whether the restriction was in force when T2 reconnected was not read).
+- T's address held across a forced reconnect (all runs) and a restart
+  through the API (run 3; whether Postgres restarted was not read). A restore, pause and restore, upgrade or compute
+  change was not tested, and the docs' "not static" line still applies.
+- Run 1's T2 `create subscription` hung until the statement timeout with
+  the source open; runs 2 and 3 created both in 5 s and the direct slot
+  creation on S took at most 1 s. The cause of run 1's hang was not found
+  (run 1 predates RR13c2's source-side probe). RR12f's two hangs under a
+  restriction therefore do not by themselves show that the restriction
+  blocked T2.
+
+Not measured in RR13: the cause of run 1's hang; an empty IPv6 allow list
+(RR13d and RR13e kept 2001:db8::/32 in it); more than two targets or a
+target in another region; the address after a restore, pause and restore,
+upgrade or compute change; how long an address holds over days; whether
+Postgres restarted during RR13f; a source without the add-on (RR12).
 
 ## Not measured
 

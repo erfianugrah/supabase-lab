@@ -4656,7 +4656,7 @@ projects (feature battery, two conversion probes), all `small`,
   cannot call them), so the blog's "tracked" is untested for the dashboard;
   `migration_version`; the dashboard merge-request screen.
 
-## experiments/replica-routing - key facts (validated 2026-10-10, Pro org; RR02 2026-10-23, two runs; RR03 and RR04 2026-10-26, two runs each; RR06 and RR08 2026-10-28, two runs each; RR07 2026-10-28, three runs; RR09 2026-11-09, Team org, three runs, one complete; RR10 2026-11-10, Team org, one run; RR11 2026-11-10, Team org, four runs, three past RR11a; RR12 2026-11-11, Team org, two runs)
+## experiments/replica-routing - key facts (validated 2026-10-10, Pro org; RR02 2026-10-23, two runs; RR03 and RR04 2026-10-26, two runs each; RR06 and RR08 2026-10-28, two runs each; RR07 2026-10-28, three runs; RR09 2026-11-09, Team org, three runs, one complete; RR10 2026-11-10, Team org, one run; RR11 2026-11-10, Team org, four runs, three past RR11a; RR12 2026-11-11, Team org, two runs; RR13 2026-11-11, Team org, three runs)
 
 - **The API load balancer's host is `<ref>-all.supabase.co` and the Management
   API does not return it** (RR01e, 2026-10-10): the Dashboard route
@@ -4950,10 +4950,30 @@ projects (feature battery, two conversion probes), all `small`,
   IPv6 list let it catch up in 5-10 s. A second project's (T2's) `create
   subscription`, run while the source allowed only T's /128, hung until T2
   cancelled it with a statement timeout at 120 s (run 2; run 1's client gave
-  up at 120 s), despite `connect_timeout=10`. Not run: a source with the
+  up at 120 s), despite `connect_timeout=10`; RR13 run 1 saw a `create
+  subscription` with no `connect_timeout` end in the same `57014` statement
+  timeout with the source open, so a hang alone does not show a block. Not run: a source with the
   IPv4 add-on; a target in another region; a subscription through the
   session pooler; a walsender beyond 20 s; whether the target's address
-  changes on restart, resize, pause and restore or upgrade.
+  changes on resize, pause and restore or upgrade (RR13, next bullet, ran
+  the IPv4 add-on and a restart).
+
+- **With the IPv4 add-on on the source, a subscription from another project
+  arrived over IPv4 from an outbound address that its own db host's DNS
+  records do not show**
+  (RR13, 2026-11-11, three runs, ap-southeast-1, one Team org, S on 15.19,
+  targets on 17.11; S had an A record and no AAAA 10 s after the add-on
+  PATCH). Two targets presented different addresses (runs 2 and 3); with only
+  the first target's /32 allowed, the first caught up and the second got none
+  of 100 new rows in 120 s. The
+  target's own pg_net request to an IP echo service left from the address the
+  source saw (run 3, both targets), so that reads it without opening the
+  source. The first target's address held across a forced reconnect (all
+  runs) and a `POST /restart` (run 3; whether Postgres restarted was not
+  read). Run 1's second target's `create subscription` ended in a `57014`
+  statement timeout with the source open (duration not recorded; cause not
+  found; runs 2 and 3 created in 5 s). Not run: restore, upgrade or compute change, more targets,
+  other regions.
 
 ## experiments/scoped-pats - key facts (SP01-SP10, validated 2026-10-10)
 
