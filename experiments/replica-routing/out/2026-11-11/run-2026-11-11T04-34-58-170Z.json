@@ -1,0 +1,106 @@
+{
+  "startedAt": "2026-11-11T04:34:58.170Z",
+  "finishedAt": "2026-11-11T04:39:13.290Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "replica-routing",
+  "labCommit": "b339e99",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "RR12a",
+      "title": "S on postgres_engine 15, T and T2 on the default; default size, ap-southeast-1, team org; db host records",
+      "status": "pass",
+      "detail": "S 15.19 A 0 AAAA 1; T 17.11 A 0 AAAA 1; T2 17.11 A 0 AAAA 1",
+      "measurements": {
+        "S_a_records": 0,
+        "S_aaaa_records": 1,
+        "T_a_records": 0,
+        "T_aaaa_records": 1,
+        "T2_a_records": 0,
+        "T2_aaaa_records": 1
+      },
+      "durationMs": 255119
+    },
+    {
+      "id": "RR12b",
+      "title": "S: 1,000 rows and a publication; T and T2: the table",
+      "status": "pass",
+      "detail": "insert HTTP 201 ; publication HTTP 201 ; S rows 1000",
+      "durationMs": 255119
+    },
+    {
+      "id": "RR12c",
+      "title": "open: T subscribes to S's direct host; the address S sees for T's walsender",
+      "status": "pass",
+      "detail": "create subscription HTTP 201 ; T rows 1000 after 0s (1 s with the walsender read); S pg_stat_replication: rr12_sub_t <v6-T>/128 streaming; seen address is IPv6 and equals a record of T's db host",
+      "measurements": {
+        "seen_is_v6": 1,
+        "seen_equals_T_record": 1
+      },
+      "durationMs": 255119
+    },
+    {
+      "id": "RR12d",
+      "title": "S restricted to 192.0.2.0/24 and 2001:db8::/32: the streaming subscription, then a reconnect",
+      "status": "info",
+      "detail": "apply HTTP 201; T's walsender on S 20 s later: present (rr12_sub_t streaming); 100 rows inserted on S: T rows 1100 after 45 s (all after 0s); after disable/enable and 100 more: T rows 1100 (not all arrived in 60 s); T pg_stat_subscription worker pid 5976; S walsenders now: none",
+      "measurements": {
+        "walsender_survived_20s": 1,
+        "rows_before_reconnect": 1100,
+        "rows_after_reconnect": 1100
+      },
+      "durationMs": 255119
+    },
+    {
+      "id": "RR12e",
+      "title": "S allows 192.0.2.0/24 and only the address RR12c saw: T catches up",
+      "status": "pass",
+      "detail": "apply HTTP 201 (192.0.2.0/24 + <addr-seen-by-S>/128); GET network-restrictions status applied, v4 1 entries, v6 1 entries; T rows 1200 (all after 5s); S walsenders: rr12_sub_t <v6-T>/128",
+      "measurements": {
+        "catch_up_s": 5
+      },
+      "durationMs": 255119
+    },
+    {
+      "id": "RR12f",
+      "title": "T2 subscribes under RR12e's restriction (connect_timeout=10)",
+      "status": "pass",
+      "detail": "create subscription HTTP 400 after 120 s: Failed to run sql query: ERROR:  57014: canceling statement due to statement timeout\n; T2's AAAA does not share an address with T's",
+      "durationMs": 255119
+    },
+    {
+      "id": "RR12g-T",
+      "title": "T's postgres_logs lines about the connection to the publisher during the run",
+      "status": "info",
+      "detail": "logs HTTP 200 \"Table \\\"postgres_logs\\\" does not exist.\"; 0 lines; first: -; distinct starts: ",
+      "measurements": {
+        "log_lines": 0
+      },
+      "durationMs": 255119
+    },
+    {
+      "id": "RR12g-T2",
+      "title": "T2's postgres_logs lines about the connection to the publisher during the run",
+      "status": "info",
+      "detail": "logs HTTP 200 \"Table \\\"postgres_logs\\\" does not exist.\"; 0 lines; first: -; distinct starts: ",
+      "measurements": {
+        "log_lines": 0
+      },
+      "durationMs": 255119
+    },
+    {
+      "id": "RR12p",
+      "title": "teardown",
+      "status": "info",
+      "detail": "S delete 200; T delete 200; T2 delete 200",
+      "durationMs": 255119
+    }
+  ]
+}

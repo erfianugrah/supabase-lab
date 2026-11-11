@@ -1,0 +1,94 @@
+{
+  "startedAt": "2026-11-10T12:41:03.975Z",
+  "finishedAt": "2026-11-10T12:54:03.661Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "replica-routing",
+  "labCommit": "b339e99",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "RR11a",
+      "title": "S on postgres_engine 15, T1-T7 on the default; default size, ap-southeast-1, team org; system_identifier and table OID",
+      "status": "pass",
+      "detail": "S 15.19 7703759990361338896 rr11_t 17617; T1 17.11 7703759698107299042 rr11_t 17643; T2 17.11 7703759698107299042 rr11_t 17520; T3 17.11 7703759698107299042 rr11_t 17518; T4 17.11 7703759698107299042 rr11_t 17643; T5 17.11 7703759698107299042 rr11_t 17644; T6 17.11 7703760980994770283 rr11_t 17643; T7 17.11 7703759698107299042 rr11_t 17518; 2 of 7 targets share system_identifier/table OID 7703759698107299042/17643",
+      "measurements": {
+        "targets_sharing": 2,
+        "targets": 7
+      },
+      "durationMs": 779687
+    },
+    {
+      "id": "RR11b",
+      "title": "S: 500000 rows of ~1 KB, publication",
+      "status": "pass",
+      "detail": "load 18s ; rows 500000; publication HTTP 201 ",
+      "durationMs": 779687
+    },
+    {
+      "id": "RR11c",
+      "title": "T1 and T4 (same system_identifier and table OID) subscribe at the same time, with T2 (different) alongside",
+      "status": "pass",
+      "detail": "T1: create HTTP 201 , OIDs 17650/17643, every table r 16s, state 'r', rows 500000; T4: create HTTP 201 , OIDs 17650/17643, every table r never, state 'f', rows 500000; T2 (control): create HTTP 201 , OIDs 17527/17520, every table r 16s, state 'r', rows 500000; bound 10 min; slots on S: rr11_sub_t1 rr11_sub_t2 rr11_sub_t4",
+      "measurements": {
+        "T1_ready_s": 16,
+        "T1_state": "r",
+        "T4_ready_s": "never",
+        "T4_state": "f",
+        "T2_ready_s": 16,
+        "T2_state": "r"
+      },
+      "durationMs": 779687
+    },
+    {
+      "id": "RR11d",
+      "title": "T3 subscribes, every table r, then T5 (session with set log_statement = 'none')",
+      "status": "pass",
+      "detail": "system_identifier T3 7703759698107299042, T5 7703759698107299042; T3 create HTTP 201 , every table r after 16s; T5: set log_statement ok, create subscription ok, every table r after 16s; OIDs T3 17525/17518, T5 17651/17644; rows T3 500000, T5 500000; slots on S: rr11_sub_t1 rr11_sub_t2 rr11_sub_t3 rr11_sub_t4 rr11_sub_t5",
+      "measurements": {
+        "first_ready_s": 16,
+        "second_ready_s": 16,
+        "set_log_statement": "ok",
+        "same_sysid": "true"
+      },
+      "durationMs": 779687
+    },
+    {
+      "id": "RR11e",
+      "title": "1,000 rows inserted on S after the syncs; counts 30 s later",
+      "status": "fail",
+      "detail": "insert HTTP 201; T1 501000 (state 'r'), T4 500000 (state 'f'), T2 501000 (state 'r'), T3 501000 (state 'r'), T5 501000 (state 'r'); expected 501000",
+      "measurements": {
+        "T1_late": 501000,
+        "T4_late": 500000,
+        "T2_late": 501000,
+        "T3_late": 501000,
+        "T5_late": 501000
+      },
+      "durationMs": 779687
+    },
+    {
+      "id": "RR11f",
+      "title": "postgres_logs rows containing create subscription, and how many hold the password (counts only)",
+      "status": "info",
+      "detail": "log_statement ddl; T1: 1 rows, 1 with the password; T4: 1 rows, 1 with the password; T2: 1 rows, 1 with the password; T3: 1 rows, 1 with the password; T5: 0 rows, 0 with the password; T5 created its subscription after set log_statement = 'none'",
+      "measurements": {
+        "log_statement": "ddl"
+      },
+      "durationMs": 779687
+    },
+    {
+      "id": "RR11p",
+      "title": "teardown",
+      "status": "info",
+      "detail": "S delete 200; T1 delete 200; T2 delete 200; T3 delete 200; T4 delete 200; T5 delete 200; T6 delete 200; T7 delete 200",
+      "durationMs": 779687
+    }
+  ]
+}

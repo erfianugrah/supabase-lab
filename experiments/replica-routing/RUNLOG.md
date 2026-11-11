@@ -1910,6 +1910,235 @@ why B's replica never served; any size but 3.9 GiB; the replicas' disk sizes;
 what `pg_stat_replication` shows for Supabase standbys in general (no row on S
 right after the load, a row at some RR10d sample).
 
+## 2026-11-10 - RR11, tablesync slot names when several new 17 projects subscribe to one source
+
+Question: RR10 saw two new 17.11 projects with one `system_identifier` collide
+on a table-sync slot name. Postgres names that slot
+`pg_<subscription oid>_sync_<table oid>_<system identifier>`, all three read
+on the subscriber (`ReplicationSlotNameForTablesync`,
+src/backend/replication/logical/tablesync.c, REL_17_STABLE, read 2026-11-10).
+How common is a shared identifier, does the collision repeat when the slot
+names match, does it stay away when they do not, and do targets subscribed one
+after another avoid it?
+
+Shape: throwaway projects on the Team org at the default compute size,
+ap-southeast-1; one source on `postgres_engine: "15"` (15.19), targets on the
+default (17.11); `rr11_t` loaded through the query endpoint (runs 2 to 4),
+published, and subscribed over the source's direct connection with
+`options=''-c statement_timeout=0''`. Readiness is polled every 5 s. Four
+artifacts, one per run. Every artifact names lab commit b339e99, which
+predates the RR11 module: each run used an uncommitted version, the module
+changed between runs, and the committed module is the run 4 version.
+
+- run 1 (stopped after RR11a): `out/2026-11-10/run-2026-11-10T12-34-20-149Z.json`,
+  four targets A-D, 1 pass, 1 fail. An earlier module version loaded through
+  the session pooler and stopped after RR11a with `Connection terminated
+  unexpectedly` (the artifact records the error, not the step).
+- run 2: `out/2026-11-10/run-2026-11-10T12-36-39-047Z.json`, five targets
+  T1-T5 grouped by `system_identifier` only, 500,000 rows, 5 pass, 3 minutes.
+- run 3: `out/2026-11-10/run-2026-11-10T12-41-03-975Z.json`, seven targets
+  T1-T7 grouped by `system_identifier` and `rr11_t`'s OID, 500,000 rows, 4
+  pass, 1 fail, 13 minutes. In this version RR11c passed on the creates alone.
+- run 4: `out/2026-11-10/run-2026-11-10T13-24-53-642Z.json`, seven targets,
+  the committed version: RR11c fails when a target never reaches `r`, RR11d
+  prefers a second pair with matching values and creates both of its
+  subscriptions in session-pooler sessions, and RR11f reads `log_statement`
+  on every subscribed target (runs 2 and 3 read it on one) and adds each
+  target's total Postgres log row count; 500,000 rows, 2 pass, 3 fail, 32
+  minutes, three 10-minute bounds waited out (RR11c's T3, RR11d's T4 and
+  T5).
+
+- RR11a: run 1: A 7703760980994770283, B, C and D 7703759698107299042.
+  Run 2: T1-T5 all 7703759698107299042. Run 3: T1-T5 and T7
+  7703759698107299042, T6 7703760980994770283; `rr11_t` OIDs 17643 (T1, T4,
+  T6), 17520 (T2), 17518 (T3, T7), 17644 (T5). Run 4: T1-T7 all
+  7703759698107299042; `rr11_t` OIDs 17643 (T2-T6), 17524 (T1), 17518 (T7).
+  With RR10's three (A, B and the fourth project of RR10c), 24 of 26 new
+  17.11 projects reported 7703759698107299042 and 2 reported
+  7703760980994770283, so every project read shared its identifier with at
+  least one other. RR11's projects and RR10's A and B were in ap-southeast-1
+  on one Team org, at the default size (RR11) or Small (RR10's A and B); the
+  fourth project's size, region and org were not recorded. The 15.19 sources in RR10 and RR11 runs 1 to 3 reported
+  7703759990361338896; run 4's reported 7703761001322865815.
+- RR11b (runs 2 to 4): 500,000 rows in 18 s, publication 201.
+- RR11c, run 2: T1 (subscription/table OIDs 17525/17518) and T2 (17650/17643),
+  same `system_identifier`, subscribed at the same time: both had every table
+  `r` by the 16 s check and 500,000 rows. Run 3: T1 and T4, both
+  17650/17643 and the same `system_identifier`, with T2 (17527/17520)
+  alongside: T1 and T2 `r` by the 16 s check; T4 never reached `r` in the
+  10-minute bound, last state `f`, 500,000 rows. Run 4: T2 and T3, both
+  17650/17643 and the same `system_identifier`, with T1 (17531/17524)
+  alongside: T2 and T1 `r` at 16 s; T3 never reached `r` in the 10-minute
+  bound, state `f`, 500,000 rows.
+- RR11d: run 2, T3 (17650/17643) and then T4 (17533/17526); run 3, T3
+  (17525/17518) and then T5 (17651/17644). Each second target started after
+  the first of its pair had every table `r`, and created its subscription in
+  a session-pooler session that first ran `set log_statement = 'none'`, which
+  was accepted; the first targets used the query endpoint. All four `r` by
+  the 16 s check, 500,000 rows each. Neither pair's slot names, computed from
+  the OIDs, matched. Run 3 had a matching one-at-a-time candidate (T3 and T7,
+  both `rr11_t` 17518 and the same `system_identifier`), which that version's
+  selection skipped. Run 4: T4 and then T5, both 17650/17643 and the same
+  `system_identifier`, both in session-pooler sessions, only T5's running
+  `set log_statement = 'none'` first: T4 never reached `r` in its 10-minute
+  bound, so T5 started at the bound, and T5 never reached `r` in its own;
+  500,000 rows each.
+- RR11e: 1,000 rows inserted on the source; 30 s later run 2's T1-T4 and run
+  3's T1, T2, T3 and T5 held 501,000; run 3's T4 held 500,000, state `f`.
+  Run 4: T1, T2, T3 and T4 held 501,000, state `r`; T5 held 500,000, state
+  `f`.
+- RR11f, runs 2 and 3: `log_statement` `ddl`, read on one target per run.
+  Postgres log rows containing `create subscription`, last hour: run 2 T1, T2,
+  T3 one each, each with the password, T4 none; run 3 T1, T2, T3, T4 one
+  each, each with the password, T5 none. T4 (run 2) and T5 (run 3) ran `set
+  log_statement = 'none'` first and were also the only targets that used a
+  session-pooler session, so these two runs do not separate the setting from
+  the connection path. Run 4: `log_statement` `ddl` on every subscribed
+  target; T1, T2, T3 (query endpoint) and T4 (session pooler, no `set`) one
+  row each, each with the password; T5 (session pooler, `set` first) none,
+  with 422 Postgres log rows in the hour, so its logs were readable. Counts
+  only; no log text was printed.
+
+Reading RR10 and RR11 together:
+
+- Every new 17.11 project read here shared its `system_identifier` with
+  another (24 of 26 one value, 2 of 26 another), in one region and one org.
+- The slot names also need the subscription and table OIDs to match. After
+  the same setup steps, 10 of the 16 subscribed targets (RR10's A and B, RR11
+  runs 2 to 4) had subscription/table OIDs 17650/17643 and five other
+  combinations came up, so which projects would match was not known until
+  each project's table existed; on all 16 the subscription OID was the table
+  OID plus 7.
+- Three of three concurrent pairs with matching names left one target's
+  table in `f` at the end of its wait bound (40 minutes in RR10, 10 in RR11),
+  its count equal to the source's (RR10, RR11 runs 3 and 4). In RR10 and RR11 run 3 that target
+  still missed the rows written afterwards at the 30 s read; in run 4 that
+  target (T3) was `r` with 501,000 rows by RR11e, and the target missing rows
+  at the 30 s read was T5, from the one-at-a-time pair (next points). RR10
+  has log evidence of the collision (`already exists`, then `does not
+  exist`, both logged by S's walsender); RR11 searched no log for slot
+  errors (RR11f counted only `create subscription` rows), so its two are
+  inferred from the states and counts. Concurrent pairs whose OIDs differed
+  did not collide (RR11 run 2, and the controls in runs 3 and 4).
+- Postgres drops a table-sync slot when that table reaches sync-done
+  (tablesync.c, the sync-done branch, "Cleanup the tablesync slot"), so a
+  target started after every earlier target has every table `r` cannot meet
+  an earlier target's sync slot. That rests on the Postgres code and one
+  incidental case: in run 2, T3 (RR11d, 17650/17643) subscribed after T2
+  (RR11c, 17650/17643, the same `system_identifier`) had every table `r`,
+  and T3 was `r` by the 16 s check with 501,000 rows at RR11e. The designated
+  one-at-a-time pairs (runs 2 and 3) had different OIDs, and run 4's
+  matching pair started while an earlier matching target was stuck.
+- Run 4's states read as slot stealing (a reading of states; no log was
+  searched for slot errors): T3, stuck in `f` after RR11c, was `r` with
+  501,000 rows by RR11e; T4, which subscribed while T3 was stuck, never
+  reached `r` in its bound but was `r` by RR11e; T5, the last subscribed
+  target with the same values (T6 matched but was not subscribed), ended in
+  `f`. The
+  reading is that a stuck target keeps retrying, takes the next same-named
+  slot when it is created, finishes, drops it and strands the newer target.
+  One at a time therefore holds only while no earlier target with the same
+  values is stuck. A target that recovers this way would start from the newer
+  slot's point and miss writes made in between (inference; nothing was
+  written on the source in that window).
+- The `create subscription` statement, password included, reached the
+  target's Postgres log on every target that did not set `log_statement`
+  (11 of 11, runs 2 to 4); `set log_statement = 'none'` in the same session
+  first kept it out on 3 of 3. Run 4's T4 is the like-for-like control: the
+  same session-pooler path without the `set`, logged.
+
+Not measured in RR11: recovering a stuck table on purpose; one at a time with
+matching names and no stuck target beyond run 2's T2 then T3 (one instance);
+writes during a slot-steal window; `set log_statement` from the SQL Editor or
+the query endpoint; `alter subscription ... connection`; more than two
+concurrent targets with matching slot names; tables larger than 500,000 rows
+(about 0.5 GiB, scaled from RR10's 3.9 GiB for 4,000,000 rows; not read in
+RR11).
+
+## 2026-11-11 - RR12, a subscription between projects when the source has network restrictions on
+
+Question: the docs say network restrictions apply to all connection routes,
+pooled or direct (https://supabase.com/docs/guides/platform/network-restrictions),
+and that a database's outbound address "is not static and cannot be
+guaranteed" (https://supabase.com/docs/guides/platform/ipv4-address), both
+read 2026-11-11. Which address does a source see when another project's
+subscription connects to its direct host, is it the address the target's own
+db host resolves to, does allowing only that address let the subscription
+through, and what does a restriction do to a subscription already streaming?
+
+Shape: three throwaway projects on the Team org at the default compute size,
+ap-southeast-1: S on `postgres_engine: "15"` (15.19), T and T2 on the default
+(17.11). `rr12_t` with 1,000 rows on S, published; T subscribes over S's
+direct host (port 5432). DNS records are read from the orchestrator.
+Restrictions are applied with `POST /v1/projects/{ref}/network-restrictions/apply`;
+the documentation ranges 192.0.2.0/24 and 2001:db8::/32 stand for every other
+address. Addresses are recorded as roles (`<v6-T>`), not values. Row counts
+are polled every 5 s. Two runs on 2026-11-11; both artifacts name lab commit
+b339e99, which predates the module. Run 1 used an earlier version; the
+committed module is run 2's, with the RR12g query fixed after it (see RR12g).
+
+- run 1: `out/2026-11-11/run-2026-11-11T04-29-45-868Z.json`, 4 pass, 1 fail,
+  4 minutes: the run ended with `The operation timed out.` before RR12g (the
+  artifact records the error, not the step; by elimination it was RR12f's
+  call, which that version gave a 120 s client budget).
+- run 2: `out/2026-11-11/run-2026-11-11T04-34-58-170Z.json`, 5 pass, 4
+  minutes.
+
+- RR12a (both runs): S 15.19, T and T2 17.11; each db host had one AAAA
+  record and no A record.
+- RR12b (both): 1,000 rows and a publication on S, 201.
+- RR12c (both): with S open, T's `create subscription` returned 201 and T
+  held 1,000 rows at the first check. On S, `pg_stat_replication` listed
+  `rr12_sub_t` streaming, with `client_addr` the address T's own db host
+  resolves to (the text cast renders it `<v6-T>/128`).
+- RR12d (both): S restricted to 192.0.2.0/24 and 2001:db8::/32 (201). 20 s
+  later T's walsender was still on S, streaming, and 100 rows inserted on S
+  were on T at the first check. After T ran `alter subscription ... disable`,
+  waited 5 s and enabled it, 100 more rows inserted on S had not arrived 60 s
+  later (T held 1,100), S listed no walsender, and T's subscription worker
+  was running (a pid in `pg_stat_subscription`).
+- RR12e (both): S allowed 192.0.2.0/24 and `<v6-T>/128` only; `GET
+  network-restrictions` read `applied` with one entry in each list. T held
+  all 1,200 rows after 10 s (run 1) and 5 s (run 2), and S listed
+  `rr12_sub_t` from `<v6-T>/128` again.
+- RR12f: under RR12e's restriction T2 ran `create subscription` with
+  `connect_timeout=10` in the connection string. Run 1: the call had not
+  returned when the client gave up at 120 s. Run 2 (240 s client budget):
+  HTTP 400 after 120 s, `57014: canceling statement due to statement
+  timeout`. T2's AAAA differed from T's in run 2 (RR12f detail); run 1
+  recorded no comparison.
+- RR12g (both): no data. Run 1 ended before it; run 2's query named
+  `postgres_logs` as a table and the endpoint answered `Table
+  "postgres_logs" does not exist.` The module now queries `logs` with
+  `source = 'postgres_logs'`; not re-run.
+- RR12p (both): three projects deleted, 200 each.
+
+Reading RR12 (two runs):
+
+- A subscription from one project to another connected from the target's own
+  IPv6 address, the one `db.<target ref>.supabase.co` resolves to, and the
+  source's restriction judged that address. Allowing that address as a /128
+  in the IPv6 list let T's subscription through; T2's `create subscription`
+  under the same restriction did not complete (RR12f; that the restriction
+  blocked it is inference, as T2 was not tried with S open).
+- A walsender connection that was already streaming was still on S 20 s
+  after the restriction's apply call (two runs); whether the restriction was
+  in force by then was not read (RR12e is the only step that reads
+  `applied`). After T disabled and re-enabled its
+  subscription it did not reconnect: 100 rows inserted on S had not arrived
+  60 s later and S listed no walsender, while T's worker still had a pid. The
+  orchestrator read no error source (RR12g returned no data).
+- A blocked `create subscription` hung instead of failing at
+  `connect_timeout`: in run 2 a statement timeout ended it at 120 s. Why
+  `connect_timeout` did not apply was not checked.
+
+Not measured in RR12: a source with the IPv4 add-on (the docs say only IPv4
+CIDRs are needed then); whether a target's address changes on restart,
+resize, pause and restore or upgrade; a subscription through the session
+pooler; a walsender's survival under a restriction beyond 20 s; the
+subscriber's log lines for the blocked connection (RR12g); a target in
+another region.
+
 ## Not measured
 
 - Any primary region other than ap-northeast-1 (RR01, RR02) and

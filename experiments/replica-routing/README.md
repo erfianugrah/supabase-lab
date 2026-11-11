@@ -83,6 +83,21 @@ setup gate hunt) and `medium-serverless` (MS06: same-region replica).
 | RR10e | B: replica added after the initial copy; first session within 60 minutes or never; backups before and after |
 | RR10f | 1,000 rows inserted on S after both syncs: counts on A, A's replica, B and B's replica |
 | RR10p | teardown: subscriptions, replicas, projects |
+| RR11a | a source on `postgres_engine` 15 and seven targets on the default 17, default size: `system_identifier` and the table OID on each |
+| RR11b | source: 500,000 rows of ~1 KB loaded through the query endpoint, publication |
+| RR11c | two targets with the same `system_identifier` and table OID subscribe at the same time, with a differing target alongside as a control |
+| RR11d | two more targets subscribe one after the other (every table `r`, or the 10-minute bound, first), a second matching pair when there is one; both in session-pooler sessions, only the second first runs `set log_statement = 'none'` |
+| RR11e | 1,000 rows inserted on the source: counts on every subscribed target 30 s later |
+| RR11f | per subscribed target: `log_statement`, Postgres log rows containing `create subscription`, how many hold the password, and all Postgres log rows in the hour (counts only) |
+| RR11p | teardown |
+| RR12a | a source on `postgres_engine` 15 and targets T and T2 on the default 17, default size: A and AAAA records of each db host |
+| RR12b | source: 1,000 rows and a publication |
+| RR12c | source open: T subscribes over the source's direct host; the address the source's `pg_stat_replication` shows for T, against T's db host records |
+| RR12d | source restricted to documentation ranges: T's streaming walsender after 20 s, rows before and after T disables and enables its subscription |
+| RR12e | source allows only the address RR12c saw: seconds until T catches up |
+| RR12f | T2 runs `create subscription` (`connect_timeout=10`) under RR12e's restriction |
+| RR12g | T's and T2's Postgres log lines about the connection to the publisher |
+| RR12p | teardown |
 
 The node that served a request is read from `public.rr_whoami()`
 (`pg_is_in_recovery()`, postmaster start time) called as a GET, not inferred
@@ -101,8 +116,10 @@ PVLAB_ORG_PRO=<pro-org-slug> make run-rr07 ZONE=<zone>   # RR07; run `bun instal
 PVLAB_ORG_PRO=<pro-org-slug> make run-rr08   # RR08, 48 and 49 minutes on 2026-10-28 (before a 5-minute wait per PUT was removed)
 PVLAB_ORG_TEAM=<team-org-slug> make run-rr09 DOMAIN=<host>   # RR09, 24 minutes on 2026-11-09 (run 3, PVLAB_RR9_PHASES=logs,cold,hog, not recorded in the artifact); Makefile header lists the knobs
 PVLAB_ORG_TEAM=<team-org-slug> make run-rr10   # RR10, 116 minutes on 2026-11-10 (A's sync ran to the 40-minute bound); Makefile header lists the knobs
+PVLAB_ORG_TEAM=<team-org-slug> make run-rr11   # RR11, 32 minutes on 2026-11-10 (run 4, the committed version, waited out three 10-minute bounds); eight projects at the default size
+PVLAB_ORG_TEAM=<team-org-slug> make run-rr12   # RR12, 4 minutes on 2026-11-11; three projects at the default size
 make leftovers        # nothing named rr-* should print
-make facts RUN=evidence/<ts>/run-<stamp>.json        # ONLY=RR02 for an RR02 run (RR03, RR04, RR08 likewise)
+make facts RUN=evidence/<ts>/run-<stamp>.json        # ONLY=RR02 for an RR02 run (RR03, RR04, RR06 to RR12 likewise)
 make publish RUN=evidence/<ts>/run-<stamp>.json
 ```
 

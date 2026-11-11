@@ -4656,7 +4656,7 @@ projects (feature battery, two conversion probes), all `small`,
   cannot call them), so the blog's "tracked" is untested for the dashboard;
   `migration_version`; the dashboard merge-request screen.
 
-## experiments/replica-routing - key facts (validated 2026-10-10, Pro org; RR02 2026-10-23, two runs; RR03 and RR04 2026-10-26, two runs each; RR06 and RR08 2026-10-28, two runs each; RR07 2026-10-28, three runs; RR09 2026-11-09, Team org, three runs, one complete; RR10 2026-11-10, Team org, one run)
+## experiments/replica-routing - key facts (validated 2026-10-10, Pro org; RR02 2026-10-23, two runs; RR03 and RR04 2026-10-26, two runs each; RR06 and RR08 2026-10-28, two runs each; RR07 2026-10-28, three runs; RR09 2026-11-09, Team org, three runs, one complete; RR10 2026-11-10, Team org, one run; RR11 2026-11-10, Team org, four runs, three past RR11a; RR12 2026-11-11, Team org, two runs)
 
 - **The API load balancer's host is `<ref>-all.supabase.co` and the Management
   API does not return it** (RR01e, 2026-10-10): the Dashboard route
@@ -4908,20 +4908,52 @@ projects (feature battery, two conversion probes), all `small`,
   recorded). Both replicas that followed a large write logged `No space left
   on device` on the replica, then `terminating any other active server
   processes` (hand read, `out/2026-11-10/rr10-manual-reads.md`).
-- **New 17.11 projects share one `system_identifier`** (7703759698107299042 on
-  3 of 3 read, RR10 hand read), and identical setup steps give identical OIDs,
-  so two new targets syncing the same table from one source at once compute
-  the same tablesync slot name (`pg_<sub oid>_sync_<relid>_<sysid>`) on the
-  source. In RR10 the slot was gone from 09:34:54 UTC, after B's sync had
-  finished (by the 108 s sample; that B's cleanup dropped it is inference from
-  the timing). A's table never reached `r` (A's tablesync worker exited with
-  code 1 about every 5 s; S's walsender logged `replication slot ... does not
-  exist` on the same cadence), its apply worker stayed up, its count matched
-  (4,000,000), and 30 s after 1,000 more rows were written on S it still held
-  4,000,000 (RR10f, the last read before teardown). Check `pg_subscription_rel`
-  for all `r` and a marker row, never counts alone. In RR10, A's Postgres log
-  held the `create subscription` statement with the connection password in
-  plain text (one hand read; `log_statement` not read).
+- **Every new 17.11 project read shared its `system_identifier` with
+  another** (24 of 26 reported 7703759698107299042 and 2 reported
+  7703760980994770283, 2026-11-10; RR10 hand read, RR11a runs 1-4; RR11's
+  projects and RR10's A and B in ap-southeast-1 on one Team org, default size
+  or Small). Postgres names a table-sync slot
+  `pg_<subscription oid>_sync_<table oid>_<system identifier>`, all three
+  read on the subscriber, so two new targets whose identifier and OIDs match
+  (subscription/table OIDs 17650/17643 on 10 of 16 subscribed targets,
+  RR10's A and B and RR11 runs 2-4; five other combinations; the
+  subscription OID was the table OID plus 7 on all 16) compute the same slot
+  name on the source. Three of three concurrent pairs with matching names
+  left one target's table in `f` with its count equal (RR10, RR11c runs 3
+  and 4); in RR10 (apply worker up, RR10f) and RR11 run 3 (RR11e) it still
+  missed rows written afterwards 30 s later, while run 4's (T3) was `r` with
+  501,000 rows by RR11e. RR10's S walsender logged `already exists`, then
+  `does not exist`; RR11 searched no log for slot errors. Concurrent pairs
+  whose OIDs differed did not collide (RR11 run 2, the controls in runs 3
+  and 4). Postgres drops a table-sync slot at sync-done, so starting a target
+  only after every earlier one has every table `r` should avoid it (Postgres
+  code, and once in RR11 run 2: T3 after T2, both 17650/17643), but only
+  while no earlier target with the same values is stuck: in RR11 run 4 a
+  stuck target's states read as it taking the next same-named slot,
+  recovering, and stranding the newer target (states; no log searched). Check `pg_subscription_rel`
+  for all `r` and a marker row, never counts alone.
+- **`create subscription` lands in the subscriber's Postgres log with the
+  password** with `log_statement` `ddl` (read on 7 of the 14 subscribed
+  targets: one each in runs 2 and 3, all five in run 4); 11 of 11 targets
+  without a `set` logged it (RR11f runs 2-4; counts only); `set log_statement = 'none'` in the
+  same session first kept it out (3 of 3; run 4's like-for-like control
+  through the same session-pooler path without the `set` was logged).
+- **A subscription from one project to another connected from the target's
+  own IPv6** (RR12, 2026-11-11, two runs, ap-southeast-1, one Team org, S on
+  15.19, targets on 17.11): the source's `pg_stat_replication` showed in
+  `client_addr` the address `db.<target ref>.supabase.co` resolves to (the
+  text cast renders it as a /128; all three db hosts had an AAAA record and
+  no A record). An already-streaming walsender was still on the source 20 s
+  after the restriction's apply call (in force not read), but after T disabled and re-enabled
+  its subscription, none of 100 rows inserted on the source arrived in 60 s
+  and the source listed no walsender; allowing only the target's /128 in the
+  IPv6 list let it catch up in 5-10 s. A second project's (T2's) `create
+  subscription`, run while the source allowed only T's /128, hung until T2
+  cancelled it with a statement timeout at 120 s (run 2; run 1's client gave
+  up at 120 s), despite `connect_timeout=10`. Not run: a source with the
+  IPv4 add-on; a target in another region; a subscription through the
+  session pooler; a walsender beyond 20 s; whether the target's address
+  changes on restart, resize, pause and restore or upgrade.
 
 ## experiments/scoped-pats - key facts (SP01-SP10, validated 2026-10-10)
 
