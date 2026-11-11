@@ -98,6 +98,15 @@ setup gate hunt) and `medium-serverless` (MS06: same-region replica).
 | RR12f | T2 runs `create subscription` (`connect_timeout=10`) under RR12e's restriction |
 | RR12g | T's and T2's Postgres log lines about the connection to the publisher |
 | RR12p | teardown |
+| RR13a | as RR12a plus the IPv4 add-on on the source; source records polled with `dig` until it has an A and no AAAA |
+| RR13b | source: 1,000 rows and a publication |
+| RR13c | T subscribes, then T2 once T has every table `r`; the addresses the source's `pg_stat_replication` shows for each |
+| RR13c2 | the source's walsenders and xid holders while each create runs; a logical slot created directly on the source |
+| RR13c3 | each target's pg_net request to an IP echo service, against the address the source saw |
+| RR13d | source allows only T's address (/32): which targets catch up after both disable and re-enable their subscriptions |
+| RR13f | T restarted through the API under RR13d's restriction: does it reconnect, from which address |
+| RR13e | source restricted to documentation ranges: T after a reconnect (control) |
+| RR13p | teardown |
 
 The node that served a request is read from `public.rr_whoami()`
 (`pg_is_in_recovery()`, postmaster start time) called as a GET, not inferred
@@ -118,8 +127,9 @@ PVLAB_ORG_TEAM=<team-org-slug> make run-rr09 DOMAIN=<host>   # RR09, 24 minutes 
 PVLAB_ORG_TEAM=<team-org-slug> make run-rr10   # RR10, 116 minutes on 2026-11-10 (A's sync ran to the 40-minute bound); Makefile header lists the knobs
 PVLAB_ORG_TEAM=<team-org-slug> make run-rr11   # RR11, 32 minutes on 2026-11-10 (run 4, the committed version, waited out three 10-minute bounds); eight projects at the default size
 PVLAB_ORG_TEAM=<team-org-slug> make run-rr12   # RR12, 4 minutes on 2026-11-11; three projects at the default size
+PVLAB_ORG_TEAM=<team-org-slug> make run-rr13   # RR13, 6 minutes on 2026-11-11 (run 3); three projects at the default size, IPv4 add-on on the source
 make leftovers        # nothing named rr-* should print
-make facts RUN=evidence/<ts>/run-<stamp>.json        # ONLY=RR02 for an RR02 run (RR03, RR04, RR06 to RR12 likewise)
+make facts RUN=evidence/<ts>/run-<stamp>.json        # ONLY=RR02 for an RR02 run (RR03, RR04, RR06 to RR13 likewise)
 make publish RUN=evidence/<ts>/run-<stamp>.json
 ```
 

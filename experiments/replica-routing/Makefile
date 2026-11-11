@@ -12,7 +12,7 @@
 ROOT := $(abspath ../..)
 TS := $(shell date +%Y%m%d-%H%M%S)
 
-.PHONY: run run-rr02 run-rr03 run-rr04 run-rr06 run-rr07 run-rr08 run-rr09 run-rr10 run-rr11 run-rr12 facts publish list
+.PHONY: run run-rr02 run-rr03 run-rr04 run-rr06 run-rr07 run-rr08 run-rr09 run-rr10 run-rr11 run-rr12 run-rr13 facts publish list
 
 # RR02: re-routing on a lagging or unhealthy replica, non-REST traffic through
 # the load balancer. Same billing shape as RR01; 24 and 33 minutes in the
@@ -154,6 +154,15 @@ run-rr12:
 	@test -n "$(PVLAB_ORG_TEAM)$(PVLAB_RR12_ORG_ROLE)" || (echo "PVLAB_ORG_TEAM not set" && exit 1)
 	cd $(ROOT) && bun harness/src/run.ts --where local --tests experiments/replica-routing/tests \
 	  --experiment replica-routing --only RR12 --destructive \
+	  --out experiments/replica-routing/evidence/$(TS)
+
+# RR13: RR12 with the IPv4 add-on on the source. Three projects at the default
+# size; the add-on is billable while on (S's lifetime here). Knobs: PVLAB_RR13_REGION
+# (ap-southeast-1), PVLAB_RR13_ORG_ROLE (team), PVLAB_RR_KEEP=1.
+run-rr13:
+	@test -n "$(PVLAB_ORG_TEAM)$(PVLAB_RR13_ORG_ROLE)" || (echo "PVLAB_ORG_TEAM not set" && exit 1)
+	cd $(ROOT) && bun harness/src/run.ts --where local --tests experiments/replica-routing/tests \
+	  --experiment replica-routing --only RR13 --destructive \
 	  --out experiments/replica-routing/evidence/$(TS)
 
 run:
