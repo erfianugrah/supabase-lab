@@ -12,7 +12,7 @@
 ROOT := $(abspath ../..)
 TS := $(shell date +%Y%m%d-%H%M%S)
 
-.PHONY: run run-rr02 run-rr03 run-rr04 run-rr06 run-rr07 run-rr08 run-rr09 run-rr10 facts publish list
+.PHONY: run run-rr02 run-rr03 run-rr04 run-rr06 run-rr07 run-rr08 run-rr09 run-rr10 run-rr11 run-rr12 facts publish list
 
 # RR02: re-routing on a lagging or unhealthy replica, non-REST traffic through
 # the load balancer. Same billing shape as RR01; 24 and 33 minutes in the
@@ -132,6 +132,28 @@ run-rr10:
 	@test -n "$(PVLAB_ORG_TEAM)$(PVLAB_RR10_ORG_ROLE)" || (echo "PVLAB_ORG_TEAM not set" && exit 1)
 	cd $(ROOT) && bun harness/src/run.ts --where local --tests experiments/replica-routing/tests \
 	  --experiment replica-routing --only RR10 --destructive \
+	  --out experiments/replica-routing/evidence/$(TS)
+
+# RR11: tablesync slot names when several new 17 projects subscribe to one
+# source. Eight projects at the default size (one source on postgres_engine 15,
+# seven targets); 32 minutes on 2026-11-10 (run 4, three 10-minute bounds
+# waited out). Knobs: PVLAB_RR11_ROWS (500000), PVLAB_RR11_SYNC_MIN (10),
+# PVLAB_RR11_REGION (ap-southeast-1), PVLAB_RR11_ORG_ROLE (team), PVLAB_RR_KEEP=1.
+run-rr11:
+	@test -n "$(PVLAB_ORG_TEAM)$(PVLAB_RR11_ORG_ROLE)" || (echo "PVLAB_ORG_TEAM not set" && exit 1)
+	cd $(ROOT) && bun harness/src/run.ts --where local --tests experiments/replica-routing/tests \
+	  --experiment replica-routing --only RR11 --destructive \
+	  --out experiments/replica-routing/evidence/$(TS)
+
+# RR12: a subscription between projects when the source has network
+# restrictions on. Three projects at the default size (a source on
+# postgres_engine 15, two targets); 4 minutes on 2026-11-11. Knobs:
+# PVLAB_RR12_REGION (ap-southeast-1), PVLAB_RR12_ORG_ROLE (team),
+# PVLAB_RR12_F_BUDGET_S (240), PVLAB_RR_KEEP=1.
+run-rr12:
+	@test -n "$(PVLAB_ORG_TEAM)$(PVLAB_RR12_ORG_ROLE)" || (echo "PVLAB_ORG_TEAM not set" && exit 1)
+	cd $(ROOT) && bun harness/src/run.ts --where local --tests experiments/replica-routing/tests \
+	  --experiment replica-routing --only RR12 --destructive \
 	  --out experiments/replica-routing/evidence/$(TS)
 
 run:
