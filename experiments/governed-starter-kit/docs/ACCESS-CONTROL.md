@@ -23,7 +23,7 @@ Checked against the live docs and pricing page on 2026-10-07.
 | Org MFA enforcement | Pro, Team and Enterprise | https://supabase.com/docs/guides/platform/mfa/org-mfa-enforcement ("MFA enforcement is only available on the Pro, Team and Enterprise plans") |
 | Platform audit logs | Team and Enterprise | https://supabase.com/docs/guides/security/platform-audit-logs ("only available on the Team and Enterprise plans"); pricing "Platform Audit Logs" row |
 | Audit log drains | NOT CONFIRMED - the audit-logs page links to them without naming a plan; project log drains are Pro, Team and Enterprise | https://supabase.com/docs/guides/security/platform-audit-logs, https://supabase.com/docs/guides/telemetry/log-drains |
-| Member role management by API | Enterprise only per the spec (not measured on an org with the entitlement enabled): v2 role and invitation writes carry `x-allowed-plans: ["Enterprise"]`; v1 has no member write | https://api.supabase.com/api/v2-json, https://api.supabase.com/api/v1-json (see below) |
+| Member role management by API | Team and Enterprise per the spec read 2026-11-12 (Enterprise only when read on 2026-10-07): v2 role and invitation writes carry `x-allowed-plans`; platform-facts F08b (2026-11-12) measured a Team org past the invitation-delete plan check and Pro and Free orgs refused with 402; the role PATCH is not measured on any org; v1 has no member write | https://api.supabase.com/api/v2-json, https://api.supabase.com/api/v1-json (see below) |
 
 SSO note: the pricing page is inconsistent. The Team plan card lists "SSO
 for Supabase Dashboard", while the comparison table's "SSO" row (under
@@ -202,8 +202,12 @@ endpoints are database access, not org membership. v2
 (https://api.supabase.com/api/v2-json) adds
 `PATCH /v2/organizations/{slug}/members/{user_id}/roles` and
 `POST /v2/organizations/{slug}/members/invitations`, both with
-`x-allowed-plans: ["Enterprise"]`. Not measured on an Enterprise org. The
-README's "no Management API for member roles on Pro or Team" stands.
+`x-allowed-plans: ["Enterprise"]` when read on 2026-10-07 and
+`["Team","Enterprise"]` on 2026-11-12. Not measured on an Enterprise org; on
+2026-11-12 platform-facts F08b measured a Team org past the invitation-delete
+plan check. The README's "no Management API for member roles on Pro or Team"
+now holds for Pro only; for Team the spec and F08b disagree with it, and the
+role PATCH itself is not measured.
 
 - [ ] Owner account has MFA enrolled (two authenticator apps, per the docs)
       before anything else in this list.
