@@ -1,0 +1,118 @@
+{
+  "startedAt": "2026-11-12T03:44:04.335Z",
+  "finishedAt": "2026-11-12T03:47:22.132Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "auth-providers",
+  "labCommit": "d41d9cd",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "AU05a-W",
+      "title": "AU05a-W: stored cap and creates before any Auth config write",
+      "status": "info",
+      "detail": "custom_oauth_max_providers 3; created 3, then 400:over_custom_provider_quota",
+      "measurements": {
+        "arm": "W",
+        "cap_config_before": "3",
+        "created_before_refusal": 3,
+        "refusal": "400:over_custom_provider_quota",
+        "ready_s": 12
+      },
+      "evidence": "201 201 201 400:over_custom_provider_quota",
+      "durationMs": 197796
+    },
+    {
+      "id": "AU05a-C",
+      "title": "AU05a-C: stored cap and creates before any Auth config write",
+      "status": "info",
+      "detail": "custom_oauth_max_providers 3; created 3, then 400:over_custom_provider_quota",
+      "measurements": {
+        "arm": "C",
+        "cap_config_before": "3",
+        "created_before_refusal": 3,
+        "refusal": "400:over_custom_provider_quota",
+        "ready_s": 12
+      },
+      "evidence": "201 201 201 400:over_custom_provider_quota",
+      "durationMs": 197796
+    },
+    {
+      "id": "AU05b-W",
+      "title": "AU05b-W: PATCH /config/auth (site_url only), then the stored cap",
+      "status": "info",
+      "detail": "HTTP 200; custom_oauth_max_providers 32767",
+      "measurements": {
+        "patch_status": 200,
+        "cap_config_after_patch": "32767"
+      },
+      "durationMs": 197796
+    },
+    {
+      "id": "AU05c-W",
+      "title": "AU05c-W: retries of the refused create, every 15 s for up to 180 s from the PATCH request",
+      "status": "info",
+      "detail": "accepted on the retry sent 15 s after the PATCH request; custom_oauth_max_providers now 32767",
+      "measurements": {
+        "arm": "W",
+        "accepted_at_s": 15,
+        "retries": 1,
+        "cap_config_end": "32767"
+      },
+      "evidence": "15s:201",
+      "durationMs": 197796
+    },
+    {
+      "id": "AU05c-C",
+      "title": "AU05c-C: retries of the refused create, every 15 s for up to 180 s from the PATCH request",
+      "status": "info",
+      "detail": "still refused at 180 s; custom_oauth_max_providers now 3",
+      "measurements": {
+        "arm": "C",
+        "accepted_at_s": -1,
+        "retries": 12,
+        "cap_config_end": "3"
+      },
+      "evidence": "15s:400:over_custom_provider_quota 30s:400:over_custom_provider_quota 45s:400:over_custom_provider_quota 61s:400:over_custom_provider_quota 76s:400:over_custom_provider_quota 91s:400:over_custom_provider_quota 106s:400:over_custom_provider_quota 121s:400:over_custom_provider_quota 136s:400:over_custom_provider_quota 151s:400:over_custom_provider_quota 166s:400:over_custom_provider_quota 181s:400:over_custom_provider_quota",
+      "durationMs": 197796
+    },
+    {
+      "id": "AU05d-W",
+      "title": "AU05d-W: create on to 8 providers after the write",
+      "status": "info",
+      "detail": "total 8, then none",
+      "measurements": {
+        "total_providers": 8,
+        "refusal_after": "none"
+      },
+      "evidence": "201 201 201 201",
+      "durationMs": 197796
+    },
+    {
+      "id": "AU05-teardown-W",
+      "title": "AU05: delete throwaway project",
+      "status": "info",
+      "detail": "HTTP 200",
+      "measurements": {
+        "delete_status": 200
+      },
+      "durationMs": 197796
+    },
+    {
+      "id": "AU05-teardown-C",
+      "title": "AU05: delete throwaway project",
+      "status": "info",
+      "detail": "HTTP 200",
+      "measurements": {
+        "delete_status": 200
+      },
+      "durationMs": 197796
+    }
+  ]
+}

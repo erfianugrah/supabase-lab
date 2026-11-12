@@ -1,0 +1,274 @@
+{
+  "startedAt": "2026-11-12T03:44:01.588Z",
+  "finishedAt": "2026-11-12T03:44:03.981Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "platform-facts",
+  "labCommit": "d41d9cd",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.6",
+    "pgbench": "pgbench (PostgreSQL) 18.6",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "F01-<ref>",
+      "title": "Entitlements: <ref>",
+      "status": "info",
+      "detail": "plan=pro, 64 features listed",
+      "measurements": {
+        "plan": "pro",
+        "status": 200,
+        "features_listed": 64,
+        "project_scoped_roles": "no",
+        "member_roles": "Administrator|Developer|Owner",
+        "audit_logs_days": "0 days",
+        "log_retention_days": "7 days",
+        "backup_retention_days": "7 days",
+        "sso": "no",
+        "audit_log_drains": "no",
+        "function_max_count": "1000 functions",
+        "function_size_limit_mb": "20 MB",
+        "project_pausing": "no",
+        "api_members_roles": "no",
+        "api_members_invitations": "no",
+        "custom_oauth_max_providers": "unlimited",
+        "backup_schedule": "no"
+      },
+      "evidence": "{\n  \"entitlements\": [\n    {\n      \"feature\": {\n        \"key\": \"instances.compute_update_available_sizes\",\n        \"type\": \"set\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"set\",\n      \"config\": {\n        \"enabled\": true,\n        \"set\": [\n          \"micro\",\n          \"small\",\n          \"medium\",\n          \"large\",\n          \"xlarge\",\n          \"2xlarge\",\n          \"4xlarge\",\n          \"8xlarge\",\n          \"12xlarge\",\n          \"16xlarge\"\n        ]\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"instances.read_replicas\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": true\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"instances.disk_modifications\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": true\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"instances.high_availability\",\n        \"type\": \"numeric\"\n      },\n      \"hasAccess\": false,\n      \"type\": \"numeric\",\n      \"config\": {\n        \"enabled\": false,\n        \"value\": 1000,\n        \"unlimited\": false,\n        \"unit\": \"projects\"\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"instances.orioledb\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": true\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"replication.etl\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": true\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"storage.max_file_size\",\n        \"type\": \"numeric\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"numeric\",\n      \"config\": {\n        \"enabled\": true,\n        \"value\": 536870912000,\n        \"unlimited\": false,\n        \"unit\": \"byte\"\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"storage.max_file_size.configurable\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": true\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"storage.iceberg_catalog\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": true\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"storage.image_transformations\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": true\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"storage.vector_buckets\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": false,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": false\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"storage.purge_cache\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": true\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"security.audit_logs_days\",\n        \"type\": \"numeric\"\n      },\n      \"hasAccess\": false,\n      \"type\": \"numeric\",\n      \"config\": {\n        \"enabled\": false,\n        \"value\": 0,\n        \"unlimited\": false,\n        \"unit\": \"days\"\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"security.soc2_report\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": false,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": false\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"security.iso27001_certificate\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": false,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": false\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"security.questionnaire\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": false,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": false\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"security.enforce_mfa\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": true\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"log.retention_days\",\n        \"type\": \"numeric\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"numeric\",\n      \"config\": {\n        \"enabled\": true,\n        \"value\": 7,\n        \"unlimited\": false,\n        \"unit\": \"days\"\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"custom_domain\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": true\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"vanity_subdomain\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": true\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"ipv4\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": true\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"pitr.available_variants\",\n        \"type\": \"set\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"set\",\n      \"config\": {\n        \"enabled\": true,\n        \"set\": [\n          \"pitr_7\",\n          \"pitr_14\",\n          \"pitr_28\"\n        ]\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"log_drains\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": true\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"audit_log_drains\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": false,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": false\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"branching_persistent\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": true\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"branching_limit\",\n        \"type\": \"numeric\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"numeric\",\n      \"config\": {\n        \"enabled\": true,\n        \"value\": 50,\n        \"unlimited\": false,\n        \"unit\": \"branches\"\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"auth.mfa_phone\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": true\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"auth.mfa_web_authn\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": true\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"auth.mfa_enhanced_security\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": true\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"auth.hooks\",\n        \"type\": \"set\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"set\",\n      \"config\": {\n        \"enabled\": true,\n        \"set\": [\n          \"HOOK_CUSTOM_ACCESS_TOKEN\",\n          \"HOOK_SEND_SMS\",\n          \"HOOK_SEND_EMAIL\",\n          \"HOOK_BEFORE_USER_CREATED\",\n          \"HOOK_AFTER_USER_CREATED\"\n        ]\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"auth.platform.sso\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": false,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": false\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"auth.custom_jwt_template\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": true\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"auth.saml_2\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": true\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"auth.user_sessions\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": true\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"auth.leaked_password_protection\",\n ",
+      "durationMs": 566
+    },
+    {
+      "id": "F01-<ref>",
+      "title": "Entitlements: <ref>",
+      "status": "info",
+      "detail": "plan=team, 64 features listed",
+      "measurements": {
+        "plan": "team",
+        "status": 200,
+        "features_listed": 64,
+        "project_scoped_roles": "yes",
+        "member_roles": "Administrator|Developer|Owner|Read-only|None",
+        "audit_logs_days": "62 days",
+        "log_retention_days": "28 days",
+        "backup_retention_days": "14 days",
+        "sso": "yes",
+        "audit_log_drains": "yes",
+        "function_max_count": "2000 functions",
+        "function_size_limit_mb": "20 MB",
+        "project_pausing": "no",
+        "api_members_roles": "yes",
+        "api_members_invitations": "yes",
+        "custom_oauth_max_providers": "unlimited",
+        "backup_schedule": "no"
+      },
+      "evidence": "{\n  \"entitlements\": [\n    {\n      \"feature\": {\n        \"key\": \"instances.compute_update_available_sizes\",\n        \"type\": \"set\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"set\",\n      \"config\": {\n        \"enabled\": true,\n        \"set\": [\n          \"micro\",\n          \"small\",\n          \"medium\",\n          \"large\",\n          \"xlarge\",\n          \"2xlarge\",\n          \"4xlarge\",\n          \"8xlarge\",\n          \"12xlarge\",\n          \"16xlarge\"\n        ]\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"instances.read_replicas\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": true\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"instances.disk_modifications\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": true\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"instances.high_availability\",\n        \"type\": \"numeric\"\n      },\n      \"hasAccess\": false,\n      \"type\": \"numeric\",\n      \"config\": {\n        \"enabled\": false,\n        \"value\": 1000,\n        \"unlimited\": false,\n        \"unit\": \"projects\"\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"instances.orioledb\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": true\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"replication.etl\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": true\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"storage.max_file_size\",\n        \"type\": \"numeric\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"numeric\",\n      \"config\": {\n        \"enabled\": true,\n        \"value\": 536870912000,\n        \"unlimited\": false,\n        \"unit\": \"byte\"\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"storage.max_file_size.configurable\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": true\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"storage.iceberg_catalog\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": true\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"storage.image_transformations\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": true\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"storage.vector_buckets\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": false,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": false\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"storage.purge_cache\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": true\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"security.audit_logs_days\",\n        \"type\": \"numeric\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"numeric\",\n      \"config\": {\n        \"enabled\": true,\n        \"value\": 62,\n        \"unlimited\": false,\n        \"unit\": \"days\"\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"security.soc2_report\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": true\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"security.iso27001_certificate\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": true\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"security.questionnaire\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": true\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"security.enforce_mfa\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": true\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"log.retention_days\",\n        \"type\": \"numeric\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"numeric\",\n      \"config\": {\n        \"enabled\": true,\n        \"value\": 28,\n        \"unlimited\": false,\n        \"unit\": \"days\"\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"custom_domain\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": true\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"vanity_subdomain\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": true\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"ipv4\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": true\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"pitr.available_variants\",\n        \"type\": \"set\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"set\",\n      \"config\": {\n        \"enabled\": true,\n        \"set\": [\n          \"pitr_7\",\n          \"pitr_14\",\n          \"pitr_28\"\n        ]\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"log_drains\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": true\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"audit_log_drains\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": true\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"branching_persistent\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": true\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"branching_limit\",\n        \"type\": \"numeric\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"numeric\",\n      \"config\": {\n        \"enabled\": true,\n        \"value\": 50,\n        \"unlimited\": false,\n        \"unit\": \"branches\"\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"auth.mfa_phone\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": true\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"auth.mfa_web_authn\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": true\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"auth.mfa_enhanced_security\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": true\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"auth.hooks\",\n        \"type\": \"set\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"set\",\n      \"config\": {\n        \"enabled\": true,\n        \"set\": [\n          \"HOOK_CUSTOM_ACCESS_TOKEN\",\n          \"HOOK_SEND_SMS\",\n          \"HOOK_SEND_EMAIL\",\n          \"HOOK_BEFORE_USER_CREATED\",\n          \"HOOK_AFTER_USER_CREATED\",\n          \"HOOK_MFA_VERIFICATION_ATTEMPT\",\n          \"HOOK_PASSWORD_VERIFICATION_ATTEMPT\"\n        ]\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"auth.platform.sso\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": true\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"auth.custom_jwt_template\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": true\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"auth.password_hibp\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": true\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"auth.saml_2\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": true\n      }\n  ",
+      "durationMs": 566
+    },
+    {
+      "id": "F01-<ref>",
+      "title": "Entitlements: <ref>",
+      "status": "info",
+      "detail": "plan=free, 64 features listed",
+      "measurements": {
+        "plan": "free",
+        "status": 200,
+        "features_listed": 64,
+        "project_scoped_roles": "no",
+        "member_roles": "Administrator|Developer|Owner",
+        "audit_logs_days": "0 days",
+        "log_retention_days": "1 days",
+        "backup_retention_days": "0 days",
+        "sso": "no",
+        "audit_log_drains": "no",
+        "function_max_count": "100 functions",
+        "function_size_limit_mb": "20 MB",
+        "project_pausing": "yes",
+        "api_members_roles": "no",
+        "api_members_invitations": "no",
+        "custom_oauth_max_providers": "3 providers",
+        "backup_schedule": "no"
+      },
+      "evidence": "{\n  \"entitlements\": [\n    {\n      \"feature\": {\n        \"key\": \"instances.compute_update_available_sizes\",\n        \"type\": \"set\"\n      },\n      \"hasAccess\": false,\n      \"type\": \"set\",\n      \"config\": {\n        \"enabled\": false,\n        \"set\": []\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"instances.read_replicas\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": false,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": false\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"instances.disk_modifications\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": false,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": false\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"instances.high_availability\",\n        \"type\": \"numeric\"\n      },\n      \"hasAccess\": false,\n      \"type\": \"numeric\",\n      \"config\": {\n        \"enabled\": false,\n        \"value\": 1000,\n        \"unlimited\": false,\n        \"unit\": \"projects\"\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"instances.orioledb\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": true\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"replication.etl\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": false,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": false\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"storage.max_file_size\",\n        \"type\": \"numeric\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"numeric\",\n      \"config\": {\n        \"enabled\": true,\n        \"value\": 52428800,\n        \"unlimited\": false,\n        \"unit\": \"byte\"\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"storage.max_file_size.configurable\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": false,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": false\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"storage.iceberg_catalog\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": false,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": false\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"storage.image_transformations\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": false,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": false\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"storage.vector_buckets\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": false,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": false\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"storage.purge_cache\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": false,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": false\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"security.audit_logs_days\",\n        \"type\": \"numeric\"\n      },\n      \"hasAccess\": false,\n      \"type\": \"numeric\",\n      \"config\": {\n        \"enabled\": false,\n        \"value\": 0,\n        \"unlimited\": false,\n        \"unit\": \"days\"\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"security.soc2_report\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": false,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": false\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"security.iso27001_certificate\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": false,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": false\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"security.questionnaire\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": false,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": false\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"security.enforce_mfa\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": false,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": false\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"log.retention_days\",\n        \"type\": \"numeric\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"numeric\",\n      \"config\": {\n        \"enabled\": true,\n        \"value\": 1,\n        \"unlimited\": false,\n        \"unit\": \"days\"\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"custom_domain\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": false,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": false\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"vanity_subdomain\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": false,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": false\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"ipv4\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": false,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": false\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"pitr.available_variants\",\n        \"type\": \"set\"\n      },\n      \"hasAccess\": false,\n      \"type\": \"set\",\n      \"config\": {\n        \"enabled\": false,\n        \"set\": []\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"log_drains\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": false,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": false\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"audit_log_drains\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": false,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": false\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"branching_persistent\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": false,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": false\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"branching_limit\",\n        \"type\": \"numeric\"\n      },\n      \"hasAccess\": false,\n      \"type\": \"numeric\",\n      \"config\": {\n        \"enabled\": false,\n        \"value\": 0,\n        \"unlimited\": false,\n        \"unit\": \"branches\"\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"auth.mfa_phone\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": false,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": false\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"auth.mfa_web_authn\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": false,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": false\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"auth.mfa_enhanced_security\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": true\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"auth.hooks\",\n        \"type\": \"set\"\n      },\n      \"hasAccess\": true,\n      \"type\": \"set\",\n      \"config\": {\n        \"enabled\": true,\n        \"set\": [\n          \"HOOK_CUSTOM_ACCESS_TOKEN\",\n          \"HOOK_SEND_SMS\",\n          \"HOOK_SEND_EMAIL\",\n          \"HOOK_BEFORE_USER_CREATED\",\n          \"HOOK_AFTER_USER_CREATED\"\n        ]\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"auth.platform.sso\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": false,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": false\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"auth.custom_jwt_template\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": false,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": false\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"auth.saml_2\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": false,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": false\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"auth.user_sessions\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": false,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": false\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"auth.leaked_password_protection\",\n        \"type\": \"boolean\"\n      },\n      \"hasAccess\": false,\n      \"type\": \"boolean\",\n      \"config\": {\n        \"enabled\": false\n      }\n    },\n    {\n      \"feature\": {\n        \"key\": \"auth.advanced_auth_settings\",\n        \"type\": \"boolean\"\n     ",
+      "durationMs": 566
+    },
+    {
+      "id": "F08a-pro",
+      "title": "v2 log-drain list, Pro",
+      "status": "info",
+      "detail": "200 -",
+      "measurements": {
+        "status": 200,
+        "error_code": "-",
+        "error_feature": "-",
+        "message": "{\"data\":[]}",
+        "body_keys": "data",
+        "error_keys": "-",
+        "error_meta": "-"
+      },
+      "durationMs": 1827
+    },
+    {
+      "id": "F08a-team",
+      "title": "v2 log-drain list, Team",
+      "status": "info",
+      "detail": "200 -",
+      "measurements": {
+        "status": 200,
+        "error_code": "-",
+        "error_feature": "-",
+        "message": "{\"data\":[]}",
+        "body_keys": "data",
+        "error_keys": "-",
+        "error_meta": "-"
+      },
+      "durationMs": 1827
+    },
+    {
+      "id": "F08b-pro",
+      "title": "v2 invitation delete, Pro",
+      "status": "info",
+      "detail": "402 payment_required",
+      "measurements": {
+        "status": 402,
+        "error_code": "payment_required",
+        "error_feature": "-",
+        "message": "This feature requires the Team, or Enterprise organization plan.",
+        "body_keys": "error",
+        "error_keys": "code,description,message",
+        "error_meta": "-"
+      },
+      "durationMs": 1827
+    },
+    {
+      "id": "F08b-free",
+      "title": "v2 invitation delete, Free",
+      "status": "info",
+      "detail": "402 payment_required",
+      "measurements": {
+        "status": 402,
+        "error_code": "payment_required",
+        "error_feature": "-",
+        "message": "This feature requires the Team, or Enterprise organization plan.",
+        "body_keys": "error",
+        "error_keys": "code,description,message",
+        "error_meta": "-"
+      },
+      "durationMs": 1827
+    },
+    {
+      "id": "F08b-team",
+      "title": "v2 invitation delete, Team",
+      "status": "info",
+      "detail": "400 validation_failed",
+      "measurements": {
+        "status": 400,
+        "error_code": "validation_failed",
+        "error_feature": "-",
+        "message": "Validation failed",
+        "body_keys": "error",
+        "error_keys": "code,issues,message",
+        "error_meta": "-"
+      },
+      "durationMs": 1827
+    },
+    {
+      "id": "F08c-pro",
+      "title": "backup schedule read, Pro",
+      "status": "info",
+      "detail": "402 entitlement_required",
+      "measurements": {
+        "status": 402,
+        "error_code": "entitlement_required",
+        "error_feature": "backup.schedule",
+        "message": "This feature requires the Enterprise organization plan.",
+        "body_keys": "error,message",
+        "error_keys": "code,feature,upgrade_url",
+        "error_meta": "-"
+      },
+      "durationMs": 1827
+    },
+    {
+      "id": "F08c-team",
+      "title": "backup schedule read, Team",
+      "status": "info",
+      "detail": "402 entitlement_required",
+      "measurements": {
+        "status": 402,
+        "error_code": "entitlement_required",
+        "error_feature": "backup.schedule",
+        "message": "This feature requires the Enterprise organization plan.",
+        "body_keys": "error,message",
+        "error_keys": "code,feature,upgrade_url",
+        "error_meta": "-"
+      },
+      "durationMs": 1827
+    },
+    {
+      "id": "F08d-pro",
+      "title": "restore-point list, Pro",
+      "status": "info",
+      "detail": "400 -",
+      "measurements": {
+        "status": 400,
+        "error_code": "-",
+        "error_feature": "-",
+        "message": "This endpoint is unavailable at the moment",
+        "body_keys": "message",
+        "error_keys": "-",
+        "error_meta": "-"
+      },
+      "durationMs": 1827
+    },
+    {
+      "id": "F08e-pro",
+      "title": "vanity subdomain read, Pro",
+      "status": "info",
+      "detail": "200 -",
+      "measurements": {
+        "status": 200,
+        "error_code": "-",
+        "error_feature": "-",
+        "message": "{\"status\":\"not-used\"}",
+        "body_keys": "status",
+        "error_keys": "-",
+        "error_meta": "-"
+      },
+      "durationMs": 1827
+    },
+    {
+      "id": "F08f-pro",
+      "title": "v2 notebooks list, Pro",
+      "status": "info",
+      "detail": "200 -",
+      "measurements": {
+        "status": 200,
+        "error_code": "-",
+        "error_feature": "-",
+        "message": "{\"data\":[],\"links\":{\"first\":null,\"prev\":null,\"next\":null}}",
+        "body_keys": "data,links",
+        "error_keys": "-",
+        "error_meta": "-"
+      },
+      "durationMs": 1827
+    },
+    {
+      "id": "F08g-pro",
+      "title": "v2 maintenance windows, Pro",
+      "status": "info",
+      "detail": "404 not_found",
+      "measurements": {
+        "status": 404,
+        "error_code": "not_found",
+        "error_feature": "-",
+        "message": "Not Found",
+        "body_keys": "error",
+        "error_keys": "code,message",
+        "error_meta": "-"
+      },
+      "durationMs": 1827
+    }
+  ]
+}

@@ -51,6 +51,9 @@ const ROWS: { key: string; feature: string }[] = [
   { key: "function_size_limit_mb", feature: "function.size_limit_mb" },
   { key: "project_pausing", feature: "project_pausing" },
   { key: "api_members_roles", feature: "api.members.roles" },
+  { key: "api_members_invitations", feature: "api.members.invitations" },
+  { key: "custom_oauth_max_providers", feature: "auth.custom_oauth.max_providers" },
+  { key: "backup_schedule", feature: "backup.schedule" },
 ];
 
 interface Entitlement {

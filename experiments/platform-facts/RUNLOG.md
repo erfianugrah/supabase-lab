@@ -223,3 +223,68 @@ Read (W3 plan, B02-1): null is 0 on this run, so the state that produced
 `eligible: null` on 2026-08-04 is not present on any lab project now; what
 it goes with stays unexplained. Not settled: one sweep of 4 projects, none
 paused, none coming up.
+
+## 2026-11-12 - F01 and F08: entitlement keys and refusal responses on the Pro, Team and Free orgs
+
+Harness: `bun harness/src/run.ts --where local --experiment platform-facts
+--only F01,F08` with `PVLAB_ORG_SLUGS` (Pro, Team, Free) and
+`PVLAB_ORG_PRO`, `PVLAB_ORG_TEAM`, `PVLAB_ORG_FREE` set, lab commit d41d9cd
+with F08 and three new F01 rows uncommitted at run time (committed as run);
+published `out/2026-11-12/run-2026-11-12T03-44-01-588Z.facts.md`. One run.
+F08 is read-only apart from F08b, whose DELETE carries `type` `invitation`,
+outside the v2 schema's enum (`organization_invitation`, live spec read
+2026-11-12), so no invitation is touched.
+
+F01, the rows added in this run (64 features listed on each org):
+
+| Org | `api.members.roles` | `api.members.invitations` | `auth.custom_oauth.max_providers` | `backup.schedule` | `project_pausing` |
+|---|---|---|---|---|---|
+| Pro | no | no | unlimited | no | no |
+| Team | yes | yes | unlimited | no | no |
+| Free | no | no | 3 providers | no | yes |
+
+F08:
+
+| Row | Org | Status | `error.code` | `error.feature` | Body keys | `error` keys | Message |
+|---|---|---|---|---|---|---|---|
+| F08a GET v2 log-drains | Pro | 200 | - | - | `data` | - | `{"data":[]}` |
+| F08a GET v2 log-drains | Team | 200 | - | - | `data` | - | `{"data":[]}` |
+| F08b DELETE v2 invitations | Pro | 402 | `payment_required` | - | `error` | `code,description,message` | This feature requires the Team, or Enterprise organization plan. |
+| F08b DELETE v2 invitations | Free | 402 | `payment_required` | - | `error` | `code,description,message` | This feature requires the Team, or Enterprise organization plan. |
+| F08b DELETE v2 invitations | Team | 400 | `validation_failed` | - | `error` | `code,issues,message` | Validation failed |
+| F08c GET v1 backups/schedule | Pro | 402 | `entitlement_required` | `backup.schedule` | `error,message` | `code,feature,upgrade_url` | This feature requires the Enterprise organization plan. |
+| F08c GET v1 backups/schedule | Team | 402 | `entitlement_required` | `backup.schedule` | `error,message` | `code,feature,upgrade_url` | This feature requires the Enterprise organization plan. |
+| F08d GET v1 restore-point | Pro | 400 | - | - | `message` | - | This endpoint is unavailable at the moment |
+| F08e GET v1 vanity-subdomain | Pro | 200 | - | - | `status` | - | `{"status":"not-used"}` |
+| F08f GET v2 notebooks | Pro | 200 | - | - | `data,links` | - | `{"data":[],"links":{"first":null,"prev":null,"next":null}}` |
+| F08g GET v2 maintenance windows | Pro | 404 | `not_found` | - | `error` | `code,message` | Not Found |
+
+Read:
+
+- The v2 invitation-delete refusal (F08b) is 402 with `error` keys `code`,
+  `description` and `message`: no `error.feature` and no `error.meta`. The v1
+  backup-schedule refusal (F08c) is 402 with `error.code`
+  `entitlement_required`, `error.feature` `backup.schedule` and
+  `error.upgrade_url`. Not every v1 refusal has that shape: F08d is a 400 with
+  only `message`.
+- The Team org got past the v2 invitation-delete plan check (F08b-team stopped
+  at validation); the Pro and Free orgs did not. That matches F01
+  (`api.members.invitations` yes on Team, no on Pro and Free) and the live
+  spec's `x-allowed-plans` `["Team","Enterprise"]` on both invitation
+  operations (read 2026-11-12, not archived). The role PATCH and the
+  invitation POST were not run.
+- The backup-schedule read was refused on Team as well as Pro; F01 reads
+  `backup.schedule` no on both.
+- The v2 log-drain GET answered 200 on the Pro and Team orgs. On 2026-10-10 GET
+  and POST on this route answered 403 "Your organization does not have access
+  to this API" on the Pro org's OB04 project (archived) and on a Team-org
+  project in an unarchived exploratory check (observability-surface RUNLOG,
+  OB04c). F08a sent GET only; POST was not run, and whether the 2026-10-10
+  Team org is the one behind `PVLAB_ORG_TEAM` is not recorded.
+- The v2 notebooks list answered 200 on the Pro org. v2 maintenance windows
+  answered 404 `not_found` there; the v2 spec documents that 404 as
+  "Organization not found", while other rows on the same org answered, so
+  what the 404 reflects was not determined.
+- Not measured: a platform-plan or Enterprise org (none on this account), and
+  any project-scoped row on the Free org (F07, 2026-10-13: neither Free org
+  listed a project; not re-checked here).
