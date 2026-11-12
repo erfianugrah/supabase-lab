@@ -42,7 +42,7 @@ SUPABASE_ACCESS_TOKEN=... PVLAB_ORG_SLUGS=<platform-org> [PVLAB_ORG_SOURCE=<seco
 |---|---|---|
 | Project-scoped roles on the platform plan | enabled; roles Owner, Administrator, Developer, Read-only, None | BA01a |
 | Org audit log retention | 366 days | BA01a |
-| Member/role management on the API | not on this org (`api.members.roles` false); the v2 role and invitation endpoints are listed for Enterprise only (`x-allowed-plans`, v2 OpenAPI read 2026-10-07; not measured on an org with the entitlement enabled) | BA01a |
+| Member/role management on the API | not on this org (`api.members.roles` false); the v2 role and invitation endpoints were listed for Enterprise only (`x-allowed-plans`, v2 OpenAPI read 2026-10-07) and for Team and Enterprise on 2026-11-12; platform-facts F08b (2026-11-12) measured a Team org past the invitation-delete plan check; the role PATCH is not measured on any org | BA01a |
 | Management API rate limit | 120 per window (`x-ratelimit-limit`) | BA01b |
 | Create returns the ref | 201 in ~6 s, ref in the body | BA02a |
 | Sweep source | `GET /organizations/{slug}/projects`: new ref visible in ~6 s; paginated, limit 100 | BA02b |

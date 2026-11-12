@@ -657,6 +657,8 @@ exploratory check on a Team-plan org. The v1 API publishes no log-drains route
 lists `/v2/projects/{ref}/analytics/log-drains` and `/{id}`). What grants access
 was not determined. Missing prerequisite for OB04d: an org the v2 route
 accepts, or a drain created in the Dashboard pointed at the sink.
+2026-11-12 (platform-facts F08a): the v2 GET list answered 200 on the Pro and
+Team orgs; POST was not re-run, so whether a drain can now be created is open.
 
 Not measured: everything under OB04d; drain cost per drain-hour (none was
 incurred: no drain existed); Audit Log Drains (entitlement only).
