@@ -81,7 +81,7 @@ monthly (operator, local):
   scripts/provision-store.ts    - one-time production provisioning (PAT direct)
   scripts/integration-live.ts   - live end-to-end proof on a throwaway store
   test/*.test.ts
-~/gatekeeper/
+~/cf-stuff/workers/gatekeeper/
   dashboard/src/lib/policy-templates.ts   (+2 templates)
   test/policy-templates.test.ts           (+proven deny boundaries)
   docs/GUIDE.md                            (Policy Templates appendix sync)
@@ -1627,11 +1627,11 @@ git commit -m "feat: production provisioning script for the ledger-store"
 **Satisfies:** C5
 
 **Files:**
-- Modify: `~/gatekeeper/dashboard/src/lib/policy-templates.ts` (append to `SUPABASE_TEMPLATES`)
-- Create: `~/gatekeeper/test/policy-templates-metering.test.ts`
-- Modify: `~/gatekeeper/docs/GUIDE.md` ("Policy Templates" appendix - the lib file's header comment requires keeping it in sync)
+- Modify: `~/cf-stuff/workers/gatekeeper/dashboard/src/lib/policy-templates.ts` (append to `SUPABASE_TEMPLATES`)
+- Create: `~/cf-stuff/workers/gatekeeper/test/policy-templates-metering.test.ts`
+- Modify: `~/cf-stuff/workers/gatekeeper/docs/GUIDE.md` ("Policy Templates" appendix - the lib file's header comment requires keeping it in sync)
 
-NOTE on commits: `~/gatekeeper/.pi/harness.json` exists. If this task runs under the self-correcting loop, SKIP the commit step (the loop owns git state). Commit only for human/inline execution.
+NOTE on commits: `~/cf-stuff/workers/gatekeeper/.pi/harness.json` exists. If this task runs under the self-correcting loop, SKIP the commit step (the loop owns git state). Commit only for human/inline execution.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1707,7 +1707,7 @@ describe('sb-tenant-observer', () => {
 
 - [ ] **Step 2: Run to verify failure**
 
-Run: `cd ~/gatekeeper && bun run test -- test/policy-templates-metering.test.ts`
+Run: `cd ~/cf-stuff/workers/gatekeeper && bun run test -- test/policy-templates-metering.test.ts`
 Expected: FAIL - `template exists` assertions (no such template ids yet).
 
 - [ ] **Step 3: Append the two templates to `SUPABASE_TEMPLATES` in `dashboard/src/lib/policy-templates.ts`**
@@ -1755,7 +1755,7 @@ Add `sb-tenant-observer` and `sb-usage-poller` rows to the "Policy Templates" ap
 - [ ] **Step 6: Commit (inline execution only - see harness note above)**
 
 ```bash
-cd ~/gatekeeper
+cd ~/cf-stuff/workers/gatekeeper
 git add dashboard/src/lib/policy-templates.ts test/policy-templates-metering.test.ts docs/GUIDE.md
 git commit -m "feat: metering policy templates (tenant observer, usage poller)"
 ```
@@ -1772,7 +1772,7 @@ git commit -m "feat: metering policy templates (tenant observer, usage poller)"
 - [ ] **Step 1: Register the PAT as an upstream token (or reuse the existing supabase one)**
 
 ```bash
-cd ~/gatekeeper
+cd ~/cf-stuff/workers/gatekeeper
 bun run cli upstream-tokens list
 # if no supabase-scope token is registered yet:
 bun run cli upstream-tokens create --help   # then create with scope=supabase
@@ -1783,7 +1783,7 @@ Expected: an `upt_...` id for the supabase upstream token.
 - [ ] **Step 2: Render the poller policy from the template**
 
 ```bash
-cd ~/gatekeeper
+cd ~/cf-stuff/workers/gatekeeper
 # replace REAL_ORG_SLUG with the metered org's slug
 bun -e "
 import { POLICY_TEMPLATES, applyTemplate } from './dashboard/src/lib/policy-templates.ts';
@@ -1797,7 +1797,7 @@ cat /tmp/poller-policy.json   # eyeball: org slug substituted, only read actions
 - [ ] **Step 3: Mint the key**
 
 ```bash
-cd ~/gatekeeper
+cd ~/cf-stuff/workers/gatekeeper
 bun run cli keys create --name tenant-ledger-poller --upstream-token-id <upt_...> --policy @/tmp/poller-policy.json
 ```
 

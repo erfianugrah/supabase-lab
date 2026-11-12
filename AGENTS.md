@@ -1747,7 +1747,7 @@ Open work lives on the task board (project work-supabase-lab); this section keep
 
 - O01c/d/e (byo-oauth re-run, consent drill) -> work-supabase-lab#182. Inputs `PVLAB_OAUTH_CLIENT_ID/SECRET/REFRESH_TOKEN` in `.pi/oauth-drill.env` (gitignored); a green O01e burns the grant - re-consent to re-run. Consent steps: experiments/byo-oauth/RUNLOG.md.
 - L01b (rate-limits, second user) -> work-supabase-lab#183. Input `PVLAB_PAT2` in the same file.
-- M02/M04 (Gatekeeper re-runs) -> work-supabase-lab#184. Inputs `GATEKEEPER_URL` + `GATEKEEPER_ADMIN_KEY` (sourced from ~/gatekeeper/.env by the probes).
+- M02/M04 (Gatekeeper re-runs) -> work-supabase-lab#184. Inputs `GATEKEEPER_URL` + `GATEKEEPER_ADMIN_KEY` (sourced from ~/cf-stuff/workers/gatekeeper/.env by the probes).
 - M07 (invoice PDF) -> work-supabase-lab#36. Input `PVLAB_INVOICE_PDF=<path>`.
 - compute-disk D10 on the platform-plan org -> work-supabase-lab#15. Needs the platform org's slug and token; the 2 GB Nano volume makes the fill cheap (~40 min).
 - `.pi/sweep-all.sh` runs every acceptance probe in a burst-safe order.
