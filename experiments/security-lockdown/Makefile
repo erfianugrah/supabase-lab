@@ -11,7 +11,7 @@ RL_PORT ?= 8080
 RLW_PORT ?= 8788
 EDGE_PORT ?= 8081
 
-.PHONY: init fmt validate apply probe probe-s23 echo-worker-up echo-worker-down publish-evidence destroy postgrest-up postgrest-down ratelimit-up ratelimit-down ratelimit-worker-up ratelimit-worker-down edge-up edge-down
+.PHONY: init fmt validate apply probe probe-s23 probe-s24 echo-worker-up echo-worker-down publish-evidence destroy postgrest-up postgrest-down ratelimit-up ratelimit-down ratelimit-worker-up ratelimit-worker-down edge-up edge-down
 
 init:
 	tofu init
@@ -122,6 +122,17 @@ probe-s23:
 	@mkdir -p evidence/$(TS)
 	PVLAB_ENDPOINT_ECHO_WORKER="$(ECHO_WORKER)" $(HARNESS_RUN) --where local --experiment security-lockdown \
 		--only S23 --destructive --out evidence/$(TS)
+
+# S24: per-service Postgres login roles on a self-provisioned Pro-org Micro
+# (created and deleted by the module, no tofu state). The org slug is an
+# account identifier: pass it in the environment, never in a tracked file.
+probe-s24:
+	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "export SUPABASE_ACCESS_TOKEN"; exit 1)
+	@test -n "$$PVLAB_ORG_PRO" || (echo "export PVLAB_ORG_PRO"; exit 1)
+	@$(HARNESS_BUILD)
+	@mkdir -p evidence/$(TS)
+	$(HARNESS_RUN) --where local --experiment security-lockdown \
+		--only S24 --destructive --out evidence/$(TS)
 
 # Needs CLOUDFLARE_API_TOKEN (Workers edit) and CLOUDFLARE_ACCOUNT_ID in the env.
 echo-worker-up:
