@@ -9,7 +9,8 @@ version is not exposed by the platform and was not recorded. supabase-js
 Playwright container image named in `tests/au02-passkeys.ts`; AU02a records
 its build in the `chromium` measurement.
 
-All runs 2026-10-10 (UTC 00:09 to 00:27 for the artifacts cited below). n is
+All runs 2026-10-10 (UTC 00:09 to 00:27 for the artifacts cited below)
+except AU05 (2026-11-12, lab commit d41d9cd; see its section). n is
 1 run per row unless a row says otherwise; each module created its own
 `au-*` project on the Pro org (AU01 also one on a Free org) and
 deleted it in `finally`. The numbers below are pasted from the harness's
@@ -62,7 +63,9 @@ update and audience results; they predate the `providers_before_loop` column.
 Not measured: whether a Pro-plan limit above 3 can be granted (an
 entitlement or a per-project setting). The competing reading is "default 3,
 overridable", and the docs text says unlimited, so the 3 here is a measured
-default on one Pro-org project, not a plan ceiling. `skip_nonce_check=true`,
+default on one Pro-org project, not a plan ceiling. AU05 (2026-11-12): on a
+fresh Pro project the stored cap was 3 and an Auth config write raised it to
+32767; a control project with no write kept 3. `skip_nonce_check=true`,
 `discovery_url`, `authorization_params`, `attribute_mapping`, the OAuth2
 provider type, and what disabling a provider does to existing users were not
 run.
@@ -146,6 +149,54 @@ a custom `sub`, SAML session lifetime and logout, provider quotas, an IdP
 outage while a metadata URL is configured. SAML 2.0 support is on "plans Pro and above" per the
 SAML docs page cited above; the module ran only on a Pro org, so the Free-org answer is not
 measured.
+
+## AU05 - provider cap, Auth config write vs elapsed time (run 2026-11-12 03:44 UTC, artifact `out/2026-11-12/run-2026-11-12T03-44-04-335Z.json`)
+
+Question: AU01b measured a cap of 3 custom providers on a Pro-org project,
+while the custom providers docs page says Pro and above have unlimited
+providers and platform-facts F01 (2026-11-12) reads
+`auth.custom_oauth.max_providers` unlimited on Pro and Team and 3 on Free.
+Does an Auth config write through the Management API lift the cap, and is it
+the write or elapsed time that does?
+
+Harness: `bun harness/src/run.ts --where local --experiment auth-providers
+--only AU05 --destructive` with `PVLAB_ORG_PRO`, lab commit d41d9cd with AU05
+uncommitted at run time (committed as run, except that the placeholder client
+secret, a fixed string at run time, is now built per provider so secret
+scanners do not match it). Two throwaway Pro-org projects
+(Micro) provisioned together, each ready 12 s after its create call
+(`ready_s`: `ACTIVE_HEALTHY` at the first poll, 10 s in, then the API keys and
+`/auth/v1/settings` 200). W got `PATCH /v1/projects/{ref}/config/auth` with
+`site_url` only; C (control) got no Auth config write. Both deleted with 200.
+Issuer `https://accounts.google.com`, whose discovery document resolves;
+nothing signs in. The stored cap is `custom_oauth_max_providers` from
+`GET /v1/projects/{ref}/config/auth`.
+
+| Row | W (write) | C (control) |
+|---|---|---|
+| AU05a stored cap before any write | 3 | 3 |
+| AU05a creates before refusal | 3, then 400 `over_custom_provider_quota` | 3, then 400 `over_custom_provider_quota` |
+| AU05b PATCH `site_url` only, stored cap read straight after | 200; 32767 | not sent |
+| AU05c retries of the refused create, every 15 s for up to 180 s from the PATCH request | accepted on the first retry, sent 15 s after the PATCH request | refused on all 12 retries |
+| AU05c stored cap at the end | 32767 | 3 |
+| AU05d creates on from there | 8 providers in total, no refusal (the module stops at 8) | not run |
+
+Read: in this run a fresh Pro project stored a cap of 3 and enforced it. The
+Auth config write replaced the stored value with 32767 at once and the
+refused create went through on the next try; the control project, the same
+age with no write, still stored 3 and refused for 180 s. So here the write
+lifted the cap and elapsed time did not. Retries were 15 s apart, so the lift
+took effect at or before 15 s; no earlier retry was sent. Not measured:
+whether a write that changes another field, or a dashboard change, does the
+same; the cap beyond 8 providers.
+
+This sits against AU01b (2026-10-10): AU01's setup wrote `site_url` through
+the same PATCH before any provider existed, and the 4th provider was still
+refused. Readings, not separated: the behaviour changed between the two
+dates, or something in AU01's sequence kept the stored 3. AU01 was not re-run
+and did not read the stored value. A separate ad-hoc check on 2026-11-12 at
+about 03:24 UTC, outside the harness and with no artifact, on another
+throwaway Pro project (deleted with 200), showed the same order as W.
 
 ## Cost and teardown
 

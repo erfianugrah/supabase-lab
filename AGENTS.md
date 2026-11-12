@@ -1207,6 +1207,19 @@ each user's auth rows". Findings and artifacts in RUNLOG.md; out/2026-09-25/.
   and the only two org-scoped writes are org creation and project-claim. The
   `jit/invite` endpoints that a keyword search turns up are DATABASE access, a
   different subsystem - do not read them as membership provisioning.
+- Refusal responses (F08, 2026-11-12, one run on the Pro, Team and Free orgs;
+  RUNLOG 2026-11-12): the v2 invitation-delete refusal (F08b) is 402
+  `error.code` `payment_required` with `error` keys `code,description,message`
+  and no `error.feature`; the v1 backup-schedule refusal (F08c) is 402
+  `entitlement_required` with `error.feature` `backup.schedule` and
+  `error.upgrade_url`, on Team as well as Pro. Not every v1 refusal carries
+  that shape (restore-point list: 400 with only `message`, "This endpoint is
+  unavailable at the moment"). The Team org got past the invitation-delete
+  plan check; Pro and Free did not. The v2 log-drain GET answered 200 on Pro
+  and Team (GET and POST 403 on 2026-10-10, observability-surface OB04c; POST
+  not re-run). F01 now also reads `api.members.invitations`,
+  `auth.custom_oauth.max_providers` (unlimited on Pro and Team, 3 on Free) and
+  `backup.schedule`.
 - **The upgrade window was taken as not measurable on a throwaway project** (F06;
   superseded 2026-10-23 by upgrade-integrity UI01, section
   "experiments/upgrade-integrity - key facts"). A project created without
@@ -3155,14 +3168,18 @@ docs/plans/2026-10-02-bu-attribution.md.
   (`AuditLogsResponse_Output`) declare `token_type`, `token_hash`,
   `token_alias`, `oauth_app_id/name` per actor; the guide lists no export and
   no drain. Security review only - not an attribution input (2026-10-07).
-- Role assignment on the Management API is Enterprise-only by default per the
-  spec (not measured on an org with the entitlement enabled): v2
+- Role assignment on the Management API: v2
   `PATCH /v2/organizations/{slug}/members/{user_id}/roles` and
-  `POST /v2/organizations/{slug}/members/invitations` carry
-  `x-allowed-plans: ["Enterprise"]`; v1 has only `GET .../members`. On the
-  platform-plan org `api.members.roles` reads false (BA01a), so an org admin
-  assigns roles in the dashboard, where a project-scoped invite names one
-  project.
+  `POST /v2/organizations/{slug}/members/invitations` carried
+  `x-allowed-plans: ["Enterprise"]` when read on 2026-10-07; on 2026-11-12 the
+  live spec (https://api.supabase.com/api/v2-json, read, not archived) gave
+  `["Team","Enterprise"]` on both and on `DELETE .../members/invitations`.
+  platform-facts F08b (2026-11-12) measured only the DELETE: the Team org got
+  past its plan check (400 `validation_failed`) and the Pro and Free orgs got
+  402 `payment_required`. The role PATCH and invitation POST were not
+  measured on any org. v1 has only `GET .../members`. On the platform-plan org
+  `api.members.roles` reads false (BA01a), so an org admin there assigns roles
+  in the dashboard, where a project-scoped invite names one project.
 - Credential for the write path: a scoped PAT limited to the one org with
   Organization Projects (Read-write) per the public Personal Access Tokens
   guide; classic tokens reach every org the user belongs to. Unmeasured
@@ -3402,8 +3419,15 @@ Numbers: `RUNLOG.md`, artifacts `out/2026-10-08/`.
   `sb_secret_` key (not in the Management API OpenAPI document). Create resolves
   the issuer (unresolvable host: 400 `validation_failed`). Quota measured at 3
   providers per project on BOTH a Pro-org and a Free-org project
-  (`over_custom_provider_quota`); the docs say Pro is unlimited, so whether the
-  3 is a default that can be raised is open. Update is PUT; `provider_type` and
+  (`over_custom_provider_quota`); the docs say Pro is unlimited. AU05
+  (2026-11-12, two throwaway Pro projects): both stored
+  `custom_oauth_max_providers` 3 (`GET .../config/auth`) and refused the 4th
+  create; `PATCH /v1/projects/{ref}/config/auth` with `site_url` only set the
+  stored value to 32767 at once and the refused create went through on the
+  first retry, 15 s later (8 providers in total, no refusal); the control
+  project with no write kept 3 and refused for 180 s. AU01's own setup PATCH
+  did not lift it on 2026-10-10; that difference is unexplained (AU01 not
+  re-run). Update is PUT; `provider_type` and
   `identifier` in the body are ignored with 200, not refused. `pkce_enabled`
   defaults true and the authorize redirect carries `code_challenge` S256 and
   `state` but no `nonce`; the client secret is sent by HTTP Basic. No email
@@ -3532,7 +3556,9 @@ Modules OB01-OB06 and OB03d; docs claims and measurements are kept apart in RUNL
   (OB04b) is tested and waits for a drain. The v1 API publishes no log-drains route (v2 does). The v2 route
   refuses these orgs regardless of the entitlement; what grants access was not
   determined. Missing prerequisite: an org the v2 route accepts, or a drain
-  created in the Dashboard pointed at the sink.
+  created in the Dashboard pointed at the sink. 2026-11-12 (platform-facts
+  F08a): the v2 GET list answered 200 on the Pro and Team orgs; POST was not
+  re-run, so whether a drain can now be created here is open.
 - **track_planning, metrics waits, clone API (OB06, 2 runs, Micro, PG 17.11)**:
   as `postgres`, `alter role <r> set pg_stat_statements.track_planning = on`
   is accepted for authenticator, authenticated, anon, postgres and
