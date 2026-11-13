@@ -17,16 +17,16 @@
  *   - a project still INACTIVE after its candidate fired -> that call does not
  *     wake an auto-paused project
  *   - a project no longer INACTIVE, while `control` stayed INACTIVE -> that
- *     call woke it, and on a production platform org that is a billing event
+ *     call woke it, and on a platform org that is a billing event
  *   - `control` itself moved -> discard the run; the fleet was not quiescent
  *
  * This module does NOT delete the fleet. A woken project is a spent subject
  * whose next window is days away, but deleting it silently would destroy the
  * evidence of what woke it. Clean up deliberately, after reading the report.
  *
- * Distinct from Z01/Z02, which measured a MANUALLY paused project - a state
- * with no public DNS record, and therefore one that traffic cannot wake. Auto
- * pause is a different route into the state and may or may not land in the
+ * Distinct from Z01/Z02, which measured a MANUALLY paused project (no
+ * Management API read woke it in Z01 on 2026-10-13). Auto pause is a
+ * different route into the state and may or may not land in the
  * same place; whether it does is Z04b.
  */
 import type { Ctx, TestModule, TestResult } from "../../../harness/src/types.js";
@@ -135,8 +135,8 @@ const mod: TestModule = {
       title: "Z04b: is an auto-paused project shaped like a manually paused one?",
       status: "info",
       detail:
-        `${resolving}/${fleet.length} still resolve public DNS. A manual pause tears DNS down ` +
-        `(measured 2026-09-09), so ${resolving === 0 ? "auto-pause matches it" : "auto-pause DIFFERS - traffic can still reach these"}`,
+        `${resolving}/${fleet.length} still resolve public DNS` +
+        `${resolving === 0 ? "" : " - traffic can still reach these"}`,
       measurements: { dns_resolving: resolving, fleet: fleet.length },
       evidence: fleet.map((r) => `${r.key}\t${dns[r.key] ? "resolves" : "NXDOMAIN"}`).join("\n"),
     });
