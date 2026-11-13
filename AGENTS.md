@@ -6131,7 +6131,7 @@ runs 3-4. Numbers and per-write evidence: RUNLOG.md, artifacts
   apparent ~10 s overlap of 15.19 and 17.11 accepting writes in run 3).
 - **Outside this module, 2026-11-09: the same loss on a Team org, Small, at
   3.65 GB** (pgmig repo, `test/inplace-upgrade.harness.ts` and
-  `docs/research/2026-11-09-pg15-to-17-live.md`; one run per size, 15.19 to
+  `~/work/pgmig/docs/research/2026-11-09-pg15-to-17-live.md`; one run per size, 15.19 to
   target image `supabase-postgres-17.11.0.018`, a 1 s probe writer and a 2 s
   sampler through the session pooler): 53 of 458 acknowledged writes absent at
   0.06 GB and 52 of 691 at 3.65 GB, all acknowledged by the last 15.19 restart
