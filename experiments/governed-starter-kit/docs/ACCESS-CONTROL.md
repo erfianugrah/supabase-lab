@@ -1,7 +1,7 @@
 # Access control: platform roles on top of the kit
 
 A 2-3 minute dashboard walkthrough of what a Team or Enterprise organization
-adds over a set of separate Pro organizations, and how it lines up with the
+adds over separate Pro organizations, and how it lines up with the
 controls the kit already puts inside the database.
 
 The point to land: there are two planes. The platform plane decides who may

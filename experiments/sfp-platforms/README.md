@@ -71,7 +71,6 @@ BYO-backend bridge. On this org:
 
 ```
 SUPABASE_ACCESS_TOKEN=<org PAT> \
-
 PVLAB_ORG_SLUGS=<org slug> \
 .pi/probe-sfp-platforms.sh S01
 ```
