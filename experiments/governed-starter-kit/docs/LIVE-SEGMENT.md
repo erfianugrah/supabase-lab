@@ -1,5 +1,8 @@
 # Live segment: a coding agent builds an app on the kit
 
+<!-- doc-drift: off -->
+<!-- Cites paths in a user workspace (describes the agent workspace of the live demo, not this repo); doc-drift.py in ~/dotfiles. -->
+
 The platform team turns a request into a guarded backend in under a
 minute, then a coding agent, connected to `kit-live` through the Supabase
 MCP server and reading the kit's guardrails, builds a small internal app on

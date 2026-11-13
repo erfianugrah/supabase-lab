@@ -122,7 +122,7 @@ make agent-local ENV_FILE=/path/to/anthropic.env   # file holds ANTHROPIC_API_KE
 Runs K03's chat checks (`lib/agent-chat-checks.ts`, shared with K03) on a
 throwaway local stack in Docker: ports 5452x and project id
 `kit-agent-local`, so it runs beside `make bff-local` (5442x) or a default
-local stack. It applies `sql/00`, `10` and `20` (not the integrations file),
+local stack. It applies `sql/00-baseline.sql`, `sql/10-app.sql` and `sql/20-agent.sql` (not the integrations file),
 seeds the kit users the way `make seed` does (`lib/seed.ts`; passwords in
 `evidence/users-agent-local.json`), serves only the `agent` function,
 embeds the KB rows with gte-small through `embed` mode, runs six tool-mode

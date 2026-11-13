@@ -1,5 +1,8 @@
 # Change management: environments, direct changes, drift
 
+<!-- doc-drift: off -->
+<!-- Cites paths in a user workspace (describes the CLI layout of a user project, not this repo); doc-drift.py in ~/dotfiles. -->
+
 Questions a central IT team asks before letting business teams build on the
 kit: how do sandbox, staging and production relate; can anyone change
 production on the spot; and when a fix does go straight into production, how

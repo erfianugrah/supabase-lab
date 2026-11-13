@@ -61,4 +61,4 @@ they carry project refs); redacted copies are under `out/<date>/`.
   route, key and project.
 - `lib/cs.ts` - Micro project create and delete, a v2 call that keeps status,
   `error.code` and body verbatim, and the gate reading. The CLI spawn helper
-  is cli-surface's `lib/cli.ts`.
+  is `experiments/cli-surface/lib/cli.ts`.
