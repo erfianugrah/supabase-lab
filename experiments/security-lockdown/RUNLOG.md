@@ -461,6 +461,62 @@ from `GET /v1/projects` after 0 s (run 1) and 20 s (run 2); re-checked by
 listing after both runs. The echo Worker was deleted with
 `make echo-worker-down`. Nothing left standing.
 
+## Run 8 - 2026-11-12 - per-service login roles (S24), run live
+
+Question: a separate Postgres login per service, `create role ... login password` with grants on its own schema only. What can that login do on each connection path, and how fast does a password change apply on each? The roles guide recommends a user per service; before this the lab had only shown custom roles logging in over the poolers (rls-wire-claims C01-C03, medium-serverless MS04).
+
+Shape: S24 (`tests/s24-service-login-roles.ts`, `make probe-s24`) self-provisions a Pro-org Micro in ap-southeast-1 (PostgreSQL 17.11) through `lib/project.ts` and deletes it in `finally`. Setup, through the Management API query route: `svc_a.orders` (2 rows) and `svc_b.payroll` (3 rows); `public.shared` (3 rows, owners `svc_app_a`, `svc_app_b`, `someone_else`) with RLS on and one SELECT policy `owner = current_user` for both roles; `public.internal_notes` with no grant to either role. `svc_app_a`: USAGE on `svc_a`, SELECT and INSERT on `svc_a.orders`, SELECT on `public.shared`. `svc_app_b`: USAGE on `svc_b`, SELECT on `svc_b.payroll`, SELECT on `public.shared`. Both `nosuperuser nocreatedb nocreaterole noinherit`. Vantage: the macOS orchestrator. Three runs, one project each.
+
+- Run 1: `out/2026-11-12/run-2026-11-12T10-13-06-312Z.json`
+- Run 2: `out/2026-11-12/run-2026-11-12T10-14-14-089Z.json`
+- Run 3: `out/2026-11-12/run-2026-11-12T10-22-29-844Z.json`
+
+### Direct and dedicated pooler rows in runs 1 and 2 are a vantage fault
+
+In runs 1 and 2 every login on direct 5432 and the dedicated pooler 6543 failed with `ENOTFOUND` for `db.<ref>`; run 2 retried for 420.9 s (43 lookups). On this Mac `dns.lookup` (getaddrinfo) answers ENOTFOUND for the AAAA-only db host while the system resolver and `dns.resolve6` return the address, and TCP to 5432 and 6543 over IPv6 connected (checked against another project the same day; IPv6 here runs over tunnel interfaces only). Run 3 resolves AAAA itself and dials the address. Those four rows in runs 1 and 2 say nothing about the platform.
+
+### Least privilege per path (S24b)
+
+Run 3: all 8 role x path rows passed, on direct 5432, Supavisor session 5432, Supavisor transaction 6543 and the dedicated pooler 6543. Runs 1 and 2: the 4 Supavisor rows each passed the same way. For each role on each path:
+
+- Login on the first attempt (`login_attempts` 1 on every row in all three runs).
+- Its own table read (`svc_app_b` 3 rows; `svc_app_a` 2 rows before any insert); `svc_app_a`'s insert into `svc_a.orders` returned a new id on every path.
+- `denied 42501` on: the other role's table, `public.internal_notes` (no grant), `auth.users`, `storage.objects`, `create table` in its own schema (USAGE only) and in `public`, `set role` to the project's default admin role, `create role`.
+- `public.shared`: 1 of 3 rows for each role, the row its policy matches.
+
+These were fresh roles, so MS04's refusal of a recreated role's password did not come up; recreating a role was not run.
+
+### Password rotation (S24c)
+
+`alter role svc_app_a password` through the Management API route at t0, then each path that had logged in was polled with the new and the old password until both settled. Seconds after t0. The poll step was 3 s in run 1 and 1 s in runs 2 and 3, and the paths are polled in turn, so a path is sampled less often than the step.
+
+| Path | Run | New password first accepted | Old password first refused | Neither worked |
+| --- | --- | --- | --- | --- |
+| direct 5432 | 3 | 0.3 | 0.4 | 0 |
+| Supavisor session 5432 | 1 | 4.9 | 1.2 | 3.7 |
+| Supavisor session 5432 | 2 | 3.0 | 1.3 | 1.7 |
+| Supavisor session 5432 | 3 | 3.4 | 1.5 | 1.9 |
+| Supavisor transaction 6543 | 1 | 1.3 | 1.8 | 0 |
+| Supavisor transaction 6543 | 2 | 1.4 | 1.9 | 0 |
+| Supavisor transaction 6543 | 3 | 1.6 | 2.1 | 0 |
+| dedicated 6543 | 3 | 2.2 | 2.3 | 0 |
+
+The old password was refused with 28P01 on direct and both Supavisor modes, and with 08P01 on the dedicated pooler.
+
+Reading: in all three runs the Supavisor session pooler refused the old password 1.7 to 3.7 s before it accepted the new one, so a login through it just after a rotation can fail with both passwords for a few seconds; on the transaction pooler and the dedicated pooler the new password was accepted before the old one was refused, and direct switched within one poll. Three runs, one region, one compute size; why the session pooler differs was not looked at.
+
+### Dashboard Read-only role (S24d)
+
+All three runs: `supabase_read_only_user` has `rolbypassrls = true`, can log in, and is a member of `pg_read_all_data` but not `pg_write_all_data`, so RLS policies do not limit what it reads. A row count as that role was not taken: `set local role supabase_read_only_user` from the Management API route answered 42501, because the route runs as the project's default admin role (S24e), which is not a member.
+
+### Not run
+
+Restoring a daily backup to see custom role passwords need resetting (the backups doc says they do); recreating a role; per-role connection limits; network restrictions with a custom role.
+
+### Teardown (run 8)
+
+Each run's project answered DELETE 200 and was gone from `GET /projects` at the first check.
+
 ## Remaining
 
 - Phase C PrivateLink (iap-lockdown L20-L23) - needs a Team-tier org, an AWS

@@ -1916,7 +1916,7 @@ AR05/AR06 artifacts in `out/2026-10-26/` (reference AR06 run
 - Cloudflare pieces are OpenTofu (provider v4, gated on `enable_cloudflare`);
   real CF ids live in gitignored `cloudflare.auto.tfvars`.
 
-## experiments/security-lockdown - key facts (validated 2026-08-28; S13-S15 2026-08-31; S16-S21 2026-09-03; S23 2026-10-23)
+## experiments/security-lockdown - key facts (validated 2026-08-28; S13-S15 2026-08-31; S16-S21 2026-09-03; S23 2026-10-23; S24 2026-11-12)
 
 - S01: the Management API security advisor catches every seeded exposure
   (rls_disabled_in_public, rls_enabled_no_policy, security_definer_view,
@@ -2052,6 +2052,22 @@ AR05/AR06 artifacts in `out/2026-10-26/` (reference AR06 run
   restrict-all fires its webhooks. Restrictions are inbound only; pg_net
   egress stays open. Enable webhooks via `POST
   /database/webhooks/enable` (201). Evidence `out/2026-10-23/`.
+- S24 per-service login roles (2026-11-12, three runs, one fresh Pro Micro
+  each, ap-southeast-1, PostgreSQL 17.11, `make probe-s24`): two `login
+  password ... noinherit` roles with USAGE on their own schema only kept least
+  privilege on direct 5432, Supavisor session 5432, Supavisor transaction 6543
+  and the dedicated pooler 6543 (run 3, 8 of 8 role x path rows): own table
+  read and write, `42501` on the other role's schema, an ungranted `public`
+  table, `auth.users`, `storage.objects`, DDL in its own schema and `public`,
+  `set role` to the project's default admin role and `create role`; an RLS
+  policy `owner = current_user` returned 1 of 3 rows. After `alter role ...
+  password` through the Management API query route, the Supavisor session
+  pooler refused the old password 1.7-3.7 s before it accepted the new one in
+  all three runs; transaction, dedicated and direct showed no gap. The
+  dashboard Read-only role `supabase_read_only_user` has `rolbypassrls` and
+  `pg_read_all_data`. Runs 1-2 direct and dedicated rows are a vantage fault
+  (Bun `dns.lookup` on macOS misses the AAAA-only db host; run 3 resolves AAAA
+  itself). Evidence `out/2026-11-12/`.
 
 ## experiments/edge-function-limits - key facts (validated 2026-09-02, micro, Pro org; EF09, EF13, EF14 2026-10-23 on a Pro and a Free project)
 
