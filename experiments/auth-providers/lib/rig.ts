@@ -43,9 +43,10 @@ export interface Rig {
   provisionS: number;
 }
 
-export async function provisionProject(base: Ctx, org: string, tag: string, opts: { pro?: boolean } = {}): Promise<Rig> {
+export async function provisionProject(base: Ctx, org: string, tag: string, opts: { pro?: boolean; prefix?: string } = {}): Promise<Rig> {
   const t0 = Date.now();
-  const name = `au-${tag}-${t0.toString(36)}`;
+  // Other experiments reuse this rig under their own prefix so their sweeps stay separate.
+  const name = `${opts.prefix ?? "au"}-${tag}-${t0.toString(36)}`;
   const create = await mgmt(base, "POST", "/projects", {
     organization_slug: org,
     name,
