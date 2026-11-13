@@ -6228,3 +6228,41 @@ runs 3-4. Numbers and per-write evidence: RUNLOG.md, artifacts
   Bun's fetch queues above 256 in flight by default (bun docs), so the
   Makefile sets `BUN_CONFIG_MAX_HTTP_REQUESTS=512`; `PVLAB_EB_BURST_LANES`
   sets the burst's lanes apart from the step cap.
+
+## experiments/hook-gated-signup - key facts (validated 2026-11-12, two runs, Pro org, one self-provisioned Micro per run, ap-southeast-1 requested)
+
+- Question: the managed Auth surface an edge-scored, hook-enforced signup rests
+  on. HG01 provisions one `hg-*` project (rig: `auth-providers/lib/rig.ts`
+  with `prefix: "hg"`), records every before-user-created event in
+  `public.hg_seen` through a Postgres hook, deploys one Edge Function for the
+  HTTP-hook row, and deletes the project in `finally`. `make probe`.
+- Forwarding off (HG01a): the hook's `metadata.ip_address` is the leftmost
+  client-supplied `X-Forwarded-For` entry, with the publishable and with the
+  secret key; with no XFF it is the client's address. So on a direct POST any
+  caller chooses it. In code (supabase/auth 8872586) the CAPTCHA `remoteip`
+  shares that function; the per-IP rate-limit key does not (it reads
+  `Sb-Forwarded-For`, else the configured rate-limit header, not read on
+  managed). Neither leg measured.
+- Forwarding on (HG01b): `Sb-Forwarded-For` honoured only with the secret key,
+  on email signup and anonymous sign-in; ignored with publishable, legacy anon
+  and legacy service_role keys (the hook saw the client's address). A
+  publishable-key request's XFF was ignored too, which the Auth code alone
+  does not predict: something in front of Auth changes the request (where not
+  measured). XFF with forwarding on was not sent with the other keys.
+- CAPTCHA (HG01c): with CAPTCHA on, secret and legacy service_role key
+  signups and anonymous sign-ins passed with no token (200); publishable and
+  legacy anon got 400 `captcha_failed`.
+- HTTP hook refusal (HG01d): 200 with `{"error":{"http_code":403|429,...}}`
+  reaches the client as 403 or 429 with the hook's message (`error_code`
+  `unknown`); a 400 reply becomes 500 `unexpected_failure` "Invalid payload
+  sent to hook".
+- Payload (HG01e/f): signup `data` arrives intact as `user.user_metadata`;
+  an anonymous sign-in with `data` fires the hook (`is_anonymous=true`).
+- Edge logs (HG01g): `edge_logs` rows for `/auth/v1/signup` carry
+  `request.cf.botManagement.ja4` (non-empty) and 9 other `cf` keys; no bot
+  score, no `request.cf.asn`. Ingest delay not measured.
+- `auth.audit_log_entries` held 0 rows on a fresh project after 13 to 15
+  email signups, 5 anonymous sign-ins and two password sign-ins (run 2), so
+  sign-in routes could not be checked through it.
+- Config changes (hook, forwarding, CAPTCHA, hook URI) were first seen 4 to
+  5 s after `PATCH /config/auth` returned.
