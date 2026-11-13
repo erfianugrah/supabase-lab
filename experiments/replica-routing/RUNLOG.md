@@ -486,7 +486,7 @@ rows quoted from the facts files beside them):
   00:45:43 UTC, 15 rows, 4 pass, 11 info, 0 fail
 
 Run 2 differs from run 1 in three module changes made between the runs (both
-artifacts record lab commit 848b9f3; the module was uncommitted, so the
+artifacts record lab commit 353bfb7; the module was uncommitted, so the
 commit does not identify either version): no `signOut` after sign-in (see
 RR03d), the RR03h order of nodes recorded as a sequence plus a `Connection:
 close` variant, and the RR03k log poll waiting until the row total stops
@@ -747,7 +747,7 @@ Artifacts (module rows quoted from the facts files beside them):
 - run 2: `out/2026-10-26/run-2026-10-26T06-34-17-863Z.json`, 06:34:17 to
   06:50:39 UTC, 4 pass, 12 info, 0 fail
 
-Both artifacts record lab commit adc597c; the module was uncommitted, and it
+Both artifacts record lab commit 7600c61; the module was uncommitted, and it
 changed between the runs in two places: RR04j waits for the replica to catch
 up between conflict cycles (in run 1 cycle 2 was cancelled 0.1 s after cycle
 1 and cycle 3 never ran, see RR04j), and RR04j/RR04k record the load
@@ -1028,7 +1028,7 @@ Vantage: the Singapore workstation. supabase-js 2.118.0. Artifacts:
 - run 2: `out/2026-10-28/run-2026-10-28T06-03-01-848Z.json`, 06:03:01 to
   06:11:35 UTC, 7 pass, 1 info (RR06e), 0 fail
 
-Both artifacts record lab commit 1fdc95d; the module was uncommitted. Between
+Both artifacts record lab commit 0f5f996; the module was uncommitted. Between
 the runs the module changed in two places: a `*.workers.dev` Worker host
 deploys without `--domain` (RR06g), and the serving wait, shared by RR06c's
 custom-host wait and RR06g's Worker wait, asks 1.1.1.1 before the system
@@ -1184,7 +1184,7 @@ wrangler 4.147.0, Playwright 1.63.0, Bun 1.3.14. Artifacts:
 - run 2: `out/2026-10-28/run-2026-10-28T08-54-56-906Z.json`, 08:54:56 to
   09:02:26 UTC, 12 pass, 0 fail, 0 skip
 
-All three record lab commit c2de0d9; the module was uncommitted. Between run 0
+All three record lab commit 21c54ae; the module was uncommitted. Between run 0
 and run 1 the module's DNS wait changed (RR07d below) and RR07d gained two
 fields (`deploy_output_names_custom_domain`, `workers_domain_listed`).
 Nothing else changed.
@@ -1374,7 +1374,7 @@ facts files beside them):
 - run 2: `out/2026-10-28/run-2026-10-28T08-26-05-821Z.json`, 08:26:05 to
   09:13:57 UTC, 7 pass, 9 info, 0 fail
 
-Both artifacts record lab commit c2de0d9; the module was uncommitted. After
+Both artifacts record lab commit 21c54ae; the module was uncommitted. After
 run 2 two changes were made, neither to a measurement: the heartbeat pollers
 start 1.5 s after the heartbeat writer (see "First poll of an arm" below), and
 the wait after each PUT stops when the replica host serves `rr_node`, where
@@ -1646,11 +1646,11 @@ bytes and node_disk MB is 1024^2 bytes throughout. Run 3 adds the
 Singapore workstation. Artifacts:
 
 - run 1: `out/2026-11-09/run-2026-11-09T07-19-34-700Z.json`, 07:19:34 to
-  08:13:07 UTC, lab commit d039f7a, 2 pass, 1 fail
+  08:13:07 UTC, lab commit 8168540, 2 pass, 1 fail
 - run 2: `out/2026-11-09/run-2026-11-09T08-26-18-905Z.json`, 08:26:18 to
-  08:38:27 UTC, lab commit e5fd176, 3 pass, 1 fail
+  08:38:27 UTC, lab commit dac8f8d, 3 pass, 1 fail
 - run 3: `out/2026-11-09/run-2026-11-09T08-39-01-619Z.json`, 08:39:01 to
-  09:03:29 UTC, lab commit 49b0933, 5 pass, 3 info
+  09:03:29 UTC, lab commit dcdf5f0, 5 pass, 3 info
 
 Run 1 loaded the table first (4,000,000 rows in 192 s), then called
 `read-replicas/setup`: HTTP 204, and the replica never accepted a session
@@ -1660,7 +1660,7 @@ primary's volume at 36 GB, `last_modified_at` 07:52:12 UTC, against the 24 GB
 the module set. Why the replica never served was not read; a base backup of a
 3.9 GB primary outlasting 45 minutes on Small and an interaction with the disk
 change are both open, and nothing separates them. Run 1 also ran an earlier
-version of the module (d039f7a).
+version of the module (8168540).
 
 Run 2 added the replica to the empty primary (first session connection 181 s
 after the setup call) and loaded afterwards (205 s), so the load streamed to the
@@ -1675,7 +1675,7 @@ does not record whether that wait ended on `5_services_reconfigured` or on its
 15-minute cap).
 
 The RR09b title in runs 2 and 3 reads "(built after the load)", text left in the
-code from run 1 (d039f7a); in both runs the replica was added before the load
+code from run 1 (8168540); in both runs the replica was added before the load
 (RR09a2 records the load, after RR09b's replica was serving). Run 3's order:
 replica, load, load balancer lookup, custom domain, RR09d's tagged GETs, RR09e,
 RR09f, then RR09d's log read. No step waited for the replica's replay to catch up
@@ -1800,7 +1800,7 @@ created with `postgres_engine: "15"` (15.19), targets A and B on the default
 30)`), 3.9 GiB total relation size. The subscriptions use S's direct
 connection on 5432 as `postgres`, `options=''-c statement_timeout=0''`.
 Artifact `out/2026-11-10/run-2026-11-10T09-17-41-956Z.json`, 09:17:41 to
-11:14:04 UTC, lab commit 6e78709 (the module was first committed with this
+11:14:04 UTC, lab commit 6f6a0a0 (the module was first committed with this
 write-up, after the run; its header comment has changed since), 3 pass, 3
 fail. While RR10e waited, A, B and S were read by hand through the
 Management API query and logs endpoints; the redacted output is
@@ -1926,7 +1926,7 @@ ap-southeast-1; one source on `postgres_engine: "15"` (15.19), targets on the
 default (17.11); `rr11_t` loaded through the query endpoint (runs 2 to 4),
 published, and subscribed over the source's direct connection with
 `options=''-c statement_timeout=0''`. Readiness is polled every 5 s. Four
-artifacts, one per run. Every artifact names lab commit b339e99, which
+artifacts, one per run. Every artifact names lab commit f5bd16b, which
 predates the RR11 module: each run used an uncommitted version, the module
 changed between runs, and the committed module is the run 4 version.
 
@@ -2074,7 +2074,7 @@ Restrictions are applied with `POST /v1/projects/{ref}/network-restrictions/appl
 the documentation ranges 192.0.2.0/24 and 2001:db8::/32 stand for every other
 address. Addresses are recorded as roles (`<v6-T>`), not values. Row counts
 are polled every 5 s. Two runs on 2026-11-11; both artifacts name lab commit
-b339e99, which predates the module. Run 1 used an earlier version; the
+f5bd16b, which predates the module. Run 1 used an earlier version; the
 committed module is run 2's, with the RR12g query fixed after it (see RR12g).
 
 - run 1: `out/2026-11-11/run-2026-11-11T04-29-45-868Z.json`, 4 pass, 1 fail,
@@ -2161,7 +2161,7 @@ IPv4 add-on on S (`PATCH /v1/projects/{ref}/billing/addons`,
 had an A and no AAAA. T subscribes to S's direct host; T2 subscribes once T
 has every table `r` (one at a time). Addresses are recorded as roles
 (`<v4-a>`, `<v4-b>` in order of first sight, per run), not values. Three runs
-on 2026-11-11; all artifacts name lab commit 6b30084, which predates the
+on 2026-11-11; all artifacts name lab commit f557be9, which predates the
 module. The module changed between runs; the committed module is the run 3
 version.
 

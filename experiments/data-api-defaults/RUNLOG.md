@@ -9,7 +9,7 @@ public notice cited in the module header; "measured" means the artifact.
 ## 2026-10-10 - two runs (vantage: this lab's Mac, over the public internet)
 
 Harness: `make run`, modules DD01-DD04 and DD99, `--destructive`, lab commit
-d8a16df plus the uncommitted tree that adds this experiment. n = 1 project per
+c733491 plus the uncommitted tree that adds this experiment. n = 1 project per
 run, one trial per probe. Postgres 17.11 on both projects. Published
 (redacted, recovered from a session scratchpad on 2026-10-13): run 1
 `out/2026-10-09/run-2026-10-09T23-58-24-538Z.json` (UTC start date), run 2
@@ -195,8 +195,8 @@ anon change.
 ## 2026-10-13 - DD01S standing-project baseline, before 2026-10-30
 
 Harness: `make run-standing`, module DD01S only, `--destructive` (one probe
-table created and dropped; no GRANT, REVOKE or ALTER sent), lab commit 27a322f
-plus the staged tree that adds DD01S (second reading at lab commit a5a34fe).
+table created and dropped; no GRANT, REVOKE or ALTER sent), lab commit e3d698c
+plus the staged tree that adds DD01S (second reading at lab commit 51fe2f8).
 Two readings 15 minutes apart (00:06Z and 00:21Z) on n = 1 existing project, created
 2026-04-07 (before the 2026-05-30 new-project default), Postgres 17.6, not a
 lab-provisioned project. Published: `out/2026-10-13/`. The artifact header's
@@ -232,7 +232,7 @@ the legacy service_role key and an `sb_secret_` key), and edge-resilience W12
 itself, imported and run three times on one table with grants only ever added
 (none, table only, table + sequence).
 
-Harness: `make run ONLY=DD05,DD99`, `--destructive`, lab commit 661afdf plus
+Harness: `make run ONLY=DD05,DD99`, `--destructive`, lab commit 38a0f9c plus
 the uncommitted tree that adds DD05 and W12's grant variant. Two runs, n = 1
 fresh Pro-org project per run, created through `POST /v1/projects`
 (ap-southeast-1) and deleted by DD99 (`DELETE 200`, gone from the listing).

@@ -11,7 +11,7 @@ toggle writes the same `db_schema` field. Neither run held the API off for longe
 than 120 s, so neither could see a recovery that grows with the length of the
 outage.
 
-Both runs below ran from an uncommitted tree on top of lab commit ee6b5a5 (the
+Both runs below ran from an uncommitted tree on top of lab commit e2f9764 (the
 facts files record that commit, which does not contain this experiment). The
 module code is the commit that adds this RUNLOG; it includes run 2's DA05
 pre-enable check and the DA02L SQL time filter, which neither run executed in
@@ -175,13 +175,13 @@ arm came out slower is not explained by this run (n=3 pairs).
 
 ## 2026-10-23 - run 3 (fresh Micro, ap-southeast-1): DA01 and DA03 with the GraphQL fix (#129)
 
-Purpose: prove the GraphQL signal from c71a01b on a project that, like every new
+Purpose: prove the GraphQL signal from 5b74253 on a project that, like every new
 project, starts without `pg_graphql`. DA03 now reads `pg_extension` first,
 installs `pg_graphql` when absent and drops it in `finally` (DA03y). The
 `graphql` probe has POSTed `{ __typename }` and labelled the errors envelope
 `200 not-ok` since run 1 (`lib/reenable.ts`). One fresh project (tofu,
 `micro`), `make probe ONLY=DA01,DA03 RUNNER_FLAGS=--destructive` from lab
-commit 661afdf with a clean tree, local vantage, n=1. Artifact:
+commit 38a0f9c with a clean tree, local vantage, n=1. Artifact:
 `out/2026-10-23/run-2026-10-23T07-55-04-028Z.{json,facts.md}`.
 
 | Reading | run 1 (2026-09-24) | run 3 (2026-10-23) |

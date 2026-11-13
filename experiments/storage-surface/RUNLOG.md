@@ -804,7 +804,7 @@ needs one on a public bucket too). Two earlier runs the same day are not
 published; their cache states agreed with these in every cell both produced
 (operator note), and the first of them had no policy on `pub`, so its
 public-bucket signed URLs were never created. Both published artifacts record
-`labCommit` dfd5573, the commit before this module was added; the module that
+`labCommit` 5dedd76, the commit before this module was added; the module that
 produced them is the one committed with this section.
 
 ### SS08c - the request `download()` sends
@@ -925,7 +925,7 @@ module: run 1 `run-2026-10-22T05-23-24-115Z`, run 2
 (public) and `priv` (private), one select policy for any authenticated user
 on both; uploads and signing use the service key. Objects are 1,000 B (v1)
 and 2,000 B (v2), so the byte count says which version a read returned. All
-three artifacts record `labCommit` 781ef8f, the commit before this module was
+three artifacts record `labCommit` f6f3b29, the commit before this module was
 added. Run 1 used an earlier SS09a (one signed URL, expiresIn 25, read six
 times with no wait for a `HIT`, then the object deleted after expiry) and had
 no SS09d; its six warm reads were `MISS` then `REVALIDATED` five times, which
@@ -1056,7 +1056,7 @@ outside the lab and is not recorded here.
 These runs ran the module under the id SS09 on 2026-10-21, the day before
 the CDN-expiry SS09 above was committed (2026-10-22); this module was renamed
 SS10 when the two ids collided, so the artifacts carry `SS09_setup`, `SS09u`,
-`SS09c` and `SS09_summary`. All three record `labCommit` 781ef8f, HEAD at run
+`SS09c` and `SS09_summary`. All three record `labCommit` f6f3b29, HEAD at run
 time; neither the CDN-expiry SS09 nor this module was committed yet.
 
 Shape: two throwaway projects per run, provisioned in parallel; the client
@@ -1150,7 +1150,7 @@ both; one signed-in user (U) for the authenticated and `download()` reads;
 uploads, overwrites, signing and purge with the service_role key. Upload limit
 raised from `52428800` to `10737418240` (`PATCH 200`, effective after `4s`).
 One laptop client in Singapore (operator note). The artifact records
-`labCommit` 661afdf, the commit before this module was added.
+`labCommit` 38a0f9c, the commit before this module was added.
 
 ### SS11a - staleness after an overwrite, per path
 

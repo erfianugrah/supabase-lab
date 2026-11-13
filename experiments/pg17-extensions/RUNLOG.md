@@ -7,7 +7,7 @@ artifact is in `evidence/` (gitignored).
 
 | module | artifact | note |
 |---|---|---|
-| PX01 | `out/2026-11-10/run-2026-11-10T09-16-49-541Z.json` | one run; the artifact names lab commit 6e78709, the module itself was first committed with this write-up, after the run (at least the PX01a title text has changed since) |
+| PX01 | `out/2026-11-10/run-2026-11-10T09-16-49-541Z.json` | one run; the artifact names lab commit 6f6a0a0, the module itself was first committed with this write-up, after the run (at least the PX01a title text has changed since) |
 
 ## PX01 - TimescaleDB before Postgres 17
 

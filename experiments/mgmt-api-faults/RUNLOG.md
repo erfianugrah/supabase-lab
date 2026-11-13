@@ -174,9 +174,9 @@ Vantage: the same Mac (darwin arm64). Tools: supabase CLI 2.121.0 (Homebrew;
 the 2026-10-10 runs used 2.120.0, and MF01-MF05 were not re-run on 2.121.0),
 Bun 1.3.14 for the harness and the Bun `fetch()` client, Node v26.12.1 for the
 Node `fetch()` client. The lab harness ran from its working tree on top of
-661afdf with the new modules (MF06-MF08, `lib/connfault.ts`,
+38a0f9c with the new modules (MF06-MF08, `lib/connfault.ts`,
 `lib/clients.ts`, `lib/reconcile.ts`) not yet committed; the artifacts name
-661afdf.
+38a0f9c.
 
 Method. The container proxy of MF01-MF05 answers HTTP; here the fault is the
 connection, so the proxy is a raw TCP listener in the test process

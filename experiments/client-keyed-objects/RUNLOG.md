@@ -191,7 +191,7 @@ in this commit; before it, `make managed` always made both regions). Same
 migrations, same client, same 2 GiB fixture (256 chunks, 32 parts of 64 MiB).
 The whole make target ran under `caffeinate -i`. Vantage: the same laptop in
 Singapore. n = 1. Artifact: `out/2026-10-23/run-2026-10-23T10-34-14-905Z`
-(run 10:34:14Z to 11:05:26Z, lab commit 77cdea0 with this commit's
+(run 10:34:14Z to 11:05:26Z, lab commit ff9fbf6 with this commit's
 changes in the working tree). Regenerated parity table with this run added:
 `out/2026-10-23/parity.md`. In its region-b column the CK04 and CK06 cells are
 the 2026-10-23 run and the rest are 2026-10-12; CK06 byte totals cover
@@ -297,7 +297,7 @@ Shape: two runs of `make managed MANAGED=region-b IDS=CK04,CK06`, each on a
 new Pro-org micro project in eu-central-1 that the same make target created
 and deleted. Each make target ran under `caffeinate -i`. Vantage: the same
 laptop in Singapore, with other lab agents running live work from it at the
-same time. Lab commit adc597c, with this commit's client and CK06 changes in
+same time. Lab commit 7600c61, with this commit's client and CK06 changes in
 the working tree (`body_vs_start_spearman` and `scripts/ck06-reads.ts` came
 after the runs).
 

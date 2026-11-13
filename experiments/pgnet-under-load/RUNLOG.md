@@ -14,7 +14,7 @@ before the run; "measured" means the artifact.
 
 ## 2026-10-26 - NL01, NL02 (Micro, one run)
 
-Harness: `make micro`, lab commit 848b9f3 plus the uncommitted experiment.
+Harness: `make micro`, lab commit 353bfb7 plus the uncommitted experiment.
 Published: `out/2026-10-26/run-2026-10-26T00-24-41-120Z.json` (7 results)
 and its `.facts.md`. Postgres 17.11, pg_net 0.20.4.
 
@@ -91,7 +91,7 @@ timeout on calls 2-400):
 
 ## 2026-10-26 - NL03 (Large, one run) and NL04 (Large, run 1)
 
-Harness: `make large`, lab commit 848b9f3 plus the uncommitted experiment.
+Harness: `make large`, lab commit 353bfb7 plus the uncommitted experiment.
 The first `make large` (NL03, NL04, NL99 on one Large) aborted NL03 in setup
 with `22003: integer out of range` (the test table's generator multiplied an
 int past 2^31; fixed with a bigint cast) and ran NL04 to the end:

@@ -249,7 +249,7 @@ Inference, not measured: the conflicts in RR08e, RR08h and RR08j did not reach t
 ## Measured (2026-11-09, RR09, Team org, three runs, one complete)
 
 Full record: `RUNLOG.md`; artifacts `out/2026-11-09/`. Run 3
-(`run-2026-11-09T08-39-01-619Z`, lab commit 49b0933) holds every figure below
+(`run-2026-11-09T08-39-01-619Z`, lab commit dcdf5f0) holds every figure below
 except the last row, which quotes runs 1, 2 and 3. Small primary and Small replica in ap-southeast-1,
 `rr9_cold` 3.81 GB of heap, 8 clients, 90 s per arm, 50 random primary-key reads
 per GET.

@@ -6,7 +6,7 @@
   "projectRegion": "ap-southeast-1",
   "ref": "<ref>",
   "experiment": "edge-function-limits",
-  "labCommit": "dd2265a",
+  "labCommit": "596f29c",
   "toolVersions": {
     "bun": "1.3.14",
     "psql": "psql (PostgreSQL) 18.6",

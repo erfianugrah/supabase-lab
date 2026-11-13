@@ -6,7 +6,7 @@ Why: two questions the kit's control model leaves open: whether anyone can
 change production directly, and how a direct fix gets back into the
 repository. New page: `docs/CHANGE-MANAGEMENT.md`. The code of record for
 the K08 and K09 runs below is the commit that adds this entry; both
-artifacts carry `labCommit b8a3afd`, which predates the two modules (they
+artifacts carry `labCommit 78efac5`, which predates the two modules (they
 were untracked files when they ran).
 
 - **K08 (new, `make cm-probe`)**: two module runs, each on its own
@@ -120,8 +120,8 @@ under GHSA-rxp7-6hxx-x8q5 (moderate) via the shadcn CLI.
 
 ## 2026-10-13 - fourth full rebuild; kit left up
 
-First run through the kit after `1eda7df` (credentials off command lines,
-Makefile), `6e648e7` (sharp override) and two `db_password` rotations.
+First run through the kit after `390b459` (credentials off command lines,
+Makefile), `e1961e7` (sharp override) and two `db_password` rotations.
 `secrets.tfvars` compared equal to a fresh decrypt before the run.
 
 - Model key: one-token call to the in-app agent's model answered 200 before

@@ -168,7 +168,7 @@ none (unrecorded: no scan output was saved).
 Same pin (`8617532ae1a41571d5d557cd24c6f5f2565d9230`), same Docker Desktop
 host (Apple silicon; the engine reported 10 CPUs and MemTotal 8214851584
 bytes, operator read, not in the artifacts; version 29.9.2 and storage driver
-overlay2 are in the SD12 artifacts), lab base commit `661afdf` with the experiment
+overlay2 are in the SD12 artifacts), lab base commit `38a0f9c` with the experiment
 changes uncommitted while they ran. Another lab agent ran this rig's default
 stack (project `supabase`, the fixed container names, host ports 8000, 5432,
 6543) on the same engine for most of the session (operator read), so every stack here is a SLOT

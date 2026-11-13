@@ -6,7 +6,7 @@
   "projectRegion": "ap-southeast-2",
   "ref": "<ref>",
   "experiment": "sqlite-edge-compare",
-  "labCommit": "066dd4a",
+  "labCommit": "a6bcf66",
   "toolVersions": {
     "bun": "1.3.14",
     "psql": "psql (PostgreSQL) 18.6",

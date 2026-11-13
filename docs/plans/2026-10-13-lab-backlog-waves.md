@@ -37,7 +37,7 @@
   `bun test exit 0`. The pass count grows as tasks land: Task 1 adds 6 unit
   tests, and `harness/src/identifiers.test.ts` adds one case per new file
   under `experiments/*/out/` (every published run adds 2: the JSON and its
-  `.facts.md`). Baseline at 8fcdf00: `1596 pass`; with this plan file committed
+  `.facts.md`). Baseline at cd70b41: `1596 pass`; with this plan file committed
   (it is a tracked markdown file the scan covers) `1597 pass`. The running total for
   in-order execution is given in each task's verify step.
 - `make publish-evidence` prints one line per run:
@@ -521,7 +521,7 @@ Offline check that rendering an old artifact works (no ref, so no network):
 
 Run: `bun harness/src/run.ts --facts experiments/data-api-defaults/out/2026-10-13/run-2026-10-13T00-06-25-892Z.json | sed -n 3p`
 
-Expected: `Source artifact: run started 2026-10-13T00:06:25.892Z, finished ... vantage local, harness region ap-southeast-1 (not read from the project), lab commit 27a322f. Project ref omitted on purpose.`
+Expected: `Source artifact: run started 2026-10-13T00:06:25.892Z, finished ... vantage local, harness region ap-southeast-1 (not read from the project), lab commit e3d698c. Project ref omitted on purpose.`
 
 - [x] **Step 5: Commit**
 
@@ -1944,14 +1944,14 @@ Redacted copies, a `.facts.md` beside each, `out/2026-10-10/`:
 **Replace in `experiments/data-api-defaults/RUNLOG.md`:**
 
 ```text
-d8a16df plus the uncommitted tree that adds this experiment. n = 1 project per
+c733491 plus the uncommitted tree that adds this experiment. n = 1 project per
 run, one trial per probe. Postgres 17.11 on both projects.
 ```
 
 **with:**
 
 ```text
-d8a16df plus the uncommitted tree that adds this experiment. n = 1 project per
+c733491 plus the uncommitted tree that adds this experiment. n = 1 project per
 run, one trial per probe. Postgres 17.11 on both projects. Published
 (redacted, recovered from a session scratchpad on 2026-10-13): run 1
 `out/2026-10-09/run-2026-10-09T23-58-24-538Z.json` (UTC start date), run 2
@@ -2119,7 +2119,7 @@ the 2026-10-13 stocktake and is not touched.
 > **STATUS (stocktake 2026-10-13): SHIPPED** 2026-08-04: sampler and
 > `ctx.endpoints` in 4771889, D01/D02 with the Makefile and RUNLOG in f11146c,
 > D03/D04 in 597be6c (bite-time fix 04771e4, 2026-08-05); D05 added
-> 2026-10-01 in d293251. The checkboxes below were never ticked;
+> 2026-10-01 in 91ba409. The checkboxes below were never ticked;
 > `experiments/platform-downtime/RUNLOG.md` is the record of what ran.
 ```
 
@@ -2154,7 +2154,7 @@ the 2026-10-13 stocktake and is not touched.
 > **STATUS (stocktake 2026-10-13): SHIPPED** 2026-08-04: matrix primitive in
 > 9c8835e, sbperf reader in f3f5624, the nine probes and S01 in 67c95c2, S02
 > in e9858c2. Task 7's experiment Makefile was never written; the first run
-> went through medium-serverless on 2026-09-30 (ab47c63). The checkboxes
+> went through medium-serverless on 2026-09-30 (c706650). The checkboxes
 > below were never ticked; `experiments/pooler-semantics/RUNLOG.md` is the
 > record.
 ```
@@ -2423,7 +2423,7 @@ commits.
 
 - [x] **Step 2: Push** (the commit ids lexicanum links pin to must exist on the remote)
 
-> Done 2026-10-13: 20 commits 0addf0c..1047e1b pushed; the public mirror shows 1047e1b.
+> Done 2026-10-13: 20 commits 27e3185..1e03191 pushed; the public mirror shows 1e03191.
 
 ```bash
 git push
@@ -2445,7 +2445,7 @@ fallbacks).
 - [x] **Step 4: Lexicanum re-cite (separate repo, separate commit; not part of this plan's execution)**
 
 > Done 2026-10-13 in lexicanum 7a99147: 97 rows on 20 pages link the
-> facts.md published at ddd41b2 (76 files, all verified to exist). Unpublished
+> facts.md published at efc7203 (76 files, all verified to exist). Unpublished
 > modules unchanged (SP04, M03, M07, I01-I03, K06, K07). audit-trail-integrity
 > and multi-tenant-placement had no rows for these experiments. Older
 > experiments with out/ but no row links (client-retries, mgmt-api-faults,
@@ -2683,7 +2683,7 @@ git commit -m "fix: explicit Data API grants on SQL-created tables before the 20
 > O03 fails at O03b (`consent=404`, 2 of 2 runs) before O03c's grant runs;
 > W12 not run, because edge-resilience's tofu state is empty and `make up`
 > provisions two projects and a Worker (later the same day: W12 ran on one
-> API-created project instead and passed, bdb79b1, #176); T22 waits for #130. D09 surfaced an
+> API-created project instead and passed, a4971af, #176); T22 waits for #130. D09 surfaced an
 > outage-accounting gap in the module (compute-disk RUNLOG). Artifacts stay
 > in `evidence/` (none of the four experiments has a `publish-evidence`
 > target).
@@ -2890,7 +2890,7 @@ environment unless the entry says local.
 
 ## Dry-run status
 
-Dry-run 2026-10-13 on a copy of the repo at 8fcdf00 (rsync without `.git`
+Dry-run 2026-10-13 on a copy of the repo at cd70b41 (rsync without `.git`
 and `node_modules`, `node_modules` symlinked back, a fresh git index built
 from the real repo's `git ls-files` so the identifier scan sees the same
 tracked set). Every Replace/Append block in Tasks 1, 1b, 2-18 and 20 (74
@@ -2898,7 +2898,7 @@ blocks) was applied by a script that parses this file and refuses a block
 whose old text does not occur exactly once; every command block of those
 tasks that needs no network or credential was run as written.
 
-- Baseline: `tsc exit 0`; `bun test` 1596 pass / 0 fail at 8fcdf00, 1597
+- Baseline: `tsc exit 0`; `bun test` 1596 pass / 0 fail at cd70b41, 1597
   with this plan file added.
 - After Tasks 1, 1b, 2-12, 14-16, the offline parts of 13, 17 and 18, and
   Task 20: `tsc exit 0`; `bun test` 1755 pass / 0 fail; the app's

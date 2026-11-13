@@ -118,7 +118,7 @@ the SQL that creates `public.m01_payload` (M01) and `public.metering_hourly`
 (M05). Until the 2026-10-30 default change these grants repeat what the
 default already gives; the re-run checks that they execute and change no
 result. One run each, local vantage, Pro org, ap-southeast-1, run from source
-(`bun harness/src/run.ts`) at lab commit 8ec7f86, each project provisioned and
+(`bun harness/src/run.ts`) at lab commit 080124a, each project provisioned and
 deleted by its module. Artifacts are private (this experiment has no
 `publish-evidence` target): M05 `evidence/20261013-114237/run-2026-10-13T03-42-38-273Z.json`,
 M01 `evidence/20261013-114309/run-2026-10-13T03-43-10-147Z.json`.

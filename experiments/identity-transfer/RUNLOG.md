@@ -232,7 +232,7 @@ against the same issuer worker.
 | 2 | `out/2026-10-23/run-2026-10-23T08-19-09-467Z.{json,facts.md}` | 18 pass, 0 fail |
 | 3 | `out/2026-10-23/run-2026-10-23T08-19-57-569Z.{json,facts.md}` | 18 pass, 0 fail |
 
-All three artifacts carry lab commit 661afdf, the checkout's HEAD. Runs 2 and
+All three artifacts carry lab commit 38a0f9c, the checkout's HEAD. Runs 2 and
 3 ran with an uncommitted fix to `tests/it03-before-user-created.ts` that
 lands in the commit publishing these artifacts; IT01, IT02 and `lib/flow.ts`
 were the same code in all three runs. Outside the artifacts (manual, driver

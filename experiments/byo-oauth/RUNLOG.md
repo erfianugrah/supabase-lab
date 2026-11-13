@@ -101,7 +101,7 @@ refresh rotates -> org-scoped access -> revoke kills instantly.
 Task 20 of `docs/plans/2026-10-13-lab-backlog-waves.md` added `grant select,
 insert, update, delete on table public.o03_docs to anon, authenticated,
 service_role` to O03c's setup SQL. Two runs, local vantage, Pro org,
-ap-southeast-1, run from source at lab commit 8ec7f86, each project
+ap-southeast-1, run from source at lab commit 080124a, each project
 provisioned and deleted by the module. Artifacts are private (no
 `publish-evidence` target here): `evidence/20261013-114454/run-2026-10-13T03-44-55-057Z.json`
 and `evidence/20261013-114559/run-2026-10-13T03-45-59-555Z.json`.
@@ -151,9 +151,9 @@ after the PATCH; (2) O03-control then polls that document every 2 s, budget
 (1) only; runs 3-4 used (1) and (2). Nothing else changed between them.
 
 Four runs, `make probe` equivalent (`--only O03 --experiment byo-oauth`),
-local vantage, Pro org, ap-southeast-1, lab commit adc597c plus
+local vantage, Pro org, ap-southeast-1, lab commit 7600c61 plus
 uncommitted module changes: runs 1-2 ran change (1) alone, runs 3-4 ran (1)
-and (2); `labCommit` reads adc597c in all four artifacts and does not
+and (2); `labCommit` reads 7600c61 in all four artifacts and does not
 separate them. Other agents were running live work from the same Mac.
 `oauth_ready_ms` is measured from the PATCH response to the arrival of the
 first discovery 200, including each request's round trip; with requests 2 s
