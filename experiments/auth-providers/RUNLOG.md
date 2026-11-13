@@ -3,14 +3,14 @@
 Vantage for every row: one workstation (macOS, local Docker) in the lab,
 the Management API at api.supabase.com, throwaway projects in ap-southeast-1.
 Harness run from source (`bun harness/src/run.ts --where local`), lab commit
-d8a16df plus the uncommitted files of this experiment. The Auth server
+c733491 plus the uncommitted files of this experiment. The Auth server
 version is not exposed by the platform and was not recorded. supabase-js
 2.112.3 (root lockfile); the browser is the Chromium that ships in the
 Playwright container image named in `tests/au02-passkeys.ts`; AU02a records
 its build in the `chromium` measurement.
 
 All runs 2026-10-10 (UTC 00:09 to 00:27 for the artifacts cited below)
-except AU05 (2026-11-12, lab commit d41d9cd; see its section). n is
+except AU05 (2026-11-12, lab commit 74ce217; see its section). n is
 1 run per row unless a row says otherwise; each module created its own
 `au-*` project on the Pro org (AU01 also one on a Free org) and
 deleted it in `finally`. The numbers below are pasted from the harness's
@@ -160,7 +160,7 @@ Does an Auth config write through the Management API lift the cap, and is it
 the write or elapsed time that does?
 
 Harness: `bun harness/src/run.ts --where local --experiment auth-providers
---only AU05 --destructive` with `PVLAB_ORG_PRO`, lab commit d41d9cd with AU05
+--only AU05 --destructive` with `PVLAB_ORG_PRO`, lab commit 74ce217 with AU05
 uncommitted at run time (committed as run, except that the placeholder client
 secret, a fixed string at run time, is now built per provider so secret
 scanners do not match it). Two throwaway Pro-org projects

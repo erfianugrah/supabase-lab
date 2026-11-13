@@ -53,7 +53,7 @@ and pooler-checkout.
 
 ## 2026-11-04 - EB01-EB03 (run 1) and EB01, EB02 at higher rates (run 2)
 
-Harness: lab commit 1360735 plus the uncommitted experiment. Org: the lab's
+Harness: lab commit 9c57eea plus the uncommitted experiment. Org: the lab's
 Team-plan org, passed through `PVLAB_ORG_PRO` (EB01a `org_plan` team), as
 data-api-capacity DC22 did on 2026-11-03/04. The Pro org was not usable: a
 smoke run on it earlier the same day (per function: one 10 s step at 5

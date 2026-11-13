@@ -50,7 +50,7 @@ describe("isMeasuredLine", () => {
     for (const line of [
       "Run on 2026-10-26 from ap-southeast-1.",
       "The pooler listens on port 6543 and 5432.",
-      "Fixed in commit adc597c (and 7505077).",
+      "Fixed in commit 7600c61 (and a808c1a).",
       "Tracked as card #236 and #257.",
       "Store the dump in S3 over IPv4 and HTTP/2.",
       "Built for x86_64 and arm64, Node 22, Postgres 17.6.",
@@ -67,7 +67,7 @@ describe("figuresOnLine", () => {
   });
 
   test("commit ids, run artifact names and version strings are not figures", () => {
-    expect(figuresOnLine("lab commit 848b9f3 plus 661afdf, `oha` 1.16.0 for DC07, 4.5 s receiver")).toEqual(["4.5"]);
+    expect(figuresOnLine("lab commit 353bfb7 plus 38a0f9c, `oha` 1.16.0 for DC07, 4.5 s receiver")).toEqual(["4.5"]);
     expect(figuresOnLine("| `run-2026-10-26T00-24-19-000Z` | AR06d | `out/2026-10-23/run-2026-10-23T08-17-52-950Z.json` |")).toEqual([]);
   });
 });

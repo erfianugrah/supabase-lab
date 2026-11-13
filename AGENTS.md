@@ -2382,7 +2382,7 @@ Edge Function on the project and registered with `POST
   `hook_before_user_created_uri: ""` got HTTP 400, run 1, 2 of 2 calls), then
   read the flag back. Run 1's IT03d/IT03z failures were module bugs (that 400
   and a stranger numbering that re-signed an existing user), fixed before runs
-  2 and 3; the artifacts' lab commit 661afdf predates that fix.
+  2 and 3; the artifacts' lab commit 38a0f9c predates that fix.
 
 ## experiments/audit-integrity - key facts (validated 2026-09-08, micro x2 on Pro + Team orgs; entitlements and members read on Free + Pro + Team)
 
@@ -2633,7 +2633,7 @@ assumes prose quotes by paste.
   markdown tables (offline, no credential). Quote from it.
 - `make publish-evidence RUN=evidence/<ts>/run-<stamp>.json` (per experiment)
   redacts refs, project and pooler hostnames, emails and home-directory paths
-  (since 2026-10-13, fe57b6d) and writes the artifact
+  (since 2026-10-13, c0482bd) and writes the artifact
   plus its facts.md to `out/<date>/`, which IS committed (`.gitignore` carves
   dated `experiments/*/out/20*/` directories out of `**/out/`; raw artifacts
   at an `out/` root stay ignored). edge-resilience's 14 raw runs from
@@ -2895,7 +2895,7 @@ Redacted artifacts: `out/2026-09-30/`. Details: RUNLOG.md.
   destroyed or the whole run dies; `import.meta.dir` in the compiled binary is
   the bundle. `publish-evidence` redacts keys and values alike (it runs over
   the raw JSON text). Until 2026-10-06 its `\b[a-z]{20}\b` let a ref
-  touching `_` through (`2220627`, work-supabase-lab#10); a dot-joined
+  touching `_` through (`4f7b895`, work-supabase-lab#10); a dot-joined
   `postgres.<ref>` was always caught, so the 2026-09-30 key leak most likely
   had the ref next to `_` or a digit (inferred - the leaked key was not kept).
 

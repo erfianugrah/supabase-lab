@@ -10,7 +10,7 @@ page named in the module header.
 ## 2026-10-22 - three runs (vantage: this lab's Mac, over the public internet)
 
 Harness: `make run`, `--destructive`. All three artifacts carry lab commit
-3a2f9bd; the uncommitted tree that adds this experiment differed per run
+f3e1ade; the uncommitted tree that adds this experiment differed per run
 (the probe changes below). One fresh project per run. The Postgres version
 was queried at setup (`lib/project.ts`) but not written to the artifact; the
 PostgREST version was not read. Published (redacted) under
@@ -344,7 +344,7 @@ statements (the lab's wording of the opt-in) before PT01a, standing in for
 the 2026-10-30 default, which is not measured here.
 
 Harness: `make run ONLY=PT01,PT99`, `--destructive`, two fresh projects in
-parallel, plus one standalone probe. The artifacts carry lab commit 77cdea0;
+parallel, plus one standalone probe. The artifacts carry lab commit ff9fbf6;
 the uncommitted tree held this fix. Postgres version on the probe's project:
 `PostgreSQL 17.11` (not written by the two harness runs). Published
 (redacted) under `out/2026-10-23/`:

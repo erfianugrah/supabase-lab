@@ -240,7 +240,7 @@ server version, and says older clients drop binary silently.
 ## 2026-10-26 - RT05 on 2XL (subscription bursts at 2000 and 5000 joins)
 
 Artifact: `out/2026-10-26/run-2026-10-26T01-21-52-456Z.json` (15 results,
-all `info`). Lab commit 848b9f3 plus the uncommitted `RT05_COMPUTE`,
+all `info`). Lab commit 353bfb7 plus the uncommitted `RT05_COMPUTE`,
 `RT05_BOUNDS` and `RT05_BC_LEVELS` knobs. Run started 01:21:52 UTC and
 finished 01:33:06 UTC. The project was not created by RT05: it was the
 data-api-capacity DC13/DC14 project (created Small through `POST
@@ -472,7 +472,7 @@ policies are cached for the duration of the connection. Your database is
 not queried for every Channel message.").
 
 Artifacts, three projects, each created and deleted by RT06 (lab commit
-c2de0d9 plus the uncommitted RT06 module):
+21c54ae plus the uncommitted RT06 module):
 
 | run | artifact | compute at creation | shape reps | Broadcast send reps |
 | --- | --- | --- | --- | --- |

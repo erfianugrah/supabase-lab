@@ -179,7 +179,7 @@ answered, flagged partial.
 Vantage: this lab's Mac over the public internet (the "client"); the Edge
 Function was served in ap-southeast-1 (`SB_REGION` and `x-sb-edge-region`
 both `ap-southeast-1`, X04f). Harness: `make fanout`, `--destructive`, from
-source with bun; all three artifacts carry lab commit 661afdf with the
+source with bun; all three artifacts carry lab commit 38a0f9c with the
 uncommitted tree that adds these modules (between runs 1 and 2, X07 gained the
 dead_ref DNS row and the restart timeline evidence, and leg errors lost the
 request URL; before run 3, the "never answers" target changed, below).
@@ -429,7 +429,7 @@ override it uses the single row of `public.xaud_oauth_aud` when one exists.
 The custom access token hook docs (as read 2026-10-23) list `aud` as a
 required claim, typed `string` in the hook's JSON schema.
 
-Harness: `make fanout XF_ONLY=X08,X09,X99`, lab commit 77cdea0 plus the
+Harness: `make fanout XF_ONLY=X08,X09,X99`, lab commit ff9fbf6 plus the
 uncommitted tree that adds these modules. Published (redacted) under
 `out/2026-10-23/`:
 

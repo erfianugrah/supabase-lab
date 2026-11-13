@@ -5,7 +5,7 @@
   "region": "ap-southeast-1",
   "ref": "<ref>",
   "experiment": "replica-routing",
-  "labCommit": "adc597c",
+  "labCommit": "7600c61",
   "toolVersions": {
     "bun": "1.3.14",
     "psql": "psql (PostgreSQL) 18.6",

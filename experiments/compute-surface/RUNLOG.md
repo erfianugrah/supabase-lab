@@ -3,7 +3,7 @@
 ## CS00 - Compute enrollment gate (2026-10-23)
 
 One run, n = 1 per row. Vantage: one macOS machine in Singapore (Bun 1.3.14),
-lab commit 661afdf. Project: one Micro project (`ci_micro` read back from
+lab commit 38a0f9c. Project: one Micro project (`ci_micro` read back from
 billing add-ons) in ap-southeast-1 on a Pro-plan organization, created by
 CS00 and deleted in its `finally` (DELETE HTTP 200; absent from
 `GET /v1/projects` at 08:34:29 UTC). Key: the lab PAT for every row except

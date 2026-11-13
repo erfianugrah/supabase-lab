@@ -18,7 +18,7 @@ visible from outside.
 ## 2026-10-23 - two runs (vantage: this lab's Mac, over the public internet)
 
 Harness: `make run`, modules AV01, AV02, AV03 and AV99, `--destructive`, lab
-commit 661afdf plus the uncommitted tree that adds this experiment. One
+commit 38a0f9c plus the uncommitted tree that adds this experiment. One
 project per run, n = 2 projects, one trial per probe per run. Postgres 17.11
 on both. Published: run 1 `out/2026-10-23/run-2026-10-23T07-58-18-094Z.json`,
 run 2 `out/2026-10-23/run-2026-10-23T08-01-46-405Z.json`, each with a

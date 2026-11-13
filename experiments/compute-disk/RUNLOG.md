@@ -101,7 +101,7 @@ query timeouts. Write load: two sessions each insert 500,000 rows of
 `repeat('x', 1900)` into their own table (2049 MB heap, 1974 MB WAL per
 load), timed as the longer of the two sessions' INSERT statements; an
 `unlogged` variant (no WAL) is the control for how much of that time is WAL
-I/O. All four artifacts read lab commit 1360735; the module was uncommitted
+I/O. All four artifacts read lab commit 9c57eea; the module was uncommitted
 and changed between runs (run 1 required the Data API; runs 1 and 2 targeted
 6,000 IOPS; run 3 has the `accepted_after_grow_post_s` bug; D13b lists every
 attempt only since after run 4, so no artifact here has that list).
@@ -322,7 +322,7 @@ Reading (inference from the aggregates, not a sample-level measurement):
 
 One run, local vantage, Pro org, `ap-southeast-1`, one throwaway project
 created and deleted by the module, run from the working tree on lab commit
-661afdf with this entry's module changes. Artifact:
+38a0f9c with this entry's module changes. Artifact:
 `out/2026-10-23/run-2026-10-23T07-56-13-302Z.json` (facts next to it).
 Probe table ready 7 s after seeding; baseline 0 failures on every path (0/39
 `rest_read`, 0/40 `auth_health`, 0/10 `realtime_join`). Every PATCH answered
@@ -364,7 +364,7 @@ Task 20 of `docs/plans/2026-10-13-lab-backlog-waves.md` appended `grant
 select, insert, update, delete on table public.dpython_probe to anon,
 authenticated, service_role` to the SQL that creates the table D09's REST
 sampler reads with the anon key. One run, local vantage, Pro org,
-ap-southeast-1, run from source at lab commit 8ec7f86, project provisioned and
+ap-southeast-1, run from source at lab commit 080124a, project provisioned and
 deleted by the module. Artifact:
 `out/2026-10-13/run-2026-10-13T03-46-20-408Z.json` (published 2026-10-23).
 

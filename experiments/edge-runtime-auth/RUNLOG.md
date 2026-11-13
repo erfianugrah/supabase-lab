@@ -22,7 +22,7 @@ published `@supabase/server` 1.9.1 package (https://github.com/supabase/server).
 | wrangler in the container | 4.149.0 | `wrangler --version` in the image |
 | workerd build | not recorded | bundled inside wrangler; no version query was run |
 | vantage | this machine, Singapore; Cloudflare trace `colo=SIN loc=SG` | `ER02-setup` |
-| lab commit | d8a16df plus the uncommitted experiment directory | artifact header |
+| lab commit | c733491 plus the uncommitted experiment directory | artifact header |
 
 ## What the workerd runs are, and are not
 
@@ -426,7 +426,7 @@ Question: does `@supabase/server` behave on a Bun server as it does on an Edge
 Function, and do the named-key forms of `auth` (`publishable:<name>`,
 `secret:<name>`, the wildcard `:*`, a name that is not configured, and arrays
 mixing them) do what the package docs say? Package `@supabase/server` 1.9.1
-(the pin in this directory), Bun 1.3.14, lab commit 661afdf plus the
+(the pin in this directory), Bun 1.3.14, lab commit 38a0f9c plus the
 uncommitted ER03 files.
 
 Runs (n = 2 projects, one per run, each with every matrix run twice):

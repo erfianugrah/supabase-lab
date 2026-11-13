@@ -43,7 +43,7 @@ catalog query needed a `relkind::text` cast. Project deleted.
 
 ## 2026-10-23 - run 1 (Management API writer only)
 
-Harness: `make run`, lab commit 661afdf plus this experiment uncommitted.
+Harness: `make run`, lab commit 38a0f9c plus this experiment uncommitted.
 Published: `out/2026-10-23/run-2026-10-23T07-58-02-745Z.json` and its
 `.facts.md`, 23 results. UI05's two public-table rows failed on a harness bug
 (the age query returned `ui_events` without its schema, so the lookup by
@@ -332,7 +332,7 @@ key, `Prefer: return=representation`, 15 s client timeout); the fixture
 grants `select, insert` on `ui_client` and sequence usage to `service_role`
 explicitly, and `ui_sysid()` / `ui_lsn()` are SECURITY DEFINER so the
 PostgREST role reads the same identity. Harness: `make run`, lab commit
-adc597c plus this experiment staged. Vantage as above; other agents ran live
+7600c61 plus this experiment staged. Vantage as above; other agents ran live
 work from the same Mac at the time. Published:
 `out/2026-10-26/run-2026-10-26T05-45-51-382Z.json` and `.facts.md`, 32
 results (17 pass, 2 fail, 2 skip, 11 info; the fails are UI04c and

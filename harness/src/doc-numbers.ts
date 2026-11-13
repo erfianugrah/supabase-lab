@@ -67,7 +67,7 @@ const notAFigure = (n: string) => /^(19|20)\d\d$/.test(n) || /^\d{1,2}$/.test(n)
 
 // Tokens whose digits are not figures: run artifact names
 // (run-2026-10-26T00-24-19-000Z), commit ids with at least one hex letter
-// (848b9f3; an all-digit id such as 4141477 still reads as a number) and
+// (353bfb7; an all-digit id such as 3c53268 still reads as a number) and
 // dotted versions (1.16.0, 2.118.0).
 const NOT_FIGURES = [/run-\d{4}-\d\d-\d\dT[\d-]+Z/g, /\b(?=[0-9a-f]*[a-f])(?=[0-9a-f]*\d)[0-9a-f]{7,40}\b/g, /\b\d+\.\d+\.\d+\b/g];
 

@@ -9,7 +9,7 @@ UTC; probe times are the orchestrator's clock, relative to the request.
 ## 2026-10-28 - CB01-CB05 (two runs), CB02 re-run
 
 Harness: `make run LABEL=a` and `make run LABEL=b` in parallel (two
-projects), lab commit c2de0d9 plus the uncommitted experiment; then `make
+projects), lab commit 21c54ae plus the uncommitted experiment; then `make
 run LABEL=c IDS=CB02,CB99` after a fix to CB02a. Published in
 `out/2026-10-28/`: run a `run-2026-10-28T08-24-27-769Z`, run b
 `run-2026-10-28T08-25-24-631Z`, run c `run-2026-10-28T08-45-41-492Z` (each

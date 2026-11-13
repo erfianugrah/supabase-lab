@@ -5,7 +5,7 @@
   "region": "ap-southeast-1",
   "ref": "<ref>",
   "experiment": "static-hosting",
-  "labCommit": "c4d44be",
+  "labCommit": "3779b06",
   "toolVersions": {
     "bun": "1.3.14",
     "psql": "psql (PostgreSQL) 18.6",

@@ -97,7 +97,7 @@ service_role API key. All rows are one run each.
 Two runs. Run 1 (`out/2026-10-23/run-2026-10-23T07-51-57-032Z.json`) ran an
 earlier, uncommitted version of the module: Management API observer, no
 warm-up, 150 s Data API holds, steps 10/20/30/45. Both artifacts stamp lab
-commit 661afdf, which predates H02. Run 1's observer, the Management API
+commit 38a0f9c, which predates H02. Run 1's observer, the Management API
 query endpoint, logs in as `postgres` (`rolsuper` false) and was itself
 refused at the limit, so from its H02e on it saw nothing; its H02b rows
 include 8 `404` HTML answers from workers.dev during deploy propagation
@@ -304,7 +304,7 @@ Three runs, all in `out/2026-10-23/`: run 1
 (`run-2026-10-23T09-28-56-267Z.json`, Q2 then Q1), run 2
 (`run-2026-10-23T10-06-17-500Z.json`, Q2 only) and run 3
 (`run-2026-10-23T10-12-40-066Z.json`, Q2 only). The artifacts stamp lab
-commit 235cac8, which predates H03. Only the postgrest_logs capture changed
+commit 56f6174, which predates H03. Only the postgrest_logs capture changed
 between runs: run 1 kept every line in time order under a 6000-character cap,
 which ended in the first arm's reset, so its log fields are not used; run 2
 kept each arm's lines in order under a 4000-character cap, which ended about
@@ -511,7 +511,7 @@ was the shakedown, with a 150 s Q1 watch (nothing closed in it; its Q1 log
 read, a `limit 5000` query ordered by timestamp, came back with exactly 1000
 rows starting 598 s before load end, so its Q1 log fields are not used) and
 the full Q2; run 2 (`run-2026-10-26T06-14-10-950Z.json`) ran the 2700 s Q1
-watch and Q2. Both ran from uncommitted code on base adc597c (the lab commit
+watch and Q2. Both ran from uncommitted code on base 7600c61 (the lab commit
 both artifacts record, which predates the module). Run 1 ran an earlier
 revision: its `postgres_logs` read used `limit 5000` over the last 3 hours
 instead of starting 5 s before load end, it did not fold session times

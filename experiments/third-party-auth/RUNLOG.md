@@ -84,7 +84,7 @@ applies. All tier-independent, and it is not a paid-only feature.
 
 One throwaway Micro project in a Pro org, ap-southeast-1, created through the
 Management API (not `make apply`), probed with `PVLAB_REF` set, deleted the
-same session. Lab commit 661afdf plus the uncommitted tree that adds
+same session. Lab commit 38a0f9c plus the uncommitted tree that adds
 TPA05/TPA06. Three runs on that project, each with a
 fresh issuer key registered and removed in the module:
 

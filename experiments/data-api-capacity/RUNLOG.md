@@ -14,7 +14,7 @@ region (section below).
 
 ## 2026-11-03/04 - DC22, requests for missing tables and functions against other Data API requests (three runs)
 
-Harness: lab commit 5102785 plus the uncommitted DC22 module (runs 2 and
+Harness: lab commit 69ea595 plus the uncommitted DC22 module (runs 2 and
 3 also have its `curve` and `S` phases, added after run 1). Org: the lab's
 Team-plan org, passed through `PVLAB_ORG_PRO` (the module reads
 `ctx.orgs.pro` like every DC module; the Pro org was not used).
@@ -285,7 +285,7 @@ about 15 minutes).
 
 ## 2026-10-27 - DC18 recovery after a write stall under a fixed rate, DC19 bursts against the gateway's 503 overflow (two runs)
 
-Harness: lab commit af374bd plus the uncommitted DC18 and DC19 modules and
+Harness: lab commit 81830ee plus the uncommitted DC18 and DC19 modules and
 `lib/oha.ts` (run 2 also has DC18's drain column, added between the runs).
 Two Pro-org projects in ap-southeast-1, one per run, run one after the
 other from this lab's Mac in Singapore (10 cores) with `caffeinate -is` (no
@@ -446,7 +446,7 @@ Two Pro-org projects: Small for about 27 minutes, 4XL for about 20 minutes.
 
 ## 2026-10-26 - DC16 Realtime pool on a project created at 2XL, DC17 the gateway's long-request timeout (one run each)
 
-Harness: lab commit adc597c plus the uncommitted DC16 and DC17 modules (and
+Harness: lab commit 7600c61 plus the uncommitted DC16 and DC17 modules (and
 DC13's Realtime row moved to `lib/rt-read.ts`, unchanged). Three Pro-org
 projects in ap-southeast-1, one per process, the three processes started
 within 22 s of each other from this lab's Mac in Singapore (other agents
@@ -637,7 +637,7 @@ Small.
 
 ## 2026-10-26 - DC09 function-level statement timeouts, DC12 PGRST003 resends (one run)
 
-Harness: `make run ONLY=DC09,DC12,DC99`, lab commit 848b9f3 plus the
+Harness: `make run ONLY=DC09,DC12,DC99`, lab commit 353bfb7 plus the
 uncommitted DC09 and DC12 modules. One Pro-org project, ap-southeast-1,
 Small throughout (`db_pool` unset at creation), deleted by DC99 (DELETE 200,
 absent from the listing at once; `make clean` listed 0 `pvlab-dc-` projects
@@ -791,7 +791,7 @@ start and finish stamps), Small throughout, one project.
 
 ## 2026-10-26 - DC13-DC15, defaults per size up to 2XL, statements of a few seconds, a set pool across a resize (one run each)
 
-Lab commit 848b9f3 plus the uncommitted DC13-DC15 modules (`lib/tier.ts`,
+Lab commit 353bfb7 plus the uncommitted DC13-DC15 modules (`lib/tier.ts`,
 the `lib/dc.ts` changes). Five projects on the Pro org, ap-southeast-1 (the
 main project, the DC15 custom project and three DC15 control projects, two
 of which failed before any read and are not published), each created with
@@ -1031,7 +1031,7 @@ how billing rounds partial hours was not checked.
 ## 2026-10-23 - DC08, in-region clients and an application-like mix on 4XL (one run)
 
 Harness: `make run ONLY=DC08,DC99` with `PVLAB_DC_REGION=ap-northeast-2`
-and `PVLAB_DC_SIZE=small`, lab commit 235cac8 plus the uncommitted DC08
+and `PVLAB_DC_SIZE=small`, lab commit 56f6174 plus the uncommitted DC08
 module and generator. One Pro-org project, created Small, resized to 4XL
 (`ci_4xlarge`) in DC08a, deleted by DC99. Published:
 `out/2026-10-23/run-2026-10-23T09-37-44-863Z.json` (13 results) and its
@@ -1294,7 +1294,7 @@ Function calls, summed from the artifact's `gen_invocations`,
 
 Harness: `make run ONLY=DC05,DC06,DC07,DC99` with
 `PVLAB_DC_REGION=ap-northeast-2` and `PVLAB_DC_SIZE=small`, lab commit
-661afdf plus the uncommitted DC05-DC07 modules. One Pro-org project, Small
+38a0f9c plus the uncommitted DC05-DC07 modules. One Pro-org project, Small
 for the whole run (shared CPU per the compute docs, no core count published; `max_connections` 90 was
 read by DC04a on the same size, not in this artifact; `db_pool` unset at
 creation), deleted by DC99. The artifact's top-level `region`
@@ -1490,7 +1490,7 @@ gone from the listing at once). `make clean` afterwards listed 0
 ## 2026-10-23 - DC04, request rate instead of request duration (one run)
 
 Harness: `make run ONLY=DC04,DC99` with `PVLAB_DC_REGION=ap-northeast-2`
-and `PVLAB_DC_SIZE=small`, lab commit 4141477 plus the uncommitted DC04
+and `PVLAB_DC_SIZE=small`, lab commit 3c53268 plus the uncommitted DC04
 module. One Pro-org project, Small, resized to 4XL (`ci_4xlarge`) in DC04c,
 deleted by DC99. Load generator: `oha` 1.16.0, closed loop, 40 s per step,
 one GET `/rest/v1/dc_items?id=eq.4242&select=id,payload` (indexed point read
@@ -1600,7 +1600,7 @@ start and finish stamps), Small until DC04c and 4XL after, deleted by DC99
 ## 2026-10-22/23 - four runs (run 4 is the reference)
 
 Harness: `make run` (DC01, DC02, DC03, DC99, `--destructive`), lab commit
-3a2f9bd plus the uncommitted tree that adds this experiment. All figures
+f3e1ade plus the uncommitted tree that adds this experiment. All figures
 below are run 4 unless a run is named. Published (redacted):
 
 - run 1 `out/2026-10-22/run-2026-10-22T23-02-55-371Z.json` (13 results)
