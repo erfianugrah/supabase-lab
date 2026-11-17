@@ -254,9 +254,13 @@ Platform/API:
   `POST /platform/projects/{ref}/privatelink/associations/aws-account`,
   statuses CREATING | READY | ASSOCIATION_ACCEPTED |
   ASSOCIATION_REQUEST_EXPIRED | CREATION_FAILED | DELETING.
-- The PrivateLink UI is gated on a per-org feature flag PLUS a
-  server-side entitlement; a fresh Team org shows neither until both
-  are granted (beta). eu-central-2 is excluded from PrivateLink.
+- On 2026-07-31 (run 3) the PrivateLink UI was gated on a per-org
+  feature flag PLUS a server-side entitlement; a fresh Team org showed
+  neither until both were granted (beta). The docs have since described
+  it as self-serve on Team and Enterprise (lexicanum
+  supabase-aws-privatelink, read 2026-10-30); whether a fresh Team org
+  still needs the grant is not re-measured.
+  eu-central-2 is excluded from PrivateLink.
 - supabase TF provider (supabase/supabase ~> 1.10) has NO privatelink
   resource; `supabase_settings.network` (restrictions JSON) verified:
   shape applies clean and survives public-access closure to a /32
@@ -3717,7 +3721,8 @@ per use case in its README, per module in its RUNLOG; artifacts
   is not settled.
 - **Contention (TD04, 256 ops per cell)**: no errors and no lost updates on any
   backend up to 64 writers; Turso (libSQL) per-op p50 rose to 1690.5-2186 ms
-  at C64 with fewer ops/s than at C16 (one sample per cell), D1 and Postgres held 250-256.5 ms. D1's
+  at C64 in run 1 (1690.5-2592.5 ms across all three runs, RUNLOG) with fewer
+  ops/s than at C16 (one sample per cell), D1 and Postgres held 250-256.5 ms in run 1. D1's
   `overloaded` point was not reached. The libSQL C64 drop repeated in three
   runs (two of them SIN only). The Turso engine needs `tursodb_enabled` on the
   org (the Platform API refuses `use_tursodb: true` with HTTP 400 until an
