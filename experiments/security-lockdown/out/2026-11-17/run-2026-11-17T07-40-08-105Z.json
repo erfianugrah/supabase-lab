@@ -1,0 +1,102 @@
+{
+  "startedAt": "2026-11-17T07:40:08.105Z",
+  "finishedAt": "2026-11-17T07:40:28.850Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "security-lockdown",
+  "labCommit": "fd0b484",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.7",
+    "pgbench": "pgbench (PostgreSQL) 18.7",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "S26s",
+      "title": "Setup: self-provisioned Pro-org Micro, one RLS table readable by authenticated",
+      "status": "info",
+      "detail": "created in 4 s, PostgreSQL 17.12; secret key present true, publishable present true; setup ok",
+      "measurements": {
+        "create_s": 4,
+        "pg": "PostgreSQL 17.12",
+        "secret_key_present": "true",
+        "publishable_present": "true"
+      },
+      "durationMs": 20745
+    },
+    {
+      "id": "S26a",
+      "title": "an unsigned (alg none) token claiming role authenticated is refused",
+      "status": "pass",
+      "detail": "Token header {\"alg\":\"none\"}, empty signature, role authenticated, aud authenticated, this project's issuer. Data API with the legacy anon apikey -> 401 PGRST301: Wrong or unsupported encoding algorithm, rows -1. With the publishable key -> 401 PGRST301: Wrong or unsupported encoding algorithm. Auth GET /user -> 403 bad_jwt: invalid JWT: unable to parse or verify signature, token signature is invalid: signing method none is invalid.",
+      "measurements": {
+        "rest_anon_status": 401,
+        "rest_anon_code": "PGRST301: Wrong or unsupported encoding algorithm",
+        "rest_publishable_status": 401,
+        "user_status": 403,
+        "user_code": "bad_jwt: invalid JWT: unable to parse or verify signature, t"
+      },
+      "durationMs": 20745
+    },
+    {
+      "id": "S26b",
+      "title": "an anonymous sign-in carries role authenticated, so a 'to authenticated' policy admits it until a restrictive is_anonymous policy is added",
+      "status": "pass",
+      "detail": "PATCH external_anonymous_users_enabled -> 200; anonymous sign-in -> 200 after 5 s. Its JWT: role \"authenticated\", is_anonymous true, aud \"authenticated\". Read under \"for select to authenticated using (true)\" -> 200, 3 of 3 rows. Restrictive policy on (auth.jwt()->>'is_anonymous') is not true (ok) -> anonymous user 200, 0 rows; a password user (create 200, sign-in 200) -> 200, 3 rows.",
+      "measurements": {
+        "anon_enable_patch": 200,
+        "anon_signin_status": 200,
+        "anon_role_claim": "authenticated",
+        "anon_is_anonymous_claim": "true",
+        "anon_rows_permissive": 3,
+        "anon_rows_restrictive": 0,
+        "password_rows_restrictive": 3
+      },
+      "durationMs": 20745
+    },
+    {
+      "id": "S26c",
+      "title": "sb_secret_ key: browser User-Agent and Origin, and Authorization without apikey",
+      "status": "info",
+      "detail": "Data API, secret key in apikey: server UA -> 200; browser UA -> 401 Forbidden use of secret API key in browser; browser UA + Origin -> 401 Forbidden use of secret API key in browser; server UA + Origin -> 200. Secret key only as Authorization: Bearer, no apikey -> 401 No API key found in request. Auth admin list with the secret key: server UA -> 200; browser UA -> 401 Forbidden use of secret API key in browser.",
+      "measurements": {
+        "rest_server_ua": 200,
+        "rest_browser_ua": 401,
+        "rest_browser_ua_origin": 401,
+        "rest_server_ua_origin": 200,
+        "rest_bearer_only": 401,
+        "auth_admin_server_ua": 200,
+        "auth_admin_browser_ua": 401,
+        "browser_refusal_code": "Forbidden use of secret API key in browser"
+      },
+      "durationMs": 20745
+    },
+    {
+      "id": "S26d",
+      "title": "Realtime accepts a WebSocket upgrade carrying a foreign Origin",
+      "status": "info",
+      "detail": "wss /realtime/v1/websocket with the anon key. No Origin -> opened true, heartbeat answered true, closed 1000. Origin https://attacker.example -> opened true, heartbeat answered true, closed 1000. A socket that opens and answers under a foreign Origin means the hosted endpoint does not enforce check_origin; the anon key and RLS remain the gate.",
+      "measurements": {
+        "no_origin_opened": "true",
+        "no_origin_replied": "true",
+        "foreign_origin_opened": "true",
+        "foreign_origin_replied": "true",
+        "foreign_close_code": 1000
+      },
+      "durationMs": 20745
+    },
+    {
+      "id": "S26z",
+      "title": "Teardown",
+      "status": "info",
+      "detail": "DELETE 200, gone from GET /projects after 0 s",
+      "measurements": {
+        "delete_status": 200,
+        "gone_s": 0
+      },
+      "durationMs": 20745
+    }
+  ]
+}

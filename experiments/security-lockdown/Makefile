@@ -11,7 +11,7 @@ RL_PORT ?= 8080
 RLW_PORT ?= 8788
 EDGE_PORT ?= 8081
 
-.PHONY: init fmt validate apply probe probe-s23 probe-s24 echo-worker-up echo-worker-down publish-evidence destroy postgrest-up postgrest-down ratelimit-up ratelimit-down ratelimit-worker-up ratelimit-worker-down edge-up edge-down
+.PHONY: init fmt validate apply probe probe-s23 probe-s24 probe-s25 probe-s26 probe-s27 echo-worker-up echo-worker-down publish-evidence destroy postgrest-up postgrest-down ratelimit-up ratelimit-down ratelimit-worker-up ratelimit-worker-down edge-up edge-down
 
 init:
 	tofu init
@@ -133,6 +133,36 @@ probe-s24:
 	@mkdir -p evidence/$(TS)
 	$(HARNESS_RUN) --where local --experiment security-lockdown \
 		--only S24 --destructive --out evidence/$(TS)
+
+# S25: self-provisioned like S23/S24 (cf-ipcountry forge, PGRST202 hints after
+# the S21 revoke, hook + pg_cron after the revoke, request.headers in Storage).
+probe-s25:
+	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "export SUPABASE_ACCESS_TOKEN"; exit 1)
+	@test -n "$$PVLAB_ORG_PRO" || (echo "export PVLAB_ORG_PRO"; exit 1)
+	@$(HARNESS_BUILD)
+	@mkdir -p evidence/$(TS)
+	$(HARNESS_RUN) --where local --experiment security-lockdown \
+		--only S25 --destructive --out evidence/$(TS)
+
+# S26: self-provisioned (alg none token, anonymous sign-in role, sb_secret_ key
+# from a browser User-Agent, Realtime upgrade with a foreign Origin).
+probe-s26:
+	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "export SUPABASE_ACCESS_TOKEN"; exit 1)
+	@test -n "$$PVLAB_ORG_PRO" || (echo "export PVLAB_ORG_PRO"; exit 1)
+	@$(HARNESS_BUILD)
+	@mkdir -p evidence/$(TS)
+	$(HARNESS_RUN) --where local --experiment security-lockdown \
+		--only S26 --destructive --out evidence/$(TS)
+
+# S27: self-provisioned (postgres and the roles it creates: membership options,
+# grantable attributes, a BYPASSRLS reader, create database, pg_cron job users).
+probe-s27:
+	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "export SUPABASE_ACCESS_TOKEN"; exit 1)
+	@test -n "$$PVLAB_ORG_PRO" || (echo "export PVLAB_ORG_PRO"; exit 1)
+	@$(HARNESS_BUILD)
+	@mkdir -p evidence/$(TS)
+	$(HARNESS_RUN) --where local --experiment security-lockdown \
+		--only S27 --destructive --out evidence/$(TS)
 
 # Needs CLOUDFLARE_API_TOKEN (Workers edit) and CLOUDFLARE_ACCOUNT_ID in the env.
 echo-worker-up:

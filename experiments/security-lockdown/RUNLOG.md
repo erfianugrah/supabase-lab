@@ -517,6 +517,102 @@ Restoring a daily backup to see custom role passwords need resetting (the backup
 
 Each run's project answered DELETE 200 and was gone from `GET /projects` at the first check.
 
+## Run 9 - 2026-11-17 - open questions from S16, S21 and S22 (S25, S26, S27)
+
+Question: S16, S21 and S22 left nine claims that no module had run: whether a caller can forge `cf-ipcountry`, whether PGRST202 hints stop naming functions after the S21 revoke, what the S21 revoke does to an Auth hook and a pg_cron job, whether Storage policies see `request.headers`, how an `alg` "none" token fares, what role an anonymous sign-in carries, how an `sb_secret_` key behaves from a browser, whether Realtime checks `Origin`, and what `postgres` can do with roles it creates. Tracked as work-supabase-lab#326 and #328.
+
+Shape: three self-provisioned modules (`tests/s25-header-and-revoke-gaps.ts`, `tests/s26-auth-edge-gaps.ts`, `tests/s27-postgres-role-powers.ts`; `make probe-s25`, `probe-s26`, `probe-s27`), each creating one project in the Pro org in ap-southeast-1 through `lib/project.ts` (default size, expected Micro, not recorded) and deleting it in `finally`. All six projects reported PostgreSQL 17.12 and answered their first Management API query 4 or 5 s after `POST /projects`. Vantage: the macOS orchestrator. Two runs per module, one project per run.
+
+- S25 run 1: `out/2026-11-17/run-2026-11-17T07-54-00-609Z.json`
+- S25 run 2: `out/2026-11-17/run-2026-11-17T07-55-43-957Z.json`
+- S26 run 1: `out/2026-11-17/run-2026-11-17T07-40-08-105Z.json`
+- S26 run 2: `out/2026-11-17/run-2026-11-17T07-40-46-190Z.json`
+- S27 run 1: `out/2026-11-17/run-2026-11-17T07-55-35-493Z.json`
+- S27 run 2: `out/2026-11-17/run-2026-11-17T07-57-21-594Z.json`
+
+Unless a line says otherwise, both runs of a module gave the same value.
+
+### A forged cf-ipcountry: ZZ did not reach SQL (S25a)
+
+An RPC returning `request.headers`, called with the legacy anon API key: with no client header, 200 and `cf-ipcountry` present (2 characters; the value is not recorded). The same call carrying `cf-ipcountry: ZZ` answered 200, and the value in `request.headers` was not `ZZ` and equalled the no-header call's value. The edge replaces this header with its own; for `cf-connecting-ip` it refuses the request instead (S22a, 403). Only `ZZ` was tried as a forged code, and whether the edge's country is right for a given client (VPNs, Tor) was not tested.
+
+### Function-name hints survive the revoke (S25b)
+
+Anon key, `POST /rpc/sec25_private_reprot`, one transposition away from a real function `public.sec25_private_report`:
+
+| Stage | Typo call | Hint names the real function | Exact-name call |
+| --- | --- | --- | --- |
+| default grants | 404 PGRST202 | yes | 200 |
+| after the S21 recipe (EXECUTE revoked from PUBLIC, anon, authenticated; default privileges changed) | 404 PGRST202 | yes | 401 `42501: permission denied for function sec25_private_report` |
+| also USAGE on `public` revoked from anon and authenticated; `has_schema_privilege('anon', 'public', 'USAGE')` still true, through PUBLIC's `=U` | 404 PGRST202 | yes | 401, the same 42501 message |
+| also USAGE on `public` revoked from PUBLIC; `has_schema_privilege` now false | 404 PGRST202 | yes | 401 `42501: permission denied for schema public` |
+
+The hint text was `Perhaps you meant to call the function public.sec25_private_report` at every stage. Revoking privileges, including all USAGE on the schema, does not stop PostgREST's hint from naming a function to a caller who guesses close; with EXECUTE revoked the exact call's 42501 message names the function too, and with USAGE gone it names the schema instead. Removing the schema from the exposed schemas was not tested here.
+
+### The blanket revoke breaks a hook created with default grants; pg_cron keeps running (S25c)
+
+Before the revoke: a custom access token hook `public.sec25_hook` and a cron helper `public.sec25_tick`, both created with no explicit GRANT through the Management API query route. The hook was configured with `PATCH /v1/projects/{ref}/config/auth` (200), and a password sign-in carried its claim after 5 s (run 1) and 6 s (run 2). A pg_cron job on a 2 s schedule wrote 10 rows in 20 s. Read before the revoke: the hook's `proacl` `{=X/postgres,postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres}`, owner of `public.sec25_tick` `postgres`, `cron.job` username `postgres`.
+
+After the S21 recipe the hook's `proacl` read `{postgres=X/postgres,service_role=X/postgres}`: PUBLIC's EXECUTE, the only one `supabase_auth_admin` held, was gone. One password sign-in right after answered `500 unexpected_failure: Error running hook URI: pg-functions://postgres/public/sec25_hook` (one attempt per run). The cron job wrote 10 rows in the next 20 s. `grant execute on function public.sec25_hook(jsonb) to supabase_auth_admin` restored the claim on the first sign-in after it (0 s on a 3 s poll).
+
+### Storage policies see request.headers (S25d)
+
+Private bucket, legacy anon key, `GET /storage/v1/object/authenticated/sec25/<file>`, one object per stage that had never been fetched, with one SELECT policy on `storage.objects` at a time:
+
+| Policy (plus `bucket_id = 'sec25'`) | Download |
+| --- | --- |
+| `true` | 200 |
+| `request.headers` is set and non-empty | 200 |
+| `cf-connecting-ip` equals the address the S25a RPC saw | 200 |
+| `cf-connecting-ip` equals `203.0.113.9` | 400 `NoSuchKey: Object not found` |
+
+The Storage API sets `request.headers` for the policy, with `cf-connecting-ip` in it, so S22's PostgREST allowlist form works on `storage.objects` too. A cached private object can still be served to a caller who read it before the policy changed (residency-facts R05c, re-run 2026-11-17); each stage here read a different never-fetched object, so no stage could be answered from an earlier stage's cache.
+
+### alg "none" is refused (S26a)
+
+A token with header `{"alg":"none"}`, an empty signature, `role` and `aud` both `authenticated`, and this project's issuer: Data API with the legacy anon API key, 401 `PGRST301: Wrong or unsupported encoding algorithm`; with the `sb_publishable_` key, the same 401; Auth `GET /auth/v1/user`, 403 `bad_jwt: invalid JWT: unable to parse or verify signature, token signature is invalid: signing method none is invalid`.
+
+### Anonymous sign-ins carry role authenticated (S26b)
+
+With `external_anonymous_users_enabled` set (PATCH 200), `POST /auth/v1/signup` with an empty body answered 200 after 5 s. Its JWT: `role` `authenticated`, `is_anonymous` `true`, `aud` `authenticated`. Under `for select to authenticated using (true)` it read 3 of 3 rows. After a restrictive policy `(select (auth.jwt() ->> 'is_anonymous')::boolean) is not true` for authenticated, the anonymous user read 0 rows and a password user read 3.
+
+### sb_secret_ keys are refused on a browser User-Agent (S26c)
+
+| Request (Data API `GET /rest/v1/sec26_docs` unless stated) | Status |
+| --- | --- |
+| secret key in `apikey`, `User-Agent: curl/8.7.1` | 200 |
+| secret key in `apikey`, a Safari `User-Agent` | 401 `Forbidden use of secret API key in browser` |
+| the same plus `Origin: https://app.example.com` | 401, same message |
+| `curl` User-Agent plus that `Origin` | 200 |
+| secret key only as `Authorization: Bearer`, no `apikey`, `curl` User-Agent | 401 `No API key found in request` |
+| Auth `GET /auth/v1/admin/users`, `curl` User-Agent | 200 |
+| the same, Safari User-Agent | 401 `Forbidden use of secret API key in browser` |
+
+The refusal keys on the User-Agent; an `Origin` header alone did not trigger it. Which User-Agent strings count as a browser was not mapped.
+
+### Realtime accepts a socket upgrade and heartbeat under a foreign Origin (S26d)
+
+`wss://<ref>.supabase.co/realtime/v1/websocket` with the legacy anon API key: with no `Origin` and with `Origin: https://attacker.example`, the socket opened and a Phoenix heartbeat was answered; the probe then closed the socket itself (recorded close code 1000). A channel join and a broadcast under a foreign Origin were not run, so an Origin check at join time is not ruled out.
+
+### What postgres can do with roles it creates (S27)
+
+Connected as `postgres` through the Supavisor session pooler: `rolsuper` false, `rolcreaterole`, `rolcreatedb` and `rolbypassrls` true, `createrole_self_grant` empty.
+
+- `create role sec27_r nologin`: one `pg_auth_members` row for `postgres` with `admin_option` true, `inherit_option` false, `set_option` false, grantor `supabase_admin`. `set role sec27_r` answered `42501 permission denied to set role`. `grant sec27_r to postgres with set true, inherit true` succeeded and `set role` then worked. `revoke admin option for sec27_r from postgres` returned ok; afterwards `postgres` had two rows for `sec27_r`: its self-grant (grantor `postgres`, admin false, set true) and the original (grantor `supabase_admin`, admin true, set false). The plain revoke removed the admin option from the self-grant only. `drop role` succeeded.
+- `create role ... login`, `createdb`, `createrole`, `bypassrls` and `replication` each succeeded. `grant pg_read_all_data` and `grant pg_signal_backend` succeeded; `grant pg_write_all_data` answered `42501 "pg_write_all_data" role memberships are reserved, only superusers can grant them`.
+- A login with BYPASSRLS and `pg_read_all_data`, over Supavisor session 5432, read 2 of 2 rows from a table with RLS enabled and forced and no policy; its INSERT answered `42501 permission denied for table`. After `alter role ... password`, in both runs the new password first connected at 0.1 s and the first failed connect with the old one came at 0.6 s, error `28P01` (1 s poll plus connect time, session pooler only).
+- `create database sec27_db` and `drop database` succeeded.
+- pg_cron: `cron.alter_job(job, username := 'sec27_job')` answered `XX000 must be superuser to alter username`, and `cron.schedule_in_database(..., 'sec27_job')` answered `XX000 must be superuser to create a job for another role`. The job `postgres` scheduled (`sec27`, `0 0 1 1 *`, never ran during the test) is recorded in `cron.job` with username `postgres`.
+- Of the four role names queried, all four exist on a fresh project: `supabase_etl_admin` (login, replication, bypassrls), `supabase_read_only_user` (login, bypassrls), `supabase_replication_admin` (login, replication), `supabase_privileged_role` (no login).
+
+### Not run (run 9)
+
+The PGRST202 hint with the function's schema removed from the exposed schemas; forged `cf-ipcountry` codes other than `ZZ`; Realtime channel joins under a foreign Origin; mapping which User-Agents count as a browser; roles created on PostgreSQL 15 and carried through an upgrade to 17 (work-supabase-lab#328); restoring a backup with custom roles.
+
+### Teardown (run 9)
+
+All six projects answered DELETE 200 and were gone from `GET /projects` at the first check.
+
 ## Remaining
 
 - Phase C PrivateLink (iap-lockdown L20-L23) - needs a Team-tier org, an AWS

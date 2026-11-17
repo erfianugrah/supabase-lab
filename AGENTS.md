@@ -1854,7 +1854,7 @@ AR05/AR06 artifacts in `out/2026-10-26/` (reference AR06 run
   (REUSE_WINDOW_SEC default 12) prints VERDICT=defect-reproduced vs fixed;
   both hosted and local environments verified. Dart SDK at ~/sdk/dart-sdk.
 
-## experiments/residency-facts - key facts (validated 2026-08-20, Zurich project)
+## experiments/residency-facts - key facts (validated 2026-08-20, Zurich project; R05 re-run 2026-11-17: R05a pass, R05b info, R05c fail, as on 2026-08-20)
 
 - The region catalogue IS machine-readable:
   `GET /v1/projects/available-regions?organization_slug=<slug>` ->
@@ -1875,7 +1875,7 @@ AR05/AR06 artifacts in `out/2026-10-26/` (reference AR06 run
   the policy has since been tightened to deny (200/HIT; a never-authorized
   user correctly gets 400/DYNAMIC) - on a hit, the CDN does not re-evaluate
   the policy. The object carried `Cache-Control: no-cache` and was cached
-  anyway. Reproduced 3 consecutive runs.
+  anyway. Reproduced 3 consecutive runs on 2026-08-20 and 1 run on 2026-11-17.
 - realtime.messages is daily-partitioned but LAZILY: a fresh project has the
   table with zero partitions, SQL realtime.send() warns "no partition of
   relation messages found for row" and drops the message; one websocket
@@ -1920,7 +1920,7 @@ AR05/AR06 artifacts in `out/2026-10-26/` (reference AR06 run
 - Cloudflare pieces are OpenTofu (provider v4, gated on `enable_cloudflare`);
   real CF ids live in gitignored `cloudflare.auto.tfvars`.
 
-## experiments/security-lockdown - key facts (validated 2026-08-28; S13-S15 2026-08-31; S16-S21 2026-09-03; S23 2026-10-23; S24 2026-11-12)
+## experiments/security-lockdown - key facts (validated 2026-08-28; S13-S15 2026-08-31; S16-S21 2026-09-03; S23 2026-10-23; S24 2026-11-12; S25-S27 2026-11-17)
 
 - S01: the Management API security advisor catches every seeded exposure
   (rls_disabled_in_public, rls_enabled_no_policy, security_definer_view,
@@ -2072,6 +2072,50 @@ AR05/AR06 artifacts in `out/2026-10-26/` (reference AR06 run
   `pg_read_all_data`. Runs 1-2 direct and dedicated rows are a vantage fault
   (Bun `dns.lookup` on macOS misses the AAAA-only db host; run 3 resolves AAAA
   itself). Evidence `out/2026-11-12/`.
+- S25-S27 (2026-11-17, two runs per module, one fresh project per run in the
+  Pro org, ap-southeast-1, PostgreSQL 17.12, `make probe-s25|s26|s27`;
+  RUNLOG run 9). A client-supplied `cf-ipcountry: ZZ` did not reach SQL (200;
+  the value seen equalled the no-header call's); the edge refuses a client
+  `cf-connecting-ip` instead (S22a 403); only `ZZ` tried, VPN/Tor accuracy
+  untested. PGRST202 hints named a near-miss function (`Perhaps you meant to
+  call the function public.<name>`) after the S21 recipe, after revoking USAGE
+  on `public` from anon and authenticated (anon kept it through PUBLIC's
+  `=U`), and after revoking it from PUBLIC too (`has_schema_privilege` false;
+  the exact call then answered `42501 permission denied for schema public`).
+  The S21 recipe removed PUBLIC's EXECUTE from a custom access token hook
+  created with default grants (`proacl` before `{=X/postgres,...}`, after
+  `{postgres=X/postgres,service_role=X/postgres}`); the next password sign-in
+  (one per run) answered `500 unexpected_failure: Error running hook URI`
+  until `grant execute ... to supabase_auth_admin`. A pg_cron job with
+  `cron.job` username `postgres`, calling a `postgres`-owned function, kept
+  writing (10 rows per 20 s before and after). Storage policies see
+  `request.headers` with `cf-connecting-ip`: a `storage.objects` allowlist on
+  it gave 200 on a match and 400 `NoSuchKey` on `203.0.113.9`. An `alg` "none"
+  token: 401 PGRST301 on the Data API (legacy anon and publishable apikey), 403
+  `bad_jwt` on `/auth/v1/user`. Anonymous sign-ins carry `role`
+  `authenticated` and `is_anonymous` true: `to authenticated using (true)` gave
+  them 3 of 3 rows, a restrictive `is_anonymous is not true` policy 0 (a
+  password user 3). `sb_secret_` in `apikey` with a Safari User-Agent: 401
+  `Forbidden use of secret API key in browser` on the Data API and Auth admin;
+  with a `curl` UA 200, with or without `Origin: https://app.example.com`; the
+  secret key as `Authorization: Bearer` with no `apikey` 401 `No API key found
+  in request`. Realtime accepted a socket upgrade and answered a heartbeat
+  under `Origin: https://attacker.example` (channel join not tried). As
+  `postgres` (not superuser; CREATEROLE, CREATEDB, BYPASSRLS): a role it
+  creates gives it ADMIN without SET or INHERIT (grantor `supabase_admin`), so
+  `set role` is 42501 until it self-grants WITH SET; a plain `revoke admin
+  option` returns ok but clears only the self-grant's admin, and the
+  `supabase_admin` row keeps it. It can create LOGIN, CREATEDB, CREATEROLE,
+  BYPASSRLS and REPLICATION roles and grant `pg_read_all_data` and
+  `pg_signal_backend`, not `pg_write_all_data` (42501 reserved); a BYPASSRLS +
+  `pg_read_all_data` login read 2 of 2 rows of a forced-RLS table with no
+  policy and could not insert; after a password change the new password
+  connected at 0.1 s and the old failed with 28P01 at 0.6 s on the session
+  pooler (both runs). `create database` works; `cron.alter_job(username :=)`
+  and `cron.schedule_in_database` for another role need a superuser (XX000).
+  Of four named roles queried, all exist on a fresh project, including
+  `supabase_etl_admin` (login, replication, bypassrls). Evidence
+  `out/2026-11-17/`.
 
 ## experiments/edge-function-limits - key facts (validated 2026-09-02, micro, Pro org; EF09, EF13, EF14 2026-10-23 on a Pro and a Free project)
 
