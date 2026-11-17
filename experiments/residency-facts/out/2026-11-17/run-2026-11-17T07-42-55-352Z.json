@@ -1,0 +1,96 @@
+{
+  "startedAt": "2026-11-17T07:42:55.352Z",
+  "finishedAt": "2026-11-17T07:43:13.355Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "projectRegion": "eu-central-2",
+  "ref": "<ref>",
+  "experiment": "residency-facts",
+  "labCommit": "fd0b484",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.7",
+    "pgbench": "pgbench (PostgreSQL) 18.7",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "R05a",
+      "title": "signed URLs cache per token",
+      "status": "pass",
+      "detail": "per-token keying confirmed: repeat of one signed URL hits, a fresh token misses",
+      "measurements": {
+        "setup_bucket_public": 200,
+        "setup_bucket_private": 200,
+        "setup_object_r05-public": 200,
+        "setup_object_r05-private": 200,
+        "public_first": "200/MISS",
+        "public_second": "200/HIT age=0",
+        "setup_policy": "ok",
+        "private_user1_first": "200/MISS",
+        "private_user1_second": "200/HIT age=0",
+        "private_user2_first": "200/HIT",
+        "denied_user3_never_read": "400/DYNAMIC",
+        "denied_user2_after_hit": "200/HIT",
+        "private_cache_control": "private, no-cache",
+        "signed_first": "200/MISS",
+        "signed_repeat": "200/HIT age=0",
+        "signed_new_token": "200/MISS",
+        "signed_urls_differ": "yes"
+      },
+      "durationMs": 18002
+    },
+    {
+      "id": "R05b",
+      "title": "private bucket: second user misses",
+      "status": "info",
+      "detail": "documented per-user miss NOT observed: user2 first read -> 200/HIT",
+      "measurements": {
+        "setup_bucket_public": 200,
+        "setup_bucket_private": 200,
+        "setup_object_r05-public": 200,
+        "setup_object_r05-private": 200,
+        "public_first": "200/MISS",
+        "public_second": "200/HIT age=0",
+        "setup_policy": "ok",
+        "private_user1_first": "200/MISS",
+        "private_user1_second": "200/HIT age=0",
+        "private_user2_first": "200/HIT",
+        "denied_user3_never_read": "400/DYNAMIC",
+        "denied_user2_after_hit": "200/HIT",
+        "private_cache_control": "private, no-cache",
+        "signed_first": "200/MISS",
+        "signed_repeat": "200/HIT age=0",
+        "signed_new_token": "200/MISS",
+        "signed_urls_differ": "yes"
+      },
+      "durationMs": 18002
+    },
+    {
+      "id": "R05c",
+      "title": "private bucket: denied users never get the cached object",
+      "status": "fail",
+      "detail": "policy-denied user got HTTP 200 (user3=400/DYNAMIC, user2=200/HIT) - the CDN serves cached private objects without the policy",
+      "measurements": {
+        "setup_bucket_public": 200,
+        "setup_bucket_private": 200,
+        "setup_object_r05-public": 200,
+        "setup_object_r05-private": 200,
+        "public_first": "200/MISS",
+        "public_second": "200/HIT age=0",
+        "setup_policy": "ok",
+        "private_user1_first": "200/MISS",
+        "private_user1_second": "200/HIT age=0",
+        "private_user2_first": "200/HIT",
+        "denied_user3_never_read": "400/DYNAMIC",
+        "denied_user2_after_hit": "200/HIT",
+        "private_cache_control": "private, no-cache",
+        "signed_first": "200/MISS",
+        "signed_repeat": "200/HIT age=0",
+        "signed_new_token": "200/MISS",
+        "signed_urls_differ": "yes"
+      },
+      "durationMs": 18002
+    }
+  ]
+}

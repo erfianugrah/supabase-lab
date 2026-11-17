@@ -83,6 +83,27 @@ log-drains page states custom-endpoint requests are unsigned, so unsignedness
 needed no test; whether delivery actually lands end-to-end is dashboard-gated
 and untested here - stated, not probed.
 
+### 2026-11-17 - R05 re-run, 1 pass / 1 fail / 1 info
+
+Why: three months on, the docs page `storage/cdn/fundamentals` still says
+two users of a private bucket both miss the cache (line 25 of the docs source
+at HEAD, read 2026-11-17), and the 2026-08-20 result had not been re-run.
+Same shape as 2026-08-20: a fresh Zurich
+Micro on the Team org via `make apply`, R05 alone
+(`--only R05 --destructive`), `make destroy`; vantage the macOS
+orchestrator. Evidence `out/2026-11-17/run-2026-11-17T07-42-55-352Z.json`.
+
+- R05a pass: per-token keying of signed URLs holds (repeat hits, fresh token
+  misses).
+- R05b info: the documented per-user miss again did not happen; user2's first
+  read of the object user1 had fetched was `200/HIT`.
+- R05c fail: after the policy was narrowed to user1, user2, who had read the
+  cached private object before the change, still got `200/HIT`; user3, who
+  had never read it, got `400/DYNAMIC`.
+
+One run, one region; it reproduces all three 2026-08-20 rows, so the docs
+sentence is still contradicted as of this date.
+
 ## Not measured, and why
 
 - The 3-day partition retention (needs a 4-day-old project).

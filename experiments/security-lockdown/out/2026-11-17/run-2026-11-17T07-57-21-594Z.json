@@ -1,0 +1,133 @@
+{
+  "startedAt": "2026-11-17T07:57:21.594Z",
+  "finishedAt": "2026-11-17T07:57:30.925Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "security-lockdown",
+  "labCommit": "fd0b484",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.7",
+    "pgbench": "pgbench (PostgreSQL) 18.7",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "S27s",
+      "title": "Setup: connected as postgres through the session pooler",
+      "status": "info",
+      "detail": "created in 5 s, PostgreSQL 17.12. current_user postgres, superuser false, createrole true, createdb true, bypassrls true, createrole_self_grant ''.",
+      "measurements": {
+        "pg": "PostgreSQL 17.12",
+        "rolsuper": "false",
+        "rolcreaterole": "true",
+        "rolcreatedb": "true",
+        "rolbypassrls": "true",
+        "createrole_self_grant": ""
+      },
+      "durationMs": 9331
+    },
+    {
+      "id": "S27a",
+      "title": "postgres's membership in a role it creates",
+      "status": "info",
+      "detail": "create role sec27_r -> ok. Rows for postgres in pg_auth_members: 1; admin_option true, inherit_option false, set_option false, grantor supabase_admin. SET ROLE sec27_r -> 42501 permission denied to set role \"sec27_r\". Self-grant WITH SET TRUE, INHERIT TRUE -> ok; SET ROLE after -> ok. REVOKE ADMIN OPTION FOR sec27_r FROM postgres -> ok; rows after 2: postgres(admin false, set true), supabase_admin(admin true, set false). DROP ROLE -> ok.",
+      "measurements": {
+        "create_role": "ok",
+        "membership_rows": 1,
+        "admin_option": "true",
+        "inherit_option": "false",
+        "set_option": "false",
+        "grantor": "supabase_admin",
+        "set_role_before_self_grant": "42501 permission denied to set role \"sec27_r\"",
+        "self_grant": "ok",
+        "set_role_after_self_grant": "ok",
+        "revoke_own_admin": "ok",
+        "rows_after_revoke": "postgres(admin false, set true), supabase_admin(admin true, set false)",
+        "drop_role": "ok"
+      },
+      "durationMs": 9331
+    },
+    {
+      "id": "S27b",
+      "title": "role attributes and predefined roles postgres can grant",
+      "status": "info",
+      "detail": "create role with: login -> ok; createdb -> ok; createrole -> ok; bypassrls -> ok; replication -> ok. grant pg_read_all_data -> ok; pg_write_all_data -> 42501 \"pg_write_all_data\" role memberships are reserved, only superusers can grant them; pg_signal_backend -> ok.",
+      "measurements": {
+        "attr_login": "ok",
+        "attr_createdb": "ok",
+        "attr_createrole": "ok",
+        "attr_bypassrls": "ok",
+        "attr_replication": "ok",
+        "grant_read_all": "ok",
+        "grant_write_all": "42501 \"pg_write_all_data\" role memberships are reserved, only superusers can grant them",
+        "grant_signal_backend": "ok"
+      },
+      "durationMs": 9331
+    },
+    {
+      "id": "S27c",
+      "title": "a BYPASSRLS + pg_read_all_data login made by postgres reads past RLS; rotation through the session pooler",
+      "status": "info",
+      "detail": "Setup (table with RLS enabled and FORCED, no policy; role LOGIN BYPASSRLS + pg_read_all_data) -> ok. As sec27_reader over Supavisor session 5432: count -> ok, 2 of 2 rows; insert -> 42501 permission denied for table sec27_secret. alter role ... password -> ok; new password first accepted at 0.1 s, first failed connect with the old one at 0.6 s (error 28P01; 1 s poll plus connect time, session pooler only).",
+      "measurements": {
+        "setup": "ok",
+        "reader_rows": 2,
+        "reader_select": "ok",
+        "reader_insert": "42501 permission denied for table sec27_secret",
+        "rotate": "ok",
+        "new_pw_ok_s": 0.1,
+        "old_pw_refused_s": 0.6,
+        "old_pw_error": "28P01"
+      },
+      "durationMs": 9331
+    },
+    {
+      "id": "S27d",
+      "title": "create database as postgres",
+      "status": "info",
+      "detail": "create database sec27_db -> ok; listed in pg_database true; drop -> ok.",
+      "measurements": {
+        "create_database": "ok",
+        "listed": "true",
+        "drop_database": "ok"
+      },
+      "durationMs": 9331
+    },
+    {
+      "id": "S27e",
+      "title": "pg_cron: changing a job's user as postgres",
+      "status": "info",
+      "detail": "create extension pg_cron -> ok; schedule -> ok (job 1). cron.alter_job(username := 'sec27_job') -> XX000 must be superuser to alter username. cron.schedule_in_database(..., username 'sec27_job') -> XX000 must be superuser to create a job for another role. Jobs afterwards: sec27=postgres.",
+      "measurements": {
+        "schedule": "ok",
+        "alter_job_username": "XX000 must be superuser to alter username",
+        "schedule_in_database_other_user": "XX000 must be superuser to create a job for another role",
+        "jobs_after": "sec27=postgres"
+      },
+      "durationMs": 9331
+    },
+    {
+      "id": "S27f",
+      "title": "named platform roles present on a fresh project",
+      "status": "info",
+      "detail": "supabase_etl_admin (login true, replication true, bypassrls true); supabase_privileged_role (login false, replication false, bypassrls false); supabase_read_only_user (login true, replication false, bypassrls true); supabase_replication_admin (login true, replication true, bypassrls false)",
+      "measurements": {
+        "present": "supabase_etl_admin,supabase_privileged_role,supabase_read_only_user,supabase_replication_admin"
+      },
+      "durationMs": 9331
+    },
+    {
+      "id": "S27z",
+      "title": "Teardown",
+      "status": "info",
+      "detail": "DELETE 200, gone from GET /projects after 0 s",
+      "measurements": {
+        "delete_status": 200,
+        "gone_s": 0
+      },
+      "durationMs": 9331
+    }
+  ]
+}
