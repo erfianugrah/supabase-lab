@@ -3286,7 +3286,7 @@ Numbers: `RUNLOG.md`, artifacts `out/2026-10-08/`.
 - `drop_caches` in the Docker VM does not drop the macOS cache under it; a
   "cold" read here is not a disk read.
 
-## experiments/data-api-defaults - key facts (validated 2026-10-10, one API-created Pro project, Postgres 17.11)
+## experiments/data-api-defaults - key facts (validated 2026-10-10, one API-created Pro project, Postgres 17.11; DD06 2026-11-17, Postgres version not recorded)
 
 - A project created through `POST /v1/projects` on 2026-10-10 still carried the
   legacy default privileges: `pg_default_acl` for `postgres` in `public` grants
@@ -3352,6 +3352,18 @@ Numbers: `RUNLOG.md`, artifacts `out/2026-10-08/`.
   sequence GRANT is not needed under these statements (kept for a default
   that also takes UPDATE). Not run under the revoke: M01, D09, O03, T22.
   Run DD05 as `ONLY=DD05,DD99`; W12's `run(ctx, grants)` takes the variant.
+- DD06 (2026-11-17, two runs, fresh Pro-org project each): the Data API
+  compresses on request. A 2000-row read (271891 bytes uncompressed) with
+  `Accept-Encoding: gzip` came back `Content-Encoding: gzip` at 3142 bytes
+  (run 1) and 3237 bytes (run 2), with `br` at 1610 bytes, and with `gzip,
+  deflate, br` as gzip at 3237 bytes, in both runs; a 3-row body (808 bytes)
+  as 97 bytes gzip, 72 bytes br; absent or `identity` gave no encoding. `Vary:
+  Accept-Encoding` on the gzip request (the only one whose `Vary` was read).
+  Legacy service_role key, repetitive text: the compressed sizes are a best
+  case (real rows likely compress less; not measured). Set `PVLAB_ORG_SLUGS` or
+  DD99 skips and the project is left; in run 1
+  (`run-2026-11-17T09-07-35-363Z`) DD99 skipped (`missing capability: org`) and
+  the project was removed with `make clean DELETE=1`.
 
 ## experiments/realtime-surface - key facts (validated 2026-10-10, Pro org, n = 1 per row; RT05 2026-10-22 on Small and 2026-10-26 on 2XL, two reps per burst row; data-api-capacity DC13 2026-10-26, one 100-join burst per size; RT06 2026-10-28, three projects created Small, Large, Small)
 
@@ -4229,7 +4241,7 @@ because `harness/dist/pvlab` is a linux-x64 build.
   closed unexpectedly`) killed R16, R17 and R14's RP06d; module reads go
   through `again()`.
 
-## experiments/pooler-checkout - key facts (validated 2026-10-10 and 2026-10-23, Micro and Small, ap-southeast-1 and us-east-1, Pro org, Supavisor aws-0 hosts (PC01 to PC07); PC08 2026-11-04, Small, ap-northeast-1, pooler host prefix not recorded)
+## experiments/pooler-checkout - key facts (validated 2026-10-10 and 2026-10-23, Micro and Small, ap-southeast-1 and us-east-1, Pro org, Supavisor aws-0 hosts (PC01 to PC07); PC08 2026-11-04, Small, ap-northeast-1, pooler host prefix not recorded; PC10 2026-11-17)
 
 Projects come from the Management API (no OpenTofu state): on 2026-10-10 each
 run created and deleted its own Micro project; the 2026-10-23 runs (one Micro,
@@ -4342,6 +4354,15 @@ and `out/2026-11-04/`. Details: RUNLOG.md.
   80, in seconds). Hikari's `connectionTimeout` plays no part in the queued
   statements: the connection is already open (it did fail 2 of 40 follow-up
   borrows in PC08t-txn-wait, on replacement connects).
+- PC10 (2026-11-17, two runs, fresh Pro-org project each, ap-southeast-1,
+  module default size): the
+  shared Supavisor pool is per role. With `default_pool_size` 5 (PATCH 200,
+  read back 5), four roles (`postgres` and three login roles) each sending 8
+  transaction-mode `pg_sleep(25)` clients held 6 backends each, 24 in total,
+  and no client errored, in both runs. Measured at N = 4: N login roles may
+  hold about N times the pool size or more (N above 4 not run); the sixth
+  backend per role was not explained. Publish with `ONLY=PC10,PC09`: the
+  target's default `ONLY` drops the PC10 rows.
 
 ## experiments/jit-db-access - key facts (2026-10-10, Pro org, Postgres 17)
 
@@ -6222,7 +6243,7 @@ runs 3-4. Numbers and per-write evidence: RUNLOG.md, artifacts
   counts (300,202),
   and later rows into a premade and the default partition both arrived.
 
-## experiments/cron-behaviour - key facts (validated 2026-10-28, two runs, Pro org, Micro, ap-southeast-1; Postgres 17.11, pg_cron 1.6.4, pgmq 1.5.1)
+## experiments/cron-behaviour - key facts (validated 2026-10-28, two runs, Pro org, Micro, ap-southeast-1; Postgres 17.11, pg_cron 1.6.4, pgmq 1.5.1; CB06 2026-11-17, PostgreSQL 17.12)
 
 - **Hosted pg_cron skips runs whose time falls in a restart or resize; it
   does not catch up, and a run in flight fails without a re-run** (CB04
@@ -6245,6 +6266,18 @@ runs 3-4. Numbers and per-write evidence: RUNLOG.md, artifacts
   table 2555904 B; read + archive of 1,000 took 25 ms p50 per cron run,
   read + delete 19 ms. Figures from `out/2026-10-28/`; details and limits in
   its RUNLOG.
+- CB06 (2026-11-17, two runs, fresh Pro Micro each, PostgreSQL 17.12): 16
+  jobs all scheduled to fire at one UTC minute (`M H * * *`) ran 16 at once,
+  first-to-last start 0 s (rounded to 0.1 s; all succeeded), so the docs'
+  "no more than 8" is advice. With 40 jobs, a peak of 32 ran at once, equal to
+  `cron.max_running_jobs` 32 (setting not varied); the other 8 started later,
+  the last 30.2 s after the first, about when the 30 s first wave would end;
+  all 40 succeeded. `cron.timezone` GMT; no Management API sample was refused
+  while 32 jobs held connections. In a superseded third run
+  (`run-2026-11-17T09-05-47-757Z`; first module version, not kept, which
+  scheduled on `* * * * *` and unscheduled 55 s after the minute) the 8 queued
+  runs were recorded `failed`, `job canceled`; read as `cron.unschedule`
+  cancelling a run in progress, once observed, cause inferred from timing.
 
 ## experiments/edge-burst - key facts (validated 2026-11-04, two runs, Team org, one self-provisioned Micro per run, ap-northeast-1)
 

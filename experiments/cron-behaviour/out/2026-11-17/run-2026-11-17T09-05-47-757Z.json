@@ -1,0 +1,78 @@
+{
+  "startedAt": "2026-11-17T09:05:47.757Z",
+  "finishedAt": "2026-11-17T09:11:43.518Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "cron-behaviour",
+  "labCommit": "cee2220",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.7",
+    "pgbench": "pgbench (PostgreSQL) 18.7",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "CB06s",
+      "title": "pg_cron and connection settings",
+      "status": "info",
+      "detail": "pg_cron 1.6.4; cron.max_running_jobs 32; cron.use_background_workers off; cron.host localhost; max_connections 60; superuser_reserved_connections 3; PostgreSQL 17.12",
+      "measurements": {
+        "pg_cron": "1.6.4",
+        "max_running_jobs": "32",
+        "use_background_workers": "off",
+        "max_connections": "60",
+        "superuser_reserved": "3"
+      },
+      "durationMs": 354526
+    },
+    {
+      "id": "CB06a",
+      "title": "16 jobs of pg_sleep(40) on one minute boundary",
+      "status": "info",
+      "detail": "Peak backends running the sleep: 16 (31 samples every 2 s, 0 refused). Runs recorded for that minute: 16 of 16; statuses succeeded x16; peak overlap from start/end times 16; first-to-last start spread 0 s. Return messages: \"1 row\" x16.",
+      "measurements": {
+        "jobs": 16,
+        "peak_running_sampled": 16,
+        "samples": 31,
+        "sample_errors": 0,
+        "runs_recorded": 16,
+        "statuses": "succeeded x16",
+        "peak_overlap_recorded": 16,
+        "start_spread_s": 0,
+        "return_messages": "\"1 row\" x16"
+      },
+      "durationMs": 354526
+    },
+    {
+      "id": "CB06b",
+      "title": "40 jobs of pg_sleep(30) on one minute boundary",
+      "status": "info",
+      "detail": "Peak backends running the sleep: 32 (26 samples every 2 s, 0 refused). Runs recorded for that minute: 40 of 40; statuses succeeded x32, failed x8; peak overlap from start/end times 32; first-to-last start spread 30.2 s. Return messages: \"1 row\" x32, \"job canceled\" x8.",
+      "measurements": {
+        "jobs": 40,
+        "peak_running_sampled": 32,
+        "samples": 26,
+        "sample_errors": 0,
+        "runs_recorded": 40,
+        "statuses": "succeeded x32, failed x8",
+        "peak_overlap_recorded": 32,
+        "start_spread_s": 30.2,
+        "return_messages": "\"1 row\" x32, \"job canceled\" x8"
+      },
+      "durationMs": 354526
+    },
+    {
+      "id": "CB99",
+      "title": "teardown: project deleted and gone from the listing",
+      "status": "pass",
+      "detail": "DELETE 200; absent from GET /projects after 0 s",
+      "measurements": {
+        "delete_status": 200,
+        "gone_from_listing_s": 0
+      },
+      "durationMs": 1235
+    }
+  ]
+}

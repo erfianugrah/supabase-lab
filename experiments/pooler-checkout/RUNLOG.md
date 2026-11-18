@@ -711,6 +711,39 @@ that did not complete in 30 s; one run, n = 2, cause not separated.
   and H twice (runs 11 and 12). The PC08m-session-*, PC08s-* and PC08t-*
   rows ran once (run 11).
 
+## PC10 - one Supavisor pool per role (2026-11-17)
+
+Question: does the shared pooler keep one pool per project or one per role?
+Per role would let N login roles hold N x `default_pool_size` backends; PC07
+had measured one role only.
+
+Shape: `make probe ONLY=PC10` (run 1 also listed PC09, which skipped) on a
+fresh Pro-org project (`acquireProject`, ap-southeast-1, the module default
+size, `micro` unless `PVLAB_PC_SIZE` is set; size not recorded in the
+artifact), then `make sweep` to delete it. Published with
+`make publish-evidence ... ONLY=PC10,PC09` (the target's default `ONLY` would
+drop the PC10 rows). Two
+runs, one project each. `PATCH /v1/projects/{ref}/config/database/pooler`
+`default_pool_size` 5 (200, read back 5, `max_client_conn` null). Three login
+roles created through the Management API query route, plus `postgres`. Each of
+the four roles sent 8 clients at once through Supavisor transaction mode 6543,
+each running `select pg_sleep(25)`; backends running that sleep were counted
+per `usename` at +8 s through the Management API.
+
+- Run 1: `out/2026-11-17/run-2026-11-17T09-06-40-309Z.json`
+- Run 2: `out/2026-11-17/run-2026-11-17T09-08-43-190Z.json`
+
+Both runs: `postgres` 6, `pc10_r1` 6, `pc10_r2` 6, `pc10_r3` 6 backends, 24 in
+total against `default_pool_size` 5; 0 of 8 clients errored for any role, so
+the two clients per role not counted at +8 s also finished without error (when
+they ran was not recorded).
+
+Reading: the pool is per role. All four roles ran at once and each reached 6
+backends, so the four held 24, four times the per-role figure; PC10 ran no
+single-role baseline. Each role held 6 backends,
+one more than the configured 5, in both runs; where the sixth comes from was
+not looked at. One compute size, one region, one pool size.
+
 ## What was not run
 
 - Compute sizes other than Micro and Small (Small since 2026-10-23), other
