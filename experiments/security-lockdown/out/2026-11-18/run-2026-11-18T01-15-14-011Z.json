@@ -1,0 +1,133 @@
+{
+  "startedAt": "2026-11-18T01:15:14.011Z",
+  "finishedAt": "2026-11-18T01:15:44.426Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "security-lockdown",
+  "labCommit": "897e026",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.7",
+    "pgbench": "pgbench (PostgreSQL) 18.7",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "S28s",
+      "title": "Setup",
+      "status": "info",
+      "detail": "created in 4 s, PostgreSQL 17.12; setup ok",
+      "measurements": {
+        "create_s": 4,
+        "pg": "PostgreSQL 17.12"
+      },
+      "durationMs": 30416
+    },
+    {
+      "id": "S28a",
+      "title": "TOTP: enrol parameters, and one code verified on two challenges",
+      "status": "info",
+      "detail": "Enrol -> 200; URI algorithm SHA1, digits 6, period 30; secret 160 bits. First challenge verified with a locally computed code -> 200 (aal aal2). A new challenge verified with the same code in the same 30 s step -> 200.",
+      "measurements": {
+        "enrol_status": 200,
+        "uri_algorithm": "SHA1",
+        "uri_digits": "6",
+        "uri_period": "30",
+        "secret_bits": 160,
+        "first_verify": 200,
+        "first_aal": "aal2",
+        "reuse_verify": 200,
+        "reuse_code": "accepted",
+        "same_step": "true"
+      },
+      "durationMs": 30416
+    },
+    {
+      "id": "S28b",
+      "title": "a role change through the access token hook: the held token keeps the old claim until refresh",
+      "status": "info",
+      "detail": "Hook PATCH -> 200, claim user_role=editor after 5 s. Policy keyed on auth.jwt()->>'user_role' = 'editor'. Editor token -> 200, 3 of 3 rows. Role set to viewer in the table; same token -> 200, 3 rows (claim editor). Refresh -> 200, new claim viewer, read -> 200, 0 rows. Access token lifetime 3600 s.",
+      "measurements": {
+        "hook_live_s": 5,
+        "rows_editor_token": 3,
+        "rows_held_token_after_change": 3,
+        "refresh_status": 200,
+        "claim_after_refresh": "viewer",
+        "rows_after_refresh": 0,
+        "token_lifetime_s": 3600
+      },
+      "durationMs": 30416
+    },
+    {
+      "id": "S28c",
+      "title": "admin DELETE of a user: what the held tokens still do",
+      "status": "info",
+      "detail": "DELETE /admin/users -> 200. Held access token on the Data API (policy to authenticated using true) -> 200, 3 rows; on GET /auth/v1/user -> 403 user_not_found: User from sub claim in JWT does not exist; refresh token -> 400 refresh_token_not_found: Invalid Refresh Token: Refresh Token Not Found.",
+      "measurements": {
+        "delete_status": 200,
+        "rest_status": 200,
+        "rest_rows": 3,
+        "user_endpoint": "403 user_not_found: User from sub claim in JWT does not exist",
+        "refresh_status": 400
+      },
+      "durationMs": 30416
+    },
+    {
+      "id": "S28d",
+      "title": "ban_duration: what the held tokens still do",
+      "status": "info",
+      "detail": "PUT ban_duration 1h -> 200. Held access token on the Data API -> 200, 3 rows; on GET /auth/v1/user -> 403 user_banned: User is banned; refresh -> 400 user_banned: Invalid Refresh Token: User Banned; new password sign-in -> 400 user_banned: User is banned.",
+      "measurements": {
+        "ban_status": 200,
+        "rest_status": 200,
+        "rest_rows": 3,
+        "user_endpoint": "403 user_banned: User is banned",
+        "refresh_status": 400,
+        "signin_status": 400
+      },
+      "durationMs": 30416
+    },
+    {
+      "id": "S28e",
+      "title": "admin DELETE of a user who owns a Storage object",
+      "status": "info",
+      "detail": "Bucket -> 200; upload as the user -> 200; object row before: owner set, owner_id set. DELETE /admin/users -> 200; object row after: owner set, owner_id set.",
+      "measurements": {
+        "upload_status": 200,
+        "before": "owner set, owner_id set",
+        "delete_status": 200,
+        "delete_error": "-",
+        "after": "owner set, owner_id set"
+      },
+      "durationMs": 30416
+    },
+    {
+      "id": "S28f",
+      "title": "soft delete: the row, sign-in, and the same email again",
+      "status": "info",
+      "detail": "DELETE /admin/users {should_soft_delete: true} -> 200. Row still present: true; deleted_at set true, email unchanged false, email null false, password cleared true. Sign-in with the old password -> 400 invalid_credentials: Invalid login credentials. Admin create with the same email -> 200.",
+      "measurements": {
+        "soft_status": 200,
+        "row_present": "true",
+        "deleted_at_set": "true",
+        "email_unchanged": "false",
+        "password_cleared": "true",
+        "signin_status": 400,
+        "recreate_status": 200
+      },
+      "durationMs": 30416
+    },
+    {
+      "id": "S28z",
+      "title": "Teardown",
+      "status": "info",
+      "detail": "DELETE 200, gone from GET /projects after 0 s",
+      "measurements": {
+        "delete_status": 200,
+        "gone_s": 0
+      },
+      "durationMs": 30416
+    }
+  ]
+}

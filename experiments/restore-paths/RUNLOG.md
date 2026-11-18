@@ -22,8 +22,10 @@ Sources for the claims under test, read 2026-10-10:
   paid plans, physical backups required, triggered from the Dashboard's
   database backups page. The page says nothing about the database password.
 - Database backups (https://supabase.com/docs/guides/platform/backups): PITR
-  needs at least Small compute; the Management API route for restoring is
-  `restore-pitr` with a unix timestamp.
+  needs at least Small compute (as read then; the page reads "PITR is
+  available on all compute sizes" on 2026-11-18, and RP10 attached `pitr_7`
+  to Micro); the Management API route for restoring is `restore-pitr` with a
+  unix timestamp.
 
 Everything below is measured unless it says "docs", "inference" or "not run".
 
@@ -972,3 +974,50 @@ Small and Medium; a downgrade with more slots than the target size's limit
 (the limit read 10 here, so the docs' 5 was not reachable with 3 slots); a
 consumer that stays down long enough for `max_slot_wal_keep_size` to
 invalidate the slot; replica lag; the replica in another region.
+
+## 2026-11-18 - RP10 (PITR on Micro, the restart question, a second database across a restore)
+
+Question (work-supabase-lab#329): RP02 created its project at Small because
+the docs then said PITR needs at least Small; the requirement was never tested.
+Does PITR attach to a Micro project, does enabling it restart Postgres, and is
+a database other than `postgres` covered by a PITR restore?
+
+Shape: `make pitr-micro` (RP10), a fresh project in the Pro org per run,
+ap-southeast-1, created with no size, read back from
+`GET /v1/projects/{ref}/billing/addons` as `ci_micro`. `pitr_7` applied with
+`PATCH billing/addons`, its removal requested in `finally` (run 1 429, run 2
+200), project deleted. Two runs.
+
+- Run 1: `out/2026-11-18/run-2026-11-18T01-16-58-298Z.json`
+- Run 2: `out/2026-11-18/run-2026-11-18T01-19-16-203Z.json`
+
+- RP10a: `pitr_7` on `ci_micro` answered 200; `pitr_enabled` read true at the
+  first read, made as soon as the PATCH returned (0 s; the 15 s poll never
+  ran); the compute add-on still read `ci_micro` afterwards. No resize was
+  needed.
+- RP10b: `pg_postmaster_start_time()` was the same just before the PATCH and
+  at the read straight after `pitr_enabled` (run 1 1794964307, run 2
+  1794964441): Postgres did not restart between those reads; a later restart
+  was not checked. The backups view went from `walg true, pitr false`, one
+  physical backup listed, no window, to `walg true, pitr true`, no physical
+  backups listed, and a populated window.
+- RP10c: `create database rp10_extra` succeeded, run as role `postgres`; a
+  table in it was written through the Supavisor session pooler (marker A, then
+  the target after a fixed 30 s wait in the module, then marker B).
+  `restore-pitr` to the target answered 201 (run 1 at once; run 2 after one
+  `400 Recovery time target must be within range` and a retry at 61s).
+  Afterwards `rp10_extra` existed with marker A only, and the control table
+  `rp_marker` in database `postgres` held `seed-before-backup,ctl-A`: both
+  databases came back to a point between their A and B markers, consistent
+  with one recovery target for the whole cluster (the markers do not resolve
+  it more finely).
+
+How long the restore took was not measured: the status read
+`ACTIVE_HEALTHY` at the first check, made after a fixed wait following the
+201 (the known lag, work-supabase-lab#232), and the reads were retried until
+they answered. Not run: Micro under write load
+with PITR on, a daily-backup restore with a second database, an upgrade with a
+second database, `restore-pitr` on a paused project (paid projects cannot
+pause, RP01). In run 1 the `pitr_7` removal answered 429 (body not recorded; likely the add-on cooldown that `applyPitr7` retries through);
+the project delete answered 200 in both runs.
+

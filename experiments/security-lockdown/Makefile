@@ -11,7 +11,7 @@ RL_PORT ?= 8080
 RLW_PORT ?= 8788
 EDGE_PORT ?= 8081
 
-.PHONY: init fmt validate apply probe probe-s23 probe-s24 probe-s25 probe-s26 probe-s27 echo-worker-up echo-worker-down publish-evidence destroy postgrest-up postgrest-down ratelimit-up ratelimit-down ratelimit-worker-up ratelimit-worker-down edge-up edge-down
+.PHONY: init fmt validate apply probe probe-s23 probe-s24 probe-s25 probe-s26 probe-s27 probe-s28 probe-s29 echo-worker-up echo-worker-down publish-evidence destroy postgrest-up postgrest-down ratelimit-up ratelimit-down ratelimit-worker-up ratelimit-worker-down edge-up edge-down
 
 init:
 	tofu init
@@ -163,6 +163,24 @@ probe-s27:
 	@mkdir -p evidence/$(TS)
 	$(HARNESS_RUN) --where local --experiment security-lockdown \
 		--only S27 --destructive --out evidence/$(TS)
+
+# S28: self-provisioned (Auth lifecycle (TOTP reuse, hook role change, deleted/banned users, Storage owners, soft delete)).
+probe-s28:
+	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "export SUPABASE_ACCESS_TOKEN"; exit 1)
+	@test -n "$$PVLAB_ORG_PRO" || (echo "export PVLAB_ORG_PRO"; exit 1)
+	@$(HARNESS_BUILD)
+	@mkdir -p evidence/$(TS)
+	$(HARNESS_RUN) --where local --experiment security-lockdown \
+		--only S28 --destructive --out evidence/$(TS)
+
+# S29: self-provisioned (postgres against the auth schema, and the RLS a Data API upsert needs).
+probe-s29:
+	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "export SUPABASE_ACCESS_TOKEN"; exit 1)
+	@test -n "$$PVLAB_ORG_PRO" || (echo "export PVLAB_ORG_PRO"; exit 1)
+	@$(HARNESS_BUILD)
+	@mkdir -p evidence/$(TS)
+	$(HARNESS_RUN) --where local --experiment security-lockdown \
+		--only S29 --destructive --out evidence/$(TS)
 
 # Needs CLOUDFLARE_API_TOKEN (Workers edit) and CLOUDFLARE_ACCOUNT_ID in the env.
 echo-worker-up:

@@ -26,6 +26,7 @@ is built for linux-x64.
 | RP07 | PITR restore time against database size past 1 GB (`RP07_SIZES_GB`, default 3,10; `RP07_COMPUTE`, default small; disk grown once to `RP07_DISK_GB`, default 40): fill, archive catch-up, restore to the latest instant, per-path outage including a Data API read, rows kept, Postgres recovery log lines. `RP07_WAIT_ARCHIVER=1` also waits for `pg_stat_archiver` to pass the fill-end segment |
 | RP08 | PITR restore to the quoted latest instant while the WAL archiver is behind: N writers (`RP08_WRITERS`, default 3; `RP08_LOAD=bulk` rows or `wal` logical messages), a per-statement ledger and a 250 ms ticker, `pg_stat_archiver` and the `.ready` count every 10 s; per cycle (`RP08_ARMS`, default `latest,explicit`; also `live`) the target, archiver state and LSN before the call, then acked statements and ticks missing, the marker, and the recovery stop LSN |
 | RP09 | Logical slots (`pgoutput` and `wal2json` via the SQL interface over the session pooler, `wal2json` streamed by `pg_recvlogical` over direct IPv6) across compute resize Small to Medium and back, read-replica create and remove, and restart: slot present, `active`, `confirmed_flush_lsn` before vs after, retained WAL, duplicates and gaps against a steady writer; then `restore-point` and `undo` |
+| RP10 | `pitr_7` on a Micro project (the compute add-on read back from `billing/addons`), `pg_postmaster_start_time()` across the PITR PATCH, and a second database (`create database`, written through the session pooler) across a `restore-pitr` (`make pitr-micro`, about 5 minutes and under an hour of `pitr_7`) |
 
 ## Run
 
@@ -36,6 +37,7 @@ make pitr      # RP02, ~10 minutes; RP02_SEED_MB=500 make pitr for a bigger data
 make pause     # RP03, ~15 minutes, Free org (2 active projects allowed)
 make daily     # RP04, ~4 minutes while backups/restore refuses, up to ~30 if a restore runs; PVLAB_ORG_TEAM
 make rollback  # RP05, ~1-2 minutes including the preview branch; PVLAB_ORG_PRO
+make pitr-micro  # RP10, ~5 minutes of runtime, under an hour of pitr_7; PVLAB_ORG_PRO
 make rpo       # RP06, ~50 minutes (RP06_PHASE_MIN=0: ~10 minutes, restore only); PVLAB_ORG_PRO
 make size      # RP07, 36.6 to 46.5 minutes per run on Small (2026-10-22/23); PVLAB_ORG_PRO
 make lag       # RP08, project lifetime 0.47 to 0.75 h on Small (2026-10-23: 2 bulk or 3 WAL-load cycles; R27 held 2.13 h by a since-fixed sampler wait); PVLAB_ORG_PRO
