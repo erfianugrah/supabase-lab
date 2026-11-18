@@ -11,7 +11,7 @@ RL_PORT ?= 8080
 RLW_PORT ?= 8788
 EDGE_PORT ?= 8081
 
-.PHONY: init fmt validate apply probe probe-s23 probe-s24 probe-s25 probe-s26 probe-s27 probe-s28 probe-s29 echo-worker-up echo-worker-down publish-evidence destroy postgrest-up postgrest-down ratelimit-up ratelimit-down ratelimit-worker-up ratelimit-worker-down edge-up edge-down
+.PHONY: init fmt validate apply probe probe-s23 probe-s24 probe-s25 probe-s26 probe-s27 probe-s28 probe-s29 probe-s30 echo-worker-up echo-worker-down publish-evidence destroy postgrest-up postgrest-down ratelimit-up ratelimit-down ratelimit-worker-up ratelimit-worker-down edge-up edge-down
 
 init:
 	tofu init
@@ -181,6 +181,15 @@ probe-s29:
 	@mkdir -p evidence/$(TS)
 	$(HARNESS_RUN) --where local --experiment security-lockdown \
 		--only S29 --destructive --out evidence/$(TS)
+
+# S30: self-provisioned (a restore role: CREATEDB, ADMIN OPTION, pg_restore --no-owner; RLS in pg_dump).
+probe-s30:
+	@test -n "$$SUPABASE_ACCESS_TOKEN" || (echo "export SUPABASE_ACCESS_TOKEN"; exit 1)
+	@test -n "$$PVLAB_ORG_PRO" || (echo "export PVLAB_ORG_PRO"; exit 1)
+	@$(HARNESS_BUILD)
+	@mkdir -p evidence/$(TS)
+	$(HARNESS_RUN) --where local --experiment security-lockdown \
+		--only S30 --destructive --out evidence/$(TS)
 
 # Needs CLOUDFLARE_API_TOKEN (Workers edit) and CLOUDFLARE_ACCOUNT_ID in the env.
 echo-worker-up:
