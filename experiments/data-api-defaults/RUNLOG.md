@@ -284,3 +284,35 @@ What it does not settle:
   `w_probe`'s; that they would answer 42501 without it is an inference from
   the code, not a measurement. Z01's table is never read over the Data API
   (it exists to trip a security advisor lint), so DD05 says nothing about it.
+
+## 2026-11-17 - DD06: Data API response compression (work-supabase-lab#332)
+
+Why: no module had read the Data API response headers, so whether it
+compresses on `Accept-Encoding` was untested.
+
+Shape: `make run ONLY=DD06,DD99`, two runs, one fresh Pro-org project each
+(ap-southeast-1), deleted by DD99 in run 2 and by `make clean DELETE=1` in
+run 1 (DD99 skipped there: `PVLAB_ORG_SLUGS` was not set). Table
+`dd06_text`, 2000 rows of `repeat('supabase lab compression probe ', 8)`,
+read with the legacy service_role key through `fetch` with decompression off,
+so the byte count is the encoded response body as it crossed the wire
+(headers and TLS framing not counted).
+
+- Run 1: `out/2026-11-17/run-2026-11-17T09-07-35-363Z.json`
+- Run 2: `out/2026-11-17/run-2026-11-17T09-08-48-457Z.json`
+
+| `Accept-Encoding` | 2000 rows | 3 rows |
+| --- | --- | --- |
+| absent | no `Content-Encoding`, 271891 bytes | no `Content-Encoding`, 808 bytes |
+| `identity` | no `Content-Encoding`, 271891 bytes | no `Content-Encoding`, 808 bytes |
+| `gzip` | `gzip`, 3142 bytes (run 1), 3237 bytes (run 2) | `gzip`, 97 bytes |
+| `br` | `br`, 1610 bytes | `br`, 72 bytes |
+| `gzip, deflate, br` | `gzip`, 3237 bytes | `gzip`, 97 bytes |
+
+All 200, `Vary: Accept-Encoding` on the gzip request. The Data API compresses
+when asked, including a 3-row body, and answers a browser-style header with
+gzip, not br. The body is `repeat('supabase lab compression probe ', 8)` on
+every row, so real rows would likely compress less; treat these sizes as a
+best case (real rows not measured). Not run: other keys, RPC and Storage
+responses, direct or pooler Postgres traffic, and whether metered egress
+counts compressed or uncompressed bytes.

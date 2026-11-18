@@ -1,0 +1,80 @@
+{
+  "startedAt": "2026-11-17T09:08:48.457Z",
+  "finishedAt": "2026-11-17T09:08:59.597Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "data-api-defaults",
+  "labCommit": "cee2220",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.7",
+    "pgbench": "pgbench (PostgreSQL) 18.7",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "DD06a",
+      "title": "2000-row response, by Accept-Encoding",
+      "status": "info",
+      "detail": "GET /rest/v1/dd06_text?limit=2000 with the legacy service_role key, fetch with decompression off. none: 200, Content-Encoding (none), 271891 bytes; identity: 200, Content-Encoding (none), 271891 bytes; gzip: 200, Content-Encoding gzip, 3237 bytes; br: 200, Content-Encoding br, 1610 bytes; browser: 200, Content-Encoding gzip, 3237 bytes. Vary on the gzip request: Accept-Encoding.",
+      "measurements": {
+        "rows": 2000,
+        "none_status": 200,
+        "none_encoding": "(none)",
+        "none_bytes": 271891,
+        "identity_status": 200,
+        "identity_encoding": "(none)",
+        "identity_bytes": 271891,
+        "gzip_status": 200,
+        "gzip_encoding": "gzip",
+        "gzip_bytes": 3237,
+        "vary": "Accept-Encoding",
+        "br_status": 200,
+        "br_encoding": "br",
+        "br_bytes": 1610,
+        "browser_status": 200,
+        "browser_encoding": "gzip",
+        "browser_bytes": 3237
+      },
+      "durationMs": 9075
+    },
+    {
+      "id": "DD06b",
+      "title": "3-row response, by Accept-Encoding",
+      "status": "info",
+      "detail": "GET /rest/v1/dd06_text?limit=3 with the legacy service_role key, fetch with decompression off. none: 200, Content-Encoding (none), 808 bytes; identity: 200, Content-Encoding (none), 808 bytes; gzip: 200, Content-Encoding gzip, 97 bytes; br: 200, Content-Encoding br, 72 bytes; browser: 200, Content-Encoding gzip, 97 bytes. Vary on the gzip request: Accept-Encoding.",
+      "measurements": {
+        "rows": 3,
+        "none_status": 200,
+        "none_encoding": "(none)",
+        "none_bytes": 808,
+        "identity_status": 200,
+        "identity_encoding": "(none)",
+        "identity_bytes": 808,
+        "gzip_status": 200,
+        "gzip_encoding": "gzip",
+        "gzip_bytes": 97,
+        "vary": "Accept-Encoding",
+        "br_status": 200,
+        "br_encoding": "br",
+        "br_bytes": 72,
+        "browser_status": 200,
+        "browser_encoding": "gzip",
+        "browser_bytes": 97
+      },
+      "durationMs": 9075
+    },
+    {
+      "id": "DD99",
+      "title": "DD99: project deleted and gone from the listing",
+      "status": "pass",
+      "detail": "DELETE 200; absent from GET /projects after 0s",
+      "measurements": {
+        "delete_status": 200,
+        "gone_from_listing_s": 0
+      },
+      "durationMs": 2064
+    }
+  ]
+}

@@ -119,3 +119,48 @@ Not run: `cron.use_background_workers=on` (postmaster setting, not
 changeable as `postgres`), a job longer than its interval across a restart,
 more than one missed minute, a consumer on an every-minute schedule, VACUUM
 after the drain, Small or larger compute for CB01-CB04, other regions.
+
+## 2026-11-17 - CB06: how many jobs run at once (work-supabase-lab#331)
+
+Question: the Supabase pg_cron page recommends no more than 8 concurrent jobs;
+what happens at 16, and above `cron.max_running_jobs`?
+
+Shape: `make run IDS=CB06,CB99`, two runs in parallel (`LABEL=a`, `LABEL=b`),
+one fresh Pro-org Micro each in ap-southeast-1, deleted by CB99. Settings read:
+pg_cron 1.6.4, `cron.max_running_jobs` 32, `cron.use_background_workers`
+off, `cron.host` localhost, `cron.timezone` GMT, `max_connections` 60,
+`superuser_reserved_connections` 3, PostgreSQL 17.12. Each stage schedules
+its jobs for one UTC minute (`M H * * *`), so they fire once on the same
+boundary; backends running the sleep are counted every 2 s through the
+Management API, and `cron.job_run_details` is read and the jobs unscheduled
+after every run should have ended.
+
+- Run a: `out/2026-11-17/run-2026-11-17T09-12-39-392Z.json`
+- Run b: `out/2026-11-17/run-2026-11-17T09-12-59-462Z.json`
+
+| Stage | Peak sleeping backends | Runs for the minute | Statuses | First-to-last start |
+| --- | --- | --- | --- | --- |
+| 16 jobs of `pg_sleep(40)` | 16 | 16 of 16 | succeeded x16 | 0 s |
+| 40 jobs of `pg_sleep(30)` | 32 | 40 of 40 | succeeded x40 | 30.2 s |
+
+Same values in both runs; no Management API sample was refused (16-job
+stage 52 samples per run, 40-job stage 42 in run a and 40 in run b). Reading: 16 jobs ran at once, first-to-last start 0 s, so the documented 8
+(the Supabase pg_cron page recommends "no more than 8" concurrent jobs) is
+advice rather than a limit. At 40, peak sleeping backends were 32, equal to
+`cron.max_running_jobs` (setting not varied), and the other 8 started after
+the first wave (last start 30.2 s after the first, against a 30 s sleep) and
+then ran to completion. No sample through the Management API was refused
+while 32 jobs held connections; total connections against the Micro's 60 were
+not read.
+
+A superseded third run (`out/2026-11-17/run-2026-11-17T09-05-47-757Z.json`,
+from a first version of the module that was not kept: it scheduled every job
+on `* * * * *` and unscheduled them 55 s after the minute) recorded the 8
+queued runs `failed` with `job canceled`. Read as `cron.unschedule` cancelling
+a run in progress: once observed, cause inferred from timing (the artifact
+holds no end times).
+
+Not run: Small or larger compute, more jobs than `max_connections` allows,
+jobs longer than a minute on an every-minute schedule, the "job startup
+timeout" message.
+
