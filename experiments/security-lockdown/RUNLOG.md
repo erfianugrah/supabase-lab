@@ -613,6 +613,62 @@ The PGRST202 hint with the function's schema removed from the exposed schemas; f
 
 All six projects answered DELETE 200 and were gone from `GET /projects` at the first check.
 
+## Run 10 - 2026-11-18 - Auth lifecycle and postgres against the auth schema (S28, S29)
+
+Question: Auth behaviours with no run behind them: TOTP code reuse, a role change through the access-token hook, what a deleted or banned user's held tokens still do, deleting a user who owns a Storage object, soft delete, what `postgres` can do to the `auth` schema, and whether a Data API upsert needs an UPDATE policy.
+
+Shape: two self-provisioned modules (`tests/s28-auth-lifecycle.ts`, `tests/s29-auth-schema-and-upsert.ts`; `make probe-s28`, `probe-s29`), each creating one project in the Pro org in ap-southeast-1 (default size, not recorded) through `lib/project.ts` and deleting it in `finally`. PostgreSQL 17.12. Two runs per module. S29's run 2 was repeated alone: S29's first attempt at run 2 started in the same millisecond as S28's run 2, both wrote the same artifact name, and S28's run 2 artifact is the one that survived.
+
+- S28 run 1: `out/2026-11-18/run-2026-11-18T01-15-14-011Z.json`
+- S28 run 2: `out/2026-11-18/run-2026-11-18T01-15-44-778Z.json`
+- S29 run 1: `out/2026-11-18/run-2026-11-18T01-15-13-835Z.json`
+- S29 run 2: `out/2026-11-18/run-2026-11-18T01-16-48-160Z.json`
+
+Both runs of each module gave the same values.
+
+### TOTP codes can be reused inside their step (S28a)
+
+`POST /auth/v1/factors` (TOTP) answered 200; the enrol URI read `algorithm=SHA1`, `digits=6`, `period=30`, and the returned `totp.secret` decoded to 160 bits. A code computed locally from that secret (RFC 6238, SHA-1) verified the first challenge (200, session `aal2`), so the local implementation matches the server's. A second challenge verified with the same code, in the same 30 s step, also answered 200. Whether a code from the previous or next step is accepted was not tested.
+
+### The access-token hook's claim changes at refresh, not before (S28b)
+
+A custom access token hook set `user_role` from a table; a policy admitted `auth.jwt() ->> 'user_role' = 'editor'`. The editor's token read 3 of 3 rows. After the table set the user to `viewer`, the same token still read 3 rows (its claim still `editor`); a refresh (200) returned a token with `viewer`, which read 0 rows. Access tokens carried `exp - iat` = 3600 s, so, if the Data API refuses an expired token (not tested here), a role change reaches the Data API at the user's next refresh, at most the token's remaining lifetime later.
+
+### Deleted and banned users' held access tokens still read the Data API (S28c, S28d)
+
+Policy `to authenticated using (true)`, legacy anon API key plus the user's token:
+
+| After | Data API with the held access token | `GET /auth/v1/user` with it | Refresh token | New password sign-in |
+| --- | --- | --- | --- | --- |
+| admin `DELETE /auth/v1/admin/users/{id}` (200) | 200, 3 rows | 403 `user_not_found` | 400 `refresh_token_not_found` | not tried |
+| admin `PUT` `ban_duration` `1h` (200) | 200, 3 rows | 403 `user_banned` | 400 `user_banned` | 400 `user_banned` |
+
+Auth refused the user at the first check after the DELETE or ban (a fixed 2 s wait); the Data API kept serving the held token, consistent with PostgREST checking the token's signature and expiry rather than the user row (not separated here). If the Data API refuses an expired token (not tested here), the held token's remaining lifetime is the exposure (`exp - iat` 3600 s).
+
+### Deleting a user who owns a Storage object (S28e)
+
+A user uploaded an object to a private bucket (200; `owner` and `owner_id` set). Admin DELETE of that user answered 200, and the object row still had both `owner` and `owner_id` non-null: the row stays; whether those values still equal the deleted user's id, and whether the file can still be read, were not checked.
+
+### Soft delete (S28f)
+
+`DELETE /auth/v1/admin/users/{id}` with `should_soft_delete: true` answered 200. The row stayed in `auth.users` with `deleted_at` set, `email` changed (neither the original nor null) and the password cleared. A sign-in with the old password answered 400 `invalid_credentials`, and admin-creating a user with the same email answered 200.
+
+### postgres against the auth schema (S29a)
+
+`auth.users` and `auth.uid()` are owned by `supabase_auth_admin`. As `postgres` over the Supavisor session pooler: `create or replace function auth.uid()` 42501 `permission denied for schema auth`; `vacuum auth.users` returned without an error (the module records errors only; PostgreSQL skips, with a warning, a table the caller may not vacuum, and no notice or `last_vacuum` was read, so whether the table was vacuumed is not established); `alter table auth.users set (autovacuum_vacuum_scale_factor = 0.01)` 42501 `must be owner of table users`; `create index ... on auth.users` 42501, same message; `delete` of 3 of 6 test users in one statement ok, 3 deleted.
+
+### A Data API upsert needs an UPDATE policy (S29b)
+
+A signed-in user, `POST` with `Prefer: resolution=merge-duplicates`, on a table with RLS (granted select, insert, update to `authenticated`), an INSERT policy (`with check owner = auth.uid()`) and a SELECT policy (`using owner = auth.uid()`). First insert 201. An upsert of the same id answered 403 `42501: new row violates row-level security policy (USING expression)`, and the stored value stayed `first`. After adding an UPDATE policy (`using` and `with check owner = auth.uid()`) an upsert of the same id with value `third` answered 200 and stored `third`.
+
+### Not run (run 10)
+
+TOTP codes from adjacent steps; whether a soft-deleted email is ever held back (here admin create with the same email answered 200 at once); Storage access to the deleted owner's objects; the Data API's answer once a held token expires; the SAML AuthnRequest signature algorithm.
+
+### Teardown (run 10)
+
+The four projects behind the cited artifacts answered DELETE 200 and were gone from `GET /projects` at the first check. The project from S29's overwritten first attempt at run 2 has no artifact; a listing of the account's projects after all runs (2026-11-18) showed no lab project left.
+
 ## Remaining
 
 - Phase C PrivateLink (iap-lockdown L20-L23) - needs a Team-tier org, an AWS

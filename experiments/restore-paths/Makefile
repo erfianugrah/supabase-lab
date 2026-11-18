@@ -12,7 +12,7 @@ TS := $(shell date +%Y%m%d-%H%M%S)
 OUT ?= evidence/$(TS)
 PVLAB := cd $(ROOT) && bun harness/src/run.ts --tests experiments/restore-paths/tests --where local --experiment restore-paths --destructive
 
-.PHONY: gen surface pitr pause daily rollback rpo size lag slots all
+.PHONY: gen surface pitr pitr-micro pause daily rollback rpo size lag slots all
 
 # The registry is generated and gitignored; regenerate after adding a module.
 gen:
@@ -25,6 +25,10 @@ surface: gen
 # RP02: PITR restore (pitr_7 on a Small project for roughly 30-60 minutes).
 pitr: gen
 	$(PVLAB) --only RP02 --out experiments/restore-paths/$(OUT)
+
+# RP10: pitr_7 on a Micro project, the restart question, a second database across a PITR restore (~1 h of pitr_7).
+pitr-micro: gen
+	$(PVLAB) --only RP10 --out experiments/restore-paths/$(OUT)
 
 # RP03: Free-plan pause/unpause, two cycles.
 pause: gen

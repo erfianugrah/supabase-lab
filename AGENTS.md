@@ -1920,7 +1920,7 @@ AR05/AR06 artifacts in `out/2026-10-26/` (reference AR06 run
 - Cloudflare pieces are OpenTofu (provider v4, gated on `enable_cloudflare`);
   real CF ids live in gitignored `cloudflare.auto.tfvars`.
 
-## experiments/security-lockdown - key facts (validated 2026-08-28; S13-S15 2026-08-31; S16-S21 2026-09-03; S23 2026-10-23; S24 2026-11-12; S25-S27 2026-11-17)
+## experiments/security-lockdown - key facts (validated 2026-08-28; S13-S15 2026-08-31; S16-S21 2026-09-03; S23 2026-10-23; S24 2026-11-12; S25-S27 2026-11-17; S28-S29 2026-11-18)
 
 - S01: the Management API security advisor catches every seeded exposure
   (rls_disabled_in_public, rls_enabled_no_policy, security_definer_view,
@@ -2116,6 +2116,25 @@ AR05/AR06 artifacts in `out/2026-10-26/` (reference AR06 run
   Of four named roles queried, all exist on a fresh project, including
   `supabase_etl_admin` (login, replication, bypassrls). Evidence
   `out/2026-11-17/`.
+- S28-S29 (2026-11-18, two runs each, fresh Pro-org project per run,
+  PostgreSQL 17.12; RUNLOG run 10). TOTP enrol: SHA1, 6 digits, 30 s, 160-bit
+  secret; the same code verified a second challenge in the same step (200).
+  An access-token hook's claim changes at refresh: after the role table
+  changed, the held token still read 3 of 3 rows, the refreshed one 0; tokens
+  carry `exp - iat` 3600 s. After admin DELETE or `ban_duration`, the held access token
+  still read the Data API (200, 3 rows) while `/auth/v1/user` answered 403
+  (`user_not_found` / `user_banned`) and the refresh 400. Deleting a user who
+  owns a Storage object answered 200 and left `owner` and `owner_id` set on
+  the object. Soft delete keeps the row (`deleted_at` set, email changed,
+  password cleared); the old password 400s and the email can be reused (200).
+  As `postgres`: `create or replace auth.uid()` 42501 (schema auth),
+  `vacuum auth.users` returned no error (vacuumed or skipped not checked),
+  `alter table auth.users set (...)` and `create index` on it 42501 `must be
+  owner of table users` (owner `supabase_auth_admin`), a batched delete of 3
+  users ok. A Data API upsert (`resolution=merge-duplicates`) onto an owned
+  row needs an UPDATE policy: with UPDATE granted and INSERT + SELECT
+  policies only it gave 403 `42501 ... (USING expression)`, adding an UPDATE
+  policy gave 200. Evidence `out/2026-11-18/`.
 
 ## experiments/edge-function-limits - key facts (validated 2026-09-02, micro, Pro org; EF09, EF13, EF14 2026-10-23 on a Pro and a Free project)
 
@@ -4033,7 +4052,7 @@ when present, so a new module is invisible until it is regenerated).
 - Retire FAILURE-MATRIX 10.1 `[doc]` for the measured halves (create and
   restart lifecycle surfaces); capacity-driven failures remain `[doc]`.
 
-## experiments/restore-paths - key facts (2026-10-10, 2026-10-20 and 2026-10-22/23, ap-southeast-1, one vantage, IPv4-only until RP09 on 2026-10-23)
+## experiments/restore-paths - key facts (2026-10-10, 2026-10-20 and 2026-10-22/23, ap-southeast-1, one vantage, IPv4-only until RP09 on 2026-10-23; RP10 2026-11-18)
 
 Which restore paths a Pro org can drive through the Management API, and what
 each does to the db password, Storage and the per-path outage. Self-provisioning
@@ -4240,6 +4259,17 @@ because `harness/dist/pvlab` is a linux-x64 build.
   suffix. A thrown fetch to api.supabase.com (`The socket connection was
   closed unexpectedly`) killed R16, R17 and R14's RP06d; module reads go
   through `again()`.
+- RP10 (2026-11-18, two runs, fresh Pro-org project each, `ci_micro` read from
+  `billing/addons`): `pitr_7` attaches to Micro (PATCH 200, `pitr_enabled` at
+  the first read after the PATCH, compute still `ci_micro`); the docs now say
+  PITR is available on all compute sizes (backups.md, read 2026-11-18).
+  Enabling it did not restart Postgres up to the read after `pitr_enabled`
+  (`pg_postmaster_start_time` unchanged; later not checked). With PITR on,
+  the backups view listed no completed physical backups (1 before, 0 after);
+  whether the earlier backup was removed or only left out of the list was not
+  checked. A second database (`create database` run as role `postgres`,
+  written through the session pooler) came back from `restore-pitr` with the
+  same split as the `postgres` database: marker A kept, marker B gone.
 
 ## experiments/pooler-checkout - key facts (validated 2026-10-10 and 2026-10-23, Micro and Small, ap-southeast-1 and us-east-1, Pro org, Supavisor aws-0 hosts (PC01 to PC07); PC08 2026-11-04, Small, ap-northeast-1, pooler host prefix not recorded; PC10 2026-11-17)
 

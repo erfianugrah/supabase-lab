@@ -1,0 +1,70 @@
+{
+  "startedAt": "2026-11-18T01:16:48.160Z",
+  "finishedAt": "2026-11-18T01:16:57.956Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "security-lockdown",
+  "labCommit": "897e026",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.7",
+    "pgbench": "pgbench (PostgreSQL) 18.7",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "S29s",
+      "title": "Setup",
+      "status": "info",
+      "detail": "created in 4 s, PostgreSQL 17.12",
+      "measurements": {
+        "create_s": 4,
+        "pg": "PostgreSQL 17.12"
+      },
+      "durationMs": 9796
+    },
+    {
+      "id": "S29a",
+      "title": "postgres and the auth schema",
+      "status": "info",
+      "detail": "auth.users owner supabase_auth_admin; auth.uid() owner supabase_auth_admin. As postgres over Supavisor session 5432: create or replace auth.uid() -> 42501 permission denied for schema auth; vacuum auth.users -> ok; alter table auth.users set (autovacuum_vacuum_scale_factor) -> 42501 must be owner of table users; create index on auth.users -> 42501 must be owner of table users; delete 3 of 6 test users in one statement -> ok, 3 deleted.",
+      "measurements": {
+        "users_owner": "supabase_auth_admin",
+        "uid_owner": "supabase_auth_admin",
+        "replace_uid": "42501 permission denied for schema auth",
+        "vacuum_users": "ok",
+        "alter_users_storage_param": "42501 must be owner of table users",
+        "create_index_users": "42501 must be owner of table users",
+        "batched_delete": "ok, 3 deleted"
+      },
+      "durationMs": 9796
+    },
+    {
+      "id": "S29b",
+      "title": "a Data API upsert onto an owned row: INSERT + SELECT policies only, then with an UPDATE policy",
+      "status": "info",
+      "detail": "Signed-in user, POST with Prefer resolution=merge-duplicates. First insert -> 201. Upsert of the same id with INSERT and SELECT policies only -> 403 42501: new row violates row-level security policy (USING expression) for table \"s29_items\"; stored value \"first\". After adding an UPDATE policy (using and with check owner = auth.uid()) -> 200; stored value \"third\".",
+      "measurements": {
+        "insert": 201,
+        "upsert_without_update_policy": 403,
+        "upsert_without_code": "42501: new row violates row-level security policy (USING expression) for table \"",
+        "value_after_first_upsert": "first",
+        "upsert_with_update_policy": 200,
+        "value_after_second_upsert": "third"
+      },
+      "durationMs": 9796
+    },
+    {
+      "id": "S29z",
+      "title": "Teardown",
+      "status": "info",
+      "detail": "DELETE 200, gone from GET /projects after 0 s",
+      "measurements": {
+        "delete_status": 200,
+        "gone_s": 0
+      },
+      "durationMs": 9796
+    }
+  ]
+}
