@@ -1920,7 +1920,7 @@ AR05/AR06 artifacts in `out/2026-10-26/` (reference AR06 run
 - Cloudflare pieces are OpenTofu (provider v4, gated on `enable_cloudflare`);
   real CF ids live in gitignored `cloudflare.auto.tfvars`.
 
-## experiments/security-lockdown - key facts (validated 2026-08-28; S13-S15 2026-08-31; S16-S21 2026-09-03; S23 2026-10-23; S24 2026-11-12; S25-S27 2026-11-17; S28-S29 2026-11-18)
+## experiments/security-lockdown - key facts (validated 2026-08-28; S13-S15 2026-08-31; S16-S21 2026-09-03; S23 2026-10-23; S24 2026-11-12; S25-S27 2026-11-17; S28-S30 2026-11-18)
 
 - S01: the Management API security advisor catches every seeded exposure
   (rls_disabled_in_public, rls_enabled_no_policy, security_definer_view,
@@ -2135,6 +2135,16 @@ AR05/AR06 artifacts in `out/2026-10-26/` (reference AR06 run
   row needs an UPDATE policy: with UPDATE granted and INSERT + SELECT
   policies only it gave 403 `42501 ... (USING expression)`, adding an UPDATE
   policy gave 200. Evidence `out/2026-11-18/`.
+- S30 (2026-11-18, four runs, fresh Pro-org project each, PostgreSQL 17.12;
+  RUNLOG run 11): the plain local `pg_dump` 18.7 of a schema keeps `ENABLE`
+  (written `ALTER TABLE`) and `FORCE ROW LEVEL SECURITY` (written `ALTER
+  TABLE ONLY`), the policy and the function; the form was recorded in runs
+  3-4. A LOGIN CREATEDB role made by `postgres`, holding an application role
+  WITH ADMIN OPTION, created a database and `pg_restore --no-owner` loaded
+  the custom-format dump into it (exit 0): the table came back with RLS
+  enabled and forced, 1 policy, owned by the restore role, and all 9 source
+  rows (counted with FORCE off, runs 3-4). That role could grant and revoke
+  the application role; `grant pg_read_all_data` answered 42501.
 
 ## experiments/edge-function-limits - key facts (validated 2026-09-02, micro, Pro org; EF09, EF13, EF14 2026-10-23 on a Pro and a Free project)
 
@@ -6121,7 +6131,7 @@ ledger records every arrival before answering. n = 1 per module except NL04
   after a quiet period headroom (a smaller batch or a longer timeout -
   neither tested).
 
-## experiments/upgrade-integrity - key facts (validated 2026-10-23 runs 1-3 and 2026-10-26 run 4, Pro org, Micro, ap-southeast-1, 15.19.0.003 -> 17.11.0.003)
+## experiments/upgrade-integrity - key facts (validated 2026-10-23 runs 1-3 and 2026-10-26 run 4, Pro org, Micro, ap-southeast-1, 15.19.0.003 -> 17.11.0.003; UI07 2026-11-18, server_version 15.20 -> 17.12, image supabase-postgres-17.12.0.000)
 
 Self-provisioning: one project per run created on Postgres 15, upgraded in
 place through `POST /v1/projects/{ref}/upgrade`, deleted by UI99. pg_cron
@@ -6239,6 +6249,17 @@ runs 3-4. Numbers and per-write evidence: RUNLOG.md, artifacts
   upgrade stage 122.5 s and 142.8 s; first answer from 17.11 at +318.8 s and
   +344.6 s. These are pgmig harness runs, not UI01-UI06 module runs, and their
   logs are not archived in this repo.
+- UI07 (2026-11-18, two runs, fresh PG15 project each, Micro requested,
+  server_version 15.20 -> 17.12): roles that `postgres` created on 15 have no
+  `pg_auth_members` row for `postgres`. After the in-place upgrade `postgres`
+  can still `alter role ... password` on `ui07_svc`, but `grant` and `revoke`
+  of `ui07_app` answer 42501 (`Only roles with the ADMIN option on ...`) and
+  `drop role ui07_app` answers 42501 (`Only roles with the CREATEROLE
+  attribute and th...`). A role granted to `postgres` WITH ADMIN OPTION while
+  on 15 came back with grantor `supabase_admin`, and `postgres` could grant,
+  revoke and drop it. A role made on 17 could be created, altered (`nologin`)
+  and dropped. Granting each role made on 15 to `postgres` WITH ADMIN OPTION
+  before upgrading is the inferred fix (tested on one new role, `ui07_pre`).
 
 ## experiments/pg17-extensions - key facts (validated 2026-11-10, PX01 one run, Team org, default compute size, ap-southeast-1; 15.19 and 17.11)
 

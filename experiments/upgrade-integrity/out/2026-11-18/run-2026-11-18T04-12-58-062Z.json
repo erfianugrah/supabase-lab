@@ -1,0 +1,90 @@
+{
+  "startedAt": "2026-11-18T04:12:58.062Z",
+  "finishedAt": "2026-11-18T04:19:36.922Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "upgrade-integrity",
+  "labCommit": "9463ca5",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.7",
+    "pgbench": "pgbench (PostgreSQL) 18.7",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "UI07a",
+      "title": "on the old major: roles created by postgres",
+      "status": "info",
+      "detail": "server_version 15.20. create ui07_app, ui07_svc, grant ui07_app to ui07_svc -> ok. Remedy set-up: create ui07_pre, grant ui07_pre to postgres with admin option -> ok. postgres's membership rows in ui07_*: ui07_pre(admin true, grantor postgres). alter role ui07_svc password -> ok. (host suspended 343 s during this test: timings that span it are not measurements)",
+      "measurements": {
+        "version_before": "15.20",
+        "create": "ok",
+        "remedy_grant": "ok",
+        "postgres_rows_before": "ui07_pre(admin true, grantor postgres)",
+        "alter_password_before": "ok",
+        "host_suspended_s": 343
+      },
+      "durationMs": 54342
+    },
+    {
+      "id": "UI07b",
+      "title": "in-place upgrade to the first eligible target",
+      "status": "info",
+      "detail": "target 17 (supabase-postgres-17.12.0.000); POST /upgrade -> 201; on 17.12 and ACTIVE_HEALTHY after 390 s (20 s poll; last status ACTIVE_HEALTHY). (host suspended 343 s during this test: timings that span it are not measurements)",
+      "measurements": {
+        "target": "17",
+        "app_version": "supabase-postgres-17.12.0.000",
+        "post_status": 201,
+        "version_after": "17.12",
+        "upgrade_s": 390,
+        "host_suspended_s": 343
+      },
+      "durationMs": 54342
+    },
+    {
+      "id": "UI07c",
+      "title": "on the new major: what postgres can still do to roles it created on 15",
+      "status": "info",
+      "detail": "postgres's membership rows in ui07_* after the upgrade: ui07_pre(admin true, inherit true, set true, grantor supabase_admin). On roles created on 15: alter role ui07_svc password -> ok; grant ui07_app to ui07_new -> ERROR: 42501: permission denied to grant role \"ui07_app\" DETAIL: Only roles with the ADMIN option on; revoke ui07_app from ui07_svc -> ERROR: 42501: permission denied to revoke role \"ui07_app\" DETAIL: Only roles with the ADMIN option o; drop role ui07_app -> ERROR: 42501: permission denied to drop role DETAIL: Only roles with the CREATEROLE attribute and th. Control, a role created on 17: create -> ok, alter -> ok, drop -> ok. (host suspended 343 s during this test: timings that span it are not measurements)",
+      "measurements": {
+        "postgres_rows_after": "ui07_pre(admin true, inherit true, set true, grantor supabase_admin)",
+        "alter_password": "ok",
+        "create_new": "ok",
+        "grant_to_new": "ERROR: 42501: permission denied to grant role \"ui07_app\" DETAIL: Only roles with the ADMIN option on",
+        "revoke_from_svc": "ERROR: 42501: permission denied to revoke role \"ui07_app\" DETAIL: Only roles with the ADMIN option o",
+        "drop_app": "ERROR: 42501: permission denied to drop role DETAIL: Only roles with the CREATEROLE attribute and th",
+        "ctl_alter_new": "ok",
+        "ctl_drop_new": "ok",
+        "host_suspended_s": 343
+      },
+      "durationMs": 54342
+    },
+    {
+      "id": "UI07d",
+      "title": "the remedy: a role granted to postgres WITH ADMIN OPTION before the upgrade",
+      "status": "info",
+      "detail": "On 15: grant ui07_pre to postgres with admin option -> ok. On 17: grant ui07_pre to ui07_new -> ok; revoke -> ok; drop role ui07_pre -> ok. (host suspended 343 s during this test: timings that span it are not measurements)",
+      "measurements": {
+        "remedy_grant_on_15": "ok",
+        "pre_grant_to_new": "ok",
+        "pre_revoke": "ok",
+        "pre_drop": "ok",
+        "host_suspended_s": 343
+      },
+      "durationMs": 54342
+    },
+    {
+      "id": "UI99",
+      "title": "UI99: project deleted and gone from the listing",
+      "status": "pass",
+      "detail": "DELETE 200; absent from GET /projects after 0 s",
+      "measurements": {
+        "delete_status": 200,
+        "gone_from_listing_s": 0
+      },
+      "durationMs": 1100
+    }
+  ]
+}

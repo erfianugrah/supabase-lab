@@ -459,3 +459,55 @@ postmaster start any client write saw (05:54:04.798837).
 
 Not run: the direct connection (no DNS answer from this vantage), compute
 above Micro, a larger database, other regions, 17 to a newer major, n > 4.
+
+## 2026-11-18 - UI07: roles that postgres created on 15, after the upgrade to 17 (work-supabase-lab#328)
+
+Question: PostgreSQL 16 changed CREATEROLE, so a non-superuser manages only
+roles it holds ADMIN OPTION on, and gets that grant on roles it creates
+(security-lockdown S27). Roles that `postgres` created on 15 have no such row.
+What can `postgres` do to them after an in-place upgrade to 17?
+
+Shape: `make run ONLY=UI07,UI99`, a fresh PG15 project per run (Pro org,
+ap-southeast-1, Micro requested and not read back, `postgres_engine` 15,
+server_version 15.20), statements through the Management API query route
+(taken to run as `postgres`; `current_user` not read), upgrade with `POST
+/v1/projects/{ref}/upgrade` to the first eligible target (17,
+`supabase-postgres-17.12.0.000`), polled every 20 s. On 15: `ui07_app`
+(NOLOGIN), `ui07_svc` (LOGIN, granted `ui07_app`), and `ui07_pre` granted to
+`postgres` WITH ADMIN OPTION as the remedy under test. On 17 the module creates
+`ui07_new` to receive grants and as the control. Two runs.
+
+- Run 1: `out/2026-11-18/run-2026-11-18T04-07-41-781Z.json`
+- Run 2: `out/2026-11-18/run-2026-11-18T04-12-58-062Z.json`
+
+An earlier run the same day (04:01 UTC, an earlier module version without the
+remedy role, not published and not evidence here) gave the same `alter role
+ui07_svc password` ok and the same three 42501 answers. Because it had no
+remedy role, its UI07a membership rows differ from the table.
+
+| Step | Both runs unless stated |
+| --- | --- |
+| On 15: `postgres`'s membership rows in `ui07_*` | only the remedy: `ui07_pre` (admin true, grantor `postgres`) |
+| On 15: `alter role ui07_svc password` | ok |
+| Upgrade | POST 201 in both runs; run 1 on 17.12 and ACTIVE_HEALTHY after 302 s (20 s poll); run 2's 390 s spans a 343 s suspension of the local machine running the harness and is not a measurement |
+| On 17: `postgres`'s rows | only `ui07_pre` (admin true, inherit true, set true, grantor `supabase_admin`) |
+| On 17, roles made on 15: `alter role ui07_svc password` | ok |
+| On 17, roles made on 15: `grant ui07_app to ui07_new` (`ui07_new` made on 17) | `42501: permission denied to grant role "ui07_app"`, DETAIL `Only roles with the ADMIN option on ...` |
+| On 17, roles made on 15: `revoke ui07_app from ui07_svc` | `42501: permission denied to revoke role "ui07_app"`, DETAIL `Only roles with the ADMIN option o...` |
+| On 17, roles made on 15: `drop role ui07_app` | `42501: permission denied to drop role`, DETAIL `Only roles with the CREATEROLE attribute and th...` |
+| Control, `ui07_new` (made on 17): create, `alter role ... nologin`, drop (no grant or revoke) | ok, ok, ok |
+| Remedy, `ui07_pre`: grant to `ui07_new`, revoke, drop | ok, ok, ok |
+
+Reading: after the upgrade, `postgres` can still change the password of
+`ui07_svc` (created on 15), but cannot grant `ui07_app` (created on 15),
+revoke it from `ui07_svc` or drop it. `postgres` holds no ADMIN membership in
+`ui07_app`, and security-lockdown S27 found `postgres` is not a superuser (not
+read in this module). Granting `ui07_pre` to `postgres` WITH ADMIN OPTION while
+still on 15 carried through: the row came back on 17 with grantor
+`supabase_admin`, and grant to `ui07_new`, revoke and drop of `ui07_pre`
+answered ok. `ui07_pre` was the only role tested this way; the same grant on
+`ui07_app` or `ui07_svc` was not tried. Not run: fixing a role after the
+upgrade (granting ADMIN on `ui07_app` needs a role that holds ADMIN on it, or
+a superuser; which roles hold it on 17 was not read, so `supabase_admin` only,
+and with it a support request, is an inference; not tested), LOGIN roles'
+other attributes, 15 to 17 on larger compute.

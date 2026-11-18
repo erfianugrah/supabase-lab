@@ -669,6 +669,25 @@ TOTP codes from adjacent steps; whether a soft-deleted email is ever held back (
 
 The four projects behind the cited artifacts answered DELETE 200 and were gone from `GET /projects` at the first check. The project from S29's overwritten first attempt at run 2 has no artifact; a listing of the account's projects after all runs (2026-11-18) showed no lab project left.
 
+## Run 11 - 2026-11-18 - a restore role made by postgres, and RLS in pg_dump (S30)
+
+Question (work-supabase-lab#328): whether a restore flow for a custom role model works end to end: a LOGIN CREATEDB role made by `postgres`, an application role handed to it WITH ADMIN OPTION, the restore role creating a database and loading a dump with `pg_restore --no-owner`. Separately, whether `pg_dump` keeps a table's RLS state.
+
+Shape: `tests/s30-restore-role-flow.ts` (`make probe-s30`), a fresh project in the Pro org per run (ap-southeast-1, default size not recorded, PostgreSQL 17.12), deleted in `finally`. Every connection goes through the Supavisor session pooler; dump and restore are the local `pg_dump` 18.7 (version recorded) and `pg_restore` from the same install (version not recorded), with the password in `PGPASSWORD`. Source: schema `s30src`, table `notes` (9 rows, RLS enabled and forced, one SELECT policy `owner = current_user` on the text column `owner`) and one SQL function. Four runs in two module versions; the S30a-c values below are the same in all four where both versions record them.
+
+- Run 1: `out/2026-11-18/run-2026-11-18T04-01-37-647Z.json`
+- Run 2: `out/2026-11-18/run-2026-11-18T04-01-51-023Z.json`
+- Run 3: `out/2026-11-18/run-2026-11-18T04-35-08-053Z.json`
+- Run 4: `out/2026-11-18/run-2026-11-18T04-35-20-644Z.json`
+
+Runs 1-2 recorded only whether the dump held each statement, and read the rows the table owner sees under FORCE without the restored row count. Runs 3-4 add the statement form (`enable_form`, `force_form`) and, after the owner turns FORCE off, the restored row count (`rows_restored`). Two runs before run 1 (04:00 UTC, not published, not evidence here) failed S30a on a regex in the module that required `ALTER TABLE s30src.notes FORCE ...`.
+
+- S30a: the plain dump (`--no-owner --no-privileges`, as `postgres`) carries `ENABLE ROW LEVEL SECURITY`, `FORCE ROW LEVEL SECURITY`, the `CREATE POLICY` and the function; the custom-format dump exited 0. Runs 3-4: ENABLE is written `ALTER TABLE s30src.notes ENABLE ...` and FORCE `ALTER TABLE ONLY s30src.notes FORCE ...`, which matches pg_dump's source (`pg_dump.c` on REL_18_STABLE, https://github.com/postgres/postgres/blob/REL_18_STABLE/src/bin/pg_dump/pg_dump.c).
+- S30b: as `postgres`, `create role s30_restorer login createdb` and `grant s30_app to s30_restorer with admin option` succeeded. As `s30_restorer` over the session pooler, `create database s30_restored` succeeded and `pg_restore --no-owner --no-privileges` of the custom-format dump into it exited 0 with no stderr. The restored table: `relrowsecurity` true, `relforcerowsecurity` true, table owner `s30_restorer`, 1 policy, and 0 rows visible to `s30_restorer` under FORCE (no row's `owner` column is `s30_restorer`). Runs 3-4: after `alter table s30src.notes no force row level security`, `s30_restorer` counted 9 rows, the source's 9.
+- S30c: as `s30_restorer`, `grant s30_app to s30_reader` succeeded (1 membership row) and the revoke succeeded; `grant pg_read_all_data to s30_reader` (`s30_restorer` holds no ADMIN on `pg_read_all_data`) answered `42501 permission denied to grant role "pg_read_all_data"`.
+
+Not run: the dump of a full application schema, objects owned by other roles, extensions in the dump, a restore into a project instead of a second database.
+
 ## Remaining
 
 - Phase C PrivateLink (iap-lockdown L20-L23) - needs a Team-tier org, an AWS

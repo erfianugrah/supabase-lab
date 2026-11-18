@@ -1,0 +1,88 @@
+{
+  "startedAt": "2026-11-18T04:35:08.053Z",
+  "finishedAt": "2026-11-18T04:35:19.596Z",
+  "where": "local",
+  "region": "ap-southeast-1",
+  "ref": "<ref>",
+  "experiment": "security-lockdown",
+  "labCommit": "9463ca5",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "psql": "psql (PostgreSQL) 18.7",
+    "pgbench": "pgbench (PostgreSQL) 18.7",
+    "openssl": "LibreSSL 3.3.6"
+  },
+  "results": [
+    {
+      "id": "S30s",
+      "title": "Setup",
+      "status": "info",
+      "detail": "created in 4 s, PostgreSQL 17.12; source schema ok",
+      "measurements": {
+        "create_s": 4,
+        "pg": "PostgreSQL 17.12"
+      },
+      "durationMs": 11543
+    },
+    {
+      "id": "S30a",
+      "title": "pg_dump of a schema with RLS enabled and forced",
+      "status": "pass",
+      "detail": "Local pg_dump pg_dump (PostgreSQL) 18.7 through the session pooler as postgres. Plain dump exit 0; custom-format dump exit 0. Plain dump carries ENABLE ROW LEVEL SECURITY true (as ALTER TABLE), FORCE ROW LEVEL SECURITY true (as ALTER TABLE ONLY), CREATE POLICY true, the function true.",
+      "measurements": {
+        "dump_exit": 0,
+        "custom_exit": 0,
+        "enable_rls": "true",
+        "enable_form": "ALTER TABLE",
+        "force_rls": "true",
+        "force_form": "ALTER TABLE ONLY",
+        "create_policy": "true",
+        "function": "true"
+      },
+      "durationMs": 11543
+    },
+    {
+      "id": "S30b",
+      "title": "the restore role: create database, pg_restore --no-owner, RLS on the restored table",
+      "status": "info",
+      "detail": "As postgres: create role s30_restorer LOGIN CREATEDB, s30_app granted to it WITH ADMIN OPTION -> ok. As s30_restorer over the session pooler: create database -> ok. pg_restore --no-owner --no-privileges into it as s30_restorer -> exit 0. Restored table: relrowsecurity true, relforcerowsecurity true, owner s30_restorer, policies 1, rows visible to the owner under FORCE 0 (the source held 9); after NO FORCE ROW LEVEL SECURITY the owner counted 9 rows.",
+      "measurements": {
+        "roles": "ok",
+        "create_database": "ok",
+        "restore_exit": 0,
+        "restore_stderr_lines": 0,
+        "relrowsecurity": "true",
+        "relforcerowsecurity": "true",
+        "owner": "s30_restorer",
+        "policies": "1",
+        "rows_visible_to_owner": "0",
+        "rows_restored": "9"
+      },
+      "durationMs": 11543
+    },
+    {
+      "id": "S30c",
+      "title": "what ADMIN OPTION on an application role lets the restore role do",
+      "status": "info",
+      "detail": "As s30_restorer: grant s30_app to s30_reader -> ok (membership rows afterwards 1); revoke it -> ok; grant pg_read_all_data (no ADMIN on it) to s30_reader -> 42501 permission denied to grant role \"pg_read_all_data\".",
+      "measurements": {
+        "grant_app": "ok",
+        "membership_rows": "1",
+        "revoke_app": "ok",
+        "grant_read_all": "42501 permission denied to grant role \"pg_read_all_data\""
+      },
+      "durationMs": 11543
+    },
+    {
+      "id": "S30z",
+      "title": "Teardown",
+      "status": "info",
+      "detail": "DELETE 200, gone from GET /projects after 0 s",
+      "measurements": {
+        "delete_status": 200,
+        "gone_s": 0
+      },
+      "durationMs": 11543
+    }
+  ]
+}
