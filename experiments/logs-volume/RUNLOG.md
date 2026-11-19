@@ -27,6 +27,7 @@ LV03 to LV06, one run each:
 | LV04 | `out/2026-11-10/run-2026-11-10T00-04-13-049Z.json` | pool lifetime, terminate, full pg_stat_statements, revoke, host query, provenance label; LV04b invalid (see LV04) |
 | LV05 | `out/2026-11-10/run-2026-11-10T00-53-56-452Z.json` | idle pool, `reload config` vs `reload schema`, timeout row |
 | LV06 | `out/2026-11-10/run-2026-11-10T03-58-44-175Z.json` | `templates/query_history.sql` installed, queried, removed through the CLI |
+| LV07 | `out/2026-11-19/run-2026-11-19T07-03-49-866Z.json` | backend read cache, admin user lookups, pooled reads; Pro org, 2026-11-19 |
 
 Reading guide. "Docs say" lines come from public pages read on 2026-10-15 and
 are not measurements. "Measured" lines name the row, `n` and the run.
@@ -368,3 +369,59 @@ Not measured: more than one project in the loop, a filter on
 not run in the loop), a project without `supabase_read_only_user`, an
 existing job named `rca-snap`, other CLI versions, and snapshot cost on a busy
 database (LV03d and LV04f are the cost figures).
+
+## LV07 - backend read cache, admin user lookups and pooled reads
+
+One run, 2026-11-19 07:03-07:17 UTC, Pro-plan organization, same vantage
+(Bun 1.3.14), project created by the module and deleted in its `finally`
+(`GET /v1/projects` afterwards: 0 `lv-` projects). The machine plays the
+customer's backend: supabase-js with the legacy service_role key,
+lru-cache 11.5.3, node-postgres. Table `lv7`: 20 businesses x 3 rows; a read
+is `select id,status where biz=k`. The trace is 600 reads, Poisson arrivals
+with a 100 ms mean gap, keys Zipf(1) over 20, generated from a fixed seed and
+replayed verbatim in LV07a-c; each phase carries its own marker in the query
+string and its `edge_logs` rows are counted by marker.
+
+Measured:
+
+| row | what | result |
+|---|---|---|
+| LV07a | 600 reads, no cache | 600 `edge_logs` rows (1 per read, all 600 seen before the tail), 0 errors |
+| LV07b | same trace, lru-cache `fetch()`, ttl 5 s | 154 REST calls, 154 `edge_logs` rows (1 per REST call), 0.257 of the uncached rows; live hit rate 0.743 |
+| LV07c | same trace, ttl 30 s | 40 REST calls, 40 `edge_logs` rows, 0.067 of the uncached rows; live hit rate 0.933 |
+| LV07d | 50 concurrent `fetch()` for one key on an empty cache | 1 fetchMethod call, 1 `edge_logs` row, 50 of 50 results with the 3 rows (pass) |
+| LV07e | cached read (ttl 60 s), PATCH row 12 to `away` (HTTP 204), read again | without `cache.delete()`: `online` (stale); after `delete()`: `away` |
+| LV07f | `auth.admin.getUserById`, 50 sequential calls, no cache | per call 1 `edge_logs` row (2015 bytes) and 1 `auth_logs` row (789 bytes), all sources 2 rows / 2804 bytes |
+| LV07g | the same 50 lookups through lru-cache (ttl 300 s) | 1 call made; 1 `edge_logs` and 1 `auth_logs` row in the window (0.04 rows, 56 bytes per lookup) |
+| LV07h | 200 reads over one `pg.Pool` (max 2), shared pooler transaction mode (6543), as `postgres`, connections opened before the window | 3 `supavisor_logs` rows in the window (0.02 per read, 11 bytes per read); no `postgres_logs` rows above the idle rate |
+| LV07i | 30 reads, each on a new connection (connect, query, end) on 6543 | 4.1 `supavisor_logs` rows and 2924 bytes per connection; no `postgres_logs` rows above the idle rate |
+
+The TTL-bucket estimate (1 - distinct(key, floor(t / T)) / n) against the
+cache that actually ran, same trace:
+
+| ttl | estimate from the logged rows | estimate from client send times | offline fill-time replay, no network | live lru-cache |
+|---|---|---|---|---|
+| 5 s | 0.682 | 0.68 | 0.742 | 0.743 |
+| 30 s | 0.92 | 0.92 | 0.933 | 0.933 |
+
+- Every cached read wrote nothing: `edge_logs` rows equalled REST calls made
+  (154 and 40), so rows fall in proportion to the hit rate.
+- The fixed-bucket estimate undercounted the real cache by 0.061 at 5 s and
+  0.013 at 30 s on this trace: a bucket boundary resets an entry that a
+  fill-time cache keeps. The offline fill-time replay matched the live cache
+  to 0.001. Read the bucket figure as a lower bound for one shared cache.
+- `fetch()` coalesced concurrent misses for one key into one REST call
+  (LV07d). In LV07b-c concurrent misses during a fetch count as hits, as they
+  would in a backend.
+- Connect-per-read on the pooler (LV07i, 2924 bytes per connection in
+  `supavisor_logs`) wrote more than a REST read's `edge_logs` row in LV01b
+  (1659 bytes per request); a persistent pool (LV07h) wrote about 11 bytes per
+  read.
+- `edge_logs` completeness was 600 of 600 here, against 84-92 of 100 in LV01.
+
+Not measured: several backend instances, each with its own cache (the hit
+rate per instance falls); RLS-scoped reads, where the cache key would have to
+include the user; `log_connections` on (off on a new project, so LV07h-i
+carry no Postgres connection rows); session mode, the dedicated pooler and
+direct connections for LV07h-i; traces other than this one (the
+bucket-vs-live gap depends on arrival rate and key spread); metered bytes.

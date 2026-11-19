@@ -28,6 +28,7 @@ the logs endpoint. Compare actions with it; do not read it as billed GB.
 | LV04 | PostgREST pool connection lifetime and when an `authenticator` role setting reaches Data API calls; `pg_terminate_backend` to apply it; snapshot cost with `pg_stat_statements` full; default-privileges revoke from anon and authenticated only; `edge_logs` per host; the provenance comment on Management API SQL | ~45-55 min, one project |
 | LV05 | idle pool connections with no traffic; `notify pgrst, 'reload config'` vs `'reload schema'` for applying an `authenticator` setting; what `postgres_logs` keeps for a Data API statement timeout | ~15 min, one project |
 | LV06 | `templates/query_history.sql` (LV03's snapshot job as one re-runnable file, `rca.top(window)`) applied, queried and removed with the Supabase CLI and a PAT only, through a `projects list` loop; `--read-only`; Data API roles on the `rca` schema | ~5 min (one run), one project |
+| LV07 | a read cache in the customer's backend (lru-cache `fetch()`, ttl 5 s and 30 s) replaying one fixed trace: REST calls and `edge_logs` rows against no cache, and the TTL-bucket estimate against the live hit rate; coalescing of concurrent misses; delete-on-write; `auth.admin.getUserById` rows per call, cached and not; reads over a persistent transaction-mode pool vs a connection per read | ~15 min, one project (Pro org) |
 
 ## Run
 
@@ -39,6 +40,7 @@ make -C experiments/logs-volume probe IDS=LV03      # PVLAB_ORG_TEAM; PVLAB_LV3_
 make -C experiments/logs-volume probe IDS=LV04      # PVLAB_LV4_STEADY_MAX_S caps the pool wait
 make -C experiments/logs-volume probe IDS=LV05
 make -C experiments/logs-volume probe IDS=LV06      # needs the supabase CLI and jq; PVLAB_LV6_* knobs
+make -C experiments/logs-volume probe IDS=LV07      # PVLAB_ORG_PRO; LV07_READS, LV07_GAP_MS, LV07_KEYS knobs
 make -C experiments/logs-volume cleanup             # deletes any project named lv-*
 ```
 
