@@ -3681,7 +3681,7 @@ Modules OB01-OB06 and OB03d; docs claims and measurements are kept apart in RUNL
   have no clone or restore-to-new-project path (v1 115, v2 36 paths) and the
   Dashboard clone route refuses a PAT (401).
 
-## experiments/logs-volume - key facts (validated 2026-10-15 LV01-LV02 Pro org; 2026-11-09/10 LV03-LV06 Team org, one run each; ap-southeast-1, one self-provisioned project per module run)
+## experiments/logs-volume - key facts (validated 2026-10-15 LV01-LV02 Pro org; 2026-11-09/10 LV03-LV06 Team org; 2026-11-19 LV07 Pro org; LV03-LV07 one run each; ap-southeast-1, one self-provisioned project per module run)
 
 Size is a proxy: `event_message` plus `log_attributes` keys and values as the
 logs endpoint returns them (metered bytes are not readable by PAT, OB03c).
@@ -3767,6 +3767,20 @@ logs endpoint returns them (metered bytes are not readable by PAT, OB03c).
   logs endpoint; the identifier is empty on a project with no replica.
 - **LV04b is invalid** (called before the schema cache had the function,
   404 PGRST202); LV05a supersedes it.
+- **Backend read cache (LV07, 2026-11-19, Pro org, one run)**: one fixed
+  600-read trace (20 keys, Zipf(1), mean_gap_ms 100) uncached wrote 600
+  `edge_logs` rows; through lru-cache 11.5.3 `fetch()` it made 154 REST calls
+  (ttl 5 s) and 40 (ttl 30 s) and wrote exactly 154 and 40 rows: cached reads
+  write nothing. The fixed TTL-bucket estimate (1 - distinct(key, floor(t/T))
+  / n) gave 0.68 and 0.92 against live hit rates 0.743 and 0.933, so it is a
+  lower bound for one shared cache; an offline fill-time replay matched live
+  to 0.001. 50 concurrent `fetch()` for one key = 1 REST call (LV07d);
+  without `cache.delete()` a read after a PATCH was stale, with it fresh
+  (LV07e). `auth.admin.getUserById` = 1 `edge_logs` (2015 B) + 1
+  `auth_logs` (789 B) row per call (LV07f). Shared pooler 6543: a persistent
+  `pg.Pool` wrote 3 `supavisor_logs` rows for 200 reads; a new connection per
+  read wrote 4.1 rows / 2924 B per connection, more than a REST read's
+  gateway row (LV07h-i, `log_connections` off).
 - **Harness notes**: Bun's `dns.lookup` returned ENOTFOUND for the AAAA-only
   `db.<ref>.supabase.co` on macOS while `dig` resolved it; `lib/lv.ts`
   `directSession` uses `dns.resolve6` plus TLS `servername`. The logs endpoint
