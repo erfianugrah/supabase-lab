@@ -8,7 +8,7 @@
   "dependencies": {
     "@astrojs/react": "7.1.0",
     "@fontsource/ibm-plex-mono": "5.2.7",
-    "astro": "7.4.1",
+    "astro": "7.4.7",
     "react": "19.2.0",
     "react-dom": "19.2.0"
   },
@@ -20,5 +20,11 @@
     "tailwindcss": "4.3.3",
     "typescript": "5.9.3",
     "wrangler": "4.147.0"
+  },
+  "overrides": {
+    "sharp": "^0.35.5",
+    "undici": "^8.13.0",
+    "@emnapi/runtime": "1.11.3",
+    "@emnapi/core": "1.11.3"
   }
 }
