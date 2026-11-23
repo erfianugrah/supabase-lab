@@ -6437,3 +6437,25 @@ runs 3-4. Numbers and per-write evidence: RUNLOG.md, artifacts
   sign-in routes could not be checked through it.
 - Config changes (hook, forwarding, CAPTCHA, hook URI) were first seen 4 to
   5 s after `PATCH /config/auth` returned.
+
+## experiments/edge-private-flow - key facts (validated 2026-11-23, run 1, Pro org, Micro, ap-southeast-1; edge runtime 1.79.1)
+
+- Client -> Worker -> Edge Function -> upstream. Hosted `Deno.createHttpClient`
+  presents an mTLS client cert: client.badssl.com 400 without, 200 with; an
+  echo server saw our own CA's subject. Runtime reported
+  `supabase-edge-runtime-1.79.1 (compatible with Deno v2.1.4)`.
+- Client cert keys must be RSA or NAMED-curve EC. macOS LibreSSL `openssl req
+  -newkey ec -pkeyopt ec_paramgen_curve:P-256` writes explicit curve params and
+  `createHttpClient` refuses it (`KeyMismatch`); use `openssl ecparam -name
+  prime256v1 -genkey`. Multi-line PEM survives `POST /v1/projects/{ref}/secrets`.
+- The project edge sends no CertificateRequest (`No client certificate CA
+  names sent`): nothing can do mTLS INTO Supabase.
+- Gating on an edge-added header works for Functions (checked in code: direct
+  403) and the Data API (RLS policy reading `request.headers` via a SECURITY
+  DEFINER function: 2 rows via the Worker, 0 direct with no / wrong header or a
+  valid user JWT). Auth and Storage answer directly regardless.
+- A project created 2026-11-23 starts with signing keys `HS256:previously_used,
+  ES256:in_use`; user tokens are ES256 with a JWKS `kid`, so an upstream JWT
+  policy can verify them via `/auth/v1/.well-known/jwks.json` with no rotation.
+- `forceFunctionRegion=us-east-1` on a direct call ran in us-east-1; the Worker
+  pin kept calls in ap-southeast-1. Synthesis: docs/research/2026-11-23-edge-private-api.md.

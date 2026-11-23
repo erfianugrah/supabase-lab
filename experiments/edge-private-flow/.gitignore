@@ -1,0 +1,8 @@
+certs/
+evidence/
+.terraform/
+terraform.tfstate*
+tfplan*
+.wrangler/
+node_modules/
+supabase/.temp/

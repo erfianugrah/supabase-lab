@@ -1,0 +1,7 @@
+{
+  "name": "lab-epf-upstream",
+  "private": true,
+  "dependencies": {
+    "jose": "6.1.0"
+  }
+}

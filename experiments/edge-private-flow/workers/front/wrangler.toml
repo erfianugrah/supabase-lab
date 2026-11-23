@@ -1,0 +1,8 @@
+name = "lab-epf-front"
+main = "index.ts"
+compatibility_date = "2026-11-01"
+workers_dev = true
+upload_source_maps = false
+
+[vars]
+PIN_REGION = "ap-southeast-1"

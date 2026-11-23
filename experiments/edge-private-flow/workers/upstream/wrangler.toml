@@ -1,0 +1,5 @@
+name = "lab-epf-upstream"
+main = "index.ts"
+compatibility_date = "2026-11-01"
+workers_dev = true
+upload_source_maps = false
