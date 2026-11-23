@@ -1,0 +1,553 @@
+{
+  "at": "2026-11-23T07:02:14.605Z",
+  "front": "https://lab-epf-front.anugrah.workers.dev",
+  "rows": [
+    {
+      "id": "GW1 gateway matrix",
+      "arm": "gw",
+      "status": 200,
+      "ms": 3040,
+      "region": "ap-southeast-1",
+      "body": {
+        "region": "ap-southeast-1",
+        "method": "POST",
+        "gate": "passed",
+        "claims": {
+          "sub": "<uuid>",
+          "role": "authenticated",
+          "iss": "https://<ref>.supabase.co/auth/v1",
+          "alg": "ES256",
+          "kid": "<uuid>"
+        },
+        "results": [
+          {
+            "arm": "gw:cert+jwt orders",
+            "ms": 306,
+            "ok": true,
+            "status": 200,
+            "detail": {
+              "ok": true,
+              "host": "epf-gw.erfi.dev",
+              "mtls": {
+                "presented": "1",
+                "verified": "SUCCESS",
+                "subject": "CN=lab-edge-function-gw",
+                "issuer": "CN=Managed CA <account-id>,OU=www.cloudflare.com,O=Cloudflare\\, Inc.,L=San Francisco,ST=California,C=US"
+              },
+              "claims": {
+                "sub": "<uuid>",
+                "role": "authenticated",
+                "alg": "ES256"
+              },
+              "access": null,
+              "colo": "SIN",
+              "data": {
+                "orders": [
+                  {
+                    "id": "o-1",
+                    "status": "confirmed"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "arm": "gw:cert+jwt rates",
+            "ms": 317,
+            "ok": true,
+            "status": 200,
+            "detail": {
+              "ok": true,
+              "host": "epf-gw.erfi.dev",
+              "mtls": {
+                "presented": "1",
+                "verified": "SUCCESS",
+                "subject": "CN=lab-edge-function-gw",
+                "issuer": "CN=Managed CA <account-id>,OU=www.cloudflare.com,O=Cloudflare\\, Inc.,L=San Francisco,ST=California,C=US"
+              },
+              "claims": {
+                "sub": "<uuid>",
+                "role": "authenticated",
+                "alg": "ES256"
+              },
+              "access": null,
+              "colo": "SIN",
+              "data": {
+                "rates": [
+                  {
+                    "room": "studio",
+                    "sgd": 210
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "arm": "gw:cert, no jwt",
+            "ms": 308,
+            "ok": true,
+            "status": 401,
+            "detail": {
+              "gate": "jwt",
+              "ok": false,
+              "reason": "no token",
+              "mtls": {
+                "presented": "1",
+                "verified": "SUCCESS",
+                "subject": "CN=lab-edge-function-gw",
+                "issuer": "CN=Managed CA <account-id>,OU=www.cloudflare.com,O=Cloudflare\\, Inc.,L=San Francisco,ST=California,C=US"
+              }
+            }
+          },
+          {
+            "arm": "gw:jwt, no cert",
+            "ms": 135,
+            "ok": true,
+            "status": 403,
+            "detail": {
+              "gate": "mtls",
+              "ok": false,
+              "mtls": {
+                "presented": "0",
+                "verified": "NONE",
+                "subject": "",
+                "issuer": ""
+              }
+            }
+          },
+          {
+            "arm": "gw:wrong-CA cert",
+            "ms": 132,
+            "ok": true,
+            "status": 403,
+            "detail": {
+              "gate": "mtls",
+              "ok": false,
+              "mtls": {
+                "presented": "1",
+                "verified": "FAILED:FAILED:unable to verify the first certificate",
+                "subject": "CN=lab-edge-function-client-ec",
+                "issuer": "CN=lab-test-ca"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "SV1 access service token",
+      "arm": "svc",
+      "status": 200,
+      "ms": 763,
+      "region": "ap-southeast-1",
+      "body": {
+        "region": "ap-southeast-1",
+        "method": "POST",
+        "gate": "passed",
+        "claims": {
+          "sub": "<uuid>",
+          "role": "authenticated",
+          "iss": "https://<ref>.supabase.co/auth/v1",
+          "alg": "ES256",
+          "kid": "<uuid>"
+        },
+        "results": [
+          {
+            "arm": "svc:token+jwt",
+            "ms": 216,
+            "ok": true,
+            "status": 200,
+            "detail": {
+              "ok": true,
+              "host": "epf-svc.erfi.dev",
+              "mtls": {
+                "presented": "0",
+                "verified": "NONE",
+                "subject": "",
+                "issuer": ""
+              },
+              "claims": {
+                "sub": "<uuid>",
+                "role": "authenticated",
+                "alg": "ES256"
+              },
+              "access": "present",
+              "colo": "SIN",
+              "data": {
+                "rates": [
+                  {
+                    "room": "studio",
+                    "sgd": 210
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "arm": "svc:no token",
+            "ms": 693,
+            "ok": true,
+            "status": 403,
+            "detail": "<!DOCTYPE html><html><head><meta charset=\"utf-8\"/><meta name=\"viewport\" content=\"initial-scale=1, maximum-scale=1, user-"
+          }
+        ]
+      }
+    },
+    {
+      "id": "P1 proxy option honoured",
+      "arm": "proxy",
+      "status": 200,
+      "ms": 71,
+      "region": "ap-southeast-1",
+      "body": {
+        "region": "ap-southeast-1",
+        "method": "POST",
+        "gate": "passed",
+        "claims": {
+          "sub": "<uuid>",
+          "role": "authenticated",
+          "iss": "https://<ref>.supabase.co/auth/v1",
+          "alg": "ES256",
+          "kid": "<uuid>"
+        },
+        "results": [
+          {
+            "arm": "proxy:dead proxy via createHttpClient",
+            "ok": true,
+            "ms": 1,
+            "error": "TypeError: error sending request for url (https://example.com/): client error (Connect): tcp connect error: Connection refused (os error 111): Connection refused (os error 111)"
+          }
+        ]
+      }
+    },
+    {
+      "id": "V1 X.509 v1 client cert",
+      "arm": "v1-cert",
+      "status": 200,
+      "ms": 59,
+      "region": "ap-southeast-1",
+      "body": {
+        "region": "ap-southeast-1",
+        "method": "POST",
+        "gate": "passed",
+        "claims": {
+          "sub": "<uuid>",
+          "role": "authenticated",
+          "iss": "https://<ref>.supabase.co/auth/v1",
+          "alg": "ES256",
+          "kid": "<uuid>"
+        },
+        "results": [
+          {
+            "arm": "v1-cert",
+            "ok": true,
+            "ms": 0,
+            "error": "TypeError: invalid peer certificate: Other(OtherError(UnsupportedCertVersion))"
+          }
+        ]
+      }
+    },
+    {
+      "id": "V2 worker alive after v1 error",
+      "arm": "probe",
+      "status": 200,
+      "ms": 40,
+      "region": "ap-southeast-1",
+      "body": {
+        "region": "ap-southeast-1",
+        "method": "POST",
+        "gate": "passed",
+        "claims": {
+          "sub": "<uuid>",
+          "role": "authenticated",
+          "iss": "https://<ref>.supabase.co/auth/v1",
+          "alg": "ES256",
+          "kid": "<uuid>"
+        },
+        "results": [
+          {
+            "arm": "probe",
+            "ms": 0,
+            "ok": true,
+            "detail": {
+              "createHttpClient": "function",
+              "connectTls": "function",
+              "denoVersion": {
+                "deno": "supabase-edge-runtime-1.79.1 (compatible with Deno v2.1.4)",
+                "v8": "11.6.189.12",
+                "typescript": "5.1.6"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "E1 explicit-params EC key",
+      "arm": "explicit-ec",
+      "status": 200,
+      "ms": 67,
+      "region": "ap-southeast-1",
+      "body": {
+        "region": "ap-southeast-1",
+        "method": "POST",
+        "gate": "passed",
+        "claims": {
+          "sub": "<uuid>",
+          "role": "authenticated",
+          "iss": "https://<ref>.supabase.co/auth/v1",
+          "alg": "ES256",
+          "kid": "<uuid>"
+        },
+        "results": [
+          {
+            "arm": "explicit-ec",
+            "ok": true,
+            "ms": 0,
+            "error": "TypeError: unexpected error: failed to parse private key as RSA, ECDSA, or EdDSA"
+          }
+        ]
+      }
+    },
+    {
+      "id": "H1 headers seen by function via front",
+      "arm": "headers",
+      "status": 200,
+      "ms": 71,
+      "region": "ap-southeast-1",
+      "body": {
+        "region": "ap-southeast-1",
+        "method": "POST",
+        "gate": "passed",
+        "claims": {
+          "sub": "<uuid>",
+          "role": "authenticated",
+          "iss": "https://<ref>.supabase.co/auth/v1",
+          "alg": "ES256",
+          "kid": "<uuid>"
+        },
+        "results": [
+          {
+            "arm": "headers",
+            "ms": 0,
+            "ok": true,
+            "detail": {
+              "cf-connecting-ip": "2a06:98c0:3600::103",
+              "x-forwarded-for": "2a06:98c0:3600::103,2a06:98c0:3600::103, 172.70.208.81",
+              "x-real-ip": null,
+              "cf-worker": "supabase.co",
+              "cf-ipcountry": null,
+              "x-region": "ap-southeast-1",
+              "user-agent": null
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "H2 DB-seen headers via front",
+      "status": 200,
+      "body": {
+        "cf-connecting-ip": "2a06:98c0:3600::103",
+        "x-forwarded-for": "2a06:98c0:3600::103",
+        "x-real-ip": null,
+        "cf-worker": "supabase.co",
+        "x-gw-secret-present": true
+      }
+    },
+    {
+      "id": "H3 DB-seen headers direct",
+      "status": 200,
+      "body": {
+        "cf-connecting-ip": "<client-ip>",
+        "x-forwarded-for": "<client-ip>",
+        "x-real-ip": null,
+        "cf-worker": "supabase.co",
+        "x-gw-secret-present": false
+      }
+    },
+    {
+      "id": "H4 DB-seen headers direct, spoofed",
+      "status": 403,
+      "body": null
+    },
+    {
+      "id": "L gw-reuse (in-function outbound ms)",
+      "n": 20,
+      "p50": 17,
+      "p90": 40,
+      "max": 43,
+      "samples": [
+        17,
+        28,
+        28,
+        25,
+        40,
+        30,
+        17,
+        9,
+        10,
+        27,
+        30,
+        43,
+        11,
+        16,
+        32,
+        12,
+        11,
+        10,
+        11,
+        11
+      ]
+    },
+    {
+      "id": "L gw-new-client (in-function outbound ms)",
+      "n": 20,
+      "p50": 243,
+      "p90": 887,
+      "max": 954,
+      "samples": [
+        229,
+        245,
+        259,
+        954,
+        887,
+        511,
+        443,
+        47,
+        212,
+        471,
+        421,
+        254,
+        46,
+        58,
+        72,
+        40,
+        47,
+        243,
+        231,
+        46
+      ]
+    },
+    {
+      "id": "X0 env-proxy before secret",
+      "arm": "env-proxy",
+      "status": 200,
+      "ms": 97,
+      "region": "ap-southeast-1",
+      "body": {
+        "region": "ap-southeast-1",
+        "method": "POST",
+        "gate": "passed",
+        "claims": {
+          "sub": "<uuid>",
+          "role": "authenticated",
+          "iss": "https://<ref>.supabase.co/auth/v1",
+          "alg": "ES256",
+          "kid": "<uuid>"
+        },
+        "results": [
+          {
+            "arm": "env-proxy:plain fetch",
+            "ms": 61,
+            "ok": true,
+            "status": 200,
+            "detail": {
+              "httpsProxySecretVisible": null
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "X1 env-proxy with secret set",
+      "arm": "env-proxy",
+      "status": 200,
+      "ms": 2613,
+      "region": "ap-southeast-1",
+      "body": {
+        "region": "ap-southeast-1",
+        "method": "POST",
+        "gate": "passed",
+        "claims": {
+          "sub": "<uuid>",
+          "role": "authenticated",
+          "iss": "https://<ref>.supabase.co/auth/v1",
+          "alg": "ES256",
+          "kid": "<uuid>"
+        },
+        "results": [
+          {
+            "arm": "env-proxy:plain fetch",
+            "ms": 58,
+            "ok": true,
+            "status": 200,
+            "detail": {
+              "httpsProxySecretVisible": "http://127.0.0.1:9"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "X2 env-proxy with secret set",
+      "arm": "env-proxy",
+      "status": 200,
+      "ms": 44,
+      "region": "ap-southeast-1",
+      "body": {
+        "region": "ap-southeast-1",
+        "method": "POST",
+        "gate": "passed",
+        "claims": {
+          "sub": "<uuid>",
+          "role": "authenticated",
+          "iss": "https://<ref>.supabase.co/auth/v1",
+          "alg": "ES256",
+          "kid": "<uuid>"
+        },
+        "results": [
+          {
+            "arm": "env-proxy:plain fetch",
+            "ms": 8,
+            "ok": true,
+            "status": 200,
+            "detail": {
+              "httpsProxySecretVisible": "http://127.0.0.1:9"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "X3 env-proxy with secret set",
+      "arm": "env-proxy",
+      "status": 200,
+      "ms": 48,
+      "region": "ap-southeast-1",
+      "body": {
+        "region": "ap-southeast-1",
+        "method": "POST",
+        "gate": "passed",
+        "claims": {
+          "sub": "<uuid>",
+          "role": "authenticated",
+          "iss": "https://<ref>.supabase.co/auth/v1",
+          "alg": "ES256",
+          "kid": "<uuid>"
+        },
+        "results": [
+          {
+            "arm": "env-proxy:plain fetch",
+            "ms": 10,
+            "ok": true,
+            "status": 200,
+            "detail": {
+              "httpsProxySecretVisible": "http://127.0.0.1:9"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

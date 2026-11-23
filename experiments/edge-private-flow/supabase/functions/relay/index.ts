@@ -175,6 +175,66 @@ const arms: Record<string, (token: string, req: Request) => Promise<Arm>[]> = {
     }).then((a) => ({ ...a, ok: !!a.error })),
   ],
 };
+// ---- run 3 ----
+let rotClient: unknown;
+const rotSubject = async (client: unknown) => {
+  const r = await call("https://certauth.idrix.fr/json/", { client });
+  return (r.body as Record<string, string>).SSL_CLIENT_S_DN;
+};
+arms.own = (token) => [
+  ...([["own:own-CA RSA cert", "OWN_RSA_CERT", "OWN_RSA_KEY", 200], ["own:own-CA EC cert", "OWN_EC_CERT", "OWN_EC_KEY", 200],
+    ["own:Cloudflare-CA cert", "GW_CERT", "GW_KEY", 403], ["own:other-CA cert", "CLIENT_CERT", "CLIENT_KEY", 403]] as const).map(
+    ([label, c, k, want]) =>
+      timed(label, async () => {
+        const r = await call(`${env("OWN_URL")}/process/orders`, { client: mk(c, k), headers: { authorization: `Bearer ${token}` } });
+        return { ok: r.status === want, status: r.status, detail: (r.body as Record<string, unknown>)?.mtls ?? r.body };
+      }),
+  ),
+  timed("own:no cert", async () => {
+    const r = await call(`${env("OWN_URL")}/process/orders`, { headers: { authorization: `Bearer ${token}` } });
+    return { ok: r.status === 403, status: r.status, detail: (r.body as Record<string, unknown>)?.mtls ?? r.body };
+  }),
+];
+arms.tun = (token) => [
+  timed("tun:service token + jwt", async () => {
+    const r = await call(`${env("TUN_URL")}/process/rates`, {
+      headers: { authorization: `Bearer ${token}`, "CF-Access-Client-Id": env("TUN_ID"), "CF-Access-Client-Secret": env("TUN_SECRET") },
+      redirect: "manual",
+    });
+    return { ok: r.status === 200, status: r.status, detail: r.body };
+  }),
+  timed("tun:service token, no jwt", async () => {
+    const r = await call(`${env("TUN_URL")}/process/rates`, {
+      headers: { "CF-Access-Client-Id": env("TUN_ID"), "CF-Access-Client-Secret": env("TUN_SECRET") },
+      redirect: "manual",
+    });
+    return { ok: r.status === 401, status: r.status, detail: r.body };
+  }),
+  timed("tun:no service token", async () => {
+    const r = await call(`${env("TUN_URL")}/process/rates`, { headers: { authorization: `Bearer ${token}` }, redirect: "manual" });
+    return { ok: r.status !== 200, status: r.status, detail: typeof r.body === "string" ? r.body.slice(0, 80) : r.body };
+  }),
+];
+// Called with ?forceFunctionRegion=<abroad>: from there, call the relay again
+// (a) direct, unpinned and (b) through the front Worker, and report where each ran.
+arms.abroad = (token) => [
+  timed("abroad:direct unpinned", async () => {
+    const r = await call(`${env("SUPABASE_URL")}/functions/v1/relay?arm=probe`, {
+      method: "POST", body: "{}",
+      headers: { authorization: `Bearer ${token}`, apikey: env("SUPABASE_ANON_KEY"), "x-gw-secret": env("FRONT_SECRET") },
+    });
+    return { ok: r.status === 200, status: r.status, detail: { ranIn: (r.body as Record<string, unknown>)?.region } };
+  }),
+  timed("abroad:via front Worker", async () => {
+    const r = await call(`${env("FRONT_URL")}/fn/relay?arm=probe`, {
+      method: "POST", body: "{}", headers: { authorization: `Bearer ${token}`, apikey: env("SUPABASE_ANON_KEY") },
+    });
+    return { ok: r.status === 200, status: r.status, detail: { ranIn: (r.body as Record<string, unknown>)?.region } };
+  }),
+];
+arms["rot-new"] = () => [timed("rot-new", async () => ({ ok: true, detail: { subject: await rotSubject(mk("ROT_CERT", "ROT_KEY")) } }))];
+arms["rot-reuse"] = () => [timed("rot-reuse", async () => ({ ok: true, detail: { subject: await rotSubject((rotClient ??= mk("ROT_CERT", "ROT_KEY"))) } }))];
+
 arms.all = (t, r) => [...arms.probe(t, r), ...arms["mtls-ca"](t, r), ...arms["mtls-echo"](t, r), ...arms["jwt-upstream"](t, r)];
 
 Deno.serve(async (req) => {

@@ -22,7 +22,8 @@ who it is, so that the entry point can sit on the public internet.
 **Acceptance criteria:**
 - WHEN an Edge Function calls the integration entry point, THE SYSTEM SHALL present an X.509 v3 client certificate (RSA or named-curve EC) [run 1 F2/F3, run 2 GW1].
 - IF a request reaches the entry point without a client certificate, THEN THE SYSTEM SHALL refuse it before any API logic runs [run 2 GW1 "jwt, no cert"].
-- IF the certificate is signed by a CA the entry point does not trust, THEN THE SYSTEM SHALL refuse it [run 2 GW1 "wrong-CA cert"].
+- IF the certificate is signed by a CA the entry point does not trust, THEN THE SYSTEM SHALL refuse it [run 2 GW1 "wrong-CA cert"; run 3 OWN1 against an entry point trusting only the enterprise's own CA].
+- WHEN the client certificate secret changes, THE SYSTEM SHALL present the new certificate without a redeploy (seen by 10 s in run 3 ROT, one post-change sample per arm).
 - THE SYSTEM SHALL NOT depend on the Supabase egress IP address (not fixed: three addresses seen in one day, 2026-11-23).
 
 ### R2: end-user identity reaches the integration layer
@@ -53,7 +54,7 @@ enterprise WAF, so that bot and rate controls apply.
 **Story:** As the app owner, I want function execution in the project region,
 so that calls to Postgres and to the integration layer are not routed abroad.
 **Acceptance criteria:**
-- WHEN the edge forwards a function call, THE SYSTEM SHALL pin the region with `x-region` and `forceFunctionRegion` [run 1 R1-R3].
+- WHEN the edge forwards a function call, THE SYSTEM SHALL pin the region with `x-region` and `forceFunctionRegion` [run 1 R1-R3; run 3 ABR: callers in us-east-1 and eu-central-1 ran in ap-southeast-1 through the edge and in their own region without it].
 - THE SYSTEM SHALL document that a pinned call is not re-routed during a regional outage.
 
 ### R6: bounded failure

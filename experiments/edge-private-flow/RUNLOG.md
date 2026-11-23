@@ -19,8 +19,8 @@ client -> front Worker (adds x-gw-secret, pins region) -> Edge Function relay
 Setup: one micro project in ap-southeast-1 (OpenTofu, `make apply`), two
 workers.dev Workers, function deployed with `--no-verify-jwt` (the function
 does its own claims check; gateway verify_jwt is a key-possession check, L07).
-Invoked from Singapore. Evidence: `evidence/run-2026-11-23T06-41-57-722Z.json`
-(gitignored, local only).
+Invoked from Singapore. Evidence: `out/2026-11-23/run-2026-11-23T06-41-57-722Z.json`
+(redacted by `publish.ts`; all runs tabulated in `out/2026-11-23/facts.md`).
 
 | id | check | result |
 |---|---|---|
@@ -89,7 +89,7 @@ from our CSR); the Worker refuses unless `cf.tlsClientAuth.certVerified` is
 routes two mock "process APIs". The SVC host sits behind a Cloudflare Access
 self-hosted app with a service-token (non_identity) policy. Same project and
 front Worker as run 1; relay redeployed with module-scope clients. Evidence:
-`evidence/run2-2026-11-23T07-02-14-605Z.json` (local only).
+`out/2026-11-23/run2-2026-11-23T07-02-14-605Z.json`.
 
 | id | check | result |
 |---|---|---|
@@ -127,3 +127,61 @@ Readings:
 - The proxy option works and an `HTTPS_PROXY` secret does not, so a fixed-IP
   forward proxy has to be passed explicitly per client.
 - Reusing the client is the difference between ~17 ms and ~240 ms per call.
+
+## Run 3 + repeats - 2026-11-23 07:24-07:34 UTC (`make full`, clean slate)
+
+Same flow rebuilt from nothing, then runs 1 and 2 repeated after run 3, so
+runs 1 and 2 now have three passes each (06:41/07:02 above, 07:27/07:28 and
+07:32/07:33 here). Every check in the repeats matched run 1 and run 2. Run 3
+adds the gaps a review of runs 1-2 named. Evidence (redacted, `out/2026-11-23/`, facts in `facts.md`): `run3-2026-11-23T07-32-15-132Z.json`,
+`run-2026-11-23T07-27-51-750Z.json`, `run-2026-11-23T07-32-56-279Z.json`,
+`run2-2026-11-23T07-28-33-036Z.json`, `run2-2026-11-23T07-33-38-999Z.json`.
+
+| id | check | result |
+|---|---|---|
+| OWN1 | gateway trusting ONLY our own CA (Cloudflare BYO CA on the OWN host): own-CA RSA cert, own-CA named-curve EC cert | 200 / 200, `verified: SUCCESS`, issuer `CN=lab-own-ca` |
+| OWN1 | Cloudflare-managed-CA cert / cert from a third CA / no cert | 403 / 403 (`unable to verify the first certificate`) / 403 (`presented: 0`) |
+| TUN1 | Cloudflare Tunnel to a local origin (no inbound port) behind Access: service token + user JWT | 200, origin saw `cf-access-jwt-assertion` and validated the JWT |
+| TUN1 | service token, no user JWT / no service token | 401 at the origin / 403 Access block page |
+| ABR | function forced to us-east-1 calls the relay direct, unpinned | ran in us-east-1 |
+| ABR | same caller, through the front Worker (pins ap-southeast-1) | ran in ap-southeast-1 |
+| ABR | function forced to eu-central-1: direct unpinned / via front | eu-central-1 / ap-southeast-1 |
+| ROT | client cert secret changed rot-a -> rot-b, no redeploy; subject read from the certauth.idrix.fr echo | the first call on each arm after the change already presented rot-b: the new-client-per-call arm at 5 s, the module-scope (reused) client arm at 10 s (seconds counted from just before the secrets POST, so they include its duration; one sample per arm) |
+
+Rotation reading: a reused client did NOT keep the old certificate past a
+secret change; the next requests after the change were served with the new
+secret, consistent with workers being recycled on a secret update. One
+change and one post-change sample per arm (the loop stopped once both arms
+showed rot-b), so the window is "by 10 s", not a measured distribution, and
+no call between the change and those samples was taken.
+
+Egress addresses seen by the echo server (F3): 56.10.122.236 in the 06:41
+pass; 54.179.73.206 in both repeat passes (07:27, 07:32), which ran on the
+project rebuilt by `make full` (a different project from 06:41).
+
+The X.509 v1 certificate used by V1 (`certs/v1.crt`, RSA) was signed on
+macOS LibreSSL with `openssl x509 -req -in client-rsa.csr -CA ca.crt -CAkey
+ca.key -CAcreateserial -days 30 -out v1.crt`, i.e. without `-extfile`;
+`openssl x509 -text` reads `Version: 1 (0x0)`.
+
+Reused vs new HttpClient, outbound time measured inside the function to the
+gateway on the Cloudflare SIN edge, A/B interleaved per iteration:
+
+| set | n per side | reused p50 / p90 | new client p50 / p90 |
+|---|---|---|---|
+| run 2 (07:02) | 20 | 17 / 40 ms | 243 / 887 ms |
+| run 2 repeat (07:28) | 20 | 14 / 30 ms | 79 / 159 ms |
+| run 2 repeat (07:33) | 20 | 24 / 49 ms | 63 / 101 ms |
+| run 3 round 1 | 50 | 12 / 35 ms | 76 / 229 ms |
+| run 3 round 2 | 50 (49 new) | 12 / 31 ms | 61 / 212 ms |
+| run 3 round 3 | 50 | 18 / 60 ms | 62 / 134 ms |
+
+Verdict: reuse was faster in 6 of 6 sets; reused p50 12-24 ms, new-client
+p50 61-243 ms, so the gap exceeds the set-to-set spread. Limiter (inferred
+from the mechanism, not counted): a new client opens a new TCP + TLS
+connection with the client-certificate exchange on every call. Errors: one
+new-client call of 210 across the six sets did not return ok (run 3 round 2,
+49 of 50; the probe counts only status 200 with the arm ok, so the cause is
+not recorded). The gateway is on Cloudflare's SIN edge (reused-client
+minimum 10 ms), so only the relative gap transfers to a real upstream;
+absolute times depend on where the upstream runs.

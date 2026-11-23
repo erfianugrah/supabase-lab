@@ -6,7 +6,9 @@ upload_source_maps = false
 routes = [
   { pattern = "epf-gw.erfi.dev", custom_domain = true },
   { pattern = "epf-svc.erfi.dev", custom_domain = true },
+  { pattern = "epf-own.erfi.dev", custom_domain = true },
 ]
 
 [vars]
 GW_HOST = "epf-gw.erfi.dev"
+OWN_HOST = "epf-own.erfi.dev"

@@ -1,0 +1,533 @@
+{
+  "at": "2026-11-23T07:27:51.750Z",
+  "front": "https://lab-epf-front.anugrah.workers.dev",
+  "ref": "<ref>",
+  "alg": "ES256",
+  "rows": [
+    {
+      "id": "G1 direct, no front secret",
+      "expect": "403 front-secret",
+      "status": 403,
+      "ms": 2561,
+      "edgeRegion": "ap-southeast-1",
+      "frontColo": null,
+      "frontMs": null,
+      "body": {
+        "region": "ap-southeast-1",
+        "method": "POST",
+        "gate": "front-secret",
+        "ok": false
+      }
+    },
+    {
+      "id": "G2 direct, wrong front secret",
+      "expect": "403 front-secret",
+      "status": 403,
+      "ms": 61,
+      "edgeRegion": "ap-southeast-1",
+      "frontColo": null,
+      "frontMs": null,
+      "body": {
+        "region": "ap-southeast-1",
+        "method": "POST",
+        "gate": "front-secret",
+        "ok": false
+      }
+    },
+    {
+      "id": "G3 via front, no user JWT",
+      "expect": "401 jwt",
+      "status": 401,
+      "ms": 140,
+      "edgeRegion": "ap-southeast-1",
+      "frontColo": "SIN",
+      "frontMs": "49",
+      "body": {
+        "region": "ap-southeast-1",
+        "method": "POST",
+        "gate": "jwt",
+        "ok": false,
+        "error": "no sub"
+      }
+    },
+    {
+      "id": "G4 via front, garbage JWT",
+      "expect": "401 jwt",
+      "status": 401,
+      "ms": 58,
+      "edgeRegion": "ap-southeast-1",
+      "frontColo": "SIN",
+      "frontMs": "21",
+      "body": {
+        "region": "ap-southeast-1",
+        "method": "POST",
+        "gate": "jwt",
+        "ok": false,
+        "error": "JWT not in base64url format"
+      }
+    },
+    {
+      "id": "F1 via front, probe",
+      "expect": "200, createHttpClient=function, region ap-southeast-1",
+      "status": 200,
+      "ms": 116,
+      "edgeRegion": "ap-southeast-1",
+      "frontColo": "SIN",
+      "frontMs": "90",
+      "body": {
+        "region": "ap-southeast-1",
+        "method": "POST",
+        "gate": "passed",
+        "claims": {
+          "sub": "<uuid>",
+          "role": "authenticated",
+          "iss": "https://<ref>.supabase.co/auth/v1",
+          "alg": "ES256",
+          "kid": "<uuid>"
+        },
+        "results": [
+          {
+            "arm": "probe",
+            "ms": 0,
+            "ok": true,
+            "detail": {
+              "createHttpClient": "function",
+              "connectTls": "function",
+              "denoVersion": {
+                "deno": "supabase-edge-runtime-1.79.1 (compatible with Deno v2.1.4)",
+                "v8": "11.6.189.12",
+                "typescript": "5.1.6"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "F2 via front, mTLS CA-verified",
+      "expect": "no-cert 400, with-cert 200",
+      "status": 200,
+      "ms": 2306,
+      "edgeRegion": "ap-southeast-1",
+      "frontColo": "SIN",
+      "frontMs": "2292",
+      "body": {
+        "region": "ap-southeast-1",
+        "method": "POST",
+        "gate": "passed",
+        "claims": {
+          "sub": "<uuid>",
+          "role": "authenticated",
+          "iss": "https://<ref>.supabase.co/auth/v1",
+          "alg": "ES256",
+          "kid": "<uuid>"
+        },
+        "results": [
+          {
+            "arm": "mtls-ca:no-cert",
+            "ms": 992,
+            "ok": true,
+            "status": 400
+          },
+          {
+            "arm": "mtls-ca:with-cert",
+            "ms": 2270,
+            "ok": true,
+            "status": 200
+          }
+        ]
+      }
+    },
+    {
+      "id": "F3 via front, mTLS own CA echo",
+      "expect": "subject CN=lab-edge-function-client-ec",
+      "status": 200,
+      "ms": 1695,
+      "edgeRegion": "ap-southeast-1",
+      "frontColo": "SIN",
+      "frontMs": "1630",
+      "body": {
+        "region": "ap-southeast-1",
+        "method": "POST",
+        "gate": "passed",
+        "claims": {
+          "sub": "<uuid>",
+          "role": "authenticated",
+          "iss": "https://<ref>.supabase.co/auth/v1",
+          "alg": "ES256",
+          "kid": "<uuid>"
+        },
+        "results": [
+          {
+            "arm": "mtls-echo:own-ca",
+            "ms": 1608,
+            "ok": true,
+            "status": 200,
+            "detail": {
+              "subject": "CN=lab-edge-function-client-ec",
+              "issuer": "CN=lab-test-ca",
+              "verify": "FAILED:certificate authority not trusted",
+              "proto": "TLSv1.2",
+              "remote": "54.179.73.206"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "F4 via front, JWT upstream",
+      "expect": "user-token 200 ok, no-token 401",
+      "status": 200,
+      "ms": 206,
+      "edgeRegion": "ap-southeast-1",
+      "frontColo": "SIN",
+      "frontMs": "179",
+      "body": {
+        "region": "ap-southeast-1",
+        "method": "POST",
+        "gate": "passed",
+        "claims": {
+          "sub": "<uuid>",
+          "role": "authenticated",
+          "iss": "https://<ref>.supabase.co/auth/v1",
+          "alg": "ES256",
+          "kid": "<uuid>"
+        },
+        "results": [
+          {
+            "arm": "jwt-upstream:user-token",
+            "ms": 156,
+            "ok": true,
+            "status": 200,
+            "detail": {
+              "ok": true,
+              "alg": "ES256",
+              "kid": "<uuid>",
+              "sub": "<uuid>",
+              "role": "authenticated",
+              "ms": 32
+            }
+          },
+          {
+            "arm": "jwt-upstream:no-token",
+            "ms": 112,
+            "ok": true,
+            "status": 401,
+            "detail": {
+              "ok": false,
+              "reason": "no token"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "R1 via front pinned (POST)",
+      "expect": "region ap-southeast-1",
+      "status": 200,
+      "ms": 35,
+      "edgeRegion": "ap-southeast-1",
+      "frontColo": "SIN",
+      "frontMs": "22",
+      "body": {
+        "region": "ap-southeast-1",
+        "method": "POST",
+        "gate": "passed",
+        "claims": {
+          "sub": "<uuid>",
+          "role": "authenticated",
+          "iss": "https://<ref>.supabase.co/auth/v1",
+          "alg": "ES256",
+          "kid": "<uuid>"
+        },
+        "results": [
+          {
+            "arm": "probe",
+            "ms": 0,
+            "ok": true,
+            "detail": {
+              "createHttpClient": "function",
+              "connectTls": "function",
+              "denoVersion": {
+                "deno": "supabase-edge-runtime-1.79.1 (compatible with Deno v2.1.4)",
+                "v8": "11.6.189.12",
+                "typescript": "5.1.6"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "R2 via front unpinned (POST)",
+      "expect": "nearest region",
+      "status": 200,
+      "ms": 50,
+      "edgeRegion": "ap-southeast-1",
+      "frontColo": "SIN",
+      "frontMs": "23",
+      "body": {
+        "region": "ap-southeast-1",
+        "method": "POST",
+        "gate": "passed",
+        "claims": {
+          "sub": "<uuid>",
+          "role": "authenticated",
+          "iss": "https://<ref>.supabase.co/auth/v1",
+          "alg": "ES256",
+          "kid": "<uuid>"
+        },
+        "results": [
+          {
+            "arm": "probe",
+            "ms": 0,
+            "ok": true,
+            "detail": {
+              "createHttpClient": "function",
+              "connectTls": "function",
+              "denoVersion": {
+                "deno": "supabase-edge-runtime-1.79.1 (compatible with Deno v2.1.4)",
+                "v8": "11.6.189.12",
+                "typescript": "5.1.6"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "R3 direct forceFunctionRegion=us-east-1",
+      "expect": "region us-east-1 (pin moves it)",
+      "status": 200,
+      "ms": 1498,
+      "edgeRegion": "us-east-1",
+      "frontColo": null,
+      "frontMs": null,
+      "body": {
+        "region": "us-east-1",
+        "method": "POST",
+        "gate": "passed",
+        "claims": {
+          "sub": "<uuid>",
+          "role": "authenticated",
+          "iss": "https://<ref>.supabase.co/auth/v1",
+          "alg": "ES256",
+          "kid": "<uuid>"
+        },
+        "results": [
+          {
+            "arm": "probe",
+            "ms": 0,
+            "ok": true,
+            "detail": {
+              "createHttpClient": "function",
+              "connectTls": "function",
+              "denoVersion": {
+                "deno": "supabase-edge-runtime-1.79.1 (compatible with Deno v2.1.4)",
+                "v8": "11.6.189.12",
+                "typescript": "5.1.6"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "D1 REST via front",
+      "expect": "2 rows",
+      "status": 200,
+      "ms": 90,
+      "edgeRegion": null,
+      "frontColo": "SIN",
+      "frontMs": "65",
+      "body": [
+        {
+          "id": 1,
+          "name": "one"
+        },
+        {
+          "id": 2,
+          "name": "two"
+        }
+      ]
+    },
+    {
+      "id": "D2 REST direct, no header",
+      "expect": "0 rows",
+      "status": 200,
+      "ms": 86,
+      "edgeRegion": null,
+      "frontColo": null,
+      "frontMs": null,
+      "body": []
+    },
+    {
+      "id": "D3 REST direct, wrong header",
+      "expect": "0 rows",
+      "status": 200,
+      "ms": 47,
+      "edgeRegion": null,
+      "frontColo": null,
+      "frontMs": null,
+      "body": []
+    },
+    {
+      "id": "D4 REST direct, user JWT no header",
+      "expect": "0 rows",
+      "status": 200,
+      "ms": 145,
+      "edgeRegion": null,
+      "frontColo": null,
+      "frontMs": null,
+      "body": []
+    },
+    {
+      "id": "O1 Auth settings direct",
+      "expect": "200 (Auth not gated by the front)",
+      "status": 200,
+      "ms": 46,
+      "edgeRegion": null,
+      "frontColo": null,
+      "frontMs": null,
+      "body": {
+        "external": {
+          "anonymous_users": false,
+          "apple": false,
+          "azure": false,
+          "bitbucket": false,
+          "discord": false,
+          "facebook": false,
+          "snapchat": false,
+          "figma": false,
+          "fly": false,
+          "github": false,
+          "gitlab": false,
+          "google": false,
+          "keycloak": false,
+          "kakao": false,
+          "linkedin": false,
+          "linkedin_oidc": false,
+          "notion": false,
+          "spotify": false,
+          "slack": false,
+          "slack_oidc": false,
+          "workos": false,
+          "twitch": false,
+          "twitter": false,
+          "email": true,
+          "phone": false,
+          "zoom": false
+        },
+        "disable_signup": false,
+        "mailer_autoconfirm": false,
+        "phone_autoconfirm": false,
+        "sms_provider": "twilio",
+        "saml_enabled": false,
+        "saml_private_key_next_configured": true,
+        "passkeys_enabled": false
+      }
+    },
+    {
+      "id": "O2 Storage buckets direct",
+      "expect": "reachable (not gated)",
+      "status": 200,
+      "ms": 82,
+      "edgeRegion": null,
+      "frontColo": null,
+      "frontMs": null,
+      "body": []
+    },
+    {
+      "id": "T1 Supabase edge CertificateRequest",
+      "expect": "no client cert CA names sent",
+      "body": "No client certificate CA names sent"
+    },
+    {
+      "id": "L probe",
+      "n": 20,
+      "p50": 37,
+      "p90": 55,
+      "max": 57,
+      "samples": [
+        37,
+        53,
+        37,
+        33,
+        33,
+        32,
+        55,
+        34,
+        57,
+        35,
+        36,
+        54,
+        52,
+        50,
+        38,
+        38,
+        34,
+        35,
+        43,
+        32
+      ]
+    },
+    {
+      "id": "L jwt-upstream",
+      "n": 20,
+      "p50": 67,
+      "p90": 82,
+      "max": 93,
+      "samples": [
+        71,
+        67,
+        74,
+        93,
+        76,
+        74,
+        70,
+        82,
+        59,
+        68,
+        49,
+        65,
+        48,
+        46,
+        49,
+        67,
+        50,
+        49,
+        79,
+        51
+      ]
+    },
+    {
+      "id": "L mtls-echo",
+      "n": 20,
+      "p50": 1326,
+      "p90": 1435,
+      "max": 1478,
+      "samples": [
+        1374,
+        1435,
+        1330,
+        1303,
+        1359,
+        1288,
+        1478,
+        1311,
+        1345,
+        1293,
+        1278,
+        1312,
+        1343,
+        1330,
+        1299,
+        1365,
+        1282,
+        1255,
+        1316,
+        1326
+      ]
+    }
+  ]
+}

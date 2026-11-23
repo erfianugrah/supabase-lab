@@ -16,7 +16,7 @@ URL = https://$(REF).supabase.co
 export CLOUDFLARE_API_TOKEN ?= $(CLOUDFLARE_WORKERS_TOKEN)
 WURL = $(shell cat evidence/$(1).url 2>/dev/null)
 
-.PHONY: all certs apply upstream setup function front probe run2 cf-up gateway setup2 probe2 destroy
+.PHONY: all certs apply upstream setup function front probe run2 cf-up gateway setup2 probe2 run3 cf3-up setup3 probe3 full repeat destroy
 
 all: apply upstream setup function front probe
 
@@ -77,8 +77,39 @@ setup2:
 probe2:
 	FRONT_URL=$(call WURL,front) bun probe2.ts
 
+# Run 3: gateway trusting OUR OWN CA only (Cloudflare BYO CA, Enterprise zone),
+# Cloudflare Tunnel + Access to a local origin (no inbound port; probe3 starts
+# the origin and cloudflared itself), region from abroad, cert rotation without
+# redeploy, latency rounds. Same env as run 2.
+run3: cf3-up gateway setup3 probe3
+
+cf3-up:
+	@mkdir -p evidence certs
+	bun cf3.ts up
+
+setup3:
+	bun setup3.ts
+
+probe3:
+	FRONT_URL=$(call WURL,front) bun probe3.ts
+
+# Everything from a clean slate, with runs 1 and 2 repeated after run 3:
+#   sx SUPABASE_ACCESS_TOKEN CLOUDFLARE_EMAIL CLOUDFLARE_API_KEY CLOUDFLARE_WORKERS_TOKEN=CLOUDFLARE_WORKERS_TOKEN CLOUDFLARE_ACCOUNT_ID -- make full
+full: apply upstream setup function front cf-up cf3-up gateway setup2 setup3 probe probe2 probe3 repeat
+
+repeat:
+	FRONT_URL=$(call WURL,front) bun probe.ts
+	FRONT_URL=$(call WURL,front) bun probe2.ts
+
+# Redacted copies + facts table of evidence/run*-<DATE>*.json into out/<DATE>/.
+# CLIENT_IP=<the probing machine's address> so it is masked too.
+publish-evidence:
+	@test -n "$(DATE)" || (echo "DATE=YYYY-MM-DD required"; exit 1)
+	bun publish.ts $(DATE)
+
 destroy:
 	-cd workers/gateway && env -u CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID=$$(bun ../../zone-account.ts) wrangler delete --force
+	-test -f evidence/cf3.json && bun cf3.ts down
 	-test -f evidence/cf.json && bun cf.ts down
 	-cd workers/front && wrangler delete --force
 	-cd workers/upstream && wrangler delete --force

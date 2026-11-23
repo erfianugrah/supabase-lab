@@ -15,12 +15,14 @@ import { createRemoteJWKSet, decodeProtectedHeader, jwtVerify } from "jose";
 interface Env {
   SUPABASE_URL: string;
   GW_HOST: string;
+  /** run 3: mTLS against OUR OWN CA only (Cloudflare BYO CA). */
+  OWN_HOST: string;
 }
 let jwks: ReturnType<typeof createRemoteJWKSet> | undefined;
 
 const PROCESS: Record<string, unknown> = {
   "/process/orders": { orders: [{ id: "o-1", status: "confirmed" }] },
-  "/process/rates": { rates: [{ room: "studio", sgd: 210 }] },
+  "/process/rates": { rates: [{ id: "r-1", value: 1 }] },
 };
 
 export default {
@@ -33,7 +35,7 @@ export default {
       subject: tls.certSubjectDN ?? null,
       issuer: tls.certIssuerDN ?? null,
     };
-    if (u.hostname === env.GW_HOST && mtls.verified !== "SUCCESS") {
+    if ((u.hostname === env.GW_HOST || u.hostname === env.OWN_HOST) && mtls.verified !== "SUCCESS") {
       return Response.json({ gate: "mtls", ok: false, mtls }, { status: 403 });
     }
 

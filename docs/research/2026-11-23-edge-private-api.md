@@ -90,9 +90,25 @@ Caveats that change the build:
 - Reused HttpClient p50 17 ms vs new client p50 243 ms to a nearby gateway
   (n=20 each, run 2).
 
+## Run 3 additions (2026-11-23 07:24-07:34 UTC, runs 1-2 repeated)
+
+- A gateway that trusts only our own CA admits our RSA and named-curve EC
+  certs and refuses a Cloudflare-issued cert, a third CA's cert and no cert
+  [lab OWN1] - the shape of an enterprise CA with its own truststore.
+- Cloudflare Tunnel + Access service token to an origin with no inbound port:
+  200 with token + JWT, 401 without JWT, 403 without token [lab TUN1].
+- A caller outside Singapore runs the function where it is (us-east-1,
+  eu-central-1) unless pinned; through the pinning Worker it ran in
+  ap-southeast-1 [lab ABR].
+- A cert secret change reached both per-call and reused clients by 10 s (one post-change sample per arm)
+  without a redeploy [lab ROT, n=1].
+- Reused client faster in 6 of 6 interleaved sets (p50 12-24 ms vs 61-243 ms
+  to a gateway a few ms away); only the gap transfers to a real upstream.
+
 ## Not measured
 
 The Auth per-IP rate limit behind a Worker and `Sb-Forwarded-For`; which
-spoofed header triggered the 403 in H4. O2O, keyless
+spoofed header triggered the 403 in H4. Commercial iPaaS
+and cloud API gateways themselves (no accounts; docs only). O2O, keyless
 client with the key at the edge, Realtime through a cloud front door or API
 gateway, an iPaaS truststore on a real tenant.

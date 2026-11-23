@@ -103,7 +103,7 @@ enterprise arrangement; nothing found that suggests one.
 - The CLI's recorded `GET /v1/projects/{ref}/custom-hostname` response wraps a
   Cloudflare v4 envelope (`errors`, `messages`, `success`, `result` with
   `custom_origin_server`, `ownership_verification`, `ssl.validation_records`):
-  https://github.com/supabase/cli/blob/main/apps/cli-e2e/fixtures/recorded/GET_v1_projects_replayfixtureprojref_custom_hostname/default.response.json
+  https://github.com/supabase/cli/tree/main/apps/cli-e2e/fixtures/recorded (the `GET_v1_projects_..._custom_hostname` recorded response)
 - Lab comment, `experiments/hostname-path/lib/cfdns.ts`: "the custom hostname
   is served by Cloudflare for SaaS on the platform's account".
 - Inferred (strong): custom domains are Cloudflare for SaaS custom hostnames.

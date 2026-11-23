@@ -6472,3 +6472,15 @@ runs 3-4. Numbers and per-write evidence: RUNLOG.md, artifacts
   request carrying client-set cf-*/XFF headers got 403 at the edge.
 - Module-scope HttpClient: p50 17 ms to a nearby mTLS gateway; a new client
   per request p50 243 ms (n=20 each, run 2 probe output `p50=243`).
+- Run 3 + repeats (2026-11-23, `make full`): runs 1-2 matched on three passes
+  each. A gateway trusting only our own CA (Cloudflare BYO CA, Enterprise zone)
+  admitted own-CA RSA and named-curve EC certs and refused a Cloudflare-CA
+  cert, a third CA and no cert (403 each). Tunnel + Access to a local origin:
+  200 with service token + JWT, 401 without JWT, 403 without token.
+- Region from abroad: a function forced to us-east-1 / eu-central-1 calling
+  the relay unpinned ran it there; through the pinning Worker it ran in
+  ap-southeast-1.
+- Changing a cert secret (no redeploy): both a per-call client and a
+  module-scope client presented the new cert on their first post-change call (5 s and 10 s after the change was sent; one sample per arm).
+- Reuse vs new client over 6 interleaved sets: reused p50 12-24 ms, new p50
+  61-243 ms; one of 210 new-client calls did not return ok.

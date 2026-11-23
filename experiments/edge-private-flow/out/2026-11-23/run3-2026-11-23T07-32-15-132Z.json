@@ -1,0 +1,703 @@
+{
+  "at": "2026-11-23T07:32:15.133Z",
+  "front": "https://lab-epf-front.anugrah.workers.dev",
+  "rows": [
+    {
+      "id": "OWN1 own-CA gateway matrix",
+      "status": 200,
+      "ms": 2539,
+      "region": "ap-southeast-1",
+      "body": {
+        "region": "ap-southeast-1",
+        "method": "POST",
+        "gate": "passed",
+        "claims": {
+          "sub": "<uuid>",
+          "role": "authenticated",
+          "iss": "https://<ref>.supabase.co/auth/v1",
+          "alg": "ES256",
+          "kid": "<uuid>"
+        },
+        "results": [
+          {
+            "arm": "own:own-CA RSA cert",
+            "ms": 66,
+            "ok": true,
+            "status": 200,
+            "detail": {
+              "presented": "1",
+              "verified": "SUCCESS",
+              "subject": "CN=lab-own-rsa",
+              "issuer": "CN=lab-own-ca"
+            }
+          },
+          {
+            "arm": "own:own-CA EC cert",
+            "ms": 61,
+            "ok": true,
+            "status": 200,
+            "detail": {
+              "presented": "1",
+              "verified": "SUCCESS",
+              "subject": "CN=lab-own-ec",
+              "issuer": "CN=lab-own-ca"
+            }
+          },
+          {
+            "arm": "own:Cloudflare-CA cert",
+            "ms": 79,
+            "ok": true,
+            "status": 403,
+            "detail": {
+              "presented": "1",
+              "verified": "FAILED:FAILED:unable to verify the first certificate",
+              "subject": "CN=lab-edge-function-gw",
+              "issuer": "CN=Managed CA <account-id>,OU=www.cloudflare.com,O=Cloudflare\\, Inc.,L=San Francisco,ST=California,C=US"
+            }
+          },
+          {
+            "arm": "own:other-CA cert",
+            "ms": 240,
+            "ok": true,
+            "status": 403,
+            "detail": {
+              "presented": "1",
+              "verified": "FAILED:FAILED:unable to verify the first certificate",
+              "subject": "CN=lab-edge-function-client-ec",
+              "issuer": "CN=lab-test-ca"
+            }
+          },
+          {
+            "arm": "own:no cert",
+            "ms": 90,
+            "ok": true,
+            "status": 403,
+            "detail": {
+              "presented": "0",
+              "verified": "NONE",
+              "subject": "",
+              "issuer": ""
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "TUN1 tunnel + Access matrix",
+      "status": 200,
+      "ms": 697,
+      "region": "ap-southeast-1",
+      "body": {
+        "region": "ap-southeast-1",
+        "method": "POST",
+        "gate": "passed",
+        "claims": {
+          "sub": "<uuid>",
+          "role": "authenticated",
+          "iss": "https://<ref>.supabase.co/auth/v1",
+          "alg": "ES256",
+          "kid": "<uuid>"
+        },
+        "results": [
+          {
+            "arm": "tun:service token + jwt",
+            "ms": 101,
+            "ok": true,
+            "status": 200,
+            "detail": {
+              "ok": true,
+              "origin": "local-via-tunnel",
+              "path": "/process/rates",
+              "access": "present",
+              "sub": "<uuid>"
+            }
+          },
+          {
+            "arm": "tun:service token, no jwt",
+            "ms": 70,
+            "ok": true,
+            "status": 401,
+            "detail": {
+              "gate": "jwt",
+              "ok": false,
+              "access": "present"
+            }
+          },
+          {
+            "arm": "tun:no service token",
+            "ms": 646,
+            "ok": true,
+            "status": 403,
+            "detail": "<!DOCTYPE html><html><head><meta charset=\"utf-8\"/><meta name=\"viewport\" content="
+          }
+        ]
+      }
+    },
+    {
+      "id": "ABR us-east-1",
+      "status": 200,
+      "ms": 914,
+      "region": "us-east-1",
+      "body": {
+        "region": "us-east-1",
+        "method": "POST",
+        "gate": "passed",
+        "claims": {
+          "sub": "<uuid>",
+          "role": "authenticated",
+          "iss": "https://<ref>.supabase.co/auth/v1",
+          "alg": "ES256",
+          "kid": "<uuid>"
+        },
+        "results": [
+          {
+            "arm": "abroad:direct unpinned",
+            "ms": 167,
+            "ok": true,
+            "status": 200,
+            "detail": {
+              "ranIn": "us-east-1"
+            }
+          },
+          {
+            "arm": "abroad:via front Worker",
+            "ms": 398,
+            "ok": true,
+            "status": 200,
+            "detail": {
+              "ranIn": "ap-southeast-1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "ABR eu-central-1",
+      "status": 200,
+      "ms": 2361,
+      "region": "eu-central-1",
+      "body": {
+        "region": "eu-central-1",
+        "method": "POST",
+        "gate": "passed",
+        "claims": {
+          "sub": "<uuid>",
+          "role": "authenticated",
+          "iss": "https://<ref>.supabase.co/auth/v1",
+          "alg": "ES256",
+          "kid": "<uuid>"
+        },
+        "results": [
+          {
+            "arm": "abroad:direct unpinned",
+            "ms": 60,
+            "ok": true,
+            "status": 200,
+            "detail": {
+              "ranIn": "eu-central-1"
+            }
+          },
+          {
+            "arm": "abroad:via front Worker",
+            "ms": 284,
+            "ok": true,
+            "status": 200,
+            "detail": {
+              "ranIn": "ap-southeast-1"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "ROT0 rot-new before",
+      "status": 200,
+      "ms": 1685,
+      "region": "ap-southeast-1",
+      "body": {
+        "region": "ap-southeast-1",
+        "method": "POST",
+        "gate": "passed",
+        "claims": {
+          "sub": "<uuid>",
+          "role": "authenticated",
+          "iss": "https://<ref>.supabase.co/auth/v1",
+          "alg": "ES256",
+          "kid": "<uuid>"
+        },
+        "results": [
+          {
+            "arm": "rot-new",
+            "ms": 1598,
+            "ok": true,
+            "detail": {
+              "subject": "CN=lab-rot-a"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "ROT0 rot-reuse before",
+      "status": 200,
+      "ms": 1296,
+      "region": "ap-southeast-1",
+      "body": {
+        "region": "ap-southeast-1",
+        "method": "POST",
+        "gate": "passed",
+        "claims": {
+          "sub": "<uuid>",
+          "role": "authenticated",
+          "iss": "https://<ref>.supabase.co/auth/v1",
+          "alg": "ES256",
+          "kid": "<uuid>"
+        },
+        "results": [
+          {
+            "arm": "rot-reuse",
+            "ms": 1229,
+            "ok": true,
+            "detail": {
+              "subject": "CN=lab-rot-a"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "ROT rot-new",
+      "status": 200,
+      "ms": 3970,
+      "region": "ap-southeast-1",
+      "body": {
+        "region": "ap-southeast-1",
+        "method": "POST",
+        "gate": "passed",
+        "claims": {
+          "sub": "<uuid>",
+          "role": "authenticated",
+          "iss": "https://<ref>.supabase.co/auth/v1",
+          "alg": "ES256",
+          "kid": "<uuid>"
+        },
+        "results": [
+          {
+            "arm": "rot-new",
+            "ms": 1222,
+            "ok": true,
+            "detail": {
+              "subject": "CN=lab-rot-b"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "ROT rot-reuse",
+      "status": 200,
+      "ms": 4080,
+      "region": "ap-southeast-1",
+      "body": {
+        "region": "ap-southeast-1",
+        "method": "POST",
+        "gate": "passed",
+        "claims": {
+          "sub": "<uuid>",
+          "role": "authenticated",
+          "iss": "https://<ref>.supabase.co/auth/v1",
+          "alg": "ES256",
+          "kid": "<uuid>"
+        },
+        "results": [
+          {
+            "arm": "rot-reuse",
+            "ms": 1239,
+            "ok": true,
+            "detail": {
+              "subject": "CN=lab-rot-b"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "ROT summary",
+      "firstB": {
+        "rot-new": 5,
+        "rot-reuse": 10
+      },
+      "trace": [
+        {
+          "arm": "rot-new",
+          "s": 5,
+          "subj": "CN=lab-rot-b"
+        },
+        {
+          "arm": "rot-reuse",
+          "s": 10,
+          "subj": "CN=lab-rot-b"
+        }
+      ]
+    },
+    {
+      "id": "LAT r1 gw-reuse",
+      "n": 50,
+      "min": 10,
+      "p50": 12,
+      "p90": 35,
+      "max": 109,
+      "samples": [
+        109,
+        28,
+        32,
+        10,
+        31,
+        36,
+        20,
+        12,
+        10,
+        35,
+        13,
+        28,
+        33,
+        33,
+        34,
+        37,
+        36,
+        11,
+        11,
+        11,
+        10,
+        10,
+        23,
+        11,
+        10,
+        10,
+        11,
+        10,
+        11,
+        11,
+        13,
+        11,
+        11,
+        16,
+        12,
+        13,
+        12,
+        12,
+        12,
+        13,
+        13,
+        13,
+        11,
+        10,
+        12,
+        14,
+        11,
+        11,
+        12,
+        15
+      ]
+    },
+    {
+      "id": "LAT r1 gw-new-client",
+      "n": 50,
+      "min": 28,
+      "p50": 76,
+      "p90": 229,
+      "max": 359,
+      "samples": [
+        51,
+        64,
+        61,
+        91,
+        46,
+        49,
+        163,
+        86,
+        55,
+        50,
+        97,
+        48,
+        134,
+        53,
+        282,
+        103,
+        84,
+        52,
+        41,
+        119,
+        28,
+        77,
+        259,
+        192,
+        359,
+        229,
+        39,
+        229,
+        199,
+        42,
+        50,
+        160,
+        114,
+        183,
+        62,
+        50,
+        58,
+        228,
+        44,
+        85,
+        76,
+        47,
+        56,
+        222,
+        45,
+        105,
+        36,
+        64,
+        40,
+        221
+      ]
+    },
+    {
+      "id": "LAT r2 gw-reuse",
+      "n": 50,
+      "min": 10,
+      "p50": 12,
+      "p90": 31,
+      "max": 60,
+      "samples": [
+        13,
+        15,
+        12,
+        10,
+        10,
+        11,
+        33,
+        11,
+        12,
+        11,
+        11,
+        12,
+        11,
+        12,
+        11,
+        10,
+        11,
+        60,
+        31,
+        27,
+        21,
+        19,
+        13,
+        21,
+        13,
+        11,
+        11,
+        12,
+        13,
+        12,
+        13,
+        16,
+        12,
+        14,
+        43,
+        32,
+        12,
+        14,
+        12,
+        31,
+        13,
+        11,
+        12,
+        16,
+        12,
+        12,
+        12,
+        12,
+        13,
+        13
+      ]
+    },
+    {
+      "id": "LAT r2 gw-new-client",
+      "n": 49,
+      "min": 24,
+      "p50": 61,
+      "p90": 212,
+      "max": 246,
+      "samples": [
+        50,
+        87,
+        35,
+        246,
+        212,
+        51,
+        76,
+        52,
+        37,
+        219,
+        50,
+        44,
+        63,
+        50,
+        36,
+        45,
+        36,
+        74,
+        38,
+        24,
+        40,
+        66,
+        39,
+        101,
+        96,
+        35,
+        111,
+        222,
+        69,
+        57,
+        79,
+        58,
+        50,
+        74,
+        91,
+        60,
+        224,
+        200,
+        91,
+        148,
+        42,
+        71,
+        59,
+        34,
+        93,
+        99,
+        61,
+        54,
+        67
+      ]
+    },
+    {
+      "id": "LAT r3 gw-reuse",
+      "n": 50,
+      "min": 11,
+      "p50": 18,
+      "p90": 60,
+      "max": 127,
+      "samples": [
+        17,
+        14,
+        14,
+        14,
+        17,
+        12,
+        13,
+        35,
+        13,
+        19,
+        16,
+        13,
+        11,
+        13,
+        13,
+        11,
+        13,
+        14,
+        15,
+        12,
+        12,
+        11,
+        12,
+        15,
+        33,
+        12,
+        14,
+        127,
+        59,
+        74,
+        43,
+        70,
+        77,
+        37,
+        47,
+        26,
+        21,
+        42,
+        24,
+        32,
+        60,
+        22,
+        21,
+        58,
+        18,
+        20,
+        18,
+        17,
+        18,
+        22
+      ]
+    },
+    {
+      "id": "LAT r3 gw-new-client",
+      "n": 50,
+      "min": 28,
+      "p50": 62,
+      "p90": 134,
+      "max": 440,
+      "samples": [
+        57,
+        440,
+        44,
+        134,
+        54,
+        40,
+        239,
+        52,
+        48,
+        35,
+        68,
+        94,
+        53,
+        105,
+        60,
+        110,
+        141,
+        28,
+        79,
+        88,
+        43,
+        49,
+        30,
+        38,
+        64,
+        60,
+        62,
+        79,
+        40,
+        55,
+        75,
+        31,
+        55,
+        85,
+        72,
+        90,
+        59,
+        51,
+        57,
+        62,
+        66,
+        47,
+        56,
+        64,
+        129,
+        109,
+        81,
+        194,
+        45,
+        131
+      ]
+    }
+  ]
+}
