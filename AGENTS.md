@@ -2699,6 +2699,13 @@ reads it back, including `supabase_changes_only`. Details: RUNLOG.md.
   The connection form defaults Branch limit to 3; raise it before a matrix
   run. `make publish-evidence REPO=...` strips the repository name, which has
   no identifier shape for the shared redaction to catch.
+- A persistent branch's git link can be cleared without delete and recreate:
+  `PATCH /v1/branches/{branch_id}` with `{"git_branch":""}`, or `supabase
+  branches update <name> --git-branch "" --project-ref <ref>` (`null` is
+  ignored). Setting the name back reverses it. A linked push triggers a
+  Supabase Preview `in_progress` + redeploy; unlinked, the check run is
+  skipped. DELETE on a persistent branch is refused: PATCH `persistent:
+  false` first. Validated twice on a test project.
 
 ## Write-up workflow (added 2026-09-02 after three review passes)
 
