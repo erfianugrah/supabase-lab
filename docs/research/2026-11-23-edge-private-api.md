@@ -9,6 +9,7 @@ Sources: lab run `experiments/edge-private-flow/RUNLOG.md` (run 1, 2026-11-23),
 raw research in `docs/research/raw/2026-11-23-edge-private-api/`
 (`ingress-front-door.md`) and candidate ledger `coverage.md` there; the
 vendor-specific egress, adversarial and iPaaS notes are kept local only
+(a local scratch directory, local only). Tags: [lab]
 measured in run 1, [src] read in code, [doc] vendor doc read 2026-11-23,
 [inf] inferred, [untested].
 
@@ -62,6 +63,7 @@ Caveats that change the build:
   (`getClaims` caches JWKS per client instance for 10 min [src]); the 2 s CPU
   budget is per worker [doc]. The iPaaS ingress checked closes idle
   connections after 15 s [doc], so keep the pool idle timeout under the
+  upstream's and retry once.
 - Hosted outbound fetch has open reports of HTTP/2 stream errors (#685) and a
   ~75 s first-connect stall on cold isolates (#738) [doc]; set a timeout.
 - Only asymmetric signing keys publish a JWKS entry; a project still on the
