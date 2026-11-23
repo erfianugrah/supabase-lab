@@ -421,7 +421,8 @@ cache that actually ran, same trace:
 
 Not measured: several backend instances, each with its own cache (the hit
 rate per instance falls); RLS-scoped reads, where the cache key would have to
-include the user; `log_connections` on (off on a new project, so LV07h-i
-carry no Postgres connection rows); session mode, the dedicated pooler and
+include the user; `log_connections` (not read in LV07; LV07h-i logged no
+`postgres_logs` rows above the idle rate) and the same reads with it on;
+session mode, the dedicated pooler and
 direct connections for LV07h-i; traces other than this one (the
 bucket-vs-live gap depends on arrival rate and key spread); metered bytes.

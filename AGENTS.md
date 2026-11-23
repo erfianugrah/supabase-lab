@@ -3780,7 +3780,8 @@ logs endpoint returns them (metered bytes are not readable by PAT, OB03c).
   `auth_logs` (789 B) row per call (LV07f). Shared pooler 6543: a persistent
   `pg.Pool` wrote 3 `supavisor_logs` rows for 200 reads; a new connection per
   read wrote 4.1 rows / 2924 B per connection, more than a REST read's
-  gateway row (LV07h-i, `log_connections` off).
+  gateway row (LV07h-i; `log_connections` not read in LV07, no
+  `postgres_logs` rows above idle).
 - **Harness notes**: Bun's `dns.lookup` returned ENOTFOUND for the AAAA-only
   `db.<ref>.supabase.co` on macOS while `dig` resolved it; `lib/lv.ts`
   `directSession` uses `dns.resolve6` plus TLS `servername`. The logs endpoint
