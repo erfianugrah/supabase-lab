@@ -6496,3 +6496,43 @@ runs 3-4. Numbers and per-write evidence: RUNLOG.md, artifacts
   module-scope client presented the new cert on their first post-change call (5 s and 10 s after the change was sent; one sample per arm).
 - Reuse vs new client over 6 interleaved sets: reused p50 12-24 ms, new p50
   61-243 ms; one of 210 new-client calls did not return ok.
+
+## experiments/region-move - key facts (validated 2026-11-23, Pro org, Micro, ap-southeast-1 -> ap-northeast-1)
+
+Per-project region move: a new project in the new region, move the data,
+cut over. The orchestrator was a laptop and every connection went through
+the session pooler (the machine has no global IPv6, so the system resolver
+gave no address for the IPv6-only `db.<ref>` name). RUNLOG.md;
+out/2026-11-23/.
+
+- Nano is not creatable on a Pro org: `POST /v1/projects` with
+  `desired_instance_size` nano answered `400 "Minimum instance size on paid
+  plans is Micro"` (RM01a). Nano and a platform-plan org were not measured.
+- Micro (PostgreSQL 17.12): `wal_level` logical, `max_replication_slots` 10,
+  `max_wal_senders` 10, `max_logical_replication_workers` 4,
+  `max_sync_workers_per_subscription` 2, `max_worker_processes` 6,
+  `max_slot_wal_keep_size` 512 MB, `statement_timeout` 2min for `postgres`
+  (RM01b). pgmig `doctor` flags 4 logical workers for 4 tables.
+- `POST /v1/projects` read ACTIVE_HEALTHY within 3.6 s on all six pairs
+  polled, and on the four pairs read `created_at` was 5-10 min before the
+  POST (reading: the platform hands back an already-provisioned project;
+  inference). First pooler login 3.7 s and 4.1 s (RM02a). New projects
+  carried a 2 GB disk that a 1 GB seed filled (09:09:55 run); a disk grow
+  to 8 GB settled in 12 s and 14 s (RM02b).
+- Naive dump/restore of one table (~1 KB rows) through both poolers via the
+  orchestrator, the data half of the write stop only: 10.4 MB 4.8 s / 4.9 s,
+  103.3 MB 8.8 s / 8.9 s, 1024.4 MB 66 s / 67.8 s with `pg_dump -Fc` +
+  `pg_restore`; streamed `pg_dump | psql` 3.7 s / 6.2 s / 51.7 s (RM02, one
+  run, two repeats per size for the file path).
+- pgmig `cutover --with-auth-data`, managed to managed, cross-region (RM03,
+  pgmig `test/auth-cutover-live.harness.ts`, two runs): before cutover a user
+  created after bootstrap and a refresh token rotated after bootstrap were
+  refused at the target (`400 invalid_credentials`,
+  `400 refresh_token_not_found`); after it both answered 200, an aal2 (TOTP)
+  refresh stayed aal2 with amr password + totp, a held source access token
+  got `403 bad_jwt`, and auth row counts matched. Cutover with the auth
+  reload took 11.7 s and 10.8 s, about 9-10 s of it the auth dump and reload
+  through the orchestrator; without the reload, 1.6 s on 2026-11-09.
+- Not run: Nano, a platform-plan org, a writer during cutover, a large auth
+  schema, OAuth identities, config-sync / Storage / Realtime repoint,
+  parallel moves, the old-issuer third-party-auth bridge.
