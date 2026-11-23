@@ -16,7 +16,7 @@ URL = https://$(REF).supabase.co
 export CLOUDFLARE_API_TOKEN ?= $(CLOUDFLARE_WORKERS_TOKEN)
 WURL = $(shell cat evidence/$(1).url 2>/dev/null)
 
-.PHONY: all certs apply upstream setup function front probe destroy
+.PHONY: all certs apply upstream setup function front probe run2 cf-up gateway setup2 probe2 destroy
 
 all: apply upstream setup function front probe
 
@@ -55,7 +55,31 @@ front:
 probe:
 	FRONT_URL=$(call WURL,front) bun probe.ts
 
+# Run 2: integration-gateway stand-in on <zone> hostnames (mTLS via the
+# Cloudflare-managed CA + JWT; and an Access service-token host), plus runtime
+# arms (proxy option, HTTPS_PROXY secret, v1 cert, explicit-params EC key,
+# caller-address headers, reused vs new HttpClient). Needs CLOUDFLARE_EMAIL +
+# CLOUDFLARE_API_KEY (zone-level writes; the Workers token cannot) on top of
+# the run-1 env:
+#   sx SUPABASE_ACCESS_TOKEN CLOUDFLARE_EMAIL CLOUDFLARE_API_KEY -- make run2
+run2: cf-up gateway setup2 function probe2
+
+cf-up:
+	@mkdir -p evidence certs
+	bun cf.ts up
+
+gateway:
+	cd workers/gateway && bun install --silent && env -u CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID=$$(bun ../../zone-account.ts) wrangler deploy --var SUPABASE_URL:$(URL)
+
+setup2:
+	bun setup2.ts
+
+probe2:
+	FRONT_URL=$(call WURL,front) bun probe2.ts
+
 destroy:
+	-cd workers/gateway && env -u CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID=$$(bun ../../zone-account.ts) wrangler delete --force
+	-test -f evidence/cf.json && bun cf.ts down
 	-cd workers/front && wrangler delete --force
 	-cd workers/upstream && wrangler delete --force
 	TF_VAR_supabase_access_token="$$SUPABASE_ACCESS_TOKEN" tofu destroy -auto-approve -input=false $(VARS)

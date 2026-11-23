@@ -1,0 +1,12 @@
+name = "lab-epf-gateway"
+main = "index.ts"
+compatibility_date = "2026-11-01"
+workers_dev = false
+upload_source_maps = false
+routes = [
+  { pattern = "epf-gw.erfi.dev", custom_domain = true },
+  { pattern = "epf-svc.erfi.dev", custom_domain = true },
+]
+
+[vars]
+GW_HOST = "epf-gw.erfi.dev"

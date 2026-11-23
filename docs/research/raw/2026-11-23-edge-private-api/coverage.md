@@ -19,7 +19,7 @@ candidate. Lab = experiments/edge-private-flow/RUNLOG.md run 1.
 | A cloud front door / CDN WAF in front | ingress-front-door.md | untested | WebSocket idle and duration caps in vendor docs; #343 |
 | A cloud API gateway in front | ingress-front-door.md | untested | one checked cannot rewrite Host on the WS handshake; #343 |
 | CloudFront + AWS WAF | ingress-front-door.md | untested | doc only |
-| cf-worker header in RLS | https://developers.cloudflare.com/fundamentals/reference/http-headers/ | untested | spoofability unknown; #342 |
+| cf-worker header in RLS | https://developers.cloudflare.com/fundamentals/reference/http-headers/ | eliminated | run 2 H2/H3: always supabase.co |
 
 ## Egress (function -> private API)
 
@@ -29,10 +29,12 @@ candidate. Lab = experiments/edge-private-flow/RUNLOG.md run 1.
 | Forward user JWT, JWKS validation upstream | lab F4 | checked | ES256 verified by jose against project JWKS |
 | Function-signed JWT | vendor notes (local only) | untested | WebCrypto available [inf] |
 | Enterprise-IdP client credentials | vendor notes (local only) | untested | doc |
-| Forward proxy via createHttpClient({proxy}) | an options longlist O5/O6, edge-runtime vendor/deno_fetch/proxy.rs | untested | code read; #342 |
-| HTTPS_PROXY as function secret | edge-runtime ext/env/lib.rs | untested | code says ignored; #342 |
+| Forward proxy via createHttpClient({proxy}) | vendor notes (local only), edge-runtime vendor/deno_fetch/proxy.rs | checked | run 2 P1: dead proxy -> connect error (honoured) |
+| HTTPS_PROXY as function secret | edge-runtime ext/env/lib.rs | eliminated | run 2 X1-X3: visible in env, fetch ignores it |
 | Cloudflare Tunnel + Access service token | an options longlist O8 | untested | doc |
 | A cloud relay service | vendor notes (local only) | untested | doc |
+| Single mTLS+JWT gateway in front of several process APIs (Cloudflare mTLS stand-in) | lab run 2 GW1 | checked | no cert / wrong CA 403, no JWT 401, cert+JWT 200 |
+| Cloudflare Access service token in front of the gateway | lab run 2 SV1 | checked | 200 with token, 403 without |
 | A cloud or self-hosted API gateway in front of the iPaaS | vendor notes (local only) | untested | doc |
 | Queue / reverse flow | egress O10/O11 | untested | doc |
 | iPaaS inbound mTLS (ingress truststore) | vendor notes (local only) | untested | dedicated-network tier only on the one checked; optional-mTLS docs conflict; #343 |

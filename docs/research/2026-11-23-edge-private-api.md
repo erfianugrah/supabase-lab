@@ -76,10 +76,23 @@ Caveats that change the build:
   on whether optional mTLS exists [doc]; test that a no-cert request is
   refused and remove any default hostname that skips the mTLS listener [inf].
 
+## Run 2 additions (2026-11-23 07:02 UTC)
+
+- A single gateway enforcing mTLS (Cloudflare-managed CA) and JWT in front of
+  two process APIs works from a hosted function: no cert 403, wrong-CA cert
+  403, no JWT 401, cert + JWT 200 [lab GW1]. An Access service token in front
+  works as the no-PKI variant [lab SV1].
+- `createHttpClient({proxy})` is honoured; `HTTPS_PROXY` as a function secret
+  is not [lab P1, X1-X3]. X.509 v1 certs fail per request without taking the
+  worker down [lab V1/V2].
+- Behind a Worker every user arrives as `2a06:98c0:3600::103` at the function
+  and in `request.headers`; `cf-worker` is always `supabase.co` [lab H1-H3].
+- Reused HttpClient p50 17 ms vs new client p50 243 ms to a nearby gateway
+  (n=20 each, run 2).
+
 ## Not measured
 
-Forward proxy and HTTPS_PROXY-as-secret, v1 cert rejection, reused-client
-latency to a nearby upstream, `cf-worker` spoofing, the shared-IP Auth rate
-limit behind a Worker; O2O, keyless client with the
-key at the edge, Realtime through Azure Front Door / APIM, the iPaaS runtime
-truststore behaviour on a real tenant.
+The Auth per-IP rate limit behind a Worker and `Sb-Forwarded-For`; which
+spoofed header triggered the 403 in H4. O2O, keyless
+client with the key at the edge, Realtime through a cloud front door or API
+gateway, an iPaaS truststore on a real tenant.

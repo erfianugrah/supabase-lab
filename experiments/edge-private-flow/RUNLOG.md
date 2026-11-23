@@ -78,3 +78,52 @@ shared Worker egress IP against Auth per-IP rate limits;
 customer Cloudflare zone proxied in front of a Supabase custom domain, keyless
 client with the key held at the edge, Realtime through a cloud front door / API gateway,
 an iPaaS ingress truststore on a real tenant.
+
+## Run 2 - 2026-11-23 07:02 UTC
+
+Adds an integration-gateway stand-in and the runtime arms run 1 left open.
+Gateway: one Worker on two lab hostnames under a personal zone. The GW host
+has Cloudflare mTLS enabled (client cert issued by the Cloudflare-managed CA
+from our CSR); the Worker refuses unless `cf.tlsClientAuth.certVerified` is
+`SUCCESS`, then validates the forwarded JWT against the project JWKS, and
+routes two mock "process APIs". The SVC host sits behind a Cloudflare Access
+self-hosted app with a service-token (non_identity) policy. Same project and
+front Worker as run 1; relay redeployed with module-scope clients. Evidence:
+`evidence/run2-2026-11-23T07-02-14-605Z.json` (local only).
+
+| id | check | result |
+|---|---|---|
+| GW1 | cert + JWT, two process APIs | 200 / 200, `verified: SUCCESS`, subject `CN=lab-edge-function-gw` |
+| GW1 | cert, no JWT | 401 (JWT gate) |
+| GW1 | JWT, no cert | 403 (mTLS gate, `presented: 0`) |
+| GW1 | cert from a CA the gateway does not trust | 403, `verified: FAILED:unable to verify the first certificate` |
+| SV1 | Access service token + JWT | 200 |
+| SV1 | no service token | 403 (Access block page, HTML) |
+| P1 | `createHttpClient({proxy: {url: "http://127.0.0.1:9"}})` | `tcp connect error` - the proxy option is honoured |
+| X0-X3 | `HTTPS_PROXY` set as a function SECRET pointing at a dead proxy | secret visible in `Deno.env`, plain `fetch` still 200 direct (3 of 3, 30 s after the set) - the secret does not proxy fetch |
+| V1/V2 | X.509 v1 client cert | `invalid peer certificate: ... UnsupportedCertVersion`; next request on the same function answered normally |
+| E1 | EC key with explicit curve parameters | hosted: `failed to parse private key as RSA, ECDSA, or EdDSA` (local Deno 2.9.8 said `KeyMismatch`); refused either way |
+| H1 | headers the function sees via the front Worker | `cf-connecting-ip: 2a06:98c0:3600::103` (Cloudflare Workers egress), `cf-worker: supabase.co` |
+| H2 | headers Postgres sees via the front Worker (`request.headers`) | same address, `cf-worker: supabase.co`, secret header present |
+| H3 | headers Postgres sees direct | the client's own address, `cf-worker: supabase.co` |
+| H4 | direct with client-set `cf-worker`, `cf-connecting-ip`, `x-forwarded-for`, `x-real-ip` | 403 before reaching PostgREST (one combined request: which header triggered it is not isolated) |
+
+Outbound latency measured INSIDE the function to the gateway (Cloudflare SIN
+edge, a few ms away), n=20 each, interleaved:
+
+| client | p50 | p90 | max |
+|---|---|---|---|
+| module-scope HttpClient, reused | 17 ms | 40 ms | 43 ms |
+| new HttpClient per request | 243 ms | 887 ms | 954 ms |
+
+Readings:
+
+- Every user reaches Supabase from one Workers egress address behind a
+  Worker, so per-IP limits (Auth) see one client. Not measured here: the
+  Auth rate limit itself and `Sb-Forwarded-For`.
+- `cf-worker` is `supabase.co` on every request (direct and via the front),
+  so it is the platform's own Worker, not a signal that the customer's edge
+  was crossed. Gate on a secret header instead (run 1 D1-D4).
+- The proxy option works and an `HTTPS_PROXY` secret does not, so a fixed-IP
+  forward proxy has to be passed explicitly per client.
+- Reusing the client is the difference between ~17 ms and ~240 ms per call.

@@ -6459,3 +6459,16 @@ runs 3-4. Numbers and per-write evidence: RUNLOG.md, artifacts
   policy can verify them via `/auth/v1/.well-known/jwks.json` with no rotation.
 - `forceFunctionRegion=us-east-1` on a direct call ran in us-east-1; the Worker
   pin kept calls in ap-southeast-1. Synthesis: docs/research/2026-11-23-edge-private-api.md.
+- Run 2: a gateway behind Cloudflare mTLS (Cloudflare-managed CA) + JWT
+  refused no-cert (403), wrong-CA cert (403) and no-JWT (401), served two
+  process APIs to cert+JWT. Access service-token host: 200 with, 403 without.
+- `createHttpClient({proxy})` is honoured; an `HTTPS_PROXY` FUNCTION SECRET is
+  visible in `Deno.env` but plain `fetch` ignores it (3/3 direct). X.509 v1
+  client cert -> `UnsupportedCertVersion`, worker keeps serving. Explicit-param
+  EC key on hosted -> `failed to parse private key`.
+- Behind a Worker, function and Postgres both see `cf-connecting-ip
+  2a06:98c0:3600::103` for every user. `cf-worker` reads `supabase.co` on
+  every request, direct or not - useless as an edge-crossed signal. A direct
+  request carrying client-set cf-*/XFF headers got 403 at the edge.
+- Module-scope HttpClient: p50 17 ms to a nearby mTLS gateway; a new client
+  per request p50 243 ms (n=20 each, run 2 probe output `p50=243`).

@@ -19,4 +19,10 @@ sx SUPABASE_ACCESS_TOKEN CLOUDFLARE_WORKERS_TOKEN=CLOUDFLARE_WORKERS_TOKEN CLOUD
   (stand-in for an API gateway JWT policy).
 - `setup.ts` - keys, signing-key check, lab user, RLS gate on
   `request.headers`, function secrets. `probe.ts` - the matrix.
+- Run 2 (`make run2`, also needs `CLOUDFLARE_EMAIL CLOUDFLARE_API_KEY`):
+  `cf.ts up|down` (Cloudflare-managed-CA client cert, mTLS on the gateway
+  hostname merged into the zone's list, Access service-token app),
+  `workers/gateway` (mTLS + JWT gate in front of two mock process APIs),
+  `setup2.ts`, `probe2.ts`. `zone-account.ts` picks the zone's account for
+  wrangler.
 - `certs/` and `evidence/` are gitignored (keys, tokens, refs).
