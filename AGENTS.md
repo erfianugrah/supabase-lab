@@ -6,6 +6,18 @@ platform behaviour or writing it into docs
 (see ~/.pi/agent/skills/validating-empirically/SKILL.md and
 ~/.pi/agent/skills/sa-pov/SKILL.md).
 
+## Before adding an experiment or an arm
+
+Run the `searching-prior-art` sweep first and write its ledger into the plan or
+the RUNLOG header: this file's key-facts blocks and every
+`experiments/*/RUNLOG.md` (`rg -n -i '<identifiers>'`), the published pages in
+`~/lexicanum/src/content/docs`, session history, the board, vendor docs and
+code, and for work questions Notion, Slack and what the customer was told. A
+result already recorded here is cited by module id and date, and re-run only
+when the platform changed since. 2026-11-23: edge-private-flow H4 re-measured
+S22a (spoofed `cf-connecting-ip` -> 403) and its research re-found iap-lockdown
+L11/L12 because this step was skipped.
+
 ## Layout
 
 - One experiment = one directory under `experiments/<name>/` = one OpenTofu
