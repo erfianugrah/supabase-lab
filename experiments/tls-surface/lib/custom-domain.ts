@@ -16,7 +16,8 @@ import type { Ctx } from "../../../harness/src/types";
 import { addons, applyAddon, removeAddon, sleep } from "../../medium-serverless/lib/setup";
 import { curl, publicA } from "./tls";
 
-const DNS_TOOL = process.env.PVLAB_DNS_TOOL ?? ""; // DNS update tool path; no default (operator-local)
+/** The DNS update tool (path in PVLAB_DNS_TOOL; `add <name> <type> <value>` and `rm <name> <type>`). No default: the lab zone's tool is operator-local. */
+const DNS_TOOL = process.env.PVLAB_DNS_TOOL ?? "";
 
 /** Checked before anything billable happens: without it the add-on is applied and verification waits out its budget. */
 export const hasDnsTool = () => DNS_TOOL !== "" && existsSync(DNS_TOOL);

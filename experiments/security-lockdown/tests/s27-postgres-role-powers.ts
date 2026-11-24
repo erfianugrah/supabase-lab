@@ -1,5 +1,5 @@
 /**
- * S27 - what the project's `postgres` role can do with roles it creates
+ * S27 - what the project's `postgres` role can do with roles it creates.
  * Role-management steps with no run behind them: a
  * restore role with CREATEDB, an analytics login with BYPASSRLS and
  * pg_read_all_data, changing a cron job's user.

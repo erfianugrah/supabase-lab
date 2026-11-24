@@ -200,7 +200,6 @@ kinds alongside it.
 ### Task C2: Tooltips
 
 Every number on that page is meaningless without its definition, and the audience is non-technical.
-audience is non-technical.
 
 - [ ] **Step 1:** Add a small `<Hint>` component - a `title` attribute plus a
       dotted underline. No tooltip library; a `title` is native, accessible and

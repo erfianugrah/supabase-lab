@@ -2223,7 +2223,6 @@ the 2026-10-13 stocktake and is not touched.
 > **STATUS (stocktake 2026-10-13):** Tasks 1-15 DONE 2026-08-25 per the
 > tracking ledger below. Task 16 (M5, M6) is blocked on entitlement
 > enablement and Task 17 (U1-U6) is track-only; both are carried by a board card. The checkboxes were never ticked; the ledger is the
-
 > record.
 ```
 

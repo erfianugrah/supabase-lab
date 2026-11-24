@@ -1,6 +1,5 @@
 /**
- * S26 - Auth and edge questions with no run behind them
-
+ * S26 - Auth and edge questions with no run behind them.
  *
  *   S26a  an unsigned token (alg "none") claiming role authenticated, sent to
  *         the Data API and to Auth's GET /user. Lab work so far forged or

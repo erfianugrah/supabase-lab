@@ -1494,8 +1494,7 @@ Expected: ` 9 pass`, ` 0 fail`, `exit 0`.
 
 ```ts
 /**
- * F07 - upgrade eligibility across every project in the lab organizations
-
+ * F07 - upgrade eligibility across every project in the lab organizations.
  *
  * F06 reads one project. The 2026-08-04 hand sweep across the account found
  * one project answering `eligible: null` with no version fields, and nothing

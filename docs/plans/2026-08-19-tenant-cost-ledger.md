@@ -8,7 +8,6 @@
 > the work Mac; the M03-M07 results this plan builds on were never written to
 > RUNLOG.
 
-
 > **For agentic workers:** REQUIRED SUB-SKILL: Use subagent-driven-development (recommended) or implement this plan task-by-task in-session. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build the tenant-cost attribution + invoice reconciliation service that turns Supabase usage into a per-project cost ledger, plus the Gatekeeper policy templates that gate its access.
